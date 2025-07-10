@@ -1,0 +1,33 @@
+{
+  "name": "moove-mobility-dapp",
+  "version": "1.0.0",
+  "description": "Based on a company using NFTs to handle its mobile-sharing business. A complete project implementing smart contracts to React front-end.\r The future of transports is here. Already.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JPier34/Moove-Mobility-dApp.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/JPier34/Moove-Mobility-dApp/issues"
+  },
+  "homepage": "https://github.com/JPier34/Moove-Mobility-dApp#readme",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^6.0.0",
+    "@nomicfoundation/hardhat-toolbox-viem": "^4.0.0",
+    "@nomicfoundation/hardhat-verify": "^2.0.14",
+    "chai": "^5.2.1",
+    "dotenv": "^17.2.0",
+    "hardhat": "^2.25.0",
+    "hardhat-gas-reporter": "^2.3.0"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.3.0"
+  }
+}
