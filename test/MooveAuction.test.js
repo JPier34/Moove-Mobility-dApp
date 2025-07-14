@@ -34,12 +34,12 @@ describe("MooveAuction", function () {
     // Deploy NFT contract first
     const MooveNFT = await ethers.getContractFactory("MooveNFT");
     const mooveNFT = await MooveNFT.deploy("MooveNFT", "MNFT", owner.address);
-    await mooveNFT.deployed();
+    await mooveNFT.waitForDeployment();
 
     // Deploy Auction contract
     const MooveAuction = await ethers.getContractFactory("MooveAuction");
     const mooveAuction = await MooveAuction.deploy(owner.address);
-    await mooveAuction.deployed();
+    await mooveAuction.waitForDeployment();
 
     // Setup roles
     const ADMIN_ROLE = await mooveNFT.ADMIN_ROLE();
@@ -58,7 +58,7 @@ describe("MooveAuction", function () {
           `Test Bike #${i + 1}`,
           `Test description ${i + 1}`,
           `https://ipfs.io/ipfs/QmHash${i + 1}`,
-          ethers.utils.parseEther("0.05"),
+          ethers.parseEther("0.05"),
           "Test Location"
         );
     }
@@ -66,7 +66,7 @@ describe("MooveAuction", function () {
     // Approve auction contract for all NFTs
     await mooveNFT
       .connect(seller)
-      .setApprovalForAll(mooveAuction.address, true);
+      .setApprovalForAll(await mooveAuction.getAddress(), true);
 
     return {
       mooveNFT,
@@ -100,16 +100,16 @@ describe("MooveAuction", function () {
         deployAuctionFixture
       );
 
-      const startPrice = ethers.utils.parseEther("1.0");
-      const reservePrice = ethers.utils.parseEther("1.5");
-      const buyNowPrice = ethers.utils.parseEther("3.0");
+      const startPrice = ethers.parseEther("1.0");
+      const reservePrice = ethers.parseEther("1.5");
+      const buyNowPrice = ethers.parseEther("3.0");
       const duration = 24 * 60 * 60; // 24 hours
-      const bidIncrement = ethers.utils.parseEther("0.1");
+      const bidIncrement = ethers.parseEther("0.1");
 
       await expect(
         mooveAuction.connect(seller).createAuction(
           0, // NFT ID
-          mooveNFT.address,
+          await mooveNFT.getAddress(),
           AuctionType.TRADITIONAL,
           startPrice,
           reservePrice,
@@ -140,17 +140,17 @@ describe("MooveAuction", function () {
         await loadFixture(deployAuctionFixture);
 
       // Create auction
-      const startPrice = ethers.utils.parseEther("1.0");
-      const reservePrice = ethers.utils.parseEther("1.5");
-      const buyNowPrice = ethers.utils.parseEther("3.0");
+      const startPrice = ethers.parseEther("1.0");
+      const reservePrice = ethers.parseEther("1.5");
+      const buyNowPrice = ethers.parseEther("3.0");
       const duration = 24 * 60 * 60;
-      const bidIncrement = ethers.utils.parseEther("0.1");
+      const bidIncrement = ethers.parseEther("0.1");
 
       await mooveAuction
         .connect(seller)
         .createAuction(
           0,
-          mooveNFT.address,
+          await mooveNFT.getAddress(),
           AuctionType.TRADITIONAL,
           startPrice,
           reservePrice,
@@ -160,7 +160,7 @@ describe("MooveAuction", function () {
         );
 
       // Place first bid
-      const firstBid = ethers.utils.parseEther("1.0");
+      const firstBid = ethers.parseEther("1.0");
       await expect(
         mooveAuction.connect(bidder1).placeBid(0, { value: firstBid })
       )
@@ -168,7 +168,7 @@ describe("MooveAuction", function () {
         .withArgs(0, bidder1.address, firstBid, await time.latest());
 
       // Place higher bid
-      const secondBid = ethers.utils.parseEther("1.2");
+      const secondBid = ethers.parseEther("1.2");
       await expect(
         mooveAuction.connect(bidder2).placeBid(0, { value: secondBid })
       ).to.emit(mooveAuction, "BidPlaced");
@@ -187,19 +187,19 @@ describe("MooveAuction", function () {
         .connect(seller)
         .createAuction(
           0,
-          mooveNFT.address,
+          await mooveNFT.getAddress(),
           AuctionType.TRADITIONAL,
-          ethers.utils.parseEther("1.0"),
-          ethers.utils.parseEther("1.5"),
-          ethers.utils.parseEther("3.0"),
+          ethers.parseEther("1.0"),
+          ethers.parseEther("1.5"),
+          ethers.parseEther("3.0"),
           24 * 60 * 60,
-          ethers.utils.parseEther("0.1")
+          ethers.parseEther("0.1")
         );
 
       await expect(
         mooveAuction
           .connect(bidder1)
-          .placeBid(0, { value: ethers.utils.parseEther("0.5") })
+          .placeBid(0, { value: ethers.parseEther("0.5") })
       ).to.be.revertedWith("MooveAuction__BidTooLow");
     });
 
@@ -208,18 +208,18 @@ describe("MooveAuction", function () {
         deployAuctionFixture
       );
 
-      const buyNowPrice = ethers.utils.parseEther("3.0");
+      const buyNowPrice = ethers.parseEther("3.0");
       await mooveAuction
         .connect(seller)
         .createAuction(
           0,
-          mooveNFT.address,
+          await mooveNFT.getAddress(),
           AuctionType.TRADITIONAL,
-          ethers.utils.parseEther("1.0"),
-          ethers.utils.parseEther("1.5"),
+          ethers.parseEther("1.0"),
+          ethers.parseEther("1.5"),
           buyNowPrice,
           24 * 60 * 60,
-          ethers.utils.parseEther("0.1")
+          ethers.parseEther("0.1")
         );
 
       await expect(
@@ -239,16 +239,16 @@ describe("MooveAuction", function () {
 
       await mooveAuction.connect(seller).createAuction(
         0,
-        mooveNFT.address,
+        await mooveNFT.getAddress(),
         AuctionType.TRADITIONAL,
-        ethers.utils.parseEther("1.0"),
-        ethers.utils.parseEther("1.5"),
-        ethers.utils.parseEther("3.0"),
+        ethers.parseEther("1.0"),
+        ethers.parseEther("1.5"),
+        ethers.parseEther("3.0"),
         1,
-        ethers.utils.parseEther("0.1") // 1 second duration
+        ethers.parseEther("0.1") // 1 second duration
       );
 
-      const bidAmount = ethers.utils.parseEther("2.0");
+      const bidAmount = ethers.parseEther("2.0");
       await mooveAuction.connect(bidder1).placeBid(0, { value: bidAmount });
 
       // Wait for auction to end
@@ -273,25 +273,25 @@ describe("MooveAuction", function () {
         .connect(seller)
         .createAuction(
           0,
-          mooveNFT.address,
+          await mooveNFT.getAddress(),
           AuctionType.ENGLISH,
-          ethers.utils.parseEther("1.0"),
-          ethers.utils.parseEther("1.5"),
-          ethers.utils.parseEther("3.0"),
+          ethers.parseEther("1.0"),
+          ethers.parseEther("1.5"),
+          ethers.parseEther("3.0"),
           duration,
-          ethers.utils.parseEther("0.1")
+          ethers.parseEther("0.1")
         );
 
       const auctionBefore = await mooveAuction.getAuction(0);
       const originalEndTime = auctionBefore.endTime;
 
       // Wait until near end
-      await time.increaseTo(originalEndTime.sub(5)); // 5 seconds before end
+      await time.increaseTo(Number(originalEndTime) - 5); // 5 seconds before end
 
       // Place bid (should extend auction)
       await mooveAuction
         .connect(bidder1)
-        .placeBid(0, { value: ethers.utils.parseEther("1.0") });
+        .placeBid(0, { value: ethers.parseEther("1.0") });
 
       const auctionAfter = await mooveAuction.getAuction(0);
       expect(auctionAfter.endTime).to.be.gt(originalEndTime);
@@ -307,13 +307,13 @@ describe("MooveAuction", function () {
         .connect(seller)
         .createAuction(
           0,
-          mooveNFT.address,
+          await mooveNFT.getAddress(),
           AuctionType.ENGLISH,
-          ethers.utils.parseEther("1.0"),
-          ethers.utils.parseEther("1.5"),
-          ethers.utils.parseEther("3.0"),
+          ethers.parseEther("1.0"),
+          ethers.parseEther("1.5"),
+          ethers.parseEther("3.0"),
           duration,
-          ethers.utils.parseEther("0.1")
+          ethers.parseEther("0.1")
         );
 
       const auctionBefore = await mooveAuction.getAuction(0);
@@ -322,7 +322,7 @@ describe("MooveAuction", function () {
       // Place bid early
       await mooveAuction
         .connect(bidder1)
-        .placeBid(0, { value: ethers.utils.parseEther("1.0") });
+        .placeBid(0, { value: ethers.parseEther("1.0") });
 
       const auctionAfter = await mooveAuction.getAuction(0);
       expect(auctionAfter.endTime).to.equal(originalEndTime);
@@ -335,21 +335,21 @@ describe("MooveAuction", function () {
         deployAuctionFixture
       );
 
-      const startPrice = ethers.utils.parseEther("2.0");
-      const reservePrice = ethers.utils.parseEther("1.0");
+      const startPrice = ethers.parseEther("2.0");
+      const reservePrice = ethers.parseEther("1.0");
       const duration = 3600; // 1 hour
 
       await mooveAuction
         .connect(seller)
         .createAuction(
           0,
-          mooveNFT.address,
+          await mooveNFT.getAddress(),
           AuctionType.DUTCH,
           startPrice,
           reservePrice,
-          ethers.utils.parseEther("3.0"),
+          ethers.parseEther("3.0"),
           duration,
-          ethers.utils.parseEther("0.1")
+          ethers.parseEther("0.1")
         );
 
       const initialPrice = await mooveAuction.getCurrentDutchPrice(0);
@@ -359,12 +359,12 @@ describe("MooveAuction", function () {
       await time.increase(duration / 2);
 
       const midPrice = await mooveAuction.getCurrentDutchPrice(0);
-      const expectedMidPrice = startPrice.add(reservePrice).div(2);
+      const expectedMidPrice = (startPrice + reservePrice) / 2n;
 
       // Allow small rounding differences
       expect(midPrice).to.be.closeTo(
         expectedMidPrice,
-        ethers.utils.parseEther("0.01")
+        ethers.parseEther("0.01")
       );
 
       // Wait full duration
@@ -379,21 +379,21 @@ describe("MooveAuction", function () {
         deployAuctionFixture
       );
 
-      const startPrice = ethers.utils.parseEther("2.0");
-      const reservePrice = ethers.utils.parseEther("1.0");
+      const startPrice = ethers.parseEther("2.0");
+      const reservePrice = ethers.parseEther("1.0");
       const duration = 3600;
 
       await mooveAuction
         .connect(seller)
         .createAuction(
           0,
-          mooveNFT.address,
+          await mooveNFT.getAddress(),
           AuctionType.DUTCH,
           startPrice,
           reservePrice,
-          ethers.utils.parseEther("3.0"),
+          ethers.parseEther("3.0"),
           duration,
-          ethers.utils.parseEther("0.1")
+          ethers.parseEther("0.1")
         );
 
       // Wait some time for price to decrease
@@ -418,16 +418,16 @@ describe("MooveAuction", function () {
         .connect(seller)
         .createAuction(
           0,
-          mooveNFT.address,
+          await mooveNFT.getAddress(),
           AuctionType.SEALED_BID,
-          ethers.utils.parseEther("1.0"),
-          ethers.utils.parseEther("1.5"),
-          ethers.utils.parseEther("3.0"),
+          ethers.parseEther("1.0"),
+          ethers.parseEther("1.5"),
+          ethers.parseEther("3.0"),
           duration,
-          ethers.utils.parseEther("0.1")
+          ethers.parseEther("0.1")
         );
 
-      const bidAmount = ethers.utils.parseEther("2.0");
+      const bidAmount = ethers.parseEther("2.0");
       const nonce = 12345;
       const bidHash = await mooveAuction.generateBidHash(
         bidAmount,
@@ -454,16 +454,16 @@ describe("MooveAuction", function () {
         .connect(seller)
         .createAuction(
           0,
-          mooveNFT.address,
+          await mooveNFT.getAddress(),
           AuctionType.SEALED_BID,
-          ethers.utils.parseEther("1.0"),
-          ethers.utils.parseEther("1.5"),
-          ethers.utils.parseEther("3.0"),
+          ethers.parseEther("1.0"),
+          ethers.parseEther("1.5"),
+          ethers.parseEther("3.0"),
           duration,
-          ethers.utils.parseEther("0.1")
+          ethers.parseEther("0.1")
         );
 
-      const bidAmount = ethers.utils.parseEther("2.0");
+      const bidAmount = ethers.parseEther("2.0");
       const nonce = 12345;
       const bidHash = await mooveAuction.generateBidHash(
         bidAmount,
@@ -478,7 +478,7 @@ describe("MooveAuction", function () {
 
       // Wait for reveal phase
       const auction = await mooveAuction.getAuction(0);
-      await time.increaseTo(auction.endTime.sub(24 * 60 * 60 - 1)); // Start of reveal phase
+      await time.increaseTo(Number(auction.endTime) - 24 * 60 * 60 + 1); // Start of reveal phase
 
       // Reveal bid
       await expect(
@@ -498,16 +498,16 @@ describe("MooveAuction", function () {
         .connect(seller)
         .createAuction(
           0,
-          mooveNFT.address,
+          await mooveNFT.getAddress(),
           AuctionType.SEALED_BID,
-          ethers.utils.parseEther("1.0"),
-          ethers.utils.parseEther("1.5"),
-          ethers.utils.parseEther("3.0"),
+          ethers.parseEther("1.0"),
+          ethers.parseEther("1.5"),
+          ethers.parseEther("3.0"),
           duration,
-          ethers.utils.parseEther("0.1")
+          ethers.parseEther("0.1")
         );
 
-      const bidAmount = ethers.utils.parseEther("2.0");
+      const bidAmount = ethers.parseEther("2.0");
       const nonce = 12345;
       const bidHash = await mooveAuction.generateBidHash(
         bidAmount,
@@ -521,13 +521,13 @@ describe("MooveAuction", function () {
 
       // Wait for reveal phase
       const auction = await mooveAuction.getAuction(0);
-      await time.increaseTo(auction.endTime.sub(24 * 60 * 60 - 1));
+      await time.increaseTo(Number(auction.endTime) - 24 * 60 * 60 + 1);
 
       // Try to reveal with wrong amount
       await expect(
         mooveAuction
           .connect(bidder1)
-          .revealSealedBid(0, ethers.utils.parseEther("1.5"), nonce)
+          .revealSealedBid(0, ethers.parseEther("1.5"), nonce)
       ).to.be.revertedWith("MooveAuction__InvalidReveal");
 
       // Try to reveal with wrong nonce
@@ -546,16 +546,16 @@ describe("MooveAuction", function () {
         .connect(seller)
         .createAuction(
           0,
-          mooveNFT.address,
+          await mooveNFT.getAddress(),
           AuctionType.TRADITIONAL,
-          ethers.utils.parseEther("1.0"),
-          ethers.utils.parseEther("1.5"),
-          ethers.utils.parseEther("3.0"),
+          ethers.parseEther("1.0"),
+          ethers.parseEther("1.5"),
+          ethers.parseEther("3.0"),
           1,
-          ethers.utils.parseEther("0.1")
+          ethers.parseEther("0.1")
         );
 
-      const bidAmount = ethers.utils.parseEther("2.0");
+      const bidAmount = ethers.parseEther("2.0");
       await mooveAuction.connect(bidder1).placeBid(0, { value: bidAmount });
 
       await time.increase(2);
@@ -580,16 +580,16 @@ describe("MooveAuction", function () {
       const ownerBalanceAfter = await ethers.provider.getBalance(owner.address);
 
       // Calculate expected amounts
-      const platformFee = bidAmount.mul(250).div(10000); // 2.5%
-      const expectedSellerAmount = bidAmount.sub(platformFee);
+      const platformFee = (bidAmount * 250n) / 10000n; // 2.5%
+      const expectedSellerAmount = bidAmount - platformFee;
 
-      expect(sellerBalanceAfter.sub(sellerBalanceBefore)).to.be.closeTo(
+      expect(sellerBalanceAfter - sellerBalanceBefore).to.be.closeTo(
         expectedSellerAmount,
-        ethers.utils.parseEther("0.01")
+        ethers.parseEther("0.01")
       );
-      expect(ownerBalanceAfter.sub(ownerBalanceBefore)).to.be.closeTo(
+      expect(ownerBalanceAfter - ownerBalanceBefore).to.be.closeTo(
         platformFee,
-        ethers.utils.parseEther("0.01")
+        ethers.parseEther("0.01")
       );
     });
 
@@ -601,22 +601,22 @@ describe("MooveAuction", function () {
         .connect(seller)
         .createAuction(
           0,
-          mooveNFT.address,
+          await mooveNFT.getAddress(),
           AuctionType.TRADITIONAL,
-          ethers.utils.parseEther("1.0"),
-          ethers.utils.parseEther("1.5"),
-          ethers.utils.parseEther("3.0"),
+          ethers.parseEther("1.0"),
+          ethers.parseEther("1.5"),
+          ethers.parseEther("3.0"),
           1,
-          ethers.utils.parseEther("0.1")
+          ethers.parseEther("0.1")
         );
 
       // Place multiple bids
       await mooveAuction
         .connect(bidder1)
-        .placeBid(0, { value: ethers.utils.parseEther("1.0") });
+        .placeBid(0, { value: ethers.parseEther("1.0") });
       await mooveAuction
         .connect(bidder2)
-        .placeBid(0, { value: ethers.utils.parseEther("2.0") });
+        .placeBid(0, { value: ethers.parseEther("2.0") });
 
       await time.increase(2);
       await mooveAuction.endAuction(0);
@@ -628,14 +628,14 @@ describe("MooveAuction", function () {
       // Losing bidder should get refund
       await expect(mooveAuction.connect(bidder1).claimRefund(0))
         .to.emit(mooveAuction, "BidRefunded")
-        .withArgs(0, bidder1.address, ethers.utils.parseEther("1.0"));
+        .withArgs(0, bidder1.address, ethers.parseEther("1.0"));
 
       const bidder1BalanceAfter = await ethers.provider.getBalance(
         bidder1.address
       );
-      expect(bidder1BalanceAfter.sub(bidder1BalanceBefore)).to.be.closeTo(
-        ethers.utils.parseEther("1.0"),
-        ethers.utils.parseEther("0.01")
+      expect(bidder1BalanceAfter - bidder1BalanceBefore).to.be.closeTo(
+        ethers.parseEther("1.0"),
+        ethers.parseEther("0.01")
       );
     });
 
@@ -646,19 +646,19 @@ describe("MooveAuction", function () {
 
       await mooveAuction.connect(seller).createAuction(
         0,
-        mooveNFT.address,
+        await mooveNFT.getAddress(),
         AuctionType.TRADITIONAL,
-        ethers.utils.parseEther("1.0"),
-        ethers.utils.parseEther("2.0"), // High reserve
-        ethers.utils.parseEther("3.0"),
+        ethers.parseEther("1.0"),
+        ethers.parseEther("2.0"), // High reserve
+        ethers.parseEther("3.0"),
         1,
-        ethers.utils.parseEther("0.1")
+        ethers.parseEther("0.1")
       );
 
       // Bid below reserve
       await mooveAuction
         .connect(bidder1)
-        .placeBid(0, { value: ethers.utils.parseEther("1.5") });
+        .placeBid(0, { value: ethers.parseEther("1.5") });
 
       await time.increase(2);
       await mooveAuction.endAuction(0);
@@ -683,13 +683,13 @@ describe("MooveAuction", function () {
         .connect(seller)
         .createAuction(
           0,
-          mooveNFT.address,
+          await mooveNFT.getAddress(),
           AuctionType.TRADITIONAL,
-          ethers.utils.parseEther("1.0"),
-          ethers.utils.parseEther("1.5"),
-          ethers.utils.parseEther("3.0"),
+          ethers.parseEther("1.0"),
+          ethers.parseEther("1.5"),
+          ethers.parseEther("3.0"),
           3600,
-          ethers.utils.parseEther("0.1")
+          ethers.parseEther("0.1")
         );
 
       await expect(mooveAuction.connect(admin).cancelAuction(0))
@@ -729,13 +729,13 @@ describe("MooveAuction", function () {
       for (let i = 0; i < 3; i++) {
         await mooveAuction.connect(seller).createAuction(
           i,
-          mooveNFT.address,
+          await mooveNFT.getAddress(),
           i, // Different auction types
-          ethers.utils.parseEther("1.0"),
-          ethers.utils.parseEther("1.5"),
-          ethers.utils.parseEther("3.0"),
+          ethers.parseEther("1.0"),
+          ethers.parseEther("1.5"),
+          ethers.parseEther("3.0"),
           3600,
-          ethers.utils.parseEther("0.1")
+          ethers.parseEther("0.1")
         );
       }
     });
@@ -751,13 +751,13 @@ describe("MooveAuction", function () {
           .connect(seller)
           .createAuction(
             i,
-            mooveNFT.address,
+            await mooveNFT.getAddress(),
             i,
-            ethers.utils.parseEther("1.0"),
-            ethers.utils.parseEther("1.5"),
-            ethers.utils.parseEther("3.0"),
+            ethers.parseEther("1.0"),
+            ethers.parseEther("1.5"),
+            ethers.parseEther("3.0"),
             3600,
-            ethers.utils.parseEther("0.1")
+            ethers.parseEther("0.1")
           );
       }
 
@@ -778,13 +778,13 @@ describe("MooveAuction", function () {
           .connect(seller)
           .createAuction(
             i,
-            mooveNFT.address,
+            await mooveNFT.getAddress(),
             i,
-            ethers.utils.parseEther("1.0"),
-            ethers.utils.parseEther("1.5"),
-            ethers.utils.parseEther("3.0"),
+            ethers.parseEther("1.0"),
+            ethers.parseEther("1.5"),
+            ethers.parseEther("3.0"),
             3600,
-            ethers.utils.parseEther("0.1")
+            ethers.parseEther("0.1")
           );
       }
 
@@ -803,20 +803,20 @@ describe("MooveAuction", function () {
         .connect(seller)
         .createAuction(
           0,
-          mooveNFT.address,
+          await mooveNFT.getAddress(),
           AuctionType.TRADITIONAL,
-          ethers.utils.parseEther("1.0"),
-          ethers.utils.parseEther("1.5"),
-          ethers.utils.parseEther("3.0"),
+          ethers.parseEther("1.0"),
+          ethers.parseEther("1.5"),
+          ethers.parseEther("3.0"),
           3600,
-          ethers.utils.parseEther("0.1")
+          ethers.parseEther("0.1")
         );
 
       expect(await mooveAuction.hasUserBid(0, bidder1.address)).to.be.false;
 
       await mooveAuction
         .connect(bidder1)
-        .placeBid(0, { value: ethers.utils.parseEther("1.0") });
+        .placeBid(0, { value: ethers.parseEther("1.0") });
 
       expect(await mooveAuction.hasUserBid(0, bidder1.address)).to.be.true;
     });
@@ -829,21 +829,21 @@ describe("MooveAuction", function () {
         .connect(seller)
         .createAuction(
           0,
-          mooveNFT.address,
+          await mooveNFT.getAddress(),
           AuctionType.TRADITIONAL,
-          ethers.utils.parseEther("1.0"),
-          ethers.utils.parseEther("1.5"),
-          ethers.utils.parseEther("3.0"),
+          ethers.parseEther("1.0"),
+          ethers.parseEther("1.5"),
+          ethers.parseEther("3.0"),
           3600,
-          ethers.utils.parseEther("0.1")
+          ethers.parseEther("0.1")
         );
 
       await mooveAuction
         .connect(bidder1)
-        .placeBid(0, { value: ethers.utils.parseEther("1.0") });
+        .placeBid(0, { value: ethers.parseEther("1.0") });
       await mooveAuction
         .connect(bidder2)
-        .placeBid(0, { value: ethers.utils.parseEther("1.2") });
+        .placeBid(0, { value: ethers.parseEther("1.2") });
 
       const bids = await mooveAuction.getAuctionBids(0);
       expect(bids.length).to.equal(2);
@@ -862,19 +862,19 @@ describe("MooveAuction", function () {
         .connect(seller)
         .createAuction(
           0,
-          mooveNFT.address,
+          await mooveNFT.getAddress(),
           AuctionType.TRADITIONAL,
-          ethers.utils.parseEther("1.0"),
-          ethers.utils.parseEther("1.5"),
-          ethers.utils.parseEther("3.0"),
+          ethers.parseEther("1.0"),
+          ethers.parseEther("1.5"),
+          ethers.parseEther("3.0"),
           3600,
-          ethers.utils.parseEther("0.1")
+          ethers.parseEther("0.1")
         );
 
       await expect(
         mooveAuction
           .connect(seller)
-          .placeBid(0, { value: ethers.utils.parseEther("1.0") })
+          .placeBid(0, { value: ethers.parseEther("1.0") })
       ).to.be.revertedWith("Seller cannot bid");
     });
 
@@ -887,18 +887,18 @@ describe("MooveAuction", function () {
         .connect(seller)
         .createAuction(
           0,
-          mooveNFT.address,
+          await mooveNFT.getAddress(),
           AuctionType.TRADITIONAL,
-          ethers.utils.parseEther("1.0"),
-          ethers.utils.parseEther("1.5"),
-          ethers.utils.parseEther("3.0"),
+          ethers.parseEther("1.0"),
+          ethers.parseEther("1.5"),
+          ethers.parseEther("3.0"),
           1,
-          ethers.utils.parseEther("0.1")
+          ethers.parseEther("0.1")
         );
 
       await mooveAuction
         .connect(bidder1)
-        .placeBid(0, { value: ethers.utils.parseEther("2.0") });
+        .placeBid(0, { value: ethers.parseEther("2.0") });
 
       await time.increase(2);
       await mooveAuction.endAuction(0);
@@ -921,13 +921,13 @@ describe("MooveAuction", function () {
       await expect(
         mooveAuction.connect(seller).createAuction(
           0,
-          mooveNFT.address,
+          await mooveNFT.getAddress(),
           AuctionType.TRADITIONAL,
-          ethers.utils.parseEther("1.0"),
-          ethers.utils.parseEther("1.5"),
-          ethers.utils.parseEther("3.0"),
+          ethers.parseEther("1.0"),
+          ethers.parseEther("1.5"),
+          ethers.parseEther("3.0"),
           30, // 30 seconds (too short)
-          ethers.utils.parseEther("0.1")
+          ethers.parseEther("0.1")
         )
       ).to.be.revertedWith("MooveAuction__InvalidDuration");
 
@@ -935,13 +935,13 @@ describe("MooveAuction", function () {
       await expect(
         mooveAuction.connect(seller).createAuction(
           0,
-          mooveNFT.address,
+          await mooveNFT.getAddress(),
           AuctionType.TRADITIONAL,
-          ethers.utils.parseEther("1.0"),
-          ethers.utils.parseEther("1.5"),
-          ethers.utils.parseEther("3.0"),
+          ethers.parseEther("1.0"),
+          ethers.parseEther("1.5"),
+          ethers.parseEther("3.0"),
           31 * 24 * 60 * 60, // 31 days (too long)
-          ethers.utils.parseEther("0.1")
+          ethers.parseEther("0.1")
         )
       ).to.be.revertedWith("MooveAuction__InvalidDuration");
     });
@@ -955,13 +955,13 @@ describe("MooveAuction", function () {
         mooveAuction.connect(bidder1).createAuction(
           // bidder1 doesn't own NFT
           0,
-          mooveNFT.address,
+          await mooveNFT.getAddress(),
           AuctionType.TRADITIONAL,
-          ethers.utils.parseEther("1.0"),
-          ethers.utils.parseEther("1.5"),
-          ethers.utils.parseEther("3.0"),
+          ethers.parseEther("1.0"),
+          ethers.parseEther("1.5"),
+          ethers.parseEther("3.0"),
           3600,
-          ethers.utils.parseEther("0.1")
+          ethers.parseEther("0.1")
         )
       ).to.be.revertedWith("Not NFT owner");
     });
@@ -974,13 +974,13 @@ describe("MooveAuction", function () {
         .connect(seller)
         .createAuction(
           0,
-          mooveNFT.address,
+          await mooveNFT.getAddress(),
           AuctionType.TRADITIONAL,
-          ethers.utils.parseEther("1.0"),
-          ethers.utils.parseEther("1.5"),
-          ethers.utils.parseEther("3.0"),
+          ethers.parseEther("1.0"),
+          ethers.parseEther("1.5"),
+          ethers.parseEther("3.0"),
           3600,
-          ethers.utils.parseEther("0.1")
+          ethers.parseEther("0.1")
         );
 
       // Pause contract
@@ -990,7 +990,7 @@ describe("MooveAuction", function () {
       await expect(
         mooveAuction
           .connect(bidder1)
-          .placeBid(0, { value: ethers.utils.parseEther("1.0") })
+          .placeBid(0, { value: ethers.parseEther("1.0") })
       ).to.be.revertedWith("Pausable: paused");
 
       // Unpause
@@ -1000,7 +1000,7 @@ describe("MooveAuction", function () {
       await expect(
         mooveAuction
           .connect(bidder1)
-          .placeBid(0, { value: ethers.utils.parseEther("1.0") })
+          .placeBid(0, { value: ethers.parseEther("1.0") })
       ).to.not.be.reverted;
     });
   });
@@ -1019,24 +1019,23 @@ describe("MooveAuction", function () {
           .connect(seller)
           .createAuction(
             i,
-            mooveNFT.address,
+            await mooveNFT.getAddress(),
             AuctionType.TRADITIONAL,
-            ethers.utils.parseEther("1.0"),
-            ethers.utils.parseEther("1.5"),
-            ethers.utils.parseEther("3.0"),
+            ethers.parseEther("1.0"),
+            ethers.parseEther("1.5"),
+            ethers.parseEther("3.0"),
             3600,
-            ethers.utils.parseEther("0.1")
+            ethers.parseEther("0.1")
           );
         const receipt = await tx.wait();
         gasUsed.push(receipt.gasUsed);
       }
 
       // Gas usage should be relatively consistent
-      const avgGas = gasUsed
-        .reduce((a, b) => a.add(b), ethers.BigNumber.from(0))
-        .div(gasUsed.length);
+      const avgGas =
+        gasUsed.reduce((a, b) => a + b, 0n) / BigInt(gasUsed.length);
       gasUsed.forEach((gas) => {
-        expect(gas).to.be.closeTo(avgGas, avgGas.div(10)); // Within 10% of average
+        expect(gas).to.be.closeTo(avgGas, avgGas / 10n); // Within 10% of average
       });
     });
   });
@@ -1054,21 +1053,23 @@ describe("MooveAuction", function () {
         .connect(seller)
         .createAuction(
           0,
-          mooveNFT.address,
+          await mooveNFT.getAddress(),
           AuctionType.TRADITIONAL,
-          ethers.utils.parseEther("1.0"),
-          ethers.utils.parseEther("1.5"),
-          ethers.utils.parseEther("3.0"),
+          ethers.parseEther("1.0"),
+          ethers.parseEther("1.5"),
+          ethers.parseEther("3.0"),
           1,
-          ethers.utils.parseEther("0.1")
+          ethers.parseEther("0.1")
         );
 
       // NFT should be with auction contract
-      expect(await mooveNFT.ownerOf(0)).to.equal(mooveAuction.address);
+      expect(await mooveNFT.ownerOf(0)).to.equal(
+        await mooveAuction.getAddress()
+      );
 
       await mooveAuction
         .connect(bidder1)
-        .placeBid(0, { value: ethers.utils.parseEther("2.0") });
+        .placeBid(0, { value: ethers.parseEther("2.0") });
 
       await time.increase(2);
       await mooveAuction.endAuction(0);

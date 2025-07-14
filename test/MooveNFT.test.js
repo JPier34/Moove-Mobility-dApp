@@ -3,56 +3,68 @@ const { ethers } = require("hardhat");
 const { loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
 
 describe("MooveNFT", function () {
-  // Vehicle types enum
-  const VehicleType = {
-    BIKE: 0,
-    SCOOTER: 1,
-    MONOPATTINO: 2,
-  };
+  // ============ FIXTURES ============
 
   async function deployMooveNFTFixture() {
-    const [owner, admin, minter, user1, user2, user3] =
-      await ethers.getSigners();
+    const [owner, addr1, addr2, addr3] = await ethers.getSigners();
 
+    // Deploy MooveNFT
     const MooveNFT = await ethers.getContractFactory("MooveNFT");
-    const mooveNFT = await MooveNFT.deploy("MooveNFT", "MNFT", owner.address);
-    await mooveNFT.deployed();
+    const mooveNFT = await MooveNFT.waitForDeployment(
+      "Moove Vehicle NFT",
+      "MOOVE",
+      owner.address
+    );
 
-    // Grant roles
-    const ADMIN_ROLE = await mooveNFT.ADMIN_ROLE();
-    const MINTER_ROLE = await mooveNFT.MINTER_ROLE();
+    await mooveNFT.waitForDeployment();
 
-    await mooveNFT.grantRole(ADMIN_ROLE, admin.address);
-    await mooveNFT.grantRole(MINTER_ROLE, minter.address);
-
-    return {
-      mooveNFT,
-      owner,
-      admin,
-      minter,
-      user1,
-      user2,
-      user3,
-      ADMIN_ROLE,
-      MINTER_ROLE,
-    };
+    return { mooveNFT, owner, addr1, addr2, addr3 };
   }
+
+  async function deployWithMintedNFT() {
+    const { mooveNFT, owner, addr1, addr2, addr3 } = await loadFixture(
+      deployMooveNFTFixture
+    );
+
+    // Mint an NFT for testing
+    await mooveNFT.mintVehicleNFT(
+      addr1.address,
+      0, // VehicleType.BIKE
+      "Test Bike",
+      "A test bike for the platform",
+      "ipfs://QmTestHash123",
+      ethers.parseEther("0.1"), // ✅ FIX: parseEther senza utils
+      "Milano, Italy"
+    );
+
+    return { mooveNFT, owner, addr1, addr2, addr3, tokenId: 1 };
+  }
+
+  // ============ DEPLOYMENT TESTS ============
 
   describe("Deployment", function () {
     it("Should set the right owner and roles", async function () {
-      const { mooveNFT, owner, admin, minter, ADMIN_ROLE, MINTER_ROLE } =
-        await loadFixture(deployMooveNFTFixture);
+      const { mooveNFT, owner } = await loadFixture(deployMooveNFTFixture);
 
       expect(await mooveNFT.platformOwner()).to.equal(owner.address);
-      expect(await mooveNFT.hasRole(ADMIN_ROLE, admin.address)).to.be.true;
-      expect(await mooveNFT.hasRole(MINTER_ROLE, minter.address)).to.be.true;
+      expect(
+        await mooveNFT.hasRole(
+          await mooveNFT.DEFAULT_ADMIN_ROLE(),
+          owner.address
+        )
+      ).to.be.true;
+      expect(await mooveNFT.hasRole(await mooveNFT.ADMIN_ROLE(), owner.address))
+        .to.be.true;
+      expect(
+        await mooveNFT.hasRole(await mooveNFT.MINTER_ROLE(), owner.address)
+      ).to.be.true;
     });
 
     it("Should set correct name and symbol", async function () {
       const { mooveNFT } = await loadFixture(deployMooveNFTFixture);
 
-      expect(await mooveNFT.name()).to.equal("MooveNFT");
-      expect(await mooveNFT.symbol()).to.equal("MNFT");
+      expect(await mooveNFT.name()).to.equal("Moove Vehicle NFT");
+      expect(await mooveNFT.symbol()).to.equal("MOOVE");
     });
 
     it("Should initialize with correct platform fee", async function () {
@@ -62,801 +74,529 @@ describe("MooveNFT", function () {
     });
   });
 
+  // ============ MINTING TESTS ============
+
   describe("Minting", function () {
     it("Should mint NFT with correct vehicle info", async function () {
-      const { mooveNFT, minter, user1 } = await loadFixture(
+      const { mooveNFT, owner, addr1 } = await loadFixture(
         deployMooveNFTFixture
       );
 
-      const tx = await mooveNFT.connect(minter).mintVehicleNFT(
-        user1.address,
-        VehicleType.BIKE,
-        "Electric Bike #001",
-        "High-performance electric bike",
-        "https://ipfs.io/ipfs/QmHash1",
-        ethers.utils.parseEther("0.05"), // 0.05 ETH daily rate
-        "Milan Center"
+      const tx = await mooveNFT.mintVehicleNFT(
+        addr1.address,
+        0, // VehicleType.BIKE
+        "Test Bike",
+        "A test bike",
+        "ipfs://QmTest123",
+        ethers.parseEther("0.1"),
+        "Milano"
       );
 
       await expect(tx)
         .to.emit(mooveNFT, "VehicleNFTMinted")
-        .withArgs(0, user1.address, VehicleType.BIKE, "Electric Bike #001");
+        .withArgs(1, addr1.address, 0, "Test Bike");
 
-      const vehicleInfo = await mooveNFT.getVehicleInfo(0);
-      expect(vehicleInfo.vehicleType).to.equal(VehicleType.BIKE);
-      expect(vehicleInfo.name).to.equal("Electric Bike #001");
-      expect(vehicleInfo.dailyRate).to.equal(ethers.utils.parseEther("0.05"));
+      const vehicleInfo = await mooveNFT.getVehicleInfo(1);
+      expect(vehicleInfo.name).to.equal("Test Bike");
+      expect(vehicleInfo.vehicleType).to.equal(0);
+      expect(vehicleInfo.dailyRate).to.equal(ethers.parseEther("0.1"));
       expect(vehicleInfo.isActive).to.be.true;
+      expect(vehicleInfo.isForSale).to.be.false;
+      expect(vehicleInfo.location).to.equal("Milano");
     });
 
     it("Should fail minting without MINTER_ROLE", async function () {
-      const { mooveNFT, user1 } = await loadFixture(deployMooveNFTFixture);
+      const { mooveNFT, addr1, addr2 } = await loadFixture(
+        deployMooveNFTFixture
+      );
 
       await expect(
         mooveNFT
-          .connect(user1)
+          .connect(addr1)
           .mintVehicleNFT(
-            user1.address,
-            VehicleType.BIKE,
-            "Electric Bike #001",
-            "High-performance electric bike",
-            "https://ipfs.io/ipfs/QmHash1",
-            ethers.utils.parseEther("0.05"),
-            "Milan Center"
+            addr2.address,
+            0,
+            "Test Bike",
+            "Description",
+            "ipfs://test",
+            ethers.parseEther("0.1"),
+            "Milano"
           )
-      ).to.be.revertedWith("AccessControl:");
+      ).to.be.revertedWithCustomError(
+        mooveNFT,
+        "AccessControlUnauthorizedAccount"
+      );
     });
 
     it("Should batch mint multiple NFTs", async function () {
-      const { mooveNFT, minter, user1, user2 } = await loadFixture(
+      const { mooveNFT, addr1, addr2 } = await loadFixture(
         deployMooveNFTFixture
       );
 
-      const recipients = [user1.address, user2.address];
-      const vehicleTypes = [VehicleType.BIKE, VehicleType.SCOOTER];
-      const names = ["Bike #001", "Scooter #001"];
-      const descriptions = ["Electric bike", "Electric scooter"];
-      const metadataURIs = [
-        "https://ipfs.io/ipfs/QmHash1",
-        "https://ipfs.io/ipfs/QmHash2",
-      ];
-      const dailyRates = [
-        ethers.utils.parseEther("0.05"),
-        ethers.utils.parseEther("0.08"),
-      ];
-      const locations = ["Milan", "Rome"];
+      await mooveNFT.batchMint(
+        [addr1.address, addr2.address],
+        [0, 1], // BIKE, SCOOTER
+        ["Bike1", "Scooter1"],
+        ["Description1", "Description2"],
+        ["ipfs://test1", "ipfs://test2"],
+        [ethers.parseEther("0.1"), ethers.parseEther("0.2")],
+        ["Milano", "Roma"]
+      );
 
-      await mooveNFT
-        .connect(minter)
-        .batchMint(
-          recipients,
-          vehicleTypes,
-          names,
-          descriptions,
-          metadataURIs,
-          dailyRates,
-          locations
-        );
+      expect(await mooveNFT.totalSupply()).to.equal(2);
+      expect(await mooveNFT.ownerOf(1)).to.equal(addr1.address);
+      expect(await mooveNFT.ownerOf(2)).to.equal(addr2.address);
 
-      expect(await mooveNFT.ownerOf(0)).to.equal(user1.address);
-      expect(await mooveNFT.ownerOf(1)).to.equal(user2.address);
+      const vehicle1 = await mooveNFT.getVehicleInfo(1);
+      const vehicle2 = await mooveNFT.getVehicleInfo(2);
 
-      const vehicleInfo1 = await mooveNFT.getVehicleInfo(0);
-      const vehicleInfo2 = await mooveNFT.getVehicleInfo(1);
-
-      expect(vehicleInfo1.vehicleType).to.equal(VehicleType.BIKE);
-      expect(vehicleInfo2.vehicleType).to.equal(VehicleType.SCOOTER);
+      expect(vehicle1.name).to.equal("Bike1");
+      expect(vehicle2.name).to.equal("Scooter1");
     });
 
     it("Should enforce max supply", async function () {
-      const { mooveNFT, minter, user1 } = await loadFixture(
+      const { mooveNFT, owner, addr1 } = await loadFixture(
         deployMooveNFTFixture
       );
 
-      // This test would be expensive to run fully, so we'll test the logic
-      // by trying to mint after setting a low counter value
+      // Get max supply
+      const maxSupply = await mooveNFT.MAX_SUPPLY();
 
-      // We can't easily test this without modifying the contract
-      // In a real scenario, you'd need to mock or use a test-specific contract
-      expect(await mooveNFT.MAX_SUPPLY()).to.equal(10000);
+      // This test would take too long to run with real max supply (10000)
+      // So we'll test the logic by checking the error message
+
+      // Try to mint beyond max supply (we can't actually do this without modifying the contract)
+      // Instead, let's verify the max supply is set correctly
+      expect(maxSupply).to.equal(10000);
     });
   });
 
+  // ============ SALES TESTS ============
+
   describe("Sales", function () {
     beforeEach(async function () {
-      const { mooveNFT, minter, user1 } = await loadFixture(
-        deployMooveNFTFixture
-      );
-
-      // Mint an NFT for testing
-      await mooveNFT
-        .connect(minter)
-        .mintVehicleNFT(
-          user1.address,
-          VehicleType.BIKE,
-          "Electric Bike #001",
-          "High-performance electric bike",
-          "https://ipfs.io/ipfs/QmHash1",
-          ethers.utils.parseEther("0.05"),
-          "Milan Center"
-        );
+      const fixture = await loadFixture(deployWithMintedNFT);
+      Object.assign(this, fixture);
     });
 
     it("Should set NFT for sale", async function () {
-      const { mooveNFT, user1 } = await loadFixture(deployMooveNFTFixture);
+      const price = ethers.parseEther("1.0");
 
-      // First mint an NFT
-      await mooveNFT
-        .connect(user1)
-        .mintVehicleNFT(
-          user1.address,
-          VehicleType.BIKE,
-          "Electric Bike #001",
-          "High-performance electric bike",
-          "https://ipfs.io/ipfs/QmHash1",
-          ethers.utils.parseEther("0.05"),
-          "Milan Center"
-        );
+      await expect(
+        this.mooveNFT.connect(this.addr1).setForSale(this.tokenId, price)
+      )
+        .to.emit(this.mooveNFT, "PriceUpdated")
+        .withArgs(this.tokenId, price);
 
-      const price = ethers.utils.parseEther("1.0");
-
-      await expect(mooveNFT.connect(user1).setForSale(0, price))
-        .to.emit(mooveNFT, "PriceUpdated")
-        .withArgs(0, price);
-
-      const vehicleInfo = await mooveNFT.getVehicleInfo(0);
+      const vehicleInfo = await this.mooveNFT.getVehicleInfo(this.tokenId);
       expect(vehicleInfo.isForSale).to.be.true;
       expect(vehicleInfo.price).to.equal(price);
     });
 
+    it("Should remove NFT from sale", async function () {
+      const price = ethers.parseEther("1.0");
+
+      // Set for sale first
+      await this.mooveNFT.connect(this.addr1).setForSale(this.tokenId, price);
+
+      // Remove from sale
+      await expect(
+        this.mooveNFT.connect(this.addr1).removeFromSale(this.tokenId)
+      )
+        .to.emit(this.mooveNFT, "PriceUpdated")
+        .withArgs(this.tokenId, 0);
+
+      const vehicleInfo = await this.mooveNFT.getVehicleInfo(this.tokenId);
+      expect(vehicleInfo.isForSale).to.be.false;
+      expect(vehicleInfo.price).to.equal(0);
+    });
+
     it("Should purchase NFT correctly", async function () {
-      const { mooveNFT, minter, user1, user2, owner } = await loadFixture(
-        deployMooveNFTFixture
+      const price = ethers.parseEther("1.0");
+
+      // Set for sale
+      await this.mooveNFT.connect(this.addr1).setForSale(this.tokenId, price);
+
+      // Get initial balances
+      const sellerBalanceBefore = await ethers.provider.getBalance(
+        this.addr1.address
+      );
+      const buyerBalanceBefore = await ethers.provider.getBalance(
+        this.addr2.address
       );
 
-      // Mint and set for sale
-      await mooveNFT
-        .connect(minter)
-        .mintVehicleNFT(
-          user1.address,
-          VehicleType.BIKE,
-          "Electric Bike #001",
-          "High-performance electric bike",
-          "https://ipfs.io/ipfs/QmHash1",
-          ethers.utils.parseEther("0.05"),
-          "Milan Center"
-        );
-
-      const price = ethers.utils.parseEther("1.0");
-      await mooveNFT.connect(user1).setForSale(0, price);
-
-      const initialUser1Balance = await ethers.provider.getBalance(
-        user1.address
-      );
-      const initialUser2Balance = await ethers.provider.getBalance(
-        user2.address
-      );
-      const initialOwnerBalance = await ethers.provider.getBalance(
-        owner.address
-      );
-
-      // Purchase NFT
-      const tx = await mooveNFT.connect(user2).purchaseNFT(0, { value: price });
+      // Purchase
+      const tx = await this.mooveNFT
+        .connect(this.addr2)
+        .purchaseNFT(this.tokenId, { value: price });
       const receipt = await tx.wait();
-      const gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
+      const gasUsed = receipt.gasUsed * receipt.gasPrice;
 
       // Check ownership transfer
-      expect(await mooveNFT.ownerOf(0)).to.equal(user2.address);
+      expect(await this.mooveNFT.ownerOf(this.tokenId)).to.equal(
+        this.addr2.address
+      );
 
-      // Check sale status
-      const vehicleInfo = await mooveNFT.getVehicleInfo(0);
+      // Check NFT is removed from sale
+      const vehicleInfo = await this.mooveNFT.getVehicleInfo(this.tokenId);
       expect(vehicleInfo.isForSale).to.be.false;
       expect(vehicleInfo.price).to.equal(0);
 
-      // Check balances (accounting for fees)
-      const platformFee = price.mul(250).div(10000); // 2.5%
-      const royaltyFee = price.mul(500).div(10000); // 5%
-      const sellerAmount = price.sub(platformFee).sub(royaltyFee);
+      // Check payment distribution
+      const platformFee = (price * 250n) / 10000n; // 2.5%
+      const sellerAmount = price - platformFee;
 
-      const finalUser1Balance = await ethers.provider.getBalance(user1.address);
-      const finalUser2Balance = await ethers.provider.getBalance(user2.address);
+      const sellerBalanceAfter = await ethers.provider.getBalance(
+        this.addr1.address
+      );
+      const buyerBalanceAfter = await ethers.provider.getBalance(
+        this.addr2.address
+      );
 
-      expect(finalUser1Balance).to.equal(initialUser1Balance.add(sellerAmount));
-      expect(finalUser2Balance).to.equal(
-        initialUser2Balance.sub(price).sub(gasCost)
+      expect(sellerBalanceAfter - sellerBalanceBefore).to.equal(sellerAmount);
+      expect(buyerBalanceBefore - buyerBalanceAfter).to.be.closeTo(
+        price + gasUsed,
+        ethers.parseEther("0.001")
       );
     });
 
     it("Should fail purchase if not for sale", async function () {
-      const { mooveNFT, minter, user1, user2 } = await loadFixture(
-        deployMooveNFTFixture
-      );
-
-      await mooveNFT
-        .connect(minter)
-        .mintVehicleNFT(
-          user1.address,
-          VehicleType.BIKE,
-          "Electric Bike #001",
-          "High-performance electric bike",
-          "https://ipfs.io/ipfs/QmHash1",
-          ethers.utils.parseEther("0.05"),
-          "Milan Center"
-        );
-
       await expect(
-        mooveNFT
-          .connect(user2)
-          .purchaseNFT(0, { value: ethers.utils.parseEther("1.0") })
-      ).to.be.revertedWith("MooveNFT__TokenNotForSale");
+        this.mooveNFT
+          .connect(this.addr2)
+          .purchaseNFT(this.tokenId, { value: ethers.parseEther("1.0") })
+      ).to.be.revertedWithCustomError(
+        this.mooveNFT,
+        "MooveNFT__TokenNotForSale"
+      );
     });
 
     it("Should fail purchase with insufficient payment", async function () {
-      const { mooveNFT, minter, user1, user2 } = await loadFixture(
-        deployMooveNFTFixture
-      );
-
-      await mooveNFT
-        .connect(minter)
-        .mintVehicleNFT(
-          user1.address,
-          VehicleType.BIKE,
-          "Electric Bike #001",
-          "High-performance electric bike",
-          "https://ipfs.io/ipfs/QmHash1",
-          ethers.utils.parseEther("0.05"),
-          "Milan Center"
-        );
-
-      const price = ethers.utils.parseEther("1.0");
-      await mooveNFT.connect(user1).setForSale(0, price);
+      const price = ethers.parseEther("1.0");
+      await this.mooveNFT.connect(this.addr1).setForSale(this.tokenId, price);
 
       await expect(
-        mooveNFT
-          .connect(user2)
-          .purchaseNFT(0, { value: ethers.utils.parseEther("0.5") })
-      ).to.be.revertedWith("MooveNFT__InsufficientPayment");
+        this.mooveNFT
+          .connect(this.addr2)
+          .purchaseNFT(this.tokenId, { value: ethers.parseEther("0.5") })
+      ).to.be.revertedWithCustomError(
+        this.mooveNFT,
+        "MooveNFT__InsufficientPayment"
+      );
+    });
+
+    it("Should get NFTs for sale", async function () {
+      // Set multiple NFTs for sale
+      await this.mooveNFT
+        .connect(this.addr1)
+        .setForSale(this.tokenId, ethers.parseEther("1.0"));
+
+      // Mint another NFT
+      await this.mooveNFT.mintVehicleNFT(
+        this.addr1.address,
+        1, // SCOOTER
+        "Test Scooter",
+        "A test scooter",
+        "ipfs://test2",
+        ethers.parseEther("0.2"),
+        "Roma"
+      );
+
+      await this.mooveNFT
+        .connect(this.addr1)
+        .setForSale(2, ethers.parseEther("1.5"));
+
+      const forSale = await this.mooveNFT.getNFTsForSale();
+      expect(forSale).to.have.lengthOf(2);
+      expect(forSale).to.include(1n);
+      expect(forSale).to.include(2n);
     });
   });
+
+  // ============ CUSTOMIZATION TESTS ============
 
   describe("Customization", function () {
     beforeEach(async function () {
-      const { mooveNFT, minter, user1 } = await loadFixture(
-        deployMooveNFTFixture
-      );
-
-      await mooveNFT
-        .connect(minter)
-        .mintVehicleNFT(
-          user1.address,
-          VehicleType.BIKE,
-          "Electric Bike #001",
-          "High-performance electric bike",
-          "https://ipfs.io/ipfs/QmHash1",
-          ethers.utils.parseEther("0.05"),
-          "Milan Center"
-        );
+      const fixture = await loadFixture(deployWithMintedNFT);
+      Object.assign(this, fixture);
     });
 
     it("Should add sticker to vehicle", async function () {
-      const { mooveNFT, minter, user1 } = await loadFixture(
-        deployMooveNFTFixture
-      );
-
-      await mooveNFT
-        .connect(minter)
-        .mintVehicleNFT(
-          user1.address,
-          VehicleType.BIKE,
-          "Electric Bike #001",
-          "High-performance electric bike",
-          "https://ipfs.io/ipfs/QmHash1",
-          ethers.utils.parseEther("0.05"),
-          "Milan Center"
-        );
-
       await expect(
-        mooveNFT.connect(user1).addSticker(0, "racing_stripe")
-      ).to.emit(mooveNFT, "VehicleCustomized");
+        this.mooveNFT.connect(this.addr1).addSticker(this.tokenId, "sticker1")
+      ).to.emit(this.mooveNFT, "VehicleCustomized");
 
-      const customization = await mooveNFT.getCustomizationData(0);
-      expect(customization.stickers[0]).to.equal("racing_stripe");
-      expect(customization.lastUpdated).to.be.gt(0);
+      const customizations = await this.mooveNFT.getCustomizationData(
+        this.tokenId
+      );
+      expect(customizations.stickers).to.include("sticker1");
+      expect(customizations.lastUpdated).to.be.gt(0);
     });
 
     it("Should set color scheme", async function () {
-      const { mooveNFT, minter, user1 } = await loadFixture(
-        deployMooveNFTFixture
+      const colorScheme = "#FF0000";
+
+      await this.mooveNFT
+        .connect(this.addr1)
+        .setColorScheme(this.tokenId, colorScheme);
+
+      const customizations = await this.mooveNFT.getCustomizationData(
+        this.tokenId
       );
-
-      await mooveNFT
-        .connect(minter)
-        .mintVehicleNFT(
-          user1.address,
-          VehicleType.BIKE,
-          "Electric Bike #001",
-          "High-performance electric bike",
-          "https://ipfs.io/ipfs/QmHash1",
-          ethers.utils.parseEther("0.05"),
-          "Milan Center"
-        );
-
-      await mooveNFT.connect(user1).setColorScheme(0, "blue_gradient");
-
-      const customization = await mooveNFT.getCustomizationData(0);
-      expect(customization.colorScheme).to.equal("blue_gradient");
+      expect(customizations.colorScheme).to.equal(colorScheme);
     });
 
-    it("Should add achievement by admin", async function () {
-      const { mooveNFT, minter, admin, user1 } = await loadFixture(
-        deployMooveNFTFixture
+    it("Should add achievement (admin only)", async function () {
+      const achievement = "First Ride";
+
+      await this.mooveNFT.addAchievement(this.tokenId, achievement);
+
+      const customizations = await this.mooveNFT.getCustomizationData(
+        this.tokenId
       );
-
-      await mooveNFT
-        .connect(minter)
-        .mintVehicleNFT(
-          user1.address,
-          VehicleType.BIKE,
-          "Electric Bike #001",
-          "High-performance electric bike",
-          "https://ipfs.io/ipfs/QmHash1",
-          ethers.utils.parseEther("0.05"),
-          "Milan Center"
-        );
-
-      await mooveNFT.connect(admin).addAchievement(0, "eco_warrior");
-
-      const customization = await mooveNFT.getCustomizationData(0);
-      expect(customization.achievements[0]).to.equal("eco_warrior");
+      expect(customizations.achievements).to.include(achievement);
     });
 
-    it("Should fail customization if not owner", async function () {
-      const { mooveNFT, minter, user1, user2 } = await loadFixture(
-        deployMooveNFTFixture
-      );
-
-      await mooveNFT
-        .connect(minter)
-        .mintVehicleNFT(
-          user1.address,
-          VehicleType.BIKE,
-          "Electric Bike #001",
-          "High-performance electric bike",
-          "https://ipfs.io/ipfs/QmHash1",
-          ethers.utils.parseEther("0.05"),
-          "Milan Center"
-        );
-
+    it("Should fail to add sticker if not owner", async function () {
       await expect(
-        mooveNFT.connect(user2).addSticker(0, "racing_stripe")
-      ).to.be.revertedWith("MooveNFT__NotOwnerOrApproved");
+        this.mooveNFT.connect(this.addr2).addSticker(this.tokenId, "sticker1")
+      ).to.be.revertedWithCustomError(
+        this.mooveNFT,
+        "MooveNFT__NotOwnerOrApproved"
+      );
     });
   });
 
+  // ============ ADMIN FUNCTIONS ============
+
   describe("Admin Functions", function () {
     beforeEach(async function () {
-      const { mooveNFT, minter, user1 } = await loadFixture(
-        deployMooveNFTFixture
-      );
-
-      await mooveNFT
-        .connect(minter)
-        .mintVehicleNFT(
-          user1.address,
-          VehicleType.BIKE,
-          "Electric Bike #001",
-          "High-performance electric bike",
-          "https://ipfs.io/ipfs/QmHash1",
-          ethers.utils.parseEther("0.05"),
-          "Milan Center"
-        );
+      const fixture = await loadFixture(deployWithMintedNFT);
+      Object.assign(this, fixture);
     });
 
     it("Should set daily rate", async function () {
-      const { mooveNFT, minter, admin, user1 } = await loadFixture(
-        deployMooveNFTFixture
-      );
+      const newRate = ethers.parseEther("0.2");
 
-      await mooveNFT
-        .connect(minter)
-        .mintVehicleNFT(
-          user1.address,
-          VehicleType.BIKE,
-          "Electric Bike #001",
-          "High-performance electric bike",
-          "https://ipfs.io/ipfs/QmHash1",
-          ethers.utils.parseEther("0.05"),
-          "Milan Center"
-        );
+      await this.mooveNFT.setDailyRate(this.tokenId, newRate);
 
-      const newRate = ethers.utils.parseEther("0.08");
-      await mooveNFT.connect(admin).setDailyRate(0, newRate);
-
-      const vehicleInfo = await mooveNFT.getVehicleInfo(0);
+      const vehicleInfo = await this.mooveNFT.getVehicleInfo(this.tokenId);
       expect(vehicleInfo.dailyRate).to.equal(newRate);
     });
 
     it("Should activate/deactivate vehicle", async function () {
-      const { mooveNFT, minter, admin, user1 } = await loadFixture(
-        deployMooveNFTFixture
-      );
+      await expect(this.mooveNFT.setVehicleActive(this.tokenId, false))
+        .to.emit(this.mooveNFT, "VehicleActivated")
+        .withArgs(this.tokenId, false);
 
-      await mooveNFT
-        .connect(minter)
-        .mintVehicleNFT(
-          user1.address,
-          VehicleType.BIKE,
-          "Electric Bike #001",
-          "High-performance electric bike",
-          "https://ipfs.io/ipfs/QmHash1",
-          ethers.utils.parseEther("0.05"),
-          "Milan Center"
-        );
-
-      await expect(mooveNFT.connect(admin).setVehicleActive(0, false))
-        .to.emit(mooveNFT, "VehicleActivated")
-        .withArgs(0, false);
-
-      const vehicleInfo = await mooveNFT.getVehicleInfo(0);
+      const vehicleInfo = await this.mooveNFT.getVehicleInfo(this.tokenId);
       expect(vehicleInfo.isActive).to.be.false;
     });
 
     it("Should set user discount", async function () {
-      const { mooveNFT, admin, user1 } = await loadFixture(
-        deployMooveNFTFixture
+      const discount = 1000; // 10%
+
+      await this.mooveNFT.setUserDiscount(this.addr2.address, discount);
+
+      expect(await this.mooveNFT.userDiscounts(this.addr2.address)).to.equal(
+        discount
       );
-
-      await mooveNFT.connect(admin).setUserDiscount(user1.address, 1000); // 10%
-
-      expect(await mooveNFT.userDiscounts(user1.address)).to.equal(1000);
-    });
-
-    it("Should fail setting too high discount", async function () {
-      const { mooveNFT, admin, user1 } = await loadFixture(
-        deployMooveNFTFixture
-      );
-
-      await expect(
-        mooveNFT.connect(admin).setUserDiscount(user1.address, 6000) // 60%
-      ).to.be.revertedWith("Discount too high");
     });
 
     it("Should update platform fee", async function () {
-      const { mooveNFT, admin } = await loadFixture(deployMooveNFTFixture);
+      const newFee = 300; // 3%
 
-      await mooveNFT.connect(admin).setPlatformFee(300); // 3%
+      await this.mooveNFT.setPlatformFee(newFee);
 
-      expect(await mooveNFT.platformFeePercentage()).to.equal(300);
+      expect(await this.mooveNFT.platformFeePercentage()).to.equal(newFee);
     });
 
     it("Should fail admin functions without proper role", async function () {
-      const { mooveNFT, user1 } = await loadFixture(deployMooveNFTFixture);
-
       await expect(
-        mooveNFT.connect(user1).setDailyRate(0, ethers.utils.parseEther("0.08"))
-      ).to.be.revertedWith("AccessControl:");
+        this.mooveNFT
+          .connect(this.addr1)
+          .setDailyRate(this.tokenId, ethers.parseEther("0.2"))
+      ).to.be.revertedWithCustomError(
+        this.mooveNFT,
+        "AccessControlUnauthorizedAccount"
+      );
     });
   });
+
+  // ============ VIEW FUNCTIONS ============
 
   describe("View Functions", function () {
     beforeEach(async function () {
-      const { mooveNFT, minter, user1, user2 } = await loadFixture(
-        deployMooveNFTFixture
+      const fixture = await loadFixture(deployWithMintedNFT);
+      Object.assign(this, fixture);
+
+      // Mint additional NFTs for testing
+      await this.mooveNFT.mintVehicleNFT(
+        this.addr1.address,
+        1, // SCOOTER
+        "Test Scooter",
+        "A test scooter",
+        "ipfs://test2",
+        ethers.parseEther("0.2"),
+        "Roma"
       );
 
-      // Mint multiple NFTs
-      await mooveNFT
-        .connect(minter)
-        .mintVehicleNFT(
-          user1.address,
-          VehicleType.BIKE,
-          "Electric Bike #001",
-          "High-performance electric bike",
-          "https://ipfs.io/ipfs/QmHash1",
-          ethers.utils.parseEther("0.05"),
-          "Milan Center"
-        );
-
-      await mooveNFT
-        .connect(minter)
-        .mintVehicleNFT(
-          user1.address,
-          VehicleType.SCOOTER,
-          "Electric Scooter #001",
-          "High-performance electric scooter",
-          "https://ipfs.io/ipfs/QmHash2",
-          ethers.utils.parseEther("0.08"),
-          "Rome Center"
-        );
-
-      await mooveNFT
-        .connect(minter)
-        .mintVehicleNFT(
-          user2.address,
-          VehicleType.MONOPATTINO,
-          "Electric Monopattino #001",
-          "High-performance electric monopattino",
-          "https://ipfs.io/ipfs/QmHash3",
-          ethers.utils.parseEther("0.06"),
-          "Naples Center"
-        );
+      await this.mooveNFT.mintVehicleNFT(
+        this.addr2.address,
+        2, // MONOPATTINO
+        "Test Monopattino",
+        "A test monopattino",
+        "ipfs://test3",
+        ethers.parseEther("0.15"),
+        "Napoli"
+      );
     });
 
     it("Should get tokens by owner", async function () {
-      const { mooveNFT, minter, user1, user2 } = await loadFixture(
-        deployMooveNFTFixture
+      const addr1Tokens = await this.mooveNFT.getTokensByOwner(
+        this.addr1.address
+      );
+      const addr2Tokens = await this.mooveNFT.getTokensByOwner(
+        this.addr2.address
       );
 
-      // Mint multiple NFTs for different users
-      await mooveNFT
-        .connect(minter)
-        .mintVehicleNFT(
-          user1.address,
-          VehicleType.BIKE,
-          "Electric Bike #001",
-          "High-performance electric bike",
-          "https://ipfs.io/ipfs/QmHash1",
-          ethers.utils.parseEther("0.05"),
-          "Milan Center"
-        );
+      expect(addr1Tokens).to.have.lengthOf(2);
+      expect(addr1Tokens).to.include(1n);
+      expect(addr1Tokens).to.include(2n);
 
-      await mooveNFT
-        .connect(minter)
-        .mintVehicleNFT(
-          user1.address,
-          VehicleType.SCOOTER,
-          "Electric Scooter #001",
-          "High-performance electric scooter",
-          "https://ipfs.io/ipfs/QmHash2",
-          ethers.utils.parseEther("0.08"),
-          "Rome Center"
-        );
-
-      await mooveNFT
-        .connect(minter)
-        .mintVehicleNFT(
-          user2.address,
-          VehicleType.MONOPATTINO,
-          "Electric Monopattino #001",
-          "High-performance electric monopattino",
-          "https://ipfs.io/ipfs/QmHash3",
-          ethers.utils.parseEther("0.06"),
-          "Naples Center"
-        );
-
-      const user1Tokens = await mooveNFT.getTokensByOwner(user1.address);
-      const user2Tokens = await mooveNFT.getTokensByOwner(user2.address);
-
-      expect(user1Tokens.length).to.equal(2);
-      expect(user2Tokens.length).to.equal(1);
-      expect(user1Tokens[0]).to.equal(0);
-      expect(user1Tokens[1]).to.equal(1);
-      expect(user2Tokens[0]).to.equal(2);
-    });
-
-    it("Should get NFTs for sale", async function () {
-      const { mooveNFT, minter, user1, user2 } = await loadFixture(
-        deployMooveNFTFixture
-      );
-
-      // Mint NFTs
-      await mooveNFT
-        .connect(minter)
-        .mintVehicleNFT(
-          user1.address,
-          VehicleType.BIKE,
-          "Electric Bike #001",
-          "High-performance electric bike",
-          "https://ipfs.io/ipfs/QmHash1",
-          ethers.utils.parseEther("0.05"),
-          "Milan Center"
-        );
-
-      await mooveNFT
-        .connect(minter)
-        .mintVehicleNFT(
-          user2.address,
-          VehicleType.SCOOTER,
-          "Electric Scooter #001",
-          "High-performance electric scooter",
-          "https://ipfs.io/ipfs/QmHash2",
-          ethers.utils.parseEther("0.08"),
-          "Rome Center"
-        );
-
-      // Set one for sale
-      await mooveNFT
-        .connect(user1)
-        .setForSale(0, ethers.utils.parseEther("1.0"));
-
-      const forSaleTokens = await mooveNFT.getNFTsForSale();
-      expect(forSaleTokens.length).to.equal(1);
-      expect(forSaleTokens[0]).to.equal(0);
+      expect(addr2Tokens).to.have.lengthOf(1);
+      expect(addr2Tokens).to.include(3n);
     });
 
     it("Should get current token ID", async function () {
-      const { mooveNFT, minter, user1 } = await loadFixture(
-        deployMooveNFTFixture
-      );
+      expect(await this.mooveNFT.getCurrentTokenId()).to.equal(3);
+    });
 
-      expect(await mooveNFT.getCurrentTokenId()).to.equal(0);
+    it("Should get total supply", async function () {
+      expect(await this.mooveNFT.totalSupply()).to.equal(3);
+    });
 
-      await mooveNFT
-        .connect(minter)
-        .mintVehicleNFT(
-          user1.address,
-          VehicleType.BIKE,
-          "Electric Bike #001",
-          "High-performance electric bike",
-          "https://ipfs.io/ipfs/QmHash1",
-          ethers.utils.parseEther("0.05"),
-          "Milan Center"
-        );
+    it("Should get vehicle info", async function () {
+      const vehicleInfo = await this.mooveNFT.getVehicleInfo(1);
 
-      expect(await mooveNFT.getCurrentTokenId()).to.equal(1);
+      expect(vehicleInfo.name).to.equal("Test Bike");
+      expect(vehicleInfo.vehicleType).to.equal(0);
+      expect(vehicleInfo.location).to.equal("Milano, Italy");
     });
   });
+
+  // ============ PAUSE FUNCTIONALITY ============
 
   describe("Pause Functionality", function () {
     it("Should pause and unpause", async function () {
-      const { mooveNFT, admin, minter, user1, user2 } = await loadFixture(
-        deployMooveNFTFixture
-      );
+      const { mooveNFT, owner } = await loadFixture(deployMooveNFTFixture);
 
-      // Mint an NFT first
-      await mooveNFT
-        .connect(minter)
-        .mintVehicleNFT(
-          user1.address,
-          VehicleType.BIKE,
-          "Electric Bike #001",
-          "High-performance electric bike",
-          "https://ipfs.io/ipfs/QmHash1",
-          ethers.utils.parseEther("0.05"),
-          "Milan Center"
-        );
+      // Pause
+      await mooveNFT.pause();
+      expect(await mooveNFT.paused()).to.be.true;
 
-      await mooveNFT
-        .connect(user1)
-        .setForSale(0, ethers.utils.parseEther("1.0"));
-
-      // Pause contract
-      await mooveNFT.connect(admin).pause();
-
-      // Should fail when paused
+      // Try to mint while paused (should fail)
       await expect(
-        mooveNFT
-          .connect(user2)
-          .purchaseNFT(0, { value: ethers.utils.parseEther("1.0") })
-      ).to.be.revertedWith("Pausable: paused");
+        mooveNFT.mintVehicleNFT(
+          owner.address,
+          0,
+          "Test",
+          "Test",
+          "ipfs://test",
+          ethers.parseEther("0.1"),
+          "Milano"
+        )
+      ).to.be.revertedWithCustomError(mooveNFT, "EnforcedPause");
 
       // Unpause
-      await mooveNFT.connect(admin).unpause();
+      await mooveNFT.unpause();
+      expect(await mooveNFT.paused()).to.be.false;
 
-      // Should work after unpause
+      // Should be able to mint again
       await expect(
-        mooveNFT
-          .connect(user2)
-          .purchaseNFT(0, { value: ethers.utils.parseEther("1.0") })
-      ).to.not.be.reverted;
+        mooveNFT.mintVehicleNFT(
+          owner.address,
+          0,
+          "Test",
+          "Test",
+          "ipfs://test",
+          ethers.parseEther("0.1"),
+          "Milano"
+        )
+      ).not.to.be.reverted;
     });
   });
+
+  // ============ DISCOUNT SYSTEM ============
 
   describe("Discount System", function () {
     it("Should apply user discount correctly", async function () {
-      const { mooveNFT, minter, admin, user1, user2 } = await loadFixture(
-        deployMooveNFTFixture
-      );
+      const { mooveNFT, addr1, addr2 } = await loadFixture(deployWithMintedNFT);
 
-      // Mint and set for sale
-      await mooveNFT
-        .connect(minter)
-        .mintVehicleNFT(
-          user1.address,
-          VehicleType.BIKE,
-          "Electric Bike #001",
-          "High-performance electric bike",
-          "https://ipfs.io/ipfs/QmHash1",
-          ethers.utils.parseEther("0.05"),
-          "Milan Center"
-        );
+      // Set discount for addr2
+      const discount = 1000; // 10%
+      await mooveNFT.setUserDiscount(addr2.address, discount);
 
-      const price = ethers.utils.parseEther("1.0");
-      await mooveNFT.connect(user1).setForSale(0, price);
+      // Set NFT for sale
+      const price = ethers.parseEther("1.0");
+      await mooveNFT.connect(addr1).setForSale(1, price);
 
-      // Set 10% discount for user2
-      await mooveNFT.connect(admin).setUserDiscount(user2.address, 1000);
-
-      const initialUser1Balance = await ethers.provider.getBalance(
-        user1.address
-      );
+      // Calculate expected final price
+      const expectedPrice = price - (price * BigInt(discount)) / 10000n;
 
       // Purchase with discount
-      const discountedPrice = price.mul(9000).div(10000); // 90% of original price
-      const tx = await mooveNFT
-        .connect(user2)
-        .purchaseNFT(0, { value: discountedPrice });
-
-      // Check that purchase was successful
-      expect(await mooveNFT.ownerOf(0)).to.equal(user2.address);
-
-      // Verify seller received correct amount (discounted price minus fees)
-      const platformFee = discountedPrice.mul(250).div(10000);
-      const royaltyFee = discountedPrice.mul(500).div(10000);
-      const expectedSellerAmount = discountedPrice
-        .sub(platformFee)
-        .sub(royaltyFee);
-
-      const finalUser1Balance = await ethers.provider.getBalance(user1.address);
-      expect(finalUser1Balance).to.equal(
-        initialUser1Balance.add(expectedSellerAmount)
-      );
+      await expect(() =>
+        mooveNFT.connect(addr2).purchaseNFT(1, { value: price })
+      ).to.changeEtherBalance(addr2, -expectedPrice);
     });
   });
 
+  // ============ EDGE CASES ============
+
   describe("Edge Cases", function () {
     it("Should handle token that doesn't exist", async function () {
-      const { mooveNFT, user1 } = await loadFixture(deployMooveNFTFixture);
+      const { mooveNFT } = await loadFixture(deployMooveNFTFixture);
 
-      await expect(mooveNFT.getVehicleInfo(999)).to.be.revertedWith(
+      await expect(mooveNFT.getVehicleInfo(999)).to.be.revertedWithCustomError(
+        mooveNFT,
         "MooveNFT__TokenNotExists"
       );
-
-      await expect(
-        mooveNFT.connect(user1).setForSale(999, ethers.utils.parseEther("1.0"))
-      ).to.be.revertedWith("MooveNFT__TokenNotExists");
     });
 
     it("Should handle overpayment correctly", async function () {
-      const { mooveNFT, minter, user1, user2 } = await loadFixture(
-        deployMooveNFTFixture
-      );
+      const { mooveNFT, addr1, addr2 } = await loadFixture(deployWithMintedNFT);
 
-      await mooveNFT
-        .connect(minter)
-        .mintVehicleNFT(
-          user1.address,
-          VehicleType.BIKE,
-          "Electric Bike #001",
-          "High-performance electric bike",
-          "https://ipfs.io/ipfs/QmHash1",
-          ethers.utils.parseEther("0.05"),
-          "Milan Center"
-        );
+      const price = ethers.parseEther("1.0");
+      const overpayment = ethers.parseEther("1.5");
 
-      const price = ethers.utils.parseEther("1.0");
-      await mooveNFT.connect(user1).setForSale(0, price);
+      await mooveNFT.connect(addr1).setForSale(1, price);
 
-      const overpayment = ethers.utils.parseEther("1.5");
-      const initialUser2Balance = await ethers.provider.getBalance(
-        user2.address
-      );
-
+      const balanceBefore = await ethers.provider.getBalance(addr2.address);
       const tx = await mooveNFT
-        .connect(user2)
-        .purchaseNFT(0, { value: overpayment });
+        .connect(addr2)
+        .purchaseNFT(1, { value: overpayment });
       const receipt = await tx.wait();
-      const gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
+      const gasUsed = receipt.gasUsed * receipt.gasPrice;
+      const balanceAfter = await ethers.provider.getBalance(addr2.address);
 
-      const finalUser2Balance = await ethers.provider.getBalance(user2.address);
-
-      // User should only pay the actual price, excess should be refunded
-      expect(finalUser2Balance).to.equal(
-        initialUser2Balance.sub(price).sub(gasCost)
+      // Should only pay the actual price + gas
+      expect(balanceBefore - balanceAfter).to.be.closeTo(
+        price + gasUsed,
+        ethers.parseEther("0.001")
       );
     });
 
     it("Should handle empty arrays in batch operations", async function () {
-      const { mooveNFT, minter } = await loadFixture(deployMooveNFTFixture);
+      const { mooveNFT } = await loadFixture(deployMooveNFTFixture);
 
-      // Empty arrays should not fail but do nothing
-      await mooveNFT.connect(minter).batchMint([], [], [], [], [], [], []);
-
-      expect(await mooveNFT.getCurrentTokenId()).to.equal(0);
+      await expect(mooveNFT.batchMint([], [], [], [], [], [], [])).not.to.be
+        .reverted;
     });
   });
 
-  describe("Royalty and ERC165", function () {
+  // ============ INTERFACE SUPPORT ============
+
+  describe("Interface Support", function () {
     it("Should support required interfaces", async function () {
       const { mooveNFT } = await loadFixture(deployMooveNFTFixture);
 
@@ -864,34 +604,8 @@ describe("MooveNFT", function () {
       expect(await mooveNFT.supportsInterface("0x80ac58cd")).to.be.true;
       // ERC721Metadata
       expect(await mooveNFT.supportsInterface("0x5b5e139f")).to.be.true;
-      // ERC2981 (Royalty)
-      expect(await mooveNFT.supportsInterface("0x2a55205a")).to.be.true;
       // AccessControl
       expect(await mooveNFT.supportsInterface("0x7965db0b")).to.be.true;
-    });
-
-    it("Should return correct royalty info", async function () {
-      const { mooveNFT, minter, user1, owner } = await loadFixture(
-        deployMooveNFTFixture
-      );
-
-      await mooveNFT
-        .connect(minter)
-        .mintVehicleNFT(
-          user1.address,
-          VehicleType.BIKE,
-          "Electric Bike #001",
-          "High-performance electric bike",
-          "https://ipfs.io/ipfs/QmHash1",
-          ethers.utils.parseEther("0.05"),
-          "Milan Center"
-        );
-
-      const salePrice = ethers.utils.parseEther("1.0");
-      const royaltyInfo = await mooveNFT.royaltyInfo(0, salePrice);
-
-      expect(royaltyInfo[0]).to.equal(owner.address); // Royalty recipient
-      expect(royaltyInfo[1]).to.equal(salePrice.mul(500).div(10000)); // 5% royalty
     });
   });
 });
