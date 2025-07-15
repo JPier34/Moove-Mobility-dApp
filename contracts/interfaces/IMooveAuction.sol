@@ -17,6 +17,7 @@ interface IMooveAuction {
     }
 
     enum AuctionType {
+        TRADITIONAL,
         ENGLISH,
         DUTCH,
         SEALED_BID
