@@ -10,12 +10,11 @@ describe("MooveNFT", function () {
 
     // Deploy MooveNFT
     const MooveNFT = await ethers.getContractFactory("MooveNFT");
-    const mooveNFT = await MooveNFT.waitForDeployment(
+    const mooveNFT = await MooveNFT.deploy(
       "Moove Vehicle NFT",
       "MOOVE",
       owner.address
     );
-
     await mooveNFT.waitForDeployment();
 
     return { mooveNFT, owner, addr1, addr2, addr3 };
