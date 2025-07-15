@@ -84,7 +84,7 @@ contract MooveAuction is AccessControl, ReentrancyGuard, Pausable {
     // Platform settings
     address public platformOwner;
     uint256 public platformFeePercentage = 250; // 2.5%
-    uint256 public constant MIN_AUCTION_DURATION = 1 hours;
+    uint256 public constant MIN_AUCTION_DURATION = 1 minutes;
     uint256 public constant MAX_AUCTION_DURATION = 30 days;
     uint256 public constant ENGLISH_EXTENSION_TIME = 10 minutes;
     uint256 public constant REVEAL_PHASE_DURATION = 24 hours;

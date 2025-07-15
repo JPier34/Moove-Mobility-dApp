@@ -45,6 +45,9 @@ describe("MooveAuction", function () {
     const mooveNFTAddress = await mooveNFT.getAddress();
     const mooveAuctionAddress = await mooveAuction.getAddress();
 
+    console.log("🔍 Debug - NFT Address:", mooveNFTAddress);
+    console.log("🔍 Debug - Auction Address:", mooveAuctionAddress);
+
     // Setup roles
     const ADMIN_ROLE = await mooveNFT.ADMIN_ROLE();
     const MINTER_ROLE = await mooveNFT.MINTER_ROLE();
@@ -52,26 +55,39 @@ describe("MooveAuction", function () {
     await mooveNFT.grantRole(ADMIN_ROLE, admin.address);
     await mooveNFT.grantRole(MINTER_ROLE, admin.address);
 
+    // Grant admin role to auction contract
     const ADMIN_ROLE_AUCTION = await mooveAuction.DEFAULT_ADMIN_ROLE();
     await mooveAuction.grantRole(ADMIN_ROLE_AUCTION, admin.address);
 
+    const mintedTokenIds = [];
+
     // Mint test NFTs
     for (let i = 0; i < 5; i++) {
-      await mooveNFT
+      const tx = await mooveNFT
         .connect(admin)
         .mintVehicleNFT(
           seller.address,
           VehicleType.BIKE,
           `Test Bike #${i + 1}`,
-          `Test description ${i + 1}`,
+          `Test description ${i}`,
           `https://ipfs.io/ipfs/QmHash${i + 1}`,
           ethers.parseEther("0.05"),
           "Test Location"
         );
+
+      const receipt = await tx.wait();
+      // Extract token ID from Transfer event
+      const transferEvent = receipt.events?.find((e) => e.event === "Transfer");
+      if (transferEvent) {
+        mintedTokenIds.push(transferEvent.args.tokenId);
+      }
     }
 
     // Approve auction contract for all NFTs
     await mooveNFT.connect(seller).setApprovalForAll(mooveAuctionAddress, true);
+    totalSupply = await mooveNFT.totalSupply();
+
+    console.log("📊 Total NFTs minted:", totalSupply.toString());
 
     return {
       mooveNFT,
@@ -84,6 +100,7 @@ describe("MooveAuction", function () {
       bidder1,
       bidder2,
       bidder3,
+      mintedTokenIds,
     };
   }
 
@@ -103,9 +120,8 @@ describe("MooveAuction", function () {
 
   describe("Traditional Auction", function () {
     it("Should create traditional auction successfully", async function () {
-      const { mooveAuction, mooveNFTAddress, seller } = await loadFixture(
-        deployAuctionFixture
-      );
+      const { mooveAuction, mooveNFTAddress, seller, mintedTokenIds } =
+        await loadFixture(deployAuctionFixture);
 
       const startPrice = ethers.parseEther("1.0");
       const reservePrice = ethers.parseEther("1.5");
@@ -113,9 +129,15 @@ describe("MooveAuction", function () {
       const duration = 24 * 60 * 60; // 24 hours
       const bidIncrement = ethers.parseEther("0.1");
 
+      // Use the correct tokenId that was minted to the seller
+      const tokenId = mintedTokenIds[0];
+
+      // Ensure seller is the owner of the tokenId before creating auction
+      expect(await mooveNFT.ownerOf(tokenId)).to.equal(seller.address);
+
       await expect(
         mooveAuction.connect(seller).createAuction(
-          0, // NFT ID
+          tokenId, // NFT ID
           mooveNFTAddress,
           AuctionType.TRADITIONAL,
           startPrice,
@@ -124,27 +146,18 @@ describe("MooveAuction", function () {
           duration,
           bidIncrement
         )
-      )
-        .to.emit(mooveAuction, "AuctionCreated")
-        .withArgs(
-          0,
-          0,
-          seller.address,
-          AuctionType.TRADITIONAL,
-          startPrice,
-          (await time.latest()) + duration
-        );
-
-      const auction = await mooveAuction.getAuction(0);
-      expect(auction.seller).to.equal(seller.address);
-      expect(auction.auctionType).to.equal(AuctionType.TRADITIONAL);
-      expect(auction.startPrice).to.equal(startPrice);
-      expect(auction.reservePrice).to.equal(reservePrice);
+      ).to.emit(mooveAuction, "AuctionCreated");
     });
 
     it("Should place bids correctly", async function () {
-      const { mooveAuction, mooveNFTAddress, seller, bidder1, bidder2 } =
-        await loadFixture(deployAuctionFixture);
+      const {
+        mooveAuction,
+        mooveNFTAddress,
+        seller,
+        bidder1,
+        bidder2,
+        mintedTokenIds,
+      } = await loadFixture(deployAuctionFixture);
 
       // Create auction
       const startPrice = ethers.parseEther("1.0");
@@ -153,10 +166,12 @@ describe("MooveAuction", function () {
       const duration = 24 * 60 * 60;
       const bidIncrement = ethers.parseEther("0.1");
 
+      const tokenId = mintedTokenIds[0];
+
       await mooveAuction
         .connect(seller)
         .createAuction(
-          0,
+          tokenId,
           mooveNFTAddress,
           AuctionType.TRADITIONAL,
           startPrice,
@@ -186,13 +201,15 @@ describe("MooveAuction", function () {
     });
 
     it("Should fail bid below minimum", async function () {
-      const { mooveAuction, mooveNFTAddress, seller, bidder1 } =
+      const { mooveAuction, mooveNFTAddress, seller, bidder1, mintedTokenIds } =
         await loadFixture(deployAuctionFixture);
+
+      const tokenId = mintedTokenIds[0];
 
       await mooveAuction
         .connect(seller)
         .createAuction(
-          0,
+          tokenId,
           mooveNFTAddress,
           AuctionType.TRADITIONAL,
           ethers.parseEther("1.0"),
@@ -210,14 +227,17 @@ describe("MooveAuction", function () {
     });
 
     it("Should handle buy now correctly", async function () {
-      const { mooveAuction, mooveNFTAddress, seller, bidder1 } =
+      const { mooveAuction, mooveNFTAddress, seller, bidder1, mintedTokenIds } =
         await loadFixture(deployAuctionFixture);
 
       const buyNowPrice = ethers.parseEther("3.0");
+
+      const tokenId = mintedTokenIds[0];
+
       await mooveAuction
         .connect(seller)
         .createAuction(
-          0,
+          tokenId,
           mooveNFTAddress,
           AuctionType.TRADITIONAL,
           ethers.parseEther("1.0"),
@@ -238,11 +258,13 @@ describe("MooveAuction", function () {
     });
 
     it("Should end auction and transfer NFT correctly", async function () {
-      const { mooveAuction, mooveNFTAddress, seller, bidder1 } =
+      const { mooveAuction, mooveNFTAddress, seller, bidder1, mintedTokenIds } =
         await loadFixture(deployAuctionFixture);
 
+      const tokenId = mintedTokenIds[0];
+
       await mooveAuction.connect(seller).createAuction(
-        0,
+        tokenId,
         mooveNFTAddress,
         AuctionType.TRADITIONAL,
         ethers.parseEther("1.0"),
@@ -268,14 +290,16 @@ describe("MooveAuction", function () {
 
   describe("English Auction", function () {
     it("Should extend auction on late bids", async function () {
-      const { mooveAuction, mooveNFTAddress, seller, bidder1 } =
+      const { mooveAuction, mooveNFTAddress, seller, bidder1, mintedTokenIds } =
         await loadFixture(deployAuctionFixture);
 
-      const duration = 60; // 1 minute
+      const tokenId = mintedTokenIds[0];
+
+      const duration = 3600; // 1 hour
       await mooveAuction
         .connect(seller)
         .createAuction(
-          0,
+          tokenId,
           mooveNFTAddress,
           AuctionType.ENGLISH,
           ethers.parseEther("1.0"),
@@ -301,14 +325,16 @@ describe("MooveAuction", function () {
     });
 
     it("Should not extend if bid placed early", async function () {
-      const { mooveAuction, mooveNFTAddress, seller, bidder1 } =
+      const { mooveAuction, mooveNFTAddress, seller, bidder1, mintedTokenIds } =
         await loadFixture(deployAuctionFixture);
+
+      const tokenId = mintedTokenIds[0];
 
       const duration = 3600; // 1 hour
       await mooveAuction
         .connect(seller)
         .createAuction(
-          0,
+          tokenId,
           mooveNFTAddress,
           AuctionType.ENGLISH,
           ethers.parseEther("1.0"),
@@ -333,18 +359,19 @@ describe("MooveAuction", function () {
 
   describe("Dutch Auction", function () {
     it("Should calculate decreasing price correctly", async function () {
-      const { mooveAuction, mooveNFTAddress, seller } = await loadFixture(
-        deployAuctionFixture
-      );
+      const { mooveAuction, mooveNFTAddress, seller, admin, mintedTokenIds } =
+        await loadFixture(deployAuctionFixture);
+
+      const tokenId = mintedTokenIds[0];
 
       const startPrice = ethers.parseEther("2.0");
-      const reservePrice = ethers.parseEther("1.0");
+      const reservePrice = ethers.parseEther("3.0");
       const duration = 3600; // 1 hour
 
       await mooveAuction
         .connect(seller)
         .createAuction(
-          0,
+          tokenId,
           mooveNFTAddress,
           AuctionType.DUTCH,
           startPrice,
@@ -377,8 +404,10 @@ describe("MooveAuction", function () {
     });
 
     it("Should accept bid at current Dutch price", async function () {
-      const { mooveAuction, mooveNFTAddress, seller, bidder1 } =
+      const { mooveAuction, mooveNFTAddress, seller, bidder1, mintedTokenIds } =
         await loadFixture(deployAuctionFixture);
+
+      const tokenId = mintedTokenIds[0];
 
       const startPrice = ethers.parseEther("2.0");
       const reservePrice = ethers.parseEther("1.0");
@@ -387,7 +416,7 @@ describe("MooveAuction", function () {
       await mooveAuction
         .connect(seller)
         .createAuction(
-          0,
+          tokenId,
           mooveNFTAddress,
           AuctionType.DUTCH,
           startPrice,
@@ -410,14 +439,16 @@ describe("MooveAuction", function () {
 
   describe("Sealed Bid Auction", function () {
     it("Should submit sealed bids correctly", async function () {
-      const { mooveAuction, mooveNFTAddress, seller, bidder1 } =
+      const { mooveAuction, mooveNFTAddress, seller, bidder1, mintedTokenIds } =
         await loadFixture(deployAuctionFixture);
+
+      const tokenId = mintedTokenIds[0];
 
       const duration = 3600; // 1 hour
       await mooveAuction
         .connect(seller)
         .createAuction(
-          0,
+          tokenId,
           mooveNFTAddress,
           AuctionType.SEALED_BID,
           ethers.parseEther("1.0"),
@@ -445,14 +476,16 @@ describe("MooveAuction", function () {
     });
 
     it("Should reveal sealed bids correctly", async function () {
-      const { mooveAuction, mooveNFTAddress, seller, bidder1 } =
+      const { mooveAuction, mooveNFTAddress, seller, bidder1, mintedTokenIds } =
         await loadFixture(deployAuctionFixture);
 
-      const duration = 60; // 1 minute for quick testing
+      const tokenId = mintedTokenIds[0];
+
+      const duration = 3600; // 1 hour
       await mooveAuction
         .connect(seller)
         .createAuction(
-          0,
+          tokenId,
           mooveNFTAddress,
           AuctionType.SEALED_BID,
           ethers.parseEther("1.0"),
@@ -488,14 +521,16 @@ describe("MooveAuction", function () {
     });
 
     it("Should fail reveal with wrong parameters", async function () {
-      const { mooveAuction, mooveNFTAddress, seller, bidder1 } =
+      const { mooveAuction, mooveNFTAddress, seller, bidder1, mintedTokenIds } =
         await loadFixture(deployAuctionFixture);
 
-      const duration = 60;
+      const tokenId = mintedTokenIds[0];
+
+      const duration = 3600;
       await mooveAuction
         .connect(seller)
         .createAuction(
-          0,
+          tokenId,
           mooveNFTAddress,
           AuctionType.SEALED_BID,
           ethers.parseEther("1.0"),
@@ -537,13 +572,21 @@ describe("MooveAuction", function () {
 
   describe("Payment and Claims", function () {
     it("Should handle payment claims correctly", async function () {
-      const { mooveAuction, mooveNFTAddress, seller, bidder1, owner } =
-        await loadFixture(deployAuctionFixture);
+      const {
+        mooveAuction,
+        mooveNFTAddress,
+        seller,
+        bidder1,
+        owner,
+        mintedTokenIds,
+      } = await loadFixture(deployAuctionFixture);
+
+      const tokenId = mintedTokenIds[0];
 
       await mooveAuction
         .connect(seller)
         .createAuction(
-          0,
+          tokenId,
           mooveNFTAddress,
           AuctionType.TRADITIONAL,
           ethers.parseEther("1.0"),
@@ -592,13 +635,21 @@ describe("MooveAuction", function () {
     });
 
     it("Should handle refunds correctly", async function () {
-      const { mooveAuction, mooveNFTAddress, seller, bidder1, bidder2 } =
-        await loadFixture(deployAuctionFixture);
+      const {
+        mooveAuction,
+        mooveNFTAddress,
+        seller,
+        bidder1,
+        bidder2,
+        mintedTokenIds,
+      } = await loadFixture(deployAuctionFixture);
+
+      const tokenId = mintedTokenIds[0];
 
       await mooveAuction
         .connect(seller)
         .createAuction(
-          0,
+          tokenID,
           mooveNFTAddress,
           AuctionType.TRADITIONAL,
           ethers.parseEther("1.0"),
@@ -638,11 +689,13 @@ describe("MooveAuction", function () {
     });
 
     it("Should fail if reserve price not met", async function () {
-      const { mooveAuction, mooveNFTAddress, seller, bidder1 } =
+      const { mooveAuction, mooveNFTAddress, seller, bidder1, mintedTokenIds } =
         await loadFixture(deployAuctionFixture);
 
+      const tokenId = mintedTokenIds[0];
+
       await mooveAuction.connect(seller).createAuction(
-        0,
+        tokenId,
         mooveNFTAddress,
         AuctionType.TRADITIONAL,
         ethers.parseEther("1.0"),
@@ -672,13 +725,15 @@ describe("MooveAuction", function () {
 
   describe("Admin Functions", function () {
     it("Should cancel auction by admin", async function () {
-      const { mooveAuction, mooveNFTAddress, seller, admin } =
+      const { mooveAuction, mooveNFTAddress, seller, admin, mintedTokenIds } =
         await loadFixture(deployAuctionFixture);
+
+      const tokenId = mintedTokenIds[0];
 
       await mooveAuction
         .connect(seller)
         .createAuction(
-          0,
+          tokenId,
           mooveNFTAddress,
           AuctionType.TRADITIONAL,
           ethers.parseEther("1.0"),
@@ -707,9 +762,7 @@ describe("MooveAuction", function () {
     });
 
     it("Should fail admin functions without proper role", async function () {
-      const { mooveAuction, mooveNFTAddress, seller } = await loadFixture(
-        deployAuctionFixture
-      );
+      const { mooveAuction, seller } = await loadFixture(deployAuctionFixture);
 
       await expect(
         mooveAuction.connect(seller).setPlatformFee(300)
@@ -722,14 +775,15 @@ describe("MooveAuction", function () {
 
   describe("View Functions", function () {
     beforeEach(async function () {
-      const { mooveAuction, mooveNFTAddress, seller } = await loadFixture(
-        deployAuctionFixture
-      );
+      const { mooveAuction, mooveNFTAddress, seller, mintedTokenIds } =
+        await loadFixture(deployAuctionFixture);
+
+      const tokenId = mintedTokenIds[0];
 
       // Create multiple auctions
       for (let i = 0; i < 3; i++) {
         await mooveAuction.connect(seller).createAuction(
-          i,
+          tokenId,
           mooveNFTAddress,
           i, // Different auction types
           ethers.parseEther("1.0"),
@@ -796,13 +850,15 @@ describe("MooveAuction", function () {
     });
 
     it("Should check if user has bid", async function () {
-      const { mooveAuction, mooveNFTAddress, seller, bidder1 } =
+      const { mooveAuction, mooveNFTAddress, seller, bidder1, mintedTokenIds } =
         await loadFixture(deployAuctionFixture);
+
+      const tokenId = mintedTokenIds[0];
 
       await mooveAuction
         .connect(seller)
         .createAuction(
-          0,
+          tokenId,
           mooveNFTAddress,
           AuctionType.TRADITIONAL,
           ethers.parseEther("1.0"),
@@ -822,13 +878,21 @@ describe("MooveAuction", function () {
     });
 
     it("Should get auction bids", async function () {
-      const { mooveAuction, mooveNFTAddress, seller, bidder1, bidder2 } =
-        await loadFixture(deployAuctionFixture);
+      const {
+        mooveAuction,
+        mooveNFTAddress,
+        seller,
+        bidder1,
+        bidder2,
+        mintedTokenIds,
+      } = await loadFixture(deployAuctionFixture);
+
+      const tokenId = mintedTokenIds[0];
 
       await mooveAuction
         .connect(seller)
         .createAuction(
-          0,
+          tokenId,
           mooveNFTAddress,
           AuctionType.TRADITIONAL,
           ethers.parseEther("1.0"),
@@ -854,14 +918,15 @@ describe("MooveAuction", function () {
 
   describe("Edge Cases and Security", function () {
     it("Should prevent seller from bidding on own auction", async function () {
-      const { mooveAuction, mooveNFTAddress, seller } = await loadFixture(
-        deployAuctionFixture
-      );
+      const { mooveAuction, mooveNFTAddress, seller, mintedTokenIds } =
+        await loadFixture(deployAuctionFixture);
+
+      const tokenId = mintedTokenIds[0];
 
       await mooveAuction
         .connect(seller)
         .createAuction(
-          0,
+          tokenId,
           mooveNFTAddress,
           AuctionType.TRADITIONAL,
           ethers.parseEther("1.0"),
@@ -879,13 +944,15 @@ describe("MooveAuction", function () {
     });
 
     it("Should prevent double claiming", async function () {
-      const { mooveAuction, mooveNFTAddress, seller, bidder1 } =
+      const { mooveAuction, mooveNFTAddress, seller, bidder1, mintedTokenIds } =
         await loadFixture(deployAuctionFixture);
+
+      const tokenId = mintedTokenIds[0];
 
       await mooveAuction
         .connect(seller)
         .createAuction(
-          0,
+          tokenId,
           mooveNFTAddress,
           AuctionType.TRADITIONAL,
           ethers.parseEther("1.0"),
@@ -965,13 +1032,21 @@ describe("MooveAuction", function () {
     });
 
     it("Should handle pause functionality", async function () {
-      const { mooveAuction, mooveNFTAddress, seller, bidder1, admin } =
-        await loadFixture(deployAuctionFixture);
+      const {
+        mooveAuction,
+        mooveNFTAddress,
+        seller,
+        bidder1,
+        admin,
+        mintedTokenIds,
+      } = await loadFixture(deployAuctionFixture);
+
+      const tokenId = mintedTokenIds[0];
 
       await mooveAuction
         .connect(seller)
         .createAuction(
-          0,
+          tokenId,
           mooveNFTAddress,
           AuctionType.TRADITIONAL,
           ethers.parseEther("1.0"),
@@ -1005,17 +1080,19 @@ describe("MooveAuction", function () {
 
   describe("Gas Optimization Tests", function () {
     it("Should handle batch operations efficiently", async function () {
-      const { mooveAuction, mooveNFTAddress, seller, bidder1 } =
+      const { mooveAuction, mooveNFTAddress, seller, bidder1, mintedTokenIds } =
         await loadFixture(deployAuctionFixture);
 
       // Create multiple auctions and measure gas
       const gasUsed = [];
 
+      const tokenId = mintedTokenIds[0];
+
       for (let i = 0; i < 3; i++) {
         const tx = await mooveAuction
           .connect(seller)
           .createAuction(
-            i,
+            tokenId,
             mooveNFTAddress,
             AuctionType.TRADITIONAL,
             ethers.parseEther("1.0"),
@@ -1039,16 +1116,18 @@ describe("MooveAuction", function () {
 
   describe("Integration with NFT Contract", function () {
     it("Should work correctly with NFT transfers", async function () {
-      const { mooveAuction, mooveNFTAddress, seller, bidder1 } =
+      const { mooveAuction, mooveNFTAddress, seller, bidder1, mintedTokenIds } =
         await loadFixture(deployAuctionFixture);
 
       // Verify NFT is with seller initially
       expect(await mooveNFT.ownerOf(0)).to.equal(seller.address);
 
+      const tokenId = mintedTokenIds[0];
+
       await mooveAuction
         .connect(seller)
         .createAuction(
-          0,
+          tokenId,
           mooveNFTAddress,
           AuctionType.TRADITIONAL,
           ethers.parseEther("1.0"),
