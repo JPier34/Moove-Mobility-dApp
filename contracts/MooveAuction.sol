@@ -171,6 +171,47 @@ contract MooveAuction is AccessControl, ReentrancyGuard, Pausable {
         _;
     }
 
+    modifier auctionEnded(uint256 auctionId) {
+        if (auctions[auctionId].status != AuctionStatus.ENDED) {
+            revert MooveAuction__AuctionEnded();
+        }
+        _;
+    }
+
+    modifier auctionInRevealPhase(uint256 auctionId) {
+        if (
+            auctions[auctionId].status != AuctionStatus.REVEALING &&
+            auctions[auctionId].auctionType == AuctionType.SEALED_BID
+        ) {
+            revert MooveAuction__RevealPhaseActive();
+        }
+        _;
+    }
+
+    modifier onlyRoleOrAuctioneer(bytes32 role) {
+        require(
+            hasRole(role, msg.sender) || hasRole(AUCTIONEER_ROLE, msg.sender),
+            "Not authorized"
+        );
+        _;
+    }
+
+    modifier noValidBids(uint256 auctionId) {
+        Auction storage auction = auctions[auctionId];
+        if (auction.highestBidder != address(0) || auction.highestBid > 0) {
+            revert MooveAuction__NoValidBids();
+        }
+        _;
+    }
+
+    modifier alreadyClaimed(uint256 auctionId) {
+        Auction storage auction = auctions[auctionId];
+        if (auction.nftClaimed || auction.sellerPaid) {
+            revert MooveAuction__AlreadyClaimed();
+        }
+        _;
+    }
+
     // ============ CONSTRUCTOR ============
     constructor(address _platformOwner) {
         require(_platformOwner != address(0), "Invalid platform owner");
@@ -283,7 +324,9 @@ contract MooveAuction is AccessControl, ReentrancyGuard, Pausable {
         Auction storage auction = auctions[auctionId];
 
         require(block.timestamp <= auction.endTime, "Auction ended");
-        require(msg.sender != auction.seller, "Seller cannot bid");
+        if (msg.sender == auction.seller) {
+            revert MooveAuction__NotAuthorized();
+        }
         require(
             auction.auctionType != AuctionType.SEALED_BID,
             "Use submitSealedBid for sealed auctions"
@@ -490,7 +533,9 @@ contract MooveAuction is AccessControl, ReentrancyGuard, Pausable {
 
         require(auction.status == AuctionStatus.ENDED, "Auction not ended");
         require(msg.sender == auction.highestBidder, "Not the winner");
-        require(!auction.nftClaimed, "NFT already claimed");
+        if (auction.nftClaimed) {
+            revert MooveAuction__AlreadyClaimed();
+        }
         require(auction.highestBid >= auction.reservePrice, "Reserve not met");
 
         auction.nftClaimed = true;
@@ -729,7 +774,8 @@ contract MooveAuction is AccessControl, ReentrancyGuard, Pausable {
     ) external view returns (bool) {
         return
             bidderDeposits[auctionId][user] > 0 ||
-            sealedBids[auctionId][user] != bytes32(0);
+            sealedBids[auctionId][user] != bytes32(0) ||
+            auctions[auctionId].highestBidder == user;
     }
 
     /**
