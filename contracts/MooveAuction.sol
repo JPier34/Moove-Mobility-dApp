@@ -148,6 +148,7 @@ contract MooveAuction is AccessControl, ReentrancyGuard, Pausable {
     error MooveAuction__NoValidBids();
     error MooveAuction__RevealPhaseActive();
     error MooveAuction__InvalidReveal();
+    error MooveAuction__ReserveNotMet();
 
     // ============ MODIFIERS ============
     modifier onlyAuctionSeller(uint256 auctionId) {
@@ -248,7 +249,14 @@ contract MooveAuction is AccessControl, ReentrancyGuard, Pausable {
 
         require(nftContract != address(0), "Invalid NFT contract");
         require(startPrice > 0, "Start price must be positive");
-        require(reservePrice >= startPrice, "Reserve price too low");
+        if (auctionType == AuctionType.DUTCH) {
+            require(
+                startPrice >= reservePrice,
+                "Dutch: start price must be >= reserve"
+            );
+        } else {
+            require(reservePrice >= startPrice, "Reserve price too low");
+        }
         require(bidIncrement > 0, "Bid increment must be positive");
 
         // Verify NFT ownership
@@ -536,7 +544,9 @@ contract MooveAuction is AccessControl, ReentrancyGuard, Pausable {
         if (auction.nftClaimed) {
             revert MooveAuction__AlreadyClaimed();
         }
-        require(auction.highestBid >= auction.reservePrice, "Reserve not met");
+        if (auction.highestBid < auction.reservePrice) {
+            revert MooveAuction__ReserveNotMet();
+        }
 
         auction.nftClaimed = true;
 

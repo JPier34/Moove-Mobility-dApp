@@ -5,6 +5,8 @@ const {
   time,
 } = require("@nomicfoundation/hardhat-network-helpers");
 
+const { anyValue } = require("@nomicfoundation/hardhat-chai-matchers/withArgs");
+
 describe("MooveAuction", function () {
   const AuctionType = {
     TRADITIONAL: 0,
@@ -169,29 +171,15 @@ describe("MooveAuction", function () {
       mintedTokenIds,
     } = await loadFixture(deployAuctionFixture);
 
-    console.log('--- Debug Test: "Should place bids correctly" ---');
-    console.log("mooveNFTAddress:", mooveNFTAddress);
-    console.log("Contenuto di mintedTokenIds:", mintedTokenIds);
-
     const tokenId = mintedTokenIds[0];
-
-    // Create auction
     const startPrice = ethers.parseEther("1.0");
     const reservePrice = ethers.parseEther("1.5");
     const buyNowPrice = ethers.parseEther("3.0");
     const duration = 24 * 60 * 60;
     const bidIncrement = ethers.parseEther("0.1");
 
-    console.log("token id:", tokenId);
-    console.log("mooveNFTAddress:", mooveNFTAddress);
-    console.log("AuctionType.TRADITIONAL:", AuctionType.TRADITIONAL);
-    console.log("buyNowPrice:", buyNowPrice);
-    console.log("startPrice:", startPrice);
-    console.log("reservePrice:", reservePrice);
-    console.log("duration:", duration);
-    console.log("bidIncrement:", bidIncrement);
-
-    await mooveAuction
+    // Crea l'asta e recupera l'id
+    const tx = await mooveAuction
       .connect(seller)
       .createAuction(
         tokenId,
@@ -203,20 +191,34 @@ describe("MooveAuction", function () {
         duration,
         bidIncrement
       );
+    const receipt = await tx.wait();
+    let auctionId;
+    for (const log of receipt.logs) {
+      try {
+        const parsed = mooveAuction.interface.parseLog(log);
+        if (parsed && parsed.name === "AuctionCreated") {
+          auctionId = parsed.args.auctionId;
+          break;
+        }
+      } catch (e) {}
+    }
+    expect(auctionId).to.not.be.undefined;
 
     // Place first bid
     const firstBid = ethers.parseEther("1.0");
-    await expect(mooveAuction.connect(bidder1).placeBid(0, { value: firstBid }))
+    await expect(
+      mooveAuction.connect(bidder1).placeBid(auctionId, { value: firstBid })
+    )
       .to.emit(mooveAuction, "BidPlaced")
-      .withArgs(0, bidder1.address, firstBid, await time.latestBlock());
+      .withArgs(auctionId, bidder1.address, firstBid, anyValue);
 
     // Place higher bid
     const secondBid = ethers.parseEther("1.2");
     await expect(
-      mooveAuction.connect(bidder2).placeBid(0, { value: secondBid })
+      mooveAuction.connect(bidder2).placeBid(auctionId, { value: secondBid })
     ).to.emit(mooveAuction, "BidPlaced");
 
-    const auction = await mooveAuction.getAuction(0);
+    const auction = await mooveAuction.getAuction(auctionId);
     expect(auction.highestBidder).to.equal(bidder2.address);
     expect(auction.highestBid).to.equal(secondBid);
   });
@@ -226,24 +228,41 @@ describe("MooveAuction", function () {
       await loadFixture(deployAuctionFixture);
 
     const tokenId = mintedTokenIds[0];
+    const startPrice = ethers.parseEther("1.0");
+    const reservePrice = ethers.parseEther("1.5");
+    const buyNowPrice = ethers.parseEther("3.0");
+    const duration = 24 * 60 * 60;
+    const bidIncrement = ethers.parseEther("0.1");
 
-    await mooveAuction
+    const tx = await mooveAuction
       .connect(seller)
       .createAuction(
         tokenId,
         mooveNFTAddress,
         AuctionType.TRADITIONAL,
-        ethers.parseEther("1.0"),
-        ethers.parseEther("1.5"),
-        ethers.parseEther("3.0"),
-        24 * 60 * 60,
-        ethers.parseEther("0.1")
+        startPrice,
+        reservePrice,
+        buyNowPrice,
+        duration,
+        bidIncrement
       );
+    const receipt = await tx.wait();
+    let auctionId;
+    for (const log of receipt.logs) {
+      try {
+        const parsed = mooveAuction.interface.parseLog(log);
+        if (parsed && parsed.name === "AuctionCreated") {
+          auctionId = parsed.args.auctionId;
+          break;
+        }
+      } catch (e) {}
+    }
+    expect(auctionId).to.not.be.undefined;
 
     await expect(
       mooveAuction
         .connect(bidder1)
-        .placeBid(0, { value: ethers.parseEther("0.5") })
+        .placeBid(auctionId, { value: ethers.parseEther("0.5") })
     ).to.be.revertedWithCustomError(mooveAuction, "MooveAuction__BidTooLow");
   });
 
@@ -252,10 +271,10 @@ describe("MooveAuction", function () {
       await loadFixture(deployAuctionFixture);
 
     const buyNowPrice = ethers.parseEther("3.0");
-
     const tokenId = mintedTokenIds[0];
 
-    await mooveAuction
+    // Crea l'asta e recupera l'id
+    const tx = await mooveAuction
       .connect(seller)
       .createAuction(
         tokenId,
@@ -267,15 +286,27 @@ describe("MooveAuction", function () {
         24 * 60 * 60,
         ethers.parseEther("0.1")
       );
+    const receipt = await tx.wait();
+    let auctionId;
+    for (const log of receipt.logs) {
+      try {
+        const parsed = mooveAuction.interface.parseLog(log);
+        if (parsed && parsed.name === "AuctionCreated") {
+          auctionId = parsed.args.auctionId;
+          break;
+        }
+      } catch (e) {}
+    }
+    expect(auctionId).to.not.be.undefined;
 
     await expect(
-      mooveAuction.connect(bidder1).placeBid(0, { value: buyNowPrice })
+      mooveAuction.connect(bidder1).placeBid(auctionId, { value: buyNowPrice })
     )
       .to.emit(mooveAuction, "AuctionEnded")
-      .withArgs(0, bidder1.address, buyNowPrice);
+      .withArgs(auctionId, bidder1.address, buyNowPrice);
 
-    const auction = await mooveAuction.getAuction(0);
-    expect(auction.status).to.equal(AuctionStatus.ENDED);
+    const auction = await mooveAuction.getAuction(auctionId);
+    expect(auction.status).to.equal(1); // AuctionStatus.ENDED
   });
 
   it("Should end auction and transfer NFT correctly", async function () {
@@ -283,77 +314,69 @@ describe("MooveAuction", function () {
       await loadFixture(deployAuctionFixture);
 
     const tokenId = mintedTokenIds[0];
+    const startPrice = ethers.parseEther("1.0");
+    const reservePrice = ethers.parseEther("1.5");
+    const buyNowPrice = ethers.parseEther("3.0");
+    const duration = 3600;
+    const bidIncrement = ethers.parseEther("0.1");
 
-    await mooveAuction.connect(seller).createAuction(
-      tokenId,
-      mooveNFTAddress,
-      AuctionType.TRADITIONAL,
-      ethers.parseEther("1.0"),
-      ethers.parseEther("1.5"),
-      ethers.parseEther("3.0"),
-      3600,
-      ethers.parseEther("0.1") // 1 second duration
-    );
+    // Crea l'asta e recupera l'id
+    const tx = await mooveAuction
+      .connect(seller)
+      .createAuction(
+        tokenId,
+        mooveNFTAddress,
+        AuctionType.TRADITIONAL,
+        startPrice,
+        reservePrice,
+        buyNowPrice,
+        duration,
+        bidIncrement
+      );
+    const receipt = await tx.wait();
+    let auctionId;
+    for (const log of receipt.logs) {
+      try {
+        const parsed = mooveAuction.interface.parseLog(log);
+        if (parsed && parsed.name === "AuctionCreated") {
+          auctionId = parsed.args.auctionId;
+          break;
+        }
+      } catch (e) {}
+    }
+    expect(auctionId).to.not.be.undefined;
 
     const bidAmount = ethers.parseEther("2.0");
-    await mooveAuction.connect(bidder1).placeBid(0, { value: bidAmount });
+    await mooveAuction
+      .connect(bidder1)
+      .placeBid(auctionId, { value: bidAmount });
 
     // Wait for auction to end
-    await time.increase(2);
+    const auction = await mooveAuction.getAuction(auctionId);
+    await time.increaseTo(Number(auction.endTime) + 1);
 
-    await mooveAuction.endAuction(0);
+    await mooveAuction.endAuction(auctionId);
 
     // Claim NFT
-    await mooveAuction.connect(bidder1).claimNFT(0);
-    expect(await mooveNFT.ownerOf(0)).to.equal(bidder1.address);
+    await mooveAuction.connect(bidder1).claimNFT(auctionId);
+    expect(await mooveNFT.ownerOf(tokenId)).to.equal(bidder1.address);
   });
 
   describe("English Auction", function () {
     it("Should extend auction on late bids", async function () {
-      const { mooveAuction, mooveNFTAddress, seller, bidder1, mintedTokenIds } =
-        await loadFixture(deployAuctionFixture);
+      const {
+        mooveAuction,
+        mooveNFTAddress,
+        seller,
+        bidder1,
+        mintedTokenIds,
+        startPrice,
+      } = await loadFixture(deployAuctionFixture);
 
-      const tokenId = mintedTokenIds[0];
-
-      const duration = 3600; // 1 hour
-      await expect(
-        mooveAuction
-          .connect(seller)
-          .createAuction(
-            tokenId,
-            mooveNFTAddress,
-            AuctionType.ENGLISH,
-            ethers.parseEther("1.0"),
-            ethers.parseEther("1.5"),
-            ethers.parseEther("3.0"),
-            duration,
-            ethers.parseEther("0.1")
-          )
-      ).to.emit(mooveAuction, "AuctionCreated");
-
-      const auctionBefore = await mooveAuction.getAuction(0);
-      const originalEndTime = auctionBefore.endTime;
-
-      // Wait until near end
-      await time.increaseTo(Number(originalEndTime) - 5); // 5 seconds before end
-
-      // Place bid (should extend auction)
-      await mooveAuction
-        .connect(bidder1)
-        .placeBid(0, { value: ethers.parseEther("1.0") });
-
-      const auctionAfter = await mooveAuction.getAuction(0);
-      expect(auctionAfter.endTime).to.be.gt(originalEndTime);
-    });
-
-    it("Should not extend if bid placed early", async function () {
-      const { mooveAuction, mooveNFTAddress, seller, bidder1, mintedTokenIds } =
-        await loadFixture(deployAuctionFixture);
-
-      const tokenId = mintedTokenIds[0];
+      const tokenId = mintedTokenIds[0]; // Use first tokenId
 
       const duration = 3600; // 1 hour
-      await mooveAuction
+      const tx = await mooveAuction
         .connect(seller)
         .createAuction(
           tokenId,
@@ -365,16 +388,75 @@ describe("MooveAuction", function () {
           duration,
           ethers.parseEther("0.1")
         );
+      const receipt = await tx.wait();
+      let auctionId;
+      for (const log of receipt.logs) {
+        try {
+          const parsed = mooveAuction.interface.parseLog(log);
+          if (parsed && parsed.name === "AuctionCreated") {
+            auctionId = parsed.args.auctionId;
+            break;
+          }
+        } catch (e) {}
+      }
+      expect(auctionId).to.not.be.undefined;
 
-      const auctionBefore = await mooveAuction.getAuction(0);
+      const auctionBefore = await mooveAuction.getAuction(auctionId);
+      const originalEndTime = auctionBefore.endTime;
+
+      // Wait until near end
+      await time.increaseTo(Number(originalEndTime) - 5); // 5 seconds before end
+
+      // Place bid (should extend auction)
+      await mooveAuction
+        .connect(bidder1)
+        .placeBid(auctionId, { value: ethers.parseEther("1.0") });
+
+      const auctionAfter = await mooveAuction.getAuction(auctionId);
+      expect(auctionAfter.endTime).to.be.gt(originalEndTime);
+    });
+
+    it("Should not extend if bid placed early", async function () {
+      const { mooveAuction, mooveNFTAddress, seller, bidder1, mintedTokenIds } =
+        await loadFixture(deployAuctionFixture);
+
+      const tokenId = mintedTokenIds[1]; // Usa un tokenId diverso dal test precedente
+
+      const duration = 3600; // 1 hour
+      const tx = await mooveAuction
+        .connect(seller)
+        .createAuction(
+          tokenId,
+          mooveNFTAddress,
+          AuctionType.ENGLISH,
+          ethers.parseEther("1.0"),
+          ethers.parseEther("1.5"),
+          ethers.parseEther("3.0"),
+          duration,
+          ethers.parseEther("0.1")
+        );
+      const receipt = await tx.wait();
+      let auctionId;
+      for (const log of receipt.logs) {
+        try {
+          const parsed = mooveAuction.interface.parseLog(log);
+          if (parsed && parsed.name === "AuctionCreated") {
+            auctionId = parsed.args.auctionId;
+            break;
+          }
+        } catch (e) {}
+      }
+      expect(auctionId).to.not.be.undefined;
+
+      const auctionBefore = await mooveAuction.getAuction(auctionId);
       const originalEndTime = auctionBefore.endTime;
 
       // Place bid early
       await mooveAuction
         .connect(bidder1)
-        .placeBid(0, { value: ethers.parseEther("1.0") });
+        .placeBid(auctionId, { value: ethers.parseEther("1.0") });
 
-      const auctionAfter = await mooveAuction.getAuction(0);
+      const auctionAfter = await mooveAuction.getAuction(auctionId);
       expect(auctionAfter.endTime).to.equal(originalEndTime);
     });
   });
@@ -390,7 +472,8 @@ describe("MooveAuction", function () {
       const reservePrice = ethers.parseEther("2.0");
       const duration = 3600; // 1 hour
 
-      await mooveAuction
+      // Create auction and get auction ID
+      const tx = await mooveAuction
         .connect(seller)
         .createAuction(
           tokenId,
@@ -402,14 +485,26 @@ describe("MooveAuction", function () {
           duration,
           ethers.parseEther("0.1")
         );
+      const receipt = await tx.wait();
+      let auctionId;
+      for (const log of receipt.logs) {
+        try {
+          const parsed = mooveAuction.interface.parseLog(log);
+          if (parsed && parsed.name === "AuctionCreated") {
+            auctionId = parsed.args.auctionId;
+            break;
+          }
+        } catch (e) {}
+      }
+      expect(auctionId).to.not.be.undefined;
 
-      const initialPrice = await mooveAuction.getCurrentDutchPrice(0);
+      const initialPrice = await mooveAuction.getCurrentDutchPrice(auctionId);
       expect(initialPrice).to.equal(startPrice);
 
       // Wait half duration
       await time.increase(duration / 2);
 
-      const midPrice = await mooveAuction.getCurrentDutchPrice(0);
+      const midPrice = await mooveAuction.getCurrentDutchPrice(auctionId);
       const expectedMidPrice = (startPrice + reservePrice) / 2n;
 
       // Allow small rounding differences
@@ -421,7 +516,7 @@ describe("MooveAuction", function () {
       // Wait full duration
       await time.increase(duration / 2 + 1);
 
-      const finalPrice = await mooveAuction.getCurrentDutchPrice(0);
+      const finalPrice = await mooveAuction.getCurrentDutchPrice(auctionId);
       expect(finalPrice).to.equal(reservePrice);
     });
 
@@ -431,11 +526,12 @@ describe("MooveAuction", function () {
 
       const tokenId = mintedTokenIds[0];
 
-      const startPrice = ethers.parseEther("1.0");
+      const startPrice = ethers.parseEther("3.0");
       const reservePrice = ethers.parseEther("2.0");
       const duration = 3600;
 
-      await mooveAuction
+      // Crea l'asta e recupera l'id
+      const tx = await mooveAuction
         .connect(seller)
         .createAuction(
           tokenId,
@@ -447,14 +543,28 @@ describe("MooveAuction", function () {
           duration,
           ethers.parseEther("0.1")
         );
+      const receipt = await tx.wait();
+      let auctionId;
+      for (const log of receipt.logs) {
+        try {
+          const parsed = mooveAuction.interface.parseLog(log);
+          if (parsed && parsed.name === "AuctionCreated") {
+            auctionId = parsed.args.auctionId;
+            break;
+          }
+        } catch (e) {}
+      }
+      expect(auctionId).to.not.be.undefined;
 
       // Wait some time for price to decrease
       await time.increase(duration / 4);
 
-      const currentPrice = await mooveAuction.getCurrentDutchPrice(0);
+      const currentPrice = await mooveAuction.getCurrentDutchPrice(auctionId);
 
       await expect(
-        mooveAuction.connect(bidder1).placeBid(0, { value: currentPrice })
+        mooveAuction
+          .connect(bidder1)
+          .placeBid(auctionId, { value: currentPrice })
       ).to.emit(mooveAuction, "BidPlaced");
     });
   });
@@ -465,9 +575,10 @@ describe("MooveAuction", function () {
         await loadFixture(deployAuctionFixture);
 
       const tokenId = mintedTokenIds[0];
-
       const duration = 3600; // 1 hour
-      await mooveAuction
+
+      // Crea l'asta e recupera l'id
+      const tx = await mooveAuction
         .connect(seller)
         .createAuction(
           tokenId,
@@ -479,6 +590,18 @@ describe("MooveAuction", function () {
           duration,
           ethers.parseEther("0.1")
         );
+      const receipt = await tx.wait();
+      let auctionId;
+      for (const log of receipt.logs) {
+        try {
+          const parsed = mooveAuction.interface.parseLog(log);
+          if (parsed && parsed.name === "AuctionCreated") {
+            auctionId = parsed.args.auctionId;
+            break;
+          }
+        } catch (e) {}
+      }
+      expect(auctionId).to.not.be.undefined;
 
       const bidAmount = ethers.parseEther("2.0");
       const nonce = 12345;
@@ -491,10 +614,10 @@ describe("MooveAuction", function () {
       await expect(
         mooveAuction
           .connect(bidder1)
-          .submitSealedBid(0, bidHash, { value: bidAmount })
+          .submitSealedBid(auctionId, bidHash, { value: bidAmount })
       )
         .to.emit(mooveAuction, "SealedBidSubmitted")
-        .withArgs(0, bidder1.address, bidHash);
+        .withArgs(auctionId, bidder1.address, bidHash);
     });
 
     it("Should reveal sealed bids correctly", async function () {
@@ -502,9 +625,10 @@ describe("MooveAuction", function () {
         await loadFixture(deployAuctionFixture);
 
       const tokenId = mintedTokenIds[0];
-
       const duration = 3600; // 1 hour
-      await mooveAuction
+
+      // Crea l'asta e recupera l'id
+      const tx = await mooveAuction
         .connect(seller)
         .createAuction(
           tokenId,
@@ -516,6 +640,18 @@ describe("MooveAuction", function () {
           duration,
           ethers.parseEther("0.1")
         );
+      const receipt = await tx.wait();
+      let auctionId;
+      for (const log of receipt.logs) {
+        try {
+          const parsed = mooveAuction.interface.parseLog(log);
+          if (parsed && parsed.name === "AuctionCreated") {
+            auctionId = parsed.args.auctionId;
+            break;
+          }
+        } catch (e) {}
+      }
+      expect(auctionId).to.not.be.undefined;
 
       const bidAmount = ethers.parseEther("2.0");
       const nonce = 12345;
@@ -528,18 +664,20 @@ describe("MooveAuction", function () {
       // Submit sealed bid
       await mooveAuction
         .connect(bidder1)
-        .submitSealedBid(0, bidHash, { value: bidAmount });
+        .submitSealedBid(auctionId, bidHash, { value: bidAmount });
 
       // Wait for reveal phase
-      const auction = await mooveAuction.getAuction(0);
+      const auction = await mooveAuction.getAuction(auctionId);
       await time.increaseTo(Number(auction.endTime) - 24 * 60 * 60 + 1); // Start of reveal phase
 
       // Reveal bid
       await expect(
-        mooveAuction.connect(bidder1).revealSealedBid(0, bidAmount, nonce)
+        mooveAuction
+          .connect(bidder1)
+          .revealSealedBid(auctionId, bidAmount, nonce)
       )
         .to.emit(mooveAuction, "SealedBidRevealed")
-        .withArgs(0, bidder1.address, bidAmount);
+        .withArgs(auctionId, bidder1.address, bidAmount);
     });
 
     it("Should fail reveal with wrong parameters", async function () {
@@ -547,9 +685,10 @@ describe("MooveAuction", function () {
         await loadFixture(deployAuctionFixture);
 
       const tokenId = mintedTokenIds[0];
-
       const duration = 3600;
-      await mooveAuction
+
+      // Crea l'asta e recupera l'id
+      const tx = await mooveAuction
         .connect(seller)
         .createAuction(
           tokenId,
@@ -561,6 +700,18 @@ describe("MooveAuction", function () {
           duration,
           ethers.parseEther("0.1")
         );
+      const receipt = await tx.wait();
+      let auctionId;
+      for (const log of receipt.logs) {
+        try {
+          const parsed = mooveAuction.interface.parseLog(log);
+          if (parsed && parsed.name === "AuctionCreated") {
+            auctionId = parsed.args.auctionId;
+            break;
+          }
+        } catch (e) {}
+      }
+      expect(auctionId).to.not.be.undefined;
 
       const bidAmount = ethers.parseEther("2.0");
       const nonce = 12345;
@@ -572,17 +723,17 @@ describe("MooveAuction", function () {
 
       await mooveAuction
         .connect(bidder1)
-        .submitSealedBid(0, bidHash, { value: bidAmount });
+        .submitSealedBid(auctionId, bidHash, { value: bidAmount });
 
       // Wait for reveal phase
-      const auction = await mooveAuction.getAuction(0);
+      const auction = await mooveAuction.getAuction(auctionId);
       await time.increaseTo(Number(auction.endTime) - 24 * 60 * 60 + 1);
 
       // Try to reveal with wrong amount
       await expect(
         mooveAuction
           .connect(bidder1)
-          .revealSealedBid(0, ethers.parseEther("1.5"), nonce)
+          .revealSealedBid(auctionId, ethers.parseEther("1.5"), nonce)
       ).to.be.revertedWithCustomError(
         mooveAuction,
         "MooveAuction__InvalidReveal"
@@ -590,7 +741,9 @@ describe("MooveAuction", function () {
 
       // Try to reveal with wrong nonce
       await expect(
-        mooveAuction.connect(bidder1).revealSealedBid(0, bidAmount, 54321)
+        mooveAuction
+          .connect(bidder1)
+          .revealSealedBid(auctionId, bidAmount, 54321)
       ).to.be.revertedWithCustomError(
         mooveAuction,
         "MooveAuction__InvalidReveal"
@@ -611,7 +764,8 @@ describe("MooveAuction", function () {
 
       const tokenId = mintedTokenIds[0];
 
-      await mooveAuction
+      // Crea l'asta e recupera l'id
+      const tx = await mooveAuction
         .connect(seller)
         .createAuction(
           tokenId,
@@ -623,12 +777,27 @@ describe("MooveAuction", function () {
           3600,
           ethers.parseEther("0.1")
         );
+      const receipt = await tx.wait();
+      let auctionId;
+      for (const log of receipt.logs) {
+        try {
+          const parsed = mooveAuction.interface.parseLog(log);
+          if (parsed && parsed.name === "AuctionCreated") {
+            auctionId = parsed.args.auctionId;
+            break;
+          }
+        } catch (e) {}
+      }
+      expect(auctionId).to.not.be.undefined;
 
       const bidAmount = ethers.parseEther("2.0");
-      await mooveAuction.connect(bidder1).placeBid(0, { value: bidAmount });
+      await mooveAuction
+        .connect(bidder1)
+        .placeBid(auctionId, { value: bidAmount });
 
-      await time.increase(2);
-      await mooveAuction.endAuction(0);
+      const auction = await mooveAuction.getAuction(auctionId);
+      await time.increaseTo(Number(auction.endTime) + 1);
+      await mooveAuction.endAuction(auctionId);
 
       const sellerBalanceBefore = await ethers.provider.getBalance(
         seller.address
@@ -638,10 +807,9 @@ describe("MooveAuction", function () {
       );
 
       // Claim payment
-      await expect(mooveAuction.connect(seller).claimPayment(0)).to.emit(
-        mooveAuction,
-        "PaymentClaimed"
-      );
+      await expect(
+        mooveAuction.connect(seller).claimPayment(auctionId)
+      ).to.emit(mooveAuction, "PaymentClaimed");
 
       const sellerBalanceAfter = await ethers.provider.getBalance(
         seller.address
@@ -674,7 +842,8 @@ describe("MooveAuction", function () {
 
       const tokenId = mintedTokenIds[0];
 
-      await mooveAuction
+      // Crea l'asta e recupera l'id
+      const tx = await mooveAuction
         .connect(seller)
         .createAuction(
           tokenId,
@@ -686,26 +855,39 @@ describe("MooveAuction", function () {
           3600,
           ethers.parseEther("0.1")
         );
+      const receipt = await tx.wait();
+      let auctionId;
+      for (const log of receipt.logs) {
+        try {
+          const parsed = mooveAuction.interface.parseLog(log);
+          if (parsed && parsed.name === "AuctionCreated") {
+            auctionId = parsed.args.auctionId;
+            break;
+          }
+        } catch (e) {}
+      }
+      expect(auctionId).to.not.be.undefined;
 
       // Place multiple bids
       await mooveAuction
         .connect(bidder1)
-        .placeBid(0, { value: ethers.parseEther("1.0") });
+        .placeBid(auctionId, { value: ethers.parseEther("1.0") });
       await mooveAuction
         .connect(bidder2)
-        .placeBid(0, { value: ethers.parseEther("2.0") });
+        .placeBid(auctionId, { value: ethers.parseEther("2.0") });
 
-      await time.increase(2);
-      await mooveAuction.endAuction(0);
+      const auction = await mooveAuction.getAuction(auctionId);
+      await time.increaseTo(Number(auction.endTime) + 1);
+      await mooveAuction.endAuction(auctionId);
 
       const bidder1BalanceBefore = await ethers.provider.getBalance(
         bidder1.address
       );
 
       // Losing bidder should get refund
-      await expect(mooveAuction.connect(bidder1).claimRefund(0))
+      await expect(mooveAuction.connect(bidder1).claimRefund(auctionId))
         .to.emit(mooveAuction, "BidRefunded")
-        .withArgs(0, bidder1.address, ethers.parseEther("1.0"));
+        .withArgs(auctionId, bidder1.address, ethers.parseEther("1.0"));
 
       const bidder1BalanceAfter = await ethers.provider.getBalance(
         bidder1.address
@@ -722,7 +904,8 @@ describe("MooveAuction", function () {
 
       const tokenId = mintedTokenIds[0];
 
-      await mooveAuction.connect(seller).createAuction(
+      // Crea l'asta e recupera l'id
+      const tx = await mooveAuction.connect(seller).createAuction(
         tokenId,
         mooveNFTAddress,
         AuctionType.TRADITIONAL,
@@ -732,22 +915,38 @@ describe("MooveAuction", function () {
         3600,
         ethers.parseEther("0.1")
       );
+      const receipt = await tx.wait();
+      let auctionId;
+      for (const log of receipt.logs) {
+        try {
+          const parsed = mooveAuction.interface.parseLog(log);
+          if (parsed && parsed.name === "AuctionCreated") {
+            auctionId = parsed.args.auctionId;
+            break;
+          }
+        } catch (e) {}
+      }
+      expect(auctionId).to.not.be.undefined;
 
       // Bid below reserve
       await mooveAuction
         .connect(bidder1)
-        .placeBid(0, { value: ethers.parseEther("1.5") });
+        .placeBid(auctionId, { value: ethers.parseEther("1.5") });
 
-      await time.increase(2);
-      await mooveAuction.endAuction(0);
+      const auction = await mooveAuction.getAuction(auctionId);
+      await time.increaseTo(Number(auction.endTime) + 1);
+      await mooveAuction.endAuction(auctionId);
 
       // Should not be able to claim NFT
       await expect(
-        mooveAuction.connect(bidder1).claimNFT(0)
-      ).to.be.revertedWithCustomError(mooveAuction, "Reserve not met");
+        mooveAuction.connect(bidder1).claimNFT(auctionId)
+      ).to.be.revertedWithCustomError(
+        mooveAuction,
+        "MooveAuction__ReserveNotMet"
+      );
 
       // NFT should be returned to seller
-      expect(await mooveNFT.ownerOf(0)).to.equal(seller.address);
+      expect(await mooveNFT.ownerOf(tokenId)).to.equal(seller.address);
     });
   });
 
@@ -758,7 +957,8 @@ describe("MooveAuction", function () {
 
       const tokenId = mintedTokenIds[0];
 
-      await mooveAuction
+      // Create auction and retrieve its ID
+      const tx = await mooveAuction
         .connect(seller)
         .createAuction(
           tokenId,
@@ -770,16 +970,28 @@ describe("MooveAuction", function () {
           3600,
           ethers.parseEther("0.1")
         );
+      const receipt = await tx.wait();
+      let auctionId;
+      for (const log of receipt.logs) {
+        try {
+          const parsed = mooveAuction.interface.parseLog(log);
+          if (parsed && parsed.name === "AuctionCreated") {
+            auctionId = parsed.args.auctionId;
+            break;
+          }
+        } catch (e) {}
+      }
+      expect(auctionId).to.not.be.undefined;
 
-      await expect(mooveAuction.connect(admin).cancelAuction(0))
+      await expect(mooveAuction.connect(admin).cancelAuction(auctionId))
         .to.emit(mooveAuction, "AuctionCancelled")
-        .withArgs(0);
+        .withArgs(auctionId);
 
-      const auction = await mooveAuction.getAuction(0);
-      expect(auction.status).to.equal(AuctionStatus.CANCELLED);
+      const auction = await mooveAuction.getAuction(auctionId);
+      expect(auction.status).to.equal(2); // AuctionStatus.CANCELLED
 
       // NFT should be returned to seller
-      expect(await mooveNFT.ownerOf(0)).to.equal(seller.address);
+      expect(await mooveNFT.ownerOf(tokenId)).to.equal(seller.address);
     });
 
     it("Should update platform fee", async function () {
@@ -808,16 +1020,25 @@ describe("MooveAuction", function () {
 
       // Create multiple auctions con tokenId diversi
       for (let i = 0; i < 3; i++) {
-        await mooveAuction.connect(seller).createAuction(
-          mintedTokenIds[i],
-          mooveNFTAddress,
-          i, // Different auction types
-          ethers.parseEther("1.0"),
-          ethers.parseEther("1.5"),
-          ethers.parseEther("3.0"),
-          3600,
-          ethers.parseEther("0.1")
-        );
+        let startPrice = ethers.parseEther("1.0");
+        let reservePrice = ethers.parseEther("1.5");
+        if (i === 2) {
+          // Dutch Auction
+          startPrice = ethers.parseEther("3.0");
+          reservePrice = ethers.parseEther("1.5");
+        }
+        await mooveAuction
+          .connect(seller)
+          .createAuction(
+            mintedTokenIds[i],
+            mooveNFTAddress,
+            i,
+            startPrice,
+            reservePrice,
+            ethers.parseEther("3.0"),
+            3600,
+            ethers.parseEther("0.1")
+          );
       }
     });
 
@@ -825,18 +1046,23 @@ describe("MooveAuction", function () {
       const { mooveAuction, mooveNFTAddress, seller, mintedTokenIds } =
         await loadFixture(deployAuctionFixture);
 
-      const tokenId = mintedTokenIds[0];
-
-      // Create multiple auctions con tokenId diversi
+      // Create multiple auctions with different tokenIds
       for (let i = 0; i < 3; i++) {
+        let startPrice = ethers.parseEther("1.0");
+        let reservePrice = ethers.parseEther("1.5");
+        if (i === 2) {
+          // Dutch Auction
+          startPrice = ethers.parseEther("3.0");
+          reservePrice = ethers.parseEther("1.5");
+        }
         await mooveAuction
           .connect(seller)
           .createAuction(
             mintedTokenIds[i],
             mooveNFTAddress,
             i,
-            ethers.parseEther("1.0"),
-            ethers.parseEther("1.5"),
+            startPrice,
+            reservePrice,
             ethers.parseEther("3.0"),
             3600,
             ethers.parseEther("0.1")
@@ -856,14 +1082,21 @@ describe("MooveAuction", function () {
 
       const auctionIds = [];
       for (let i = 0; i < 3; i++) {
+        let startPrice = ethers.parseEther("1.0");
+        let reservePrice = ethers.parseEther("1.5");
+        if (i === 2) {
+          // Dutch Auction
+          startPrice = ethers.parseEther("3.0");
+          reservePrice = ethers.parseEther("1.5");
+        }
         const tx = await mooveAuction
           .connect(seller)
           .createAuction(
             mintedTokenIds[i],
             mooveNFTAddress,
             i,
-            ethers.parseEther("1.0"),
-            ethers.parseEther("1.5"),
+            startPrice,
+            reservePrice,
             ethers.parseEther("3.0"),
             3600,
             ethers.parseEther("0.1")
