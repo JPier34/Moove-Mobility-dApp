@@ -52,7 +52,6 @@ struct AestheticCustomization {
  * @title MooveCustomization
  * @dev Implementation contract for virtual vehicle NFT customizations
  * @notice All customizations are purely virtual and affect only NFT metadata and visual representation
- * @author Moove Team
  */
 contract MooveCustomization is AccessControl, ReentrancyGuard, Pausable {
     // ============= CONSTANTS =============

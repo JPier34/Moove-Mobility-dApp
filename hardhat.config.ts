@@ -4,6 +4,7 @@ import "hardhat-gas-reporter";
 import "solidity-coverage";
 import "@nomicfoundation/hardhat-verify";
 import * as dotenv from "dotenv";
+require("hardhat-contract-sizer");
 
 dotenv.config();
 
@@ -28,10 +29,12 @@ const config: HardhatUserConfig = {
       },
     },
     sepolia: {
-      url: process.env.SEPOLIA_URL || "",
+      url: `https://eth-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
       accounts:
         process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
       chainId: 11155111,
+      gasPrice: 20000000000, // 20 gwei
+      gas: 60000000, // 60 million gas limit
     },
     localhost: {
       url: "http://127.0.0.1:8545",

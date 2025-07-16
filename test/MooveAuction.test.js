@@ -7,6 +7,8 @@ const {
 
 const { anyValue } = require("@nomicfoundation/hardhat-chai-matchers/withArgs");
 
+const DEBUG_MODE = false;
+
 describe("MooveAuction", function () {
   const AuctionType = {
     TRADITIONAL: 0,
@@ -78,14 +80,18 @@ describe("MooveAuction", function () {
       const receipt = await tx.wait();
       const transferEvent = mooveNFT.interface.parseLog(receipt.logs[0]);
       if (transferEvent && transferEvent.name === "Transfer") {
-        console.log(
-          `[Fixture] NFT Minted! ID: ${transferEvent.args.tokenId}, Owner: ${transferEvent.args.to}`
-        );
+        if (DEBUG_MODE) {
+          console.log(
+            `[Fixture] NFT Minted! ID: ${transferEvent.args.tokenId}, Owner: ${transferEvent.args.to}`
+          );
+        }
         mintedTokenIds.push(transferEvent.args.tokenId);
       } else {
-        console.error(
-          "[Fixture] Errore: Evento 'Transfer' non trovato o non parsato correttamente."
-        );
+        if (DEBUG_MODE) {
+          console.error(
+            "[Fixture] Errore: Evento 'Transfer' non trovato o non parsato correttamente."
+          );
+        }
       }
     }
 
@@ -178,7 +184,7 @@ describe("MooveAuction", function () {
     const duration = 24 * 60 * 60;
     const bidIncrement = ethers.parseEther("0.1");
 
-    // Crea l'asta e recupera l'id
+    // Create auction and retrieve auction ID
     const tx = await mooveAuction
       .connect(seller)
       .createAuction(
@@ -273,7 +279,7 @@ describe("MooveAuction", function () {
     const buyNowPrice = ethers.parseEther("3.0");
     const tokenId = mintedTokenIds[0];
 
-    // Crea l'asta e recupera l'id
+    // Create auction and retrieve auction ID
     const tx = await mooveAuction
       .connect(seller)
       .createAuction(
@@ -320,7 +326,7 @@ describe("MooveAuction", function () {
     const duration = 3600;
     const bidIncrement = ethers.parseEther("0.1");
 
-    // Crea l'asta e recupera l'id
+    // Create auction and retrieve auction ID
     const tx = await mooveAuction
       .connect(seller)
       .createAuction(
@@ -420,7 +426,7 @@ describe("MooveAuction", function () {
       const { mooveAuction, mooveNFTAddress, seller, bidder1, mintedTokenIds } =
         await loadFixture(deployAuctionFixture);
 
-      const tokenId = mintedTokenIds[1]; // Usa un tokenId diverso dal test precedente
+      const tokenId = mintedTokenIds[1]; // Use second tokenId
 
       const duration = 3600; // 1 hour
       const tx = await mooveAuction
@@ -530,7 +536,7 @@ describe("MooveAuction", function () {
       const reservePrice = ethers.parseEther("2.0");
       const duration = 3600;
 
-      // Crea l'asta e recupera l'id
+      // Create auction and retrieve auction ID
       const tx = await mooveAuction
         .connect(seller)
         .createAuction(
@@ -577,7 +583,7 @@ describe("MooveAuction", function () {
       const tokenId = mintedTokenIds[0];
       const duration = 3600; // 1 hour
 
-      // Crea l'asta e recupera l'id
+      // Create auction and retrieve auction ID
       const tx = await mooveAuction
         .connect(seller)
         .createAuction(
@@ -627,7 +633,7 @@ describe("MooveAuction", function () {
       const tokenId = mintedTokenIds[0];
       const duration = 3600; // 1 hour
 
-      // Crea l'asta e recupera l'id
+      // Create auction and retrieve auction ID
       const tx = await mooveAuction
         .connect(seller)
         .createAuction(
@@ -687,7 +693,7 @@ describe("MooveAuction", function () {
       const tokenId = mintedTokenIds[0];
       const duration = 3600;
 
-      // Crea l'asta e recupera l'id
+      // Create auction and retrieve auction ID
       const tx = await mooveAuction
         .connect(seller)
         .createAuction(
@@ -764,7 +770,7 @@ describe("MooveAuction", function () {
 
       const tokenId = mintedTokenIds[0];
 
-      // Crea l'asta e recupera l'id
+      // Create auction and retrieve auction ID
       const tx = await mooveAuction
         .connect(seller)
         .createAuction(
@@ -842,7 +848,7 @@ describe("MooveAuction", function () {
 
       const tokenId = mintedTokenIds[0];
 
-      // Crea l'asta e recupera l'id
+      // Create auction and retrieve auction ID
       const tx = await mooveAuction
         .connect(seller)
         .createAuction(
@@ -904,7 +910,7 @@ describe("MooveAuction", function () {
 
       const tokenId = mintedTokenIds[0];
 
-      // Crea l'asta e recupera l'id
+      // Create auction and retrieve auction ID
       const tx = await mooveAuction.connect(seller).createAuction(
         tokenId,
         mooveNFTAddress,
@@ -1018,7 +1024,7 @@ describe("MooveAuction", function () {
       const { mooveAuction, mooveNFTAddress, seller, mintedTokenIds } =
         await loadFixture(deployAuctionFixture);
 
-      // Create multiple auctions con tokenId diversi
+      // Create auction and retrieve auction ID
       for (let i = 0; i < 3; i++) {
         let startPrice = ethers.parseEther("1.0");
         let reservePrice = ethers.parseEther("1.5");
@@ -1227,7 +1233,7 @@ describe("MooveAuction", function () {
 
       const tokenId = mintedTokenIds[0];
 
-      // Crea l'asta e recupera l'auctionId
+      // Create auction and retrieve auction ID
       const tx = await mooveAuction
         .connect(seller)
         .createAuction(
@@ -1269,7 +1275,7 @@ describe("MooveAuction", function () {
 
       const tokenId = mintedTokenIds[0];
 
-      // Crea l'asta e recupera l'auctionId dall'evento
+      // Create auction and retrieve auction ID
       const tx = await mooveAuction
         .connect(seller)
         .createAuction(
@@ -1299,7 +1305,7 @@ describe("MooveAuction", function () {
         .connect(bidder1)
         .placeBid(auctionId, { value: ethers.parseEther("2.0") });
 
-      // Porta il tempo oltre la fine dell'asta
+      // Take time beyond auction end
       const auction = await mooveAuction.getAuction(auctionId);
       await time.increaseTo(Number(auction.endTime) + 1);
 
@@ -1308,7 +1314,7 @@ describe("MooveAuction", function () {
       // First claim should succeed
       await mooveAuction.connect(bidder1).claimNFT(auctionId);
 
-      // Second claim should fail con errore custom corretto
+      // Second claim should fail
       await expect(
         mooveAuction.connect(bidder1).claimNFT(auctionId)
       ).to.be.revertedWithCustomError(
@@ -1388,7 +1394,7 @@ describe("MooveAuction", function () {
 
       const tokenId = mintedTokenIds[0];
 
-      // Crea l'asta e recupera l'id
+      // Create auction and retrieve auction ID
       const tx = await mooveAuction
         .connect(seller)
         .createAuction(
@@ -1448,7 +1454,7 @@ describe("MooveAuction", function () {
 
       for (let i = 0; i < 3; i++) {
         const tx = await mooveAuction.connect(seller).createAuction(
-          mintedTokenIds[i], // Usa un tokenId diverso ogni volta
+          mintedTokenIds[i], // Usa a different tokenId everytime
           mooveNFTAddress,
           AuctionType.TRADITIONAL,
           ethers.parseEther("1.0"),
