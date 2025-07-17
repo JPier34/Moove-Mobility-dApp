@@ -8,6 +8,9 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        "moove-primary": "#00D4AA",
+        "moove-secondary": "#0052CC",
+        "moove-accent": "#FF6B35",
         moove: {
           50: "#f0f9ff",
           100: "#e0f2fe",
