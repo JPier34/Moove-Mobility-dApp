@@ -1,15 +1,55 @@
 import { formatEther, parseEther } from "viem";
 import { AuctionType, AuctionStatus } from "../types/auction";
-import { IMooveVehicleNFT__factory } from "@factories/contracts/interfaces/IMooveVehicleNFT__factory";
-import type { IMooveVehicleNFT } from "@contracts/index";
 import { VehicleType } from "@/types/nft";
-export const MOOVE_NFT_ABI = IMooveVehicleNFT__factory.abi;
 
-export function createMooveNFTContract(
-  address: string,
-  runner: any
-): IMooveVehicleNFT {
-  return IMooveVehicleNFT__factory.connect(address, runner);
+// ABI for the Moove Vehicle NFT contract (copied from the contract)
+export const MOOVE_NFT_ABI = [
+  {
+    inputs: [{ internalType: "uint256", name: "tokenId", type: "uint256" }],
+    name: "getVehicleInfo",
+    outputs: [
+      {
+        components: [
+          { internalType: "uint256", name: "tokenId", type: "uint256" },
+          {
+            internalType: "enum IMooveVehicleNFT.VehicleType",
+            name: "vehicleType",
+            type: "uint8",
+          },
+          { internalType: "string", name: "name", type: "string" },
+          { internalType: "string", name: "description", type: "string" },
+          { internalType: "uint256", name: "dailyRate", type: "uint256" },
+          { internalType: "bool", name: "isActive", type: "bool" },
+          { internalType: "address", name: "currentOwner", type: "address" },
+        ],
+        internalType: "struct IMooveVehicleNFT.VehicleInfo",
+        name: "",
+        type: "tuple",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "address", name: "to", type: "address" },
+      { internalType: "uint256", name: "tokenId", type: "uint256" },
+      {
+        internalType: "enum IMooveVehicleNFT.VehicleType",
+        name: "vehicleType",
+        type: "uint8",
+      },
+    ],
+    name: "mint",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+] as const;
+
+export function createMooveNFTContract(address: string, signer: any) {
+  const { Contract } = require("ethers");
+  return new Contract(address, MOOVE_NFT_ABI, signer);
 }
 
 export function formatPrice(price: bigint): string {
@@ -27,6 +67,15 @@ export function getVehicleTypeName(type: VehicleType): string {
     [VehicleType.MONOPATTINO]: "Electric Monopattino",
   };
   return names[type] || "Unknown Vehicle";
+}
+
+export function getVehicleTypeIcon(type: VehicleType): string {
+  const icons = {
+    [VehicleType.BIKE]: "🚲",
+    [VehicleType.SCOOTER]: "🛴",
+    [VehicleType.MONOPATTINO]: "🛵",
+  };
+  return icons[type] || "🚗";
 }
 
 export function getAuctionTypeName(type: AuctionType): string {
@@ -47,6 +96,16 @@ export function getAuctionStatusName(status: AuctionStatus): string {
     [AuctionStatus.REVEALING]: "Revealing",
   };
   return names[status] || "Unknown Status";
+}
+
+export function getAuctionStatusColor(status: AuctionStatus): string {
+  const colors = {
+    [AuctionStatus.ACTIVE]: "bg-green-100 text-green-800",
+    [AuctionStatus.ENDED]: "bg-gray-100 text-gray-800",
+    [AuctionStatus.CANCELLED]: "bg-red-100 text-red-800",
+    [AuctionStatus.REVEALING]: "bg-yellow-100 text-yellow-800",
+  };
+  return colors[status] || "bg-gray-100 text-gray-800";
 }
 
 export function formatTimeRemaining(endTime: bigint): string {
@@ -77,4 +136,28 @@ export function getExplorerUrl(
   const baseUrl =
     process.env.NEXT_PUBLIC_EXPLORER_URL || "https://sepolia.etherscan.io";
   return `${baseUrl}/${type}/${hash}`;
+}
+
+export function formatCurrency(amount: bigint, decimals = 18): string {
+  const formatted = formatEther(amount);
+  const num = parseFloat(formatted);
+  return num.toLocaleString("it-IT", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 4,
+  });
+}
+
+export function formatDate(timestamp: bigint): string {
+  const date = new Date(Number(timestamp) * 1000);
+  return date.toLocaleDateString("it-IT", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+export function isValidAddress(address: string): boolean {
+  return /^0x[a-fA-F0-9]{40}$/.test(address);
 }

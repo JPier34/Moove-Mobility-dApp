@@ -26,7 +26,7 @@ export default function Footer() {
               <li>
                 <Link
                   href="/marketplace"
-                  className="text-gray-600 hover:text-moove-600"
+                  className="text-gray-600 hover:text-teal-600"
                 >
                   Marketplace
                 </Link>
@@ -34,7 +34,7 @@ export default function Footer() {
               <li>
                 <Link
                   href="/auctions"
-                  className="text-gray-600 hover:text-moove-600"
+                  className="text-gray-600 hover:text-teal-600"
                 >
                   Auctions
                 </Link>
@@ -42,7 +42,7 @@ export default function Footer() {
               <li>
                 <Link
                   href="/my-collection"
-                  className="text-gray-600 hover:text-moove-600"
+                  className="text-gray-600 hover:text-teal-600"
                 >
                   My Collection
                 </Link>

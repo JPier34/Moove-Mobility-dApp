@@ -21,7 +21,7 @@ export default function Header() {
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center">
-            <div className="text-2xl font-bold text-moove-600">Moove</div>
+            <div className="text-2xl font-bold text-teal-600">Moove</div>
             <span className="ml-2 text-sm text-gray-500">NFT</span>
           </Link>
 
@@ -34,8 +34,8 @@ export default function Header() {
                 className={clsx(
                   "px-3 py-2 text-sm font-medium transition-colors",
                   pathname === item.href
-                    ? "text-moove-600 border-b-2 border-moove-600"
-                    : "text-gray-700 hover:text-moove-600"
+                    ? "text-teal-600 border-b-2 border-teal-600"
+                    : "text-gray-700 hover:text-teal-600"
                 )}
               >
                 {item.name}
@@ -44,7 +44,9 @@ export default function Header() {
           </nav>
 
           {/* Wallet Button */}
-          <WalletButton />
+          <button className="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700">
+            Connect Wallet
+          </button>
         </div>
       </div>
     </header>
