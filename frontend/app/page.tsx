@@ -1,7 +1,25 @@
-export default function Home() {
+import Hero from "@/components/sections/Hero";
+import Features from "@/components/sections/Features";
+
+export const metadata = {
+  title: "Moove NFT Platform - Mobilità Decentralizzata",
+  description:
+    "Scopri la nuova era della micro-mobilità urbana. Acquista, personalizza e utilizza NFT per accedere alla flotta di veicoli sostenibili Moove.",
+};
+
+export default function HomePage() {
   return (
-    <div className="bg-blue-900 text-white p-4 text-2xl">
-      🔵 PAGE TEST - Dovrei essere blu!
-    </div>
+    <>
+      <Hero />
+
+      <Features />
+
+      {/* More sections to come */}
+      {/* 
+      <Stats />
+      <Testimonials />
+      <CTA />
+      */}
+    </>
   );
 }

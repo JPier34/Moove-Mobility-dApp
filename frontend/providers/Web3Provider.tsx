@@ -3,6 +3,8 @@
 import React, { createContext, useContext } from "react";
 import { useWeb3 } from "../hooks/useWeb3";
 import toast, { Toaster } from "react-hot-toast";
+import detectEthereumProvider from "@metamask/detect-provider";
+import { SUPPORTED_CHAINS } from "@/utils/contracts";
 
 interface Web3ContextType {
   provider: any;
@@ -15,6 +17,9 @@ interface Web3ContextType {
   connectWallet: () => Promise<void>;
   disconnectWallet: () => void;
   switchNetwork: (chainId: number) => Promise<void>;
+  isOnSupportedChain: boolean;
+  chainName: string;
+  shortenAddress: (address: string) => string;
 }
 
 const Web3Context = createContext<Web3ContextType | null>(null);

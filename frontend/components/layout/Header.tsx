@@ -3,8 +3,9 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import WalletButton from "../wallet/WalletButton";
+import Button from "../ui/Button";
 import { clsx } from "clsx";
+import WalletButton from "../wallet/WalletButton";
 
 const navigation = [
   { name: "Marketplace", href: "/marketplace" },
@@ -21,7 +22,7 @@ export default function Header() {
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center">
-            <div className="text-2xl font-bold text-teal-600">Moove</div>
+            <div className="text-2xl font-bold text-moove-primary">Moove</div>
             <span className="ml-2 text-sm text-gray-500">NFT</span>
           </Link>
 
@@ -34,8 +35,8 @@ export default function Header() {
                 className={clsx(
                   "px-3 py-2 text-sm font-medium transition-colors",
                   pathname === item.href
-                    ? "text-teal-600 border-b-2 border-teal-600"
-                    : "text-gray-700 hover:text-teal-600"
+                    ? "text-moove-primary border-b-2 border-moove-primary"
+                    : "text-gray-700 hover:text-moove-primary"
                 )}
               >
                 {item.name}
@@ -43,10 +44,7 @@ export default function Header() {
             ))}
           </nav>
 
-          {/* Wallet Button */}
-          <button className="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700">
-            Connect Wallet
-          </button>
+          <WalletButton />
         </div>
       </div>
     </header>
