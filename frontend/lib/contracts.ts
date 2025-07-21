@@ -2,9 +2,6 @@ import {
   IMooveVehicleNFT__factory,
   MooveAuction__factory,
   MooveAccessControl__factory,
-  type IMooveVehicleNFT,
-  type MooveAuction,
-  type MooveAccessControl,
 } from "../../typechain-types";
 
 // Contract addresses (actualize after deploy)

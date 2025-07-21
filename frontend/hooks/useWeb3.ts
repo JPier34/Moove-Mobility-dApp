@@ -33,6 +33,9 @@ export function useWeb3() {
         throw new Error("MetaMask not detected. Please install MetaMask.");
       }
 
+      if (!window.ethereum) {
+        throw new Error("MetaMask non è installato");
+      }
       const provider = new ethers.BrowserProvider(window.ethereum);
 
       // Request account access

@@ -1,15 +1,12 @@
-/** @type {import('tailwindcss').Config} */
+﻿/** @type {import('tailwindcss').Config} */
 module.exports = {
   content: [
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
     "./utils/**/*.{js,ts,jsx,tsx,mdx}",
     "./hooks/**/*.{js,ts,jsx,tsx,mdx}",
-    "./layouts/**/*.{js,ts,jsx,tsx,mdx}",
-    "./contexts/**/*.{js,ts,jsx,tsx,mdx}",
-    "./public/**/*.{js,ts,jsx,tsx,mdx}",
-    //catch-all for any other files
-    "./**/*.{js,ts,jsx,tsx,mdx}",
+    "./providers/**/*.{js,ts,jsx,tsx,mdx}",
+    "./types/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
     extend: {
