@@ -1,4 +1,5 @@
 import React from "react";
+import { UserData } from "@/types/user";
 import CollectionTabs from "@/components/collection/CollectionTabs";
 import CollectionStats from "@/components/collection/CollectionStats";
 import { AuctionType } from "@/types/auction";
@@ -16,7 +17,6 @@ const MOCK_USER_DATA = {
   address: "0x1234567890abcdef1234567890abcdef12345678",
   totalNFTs: 3,
   totalValue: "1.25", // ETH
-  activeBids: 2,
   wonAuctions: 1,
 
   // Owned NFTs
@@ -36,7 +36,7 @@ const MOCK_USER_DATA = {
         battery: "Lithium Ion",
         condition: "Excellent",
       },
-      source: "marketplace", // "marketplace" | "auction"
+      source: "marketplace" as const,
     },
     {
       id: "3",
@@ -53,7 +53,7 @@ const MOCK_USER_DATA = {
         battery: "Fast Charging",
         condition: "Mint",
       },
-      source: "auction",
+      source: "auction" as const,
     },
   ],
 
@@ -82,7 +82,7 @@ const MOCK_USER_DATA = {
   ],
 
   // Won auctions (waiting to be claimed)
-  wonAuctions: [
+  wonAuctionsDetails: [
     {
       auctionId: "5",
       nftName: "Urban Moped #099",
@@ -100,19 +100,19 @@ const MOCK_USER_DATA = {
     {
       auctionId: "4",
       nftName: "Eco Skateboard #123",
-      action: "bid", // "bid" | "won" | "lost" | "created"
+      action: "bid" as const, // "bid" | "won" | "lost" | "created"
       amount: "0.0025",
       date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000), // 5 days ago
-      result: "lost",
+      result: "lost" as const,
       auctionType: AuctionType.SEALED_BID,
     },
     {
       auctionId: "1",
       nftName: "Electric Scooter #001",
-      action: "won",
+      action: "won" as const,
       amount: "0.5",
       date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 7 days ago
-      result: "won",
+      result: "won" as const,
       auctionType: AuctionType.TRADITIONAL,
     },
   ],

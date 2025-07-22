@@ -1,20 +1,11 @@
 "use client";
 
 import React, { useState } from "react";
+import { UserData } from "@/types/user";
 import OwnedNFTs from "@/components/collection/OwnedNFTs";
 import ActiveBids from "@/components/collection/ActiveBids";
 import WonAuctions from "@/components/collection/WonAuctions";
 import AuctionHistory from "@/components/collection/AuctionHistory";
-
-interface UserData {
-  address: string;
-  totalNFTs: number;
-  totalValue: string;
-  activeBids: number;
-  ownedNFTs: any[];
-  wonAuctions: any[];
-  auctionHistory: any[];
-}
 
 interface CollectionTabsProps {
   userData: UserData;
@@ -44,8 +35,8 @@ export default function CollectionTabs({ userData }: CollectionTabsProps) {
       id: "won" as TabType,
       label: "Aste Vinte",
       icon: "🏆",
-      count: userData.wonAuctions.length,
-      component: <WonAuctions auctions={userData.wonAuctions} />,
+      count: userData.wonAuctionsDetails.length,
+      component: <WonAuctions auctions={userData.wonAuctionsDetails} />,
     },
     {
       id: "history" as TabType,
