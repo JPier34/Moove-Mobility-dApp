@@ -33,7 +33,7 @@ export default function WalletButton() {
   if (isWrongNetwork) {
     return (
       <Button variant="outline" onClick={() => window.location.reload()}>
-        Wrong Network
+        Wrong Network?
       </Button>
     );
   }

@@ -13,23 +13,30 @@ export enum AuctionStatus {
 }
 
 export interface Auction {
-  auctionId: number;
-  nftId: number;
-  nftContract: string;
+  auctionId: string;
+  nftId: string;
+  nftName: string;
+  nftImage: string;
+  nftCategory: string;
   seller: string;
   auctionType: AuctionType;
   status: AuctionStatus;
-  startPrice: bigint;
-  reservePrice: bigint;
-  buyNowPrice: bigint;
-  startTime: bigint;
-  endTime: bigint;
-  extensionTime: bigint;
-  highestBidder: string;
-  highestBid: bigint;
-  bidIncrement: bigint;
-  nftClaimed: boolean;
-  sellerPaid: boolean;
+  startPrice: string;
+  reservePrice: string;
+  buyNowPrice: string | null;
+  currentBid: string;
+  highestBidder: string | null;
+  bidCount: number;
+  startTime: Date;
+  endTime: Date;
+  bidIncrement: string;
+  currency: string;
+  attributes: {
+    range: string;
+    speed: string;
+    battery: string;
+    condition: string;
+  };
 }
 
 export interface Bid {
