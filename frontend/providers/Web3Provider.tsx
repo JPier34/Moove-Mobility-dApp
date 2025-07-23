@@ -1,72 +1,58 @@
 "use client";
 
-import React, { createContext, useContext } from "react";
-import { useWeb3 } from "../hooks/useWeb3";
-import toast, { Toaster } from "react-hot-toast";
-import detectEthereumProvider from "@metamask/detect-provider";
-import { SUPPORTED_CHAINS } from "@/utils/contracts";
+import React, { ReactNode } from "react";
+import {
+  getDefaultConfig,
+  RainbowKitProvider,
+  darkTheme,
+  lightTheme,
+} from "@rainbow-me/rainbowkit";
+import { WagmiProvider } from "wagmi";
+import { sepolia } from "wagmi/chains";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import "@rainbow-me/rainbowkit/styles.css";
 
-interface Web3ContextType {
-  provider: any;
-  signer: any;
-  account: string | null;
-  chainId: number | null;
-  isConnected: boolean;
-  isLoading: boolean;
-  error: string | null;
-  connectWallet: () => Promise<void>;
-  disconnectWallet: () => void;
-  switchNetwork: (chainId: number) => Promise<void>;
-  isOnSupportedChain: boolean;
-  chainName: string;
-  shortenAddress: (address: string) => string;
-}
+const config = getDefaultConfig({
+  appName: "Moove NFT Platform",
+  projectId: process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID!, // From .env.local
+  chains: [sepolia], // Only Sepolia for deployment
+  ssr: true, // Enable SSR for Next.js
+});
 
-const Web3Context = createContext<Web3ContextType | null>(null);
-
-export function useWeb3Context() {
-  const context = useContext(Web3Context);
-  if (!context) {
-    throw new Error("useWeb3Context must be used within Web3Provider");
-  }
-  return context;
-}
+// React Query client
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 3,
+      staleTime: 30_000, // 30 seconds
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 interface Web3ProviderProps {
-  children: React.ReactNode;
+  children: ReactNode;
+  theme?: "light" | "dark";
 }
 
-export default function Web3Provider({ children }: Web3ProviderProps) {
-  const web3 = useWeb3();
-
-  // Show toast notifications for connection events
-  React.useEffect(() => {
-    if (web3.error) {
-      toast.error(web3.error);
-    }
-  }, [web3.error]);
-
-  React.useEffect(() => {
-    if (web3.isConnected && web3.account) {
-      toast.success(
-        `Connected to ${web3.account.slice(0, 6)}...${web3.account.slice(-4)}`
-      );
-    }
-  }, [web3.isConnected, web3.account]);
-
+export default function Web3Provider({
+  children,
+  theme = "light",
+}: Web3ProviderProps) {
   return (
-    <Web3Context.Provider value={web3}>
-      {children}
-      <Toaster
-        position="top-right"
-        toastOptions={{
-          duration: 4000,
-          style: {
-            background: "#363636",
-            color: "#fff",
-          },
-        }}
-      />
-    </Web3Context.Provider>
+    <WagmiProvider config={config}>
+      <QueryClientProvider client={queryClient}>
+        <RainbowKitProvider
+          theme={theme === "dark" ? darkTheme() : lightTheme()}
+          appInfo={{
+            appName: "Moove NFT Platform",
+            //learnMoreUrl: "https://moove-nft.vercel.app/about",
+          }}
+          modalSize="compact"
+        >
+          {children}
+        </RainbowKitProvider>
+      </QueryClientProvider>
+    </WagmiProvider>
   );
 }
