@@ -99,7 +99,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
         ${inter.className} 
         min-h-screen 
         bg-gradient-to-br from-gray-50 to-moove-50 
-        text-gray-900 
+        text-gray-100 
         antialiased
         selection:bg-moove-primary/20 
         selection:text-moove-secondary
