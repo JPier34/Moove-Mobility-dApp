@@ -1,0 +1,72 @@
+{
+  "common": {
+    "loading": "Caricamento...",
+    "error": "Errore",
+    "success": "Successo",
+    "cancel": "Annulla",
+    "confirm": "Conferma",
+    "close": "Chiudi",
+    "copy": "Copia",
+    "copied": "Copiato!",
+    "connect_wallet": "Connetti Wallet",
+    "disconnect": "Disconnetti",
+    "view_details": "Vedi Dettagli"
+  },
+  "navigation": {
+    "marketplace": "Marketplace",
+    "auctions": "Aste",
+    "my_collection": "La mia Collezione",
+    "home": "Home"
+  },
+  "collection": {
+    "my_collection": "La mia Collezione",
+    "owned_nfts": "I miei NFT",
+    "active_bids": "Offerte Attive",
+    "won_auctions": "Aste Vinte",
+    "auction_history": "Storico Aste",
+    "total_nfts": "NFT Totali",
+    "portfolio_value": "Valore Portafoglio",
+    "no_nfts": "Nessun NFT trovato",
+    "load_more": "Carica Altri"
+  },
+  "vehicle_access": {
+    "vehicle_access": "Accesso Veicolo",
+    "verify_access": "Verifica Accesso",
+    "location_check": "Controllo Posizione",
+    "unlock_vehicle": "Sblocca Veicolo",
+    "vehicle_unlocked": "Veicolo Sbloccato!",
+    "access_code": "Codice Accesso",
+    "vehicle_id": "ID Veicolo",
+    "battery_level": "Livello Batteria",
+    "estimated_range": "Autonomia Stimata",
+    "access_duration": "Durata Accesso",
+    "authorized_zone": "Sei in una zona autorizzata!",
+    "unauthorized_zone": "Non sei in una zona autorizzata",
+    "location_unavailable": "Posizione non disponibile",
+    "how_to_use": "Come usare:",
+    "find_vehicle": "Trova il veicolo {{vehicleId}} nella posizione",
+    "enter_code": "Inserisci il codice sul tastierino del veicolo",
+    "unlock_duration": "Il veicolo si sbloccherà per {{duration}} minuti",
+    "enjoy_ride": "Goditi la corsa in sicurezza!"
+  },
+  "notifications": {
+    "permission_denied": "Permesso notifiche negato",
+    "permission_granted": "Notifiche abilitate",
+    "auction_ending": "Asta in Scadenza!",
+    "auction_won": "Asta Vinta!",
+    "vehicle_unlocked": "Veicolo Sbloccato",
+    "bid_placed": "Offerta Piazzata con Successo"
+  },
+  "errors": {
+    "wallet_not_connected": "Connetti il tuo wallet",
+    "wrong_network": "Passa alla rete Sepolia",
+    "transaction_failed": "Transazione fallita",
+    "insufficient_funds": "Fondi insufficienti",
+    "user_rejected": "Transazione annullata",
+    "contract_error": "Errore smart contract",
+    "network_error": "Errore di rete",
+    "ipfs_load_failed": "Impossibile caricare l'immagine",
+    "location_denied": "Accesso alla posizione negato",
+    "something_went_wrong": "Qualcosa è andato storto"
+  }
+}

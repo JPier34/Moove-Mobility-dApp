@@ -1,12 +1,13 @@
 "use client";
 
-import { useChainId, useSwitchChain, useAccount } from "wagmi";
+import { useAccount, useChainId, useSwitchChain } from "wagmi";
 import { sepolia } from "wagmi/chains";
 import { useEffect, useState } from "react";
+import { useNotifications } from "@/hooks/useNotification";
 
 interface ChainValidationResult {
   isValidChain: boolean;
-  currentChainId: number | undefined;
+  currentChain: { id: number; name?: string } | undefined;
   isConnected: boolean;
   isSwitching: boolean;
   error: string | null;
@@ -20,7 +21,8 @@ export const useChainValidation = (): ChainValidationResult => {
     isPending: isSwitching,
     error: switchError,
   } = useSwitchChain();
-  const { isConnected } = useAccount();
+  const { isConnected, chain } = useAccount();
+  const { sendNotification } = useNotifications();
 
   const [error, setError] = useState<string | null>(null);
   const [hasNotifiedWrongChain, setHasNotifiedWrongChain] = useState(false);
@@ -37,14 +39,43 @@ export const useChainValidation = (): ChainValidationResult => {
       setError(null);
       await switchChain({ chainId: sepolia.id });
 
+      sendNotification({
+        title: "✅ Network Switched",
+        body: "Successfully connected to Sepolia network",
+        tag: "network-switch-success",
+      });
+
       setHasNotifiedWrongChain(false);
     } catch (err: any) {
       const errorMessage = err?.message || "Failed to switch network";
       setError(errorMessage);
+
+      sendNotification({
+        title: "❌ Network Switch Failed",
+        body: errorMessage,
+        tag: "network-switch-error",
+      });
     }
   };
 
-  // Handle switch network errors
+  useEffect(() => {
+    if (isConnected && !isValidChain && chain && !hasNotifiedWrongChain) {
+      sendNotification({
+        title: "⚠️ Wrong Network",
+        body: `Please switch to Sepolia. Currently on: ${chain.name}`,
+        tag: "wrong-network",
+      });
+
+      setHasNotifiedWrongChain(true);
+    }
+  }, [
+    isConnected,
+    isValidChain,
+    chain,
+    hasNotifiedWrongChain,
+    sendNotification,
+  ]);
+
   useEffect(() => {
     if (switchError) {
       setError(switchError.message);
@@ -53,7 +84,7 @@ export const useChainValidation = (): ChainValidationResult => {
 
   return {
     isValidChain,
-    currentChainId: chainId,
+    currentChain: chain,
     isConnected,
     isSwitching,
     error,

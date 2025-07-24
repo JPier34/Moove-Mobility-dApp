@@ -1,0 +1,72 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "close": "Close",
+    "copy": "Copy",
+    "copied": "Copied!",
+    "connect_wallet": "Connect Wallet",
+    "disconnect": "Disconnect",
+    "view_details": "View Details"
+  },
+  "navigation": {
+    "marketplace": "Marketplace",
+    "auctions": "Auctions",
+    "my_collection": "My Collection",
+    "home": "Home"
+  },
+  "collection": {
+    "my_collection": "My Collection",
+    "owned_nfts": "Owned NFTs",
+    "active_bids": "Active Bids",
+    "won_auctions": "Won Auctions",
+    "auction_history": "Auction History",
+    "total_nfts": "Total NFTs",
+    "portfolio_value": "Portfolio Value",
+    "no_nfts": "No NFTs found",
+    "load_more": "Load More"
+  },
+  "vehicle_access": {
+    "vehicle_access": "Vehicle Access",
+    "verify_access": "Verify Access",
+    "location_check": "Location Check",
+    "unlock_vehicle": "Unlock Vehicle",
+    "vehicle_unlocked": "Vehicle Unlocked!",
+    "access_code": "Access Code",
+    "vehicle_id": "Vehicle ID",
+    "battery_level": "Battery Level",
+    "estimated_range": "Estimated Range",
+    "access_duration": "Access Duration",
+    "authorized_zone": "You're in an authorized zone!",
+    "unauthorized_zone": "You're not in an authorized zone",
+    "location_unavailable": "Location unavailable",
+    "how_to_use": "How to use:",
+    "find_vehicle": "Find vehicle {{vehicleId}} at the location",
+    "enter_code": "Enter the access code on the vehicle's keypad",
+    "unlock_duration": "Vehicle will unlock for {{duration}} minutes",
+    "enjoy_ride": "Enjoy your ride safely!"
+  },
+  "notifications": {
+    "permission_denied": "Notification permission denied",
+    "permission_granted": "Notifications enabled",
+    "auction_ending": "Auction Ending Soon!",
+    "auction_won": "Auction Won!",
+    "vehicle_unlocked": "Vehicle Unlocked",
+    "bid_placed": "Bid Placed Successfully"
+  },
+  "errors": {
+    "wallet_not_connected": "Please connect your wallet",
+    "wrong_network": "Please switch to Sepolia network",
+    "transaction_failed": "Transaction failed",
+    "insufficient_funds": "Insufficient funds",
+    "user_rejected": "Transaction was cancelled",
+    "contract_error": "Smart contract error",
+    "network_error": "Network error occurred",
+    "ipfs_load_failed": "Failed to load image",
+    "location_denied": "Location access denied",
+    "something_went_wrong": "Something went wrong"
+  }
+}

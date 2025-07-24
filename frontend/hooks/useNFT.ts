@@ -1,4 +1,6 @@
 import { useMemo } from "react";
+import { useIPFS } from "@/hooks/useIPFS";
+import React from "react";
 import { useReadMooveNFT, useWriteMooveNFT } from "./useContract";
 import { VehicleInfo, CustomizationData, MooveNFT } from "@/types/nft";
 import { useAccount } from "wagmi";
@@ -145,5 +147,29 @@ export function useRemoveFromSale() {
     isConfirming,
     isSuccess,
     error,
+  };
+}
+
+export function useNFTImage(tokenId: number) {
+  const { tokenURI, isLoading: uriLoading } = useTokenURI(tokenId);
+  const { fetchMetadata } = useIPFS();
+  const [imageHash, setImageHash] = React.useState<string>("");
+  const [isLoading, setIsLoading] = React.useState(false);
+
+  React.useEffect(() => {
+    if (tokenURI) {
+      setIsLoading(true);
+      fetchMetadata(tokenURI).then((metadata) => {
+        if (metadata?.image) {
+          setImageHash(metadata.image);
+        }
+        setIsLoading(false);
+      });
+    }
+  }, [tokenURI, fetchMetadata]);
+
+  return {
+    imageHash,
+    isLoading: uriLoading || isLoading,
   };
 }
