@@ -79,7 +79,7 @@ interface RootLayoutProps {
 
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
-    <html lang="it" className={inter.variable}>
+    <html lang="it" className={`light ${inter.variable}`}>
       <head>
         {/* ✅ IPFS Gateways preconnect */}
         <link rel="preconnect" href="https://ipfs.io" />
