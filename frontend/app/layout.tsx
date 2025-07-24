@@ -2,6 +2,7 @@ import "./globals.css";
 import Web3Provider from "../providers/Web3Provider";
 import Header from "../components/layout/Header";
 import Footer from "../components/layout/Footer";
+import { ThemeProvider } from "@/providers/ThemeProvider";
 import { Inter } from "next/font/google";
 
 // Font config
@@ -105,42 +106,45 @@ export default function RootLayout({ children }: RootLayoutProps) {
         selection:text-moove-secondary
       `}
       >
-        <Web3Provider>
-          {/* App main structure */}
-          <div className="flex min-h-screen flex-col">
-            {/* Header fixed */}
-            <Header />
+        {/* ✅ WRAP EVERYTHING in ThemeProvider */}
+        <ThemeProvider>
+          <Web3Provider>
+            {/* App main structure */}
+            <div className="flex min-h-screen flex-col">
+              {/* Header */}
+              <Header />
 
-            {/* Main content area - pages here */}
-            <main className="flex-1 relative">
-              {/* Background pattern */}
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(0,212,170,0.1),transparent_50%)] pointer-events-none" />
+              {/* Main content area */}
+              <main className="flex-1 relative">
+                {/* ✅ Theme-aware background pattern */}
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(0,212,170,0.1),transparent_50%)] dark:bg-[radial-gradient(circle_at_50%_50%,rgba(0,212,170,0.05),transparent_50%)] pointer-events-none" />
 
-              {/* Page content */}
-              <div className="Hero relative z-10">{children}</div>
-            </main>
+                {/* Page content */}
+                <div className="relative z-10">{children}</div>
+              </main>
 
-            <Footer />
-          </div>
+              <Footer />
+            </div>
 
-          {/* Loading overlay globale (if necessary) */}
-          <div
-            id="loading-overlay"
-            className="hidden fixed inset-0 bg-black/50 z-50 items-center justify-center"
-          >
-            <div className="bg-white rounded-xl p-6 shadow-2xl">
-              <div className="flex items-center space-x-3">
-                <div className="animate-spin rounded-full h-6 w-6 border-2 border-moove-primary border-t-transparent"></div>
-                <span className="text-gray-700 font-medium">
-                  Caricamento...
-                </span>
+            {/* ✅ Theme-aware loading overlay */}
+            <div
+              id="loading-overlay"
+              className="hidden fixed inset-0 bg-black/50 dark:bg-black/70 z-50 items-center justify-center"
+            >
+              <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-2xl border border-gray-200 dark:border-gray-700">
+                <div className="flex items-center space-x-3">
+                  <div className="animate-spin rounded-full h-6 w-6 border-2 border-moove-primary border-t-transparent"></div>
+                  <span className="text-gray-700 dark:text-gray-300 font-medium">
+                    Caricamento...
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Global modal container */}
-          <div id="modal-root" />
-        </Web3Provider>
+            {/* Global modal container */}
+            <div id="modal-root" />
+          </Web3Provider>
+        </ThemeProvider>
 
         {/* Analytics scripts or more integrations */}
         {process.env.NODE_ENV === "production" && (
