@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect } from "wagmi";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/providers/ThemeProvider";
 import Link from "next/link";
 
 export default function Header() {
@@ -60,7 +60,7 @@ export default function Header() {
               {/* Theme Toggle */}
               <button
                 onClick={toggleTheme}
-                className="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                className="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors border border-gray-300 dark:border-gray-600"
                 title={`Switch to ${
                   resolvedTheme === "dark" ? "light" : "dark"
                 } mode`}

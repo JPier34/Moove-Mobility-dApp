@@ -26,6 +26,8 @@ export const metadata = {
     "blockchain",
     "sostenibilità",
     "scooter elettrici",
+    "bici elettriche",
+    "monopattini elettrici",
     "Milano",
   ],
   authors: [{ name: "Moove Team" }],
@@ -58,7 +60,10 @@ export const metadata = {
     },
   },
   manifest: "/manifest.json",
-  themeColor: "#00D4AA",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#00D4AA" },
+    { media: "(prefers-color-scheme: dark)", color: "#1f2937" },
+  ],
 };
 
 // Viewport configuration
@@ -76,13 +81,10 @@ export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="it" className={inter.variable}>
       <head>
-        {/* Preconnect for performances */}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link
-          rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossOrigin=""
-        />
+        {/* ✅ IPFS Gateways preconnect */}
+        <link rel="preconnect" href="https://ipfs.io" />
+        <link rel="preconnect" href="https://gateway.pinata.cloud" />
+        <link rel="preconnect" href="https://cloudflare-ipfs.com" />
 
         {/* Favicon and icons */}
         <link rel="icon" href="/favicon.ico" sizes="any" />
@@ -93,6 +95,10 @@ export default function RootLayout({ children }: RootLayoutProps) {
         <meta name="format-detection" content="telephone=no" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+
+        {/* ✅ Web3 related meta tags */}
+        <meta name="ethereum-provider" content="rainbowkit" />
+        <meta name="web3-provider" content="wagmi" />
       </head>
 
       <body
@@ -106,7 +112,6 @@ export default function RootLayout({ children }: RootLayoutProps) {
         selection:text-moove-secondary
       `}
       >
-        {/* ✅ WRAP EVERYTHING in ThemeProvider */}
         <ThemeProvider>
           <Web3Provider>
             {/* App main structure */}
@@ -116,7 +121,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
 
               {/* Main content area */}
               <main className="flex-1 relative">
-                {/* ✅ Theme-aware background pattern */}
+                {/* Theme-aware background pattern */}
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(0,212,170,0.1),transparent_50%)] dark:bg-[radial-gradient(circle_at_50%_50%,rgba(0,212,170,0.05),transparent_50%)] pointer-events-none" />
 
                 {/* Page content */}
@@ -126,7 +131,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
               <Footer />
             </div>
 
-            {/* ✅ Theme-aware loading overlay */}
+            {/* Theme-aware loading overlay */}
             <div
               id="loading-overlay"
               className="hidden fixed inset-0 bg-black/50 dark:bg-black/70 z-50 items-center justify-center"
@@ -143,22 +148,60 @@ export default function RootLayout({ children }: RootLayoutProps) {
 
             {/* Global modal container */}
             <div id="modal-root" />
+
+            {/* Toast notifications container */}
+            <div
+              id="toast-root"
+              className="fixed top-4 right-4 z-50 space-y-2"
+            />
           </Web3Provider>
         </ThemeProvider>
 
-        {/* Analytics scripts or more integrations */}
+        {/* Enhanced analytics and debug tools */}
         {process.env.NODE_ENV === "production" && (
           <>
-            {/* Google Analytics or any other production script */}
             <script
               dangerouslySetInnerHTML={{
                 __html: `
-                  // Analytics script placeholder
                   console.log('Moove NFT Platform loaded');
+                  
+                  // Track Web3 connection events
+                  window.addEventListener('web3-connected', (e) => {
+                    console.log('Web3 Connected:', e.detail);
+                  });
+                  
+                  // Track theme changes
+                  window.addEventListener('theme-changed', (e) => {
+                    console.log('Theme Changed:', e.detail);
+                  });
                 `,
               }}
             />
           </>
+        )}
+
+        {/* Development helper scripts */}
+        {process.env.NODE_ENV === "development" && (
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `
+                window.mooveDebug = {
+                  showGrid: () => document.body.classList.toggle('debug-grid'),
+                  darkMode: () => document.documentElement.classList.toggle('dark'),
+                  clearStorage: () => {
+                    localStorage.clear();
+                    sessionStorage.clear();
+                    console.log('Storage cleared');
+                  },
+                  checkTheme: () => {
+                    console.log('HTML classes:', document.documentElement.classList.toString());
+                    console.log('Saved theme:', localStorage.getItem('moove-theme'));
+                  }
+                };
+                console.log('🚀 Moove Debug Tools:', window.mooveDebug);
+              `,
+            }}
+          />
         )}
       </body>
     </html>
