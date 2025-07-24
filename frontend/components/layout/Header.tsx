@@ -3,13 +3,13 @@
 import React, { useState } from "react";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect } from "wagmi";
-import { useTheme } from "next-themes";
+import { useTheme } from "@/hooks/useTheme";
 import Link from "next/link";
 
 export default function Header() {
   const { isConnected } = useAccount();
   const { disconnect } = useDisconnect();
-  const { theme, setTheme } = useTheme();
+  const { theme, resolvedTheme, toggleTheme } = useTheme();
   const [showDisconnectModal, setShowDisconnectModal] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -59,10 +59,13 @@ export default function Header() {
             <div className="hidden md:flex items-center space-x-4">
               {/* Theme Toggle */}
               <button
-                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                onClick={toggleTheme}
                 className="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                title={`Switch to ${
+                  resolvedTheme === "dark" ? "light" : "dark"
+                } mode`}
               >
-                {theme === "dark" ? "☀️" : "🌙"}
+                {resolvedTheme === "dark" ? "☀️" : "🌙"}
               </button>
 
               {/* Custom Connect Button for Wagmi v2 */}
@@ -191,15 +194,16 @@ export default function Header() {
                   </Link>
                 ))}
 
+                {/* Mobile theme toggle */}
                 <div className="flex items-center justify-between px-2 pt-4 border-t border-gray-200 dark:border-gray-700">
                   <button
-                    onClick={() =>
-                      setTheme(theme === "dark" ? "light" : "dark")
-                    }
-                    className="flex items-center space-x-2 text-gray-100 dark:text-gray-300"
+                    onClick={toggleTheme}
+                    className="flex items-center space-x-2 text-gray-600 dark:text-gray-300"
                   >
-                    <span>{theme === "dark" ? "☀️" : "🌙"}</span>
-                    <span>{theme === "dark" ? "Light" : "Dark"} Mode</span>
+                    <span>{resolvedTheme === "dark" ? "☀️" : "🌙"}</span>
+                    <span>
+                      {resolvedTheme === "dark" ? "Light" : "Dark"} Mode
+                    </span>
                   </button>
                 </div>
 
