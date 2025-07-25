@@ -3,7 +3,7 @@
 import React from "react";
 import { NFT } from "./NFTGrid";
 import Button from "../ui/Button";
-import { useWeb3Context } from "../../providers/Web3Provider";
+import { useAccount, useDisconnect } from "wagmi";
 import { shortenAddress } from "../../utils/shortenAddress";
 
 interface NFTCardProps {
@@ -29,7 +29,7 @@ const rarityColors = {
 };
 
 export default function NFTCard({ nft, onClick }: NFTCardProps) {
-  const { isConnected } = useWeb3Context();
+  const { isConnected } = useAccount();
 
   const handleQuickBuy = (e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent card click

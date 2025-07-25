@@ -105,7 +105,7 @@ export default function SearchAndFilters({
         <Button
           variant="outline"
           onClick={() => setIsFiltersOpen(!isFiltersOpen)}
-          className="lg:w-auto"
+          className="lg:w-auto dark:bg-gray-800"
         >
           <svg
             className="w-4 h-4 mr-2"

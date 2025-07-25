@@ -27,16 +27,16 @@ const Features: React.FC = () => {
   ];
 
   return (
-    <section className="py-20 bg-white">
+    <section className="py-20 bg-white dark:bg-gray-900">
       <div className="container mx-auto px-6">
         <div className="text-center mb-16">
-          <h2 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
+          <h2 className="text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-4">
             Come Funziona{" "}
             <span className="bg-gradient-to-r from-[#00D4AA] to-[#0052CC] bg-clip-text text-transparent">
               Moove
             </span>
           </h2>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+          <p className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
             Un ecosistema completo che unisce blockchain, mobilità sostenibile e
             innovazione
           </p>
@@ -44,17 +44,21 @@ const Features: React.FC = () => {
 
         <div className="grid md:grid-cols-3 gap-8">
           {features.map((feature, index) => (
-            <Card key={index} hover className="p-8 text-center group">
+            <Card
+              key={index}
+              hover
+              className="p-8 text-center group bg-white dark:bg-gray-800"
+            >
               <div
                 className={`w-16 h-16 bg-gradient-to-r ${feature.gradient} rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300`}
               >
                 <span className="text-white text-2xl">{feature.icon}</span>
               </div>
 
-              <h3 className="text-xl font-bold text-gray-900 mb-4">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
                 {feature.title}
               </h3>
-              <p className="text-gray-600 leading-relaxed">
+              <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
                 {feature.description}
               </p>
             </Card>

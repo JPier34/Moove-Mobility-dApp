@@ -11,10 +11,22 @@
       "static/css/app/layout.css",
       "static/chunks/app/layout.js"
     ],
-    "/test-theme/page": [
+    "/marketplace/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/test-theme/page.js"
+      "static/css/app/marketplace/page.css",
+      "static/chunks/app/marketplace/page.js"
+    ],
+    "/auctions/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/css/app/auctions/page.css",
+      "static/chunks/app/auctions/page.js"
+    ],
+    "/_not-found/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/_not-found/page.js"
     ]
   }
 }
