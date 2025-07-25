@@ -131,15 +131,15 @@ const MOCK_NFTS: NFT[] = [
 
 export default function MarketplacePage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-moove-50/30">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-moove-50/30 dark:from-gray-900 dark:to-moove-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Marketplace Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
+          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
             Marketplace
             <span className="text-moove-primary ml-2">NFT</span>
           </h1>
-          <p className="text-xl text-gray-600 max-w-2xl">
+          <p className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl">
             Scopri e acquista veicoli NFT per la micro-mobilità urbana. Ogni NFT
             rappresenta un veicolo reale accessibile nella nostra rete.
           </p>
@@ -147,23 +147,31 @@ export default function MarketplacePage() {
 
         {/* Quick stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-            <div className="text-2xl font-bold text-gray-900">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">
               {MOCK_NFTS.length}
             </div>
-            <div className="text-sm text-gray-600">NFT Totali</div>
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              NFT Totali
+            </div>
           </div>
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-            <div className="text-2xl font-bold text-gray-900">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">
               {MOCK_NFTS.filter((nft) => nft.isForSale).length}
             </div>
-            <div className="text-sm text-gray-600">In Vendita</div>
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              In Vendita
+            </div>
           </div>
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-            <div className="text-2xl font-bold text-gray-900">4</div>
-            <div className="text-sm text-gray-600">Categorie</div>
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">
+              4
+            </div>
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              Categorie
+            </div>
           </div>
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
             <div className="text-2xl font-bold text-moove-primary">
               {Math.round(
                 MOCK_NFTS.reduce((sum, nft) => sum + parseFloat(nft.price), 0) *
@@ -171,7 +179,9 @@ export default function MarketplacePage() {
               ) / 100}{" "}
               ETH
             </div>
-            <div className="text-sm text-gray-600">Volume Totale</div>
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              Volume Totale
+            </div>
           </div>
         </div>
 

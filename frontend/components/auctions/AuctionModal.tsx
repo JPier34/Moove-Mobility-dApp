@@ -3,8 +3,8 @@
 import React, { useState, useEffect } from "react";
 import { Auction, AuctionType, AuctionStatus } from "../../types/auction";
 import Button from "../ui/Button";
-import { useWeb3Context } from "../../providers/Web3Provider";
 import { shortenAddress } from "../../utils/shortenAddress";
+import { useAccount } from "wagmi";
 
 interface AuctionModalProps {
   auction: Auction;
@@ -25,7 +25,7 @@ export default function AuctionModal({
   isOpen,
   onClose,
 }: AuctionModalProps) {
-  const { isConnected, account } = useWeb3Context();
+  const { address, isConnected } = useAccount();
   const [activeTab, setActiveTab] = useState<"details" | "bids" | "history">(
     "details"
   );
@@ -228,7 +228,7 @@ export default function AuctionModal({
   };
 
   const isOwner =
-    account && account.toLowerCase() === auction.seller.toLowerCase();
+    address && address.toLowerCase() === auction.seller.toLowerCase();
 
   if (!isOpen) return null;
 

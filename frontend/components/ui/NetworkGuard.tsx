@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { useWeb3Context } from "@/providers/Web3Provider";
+import { useAccount, useSwitchChain } from "wagmi";
 import Button from "./Button";
 
 interface NetworkGuardProps {
@@ -13,7 +13,16 @@ export default function NetworkGuard({
   children,
   requiredChainId = 11155111, // Sepolia
 }: NetworkGuardProps) {
-  const { isConnected, chainId, switchNetwork } = useWeb3Context();
+  const { isConnected, chainId } = useAccount();
+  const { switchChainAsync, isPending } = useSwitchChain();
+
+  const handleSwitch = async () => {
+    try {
+      await switchChainAsync({ chainId: requiredChainId });
+    } catch (error) {
+      console.error("Errore nel cambio di rete:", error);
+    }
+  };
 
   if (!isConnected) {
     return (
@@ -39,8 +48,8 @@ export default function NetworkGuard({
         <p className="text-gray-600 mb-6">
           Please switch to the {networkName} network to continue.
         </p>
-        <Button onClick={() => switchNetwork(requiredChainId)}>
-          Switch to {networkName}
+        <Button onClick={handleSwitch} disabled={isPending}>
+          {isPending ? "Switching..." : `Switch to ${networkName}`}
         </Button>
       </div>
     );

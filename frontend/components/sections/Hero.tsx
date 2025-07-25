@@ -11,9 +11,10 @@ export default function Hero() {
     router.push("/marketplace");
   };
 
+  // unused but can be used for future enhancements
   const handleLearnMoreClick = () => {
     router.push("/about");
-  }; // unused but can be used for future enhancements
+  };
 
   return (
     <section className="pt-24 pb-16 bg-gradient-to-br from-gray-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 overflow-hidden">

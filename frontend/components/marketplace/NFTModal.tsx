@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { NFT } from "./NFTGrid";
 import Button from "../ui/Button";
-import { useWeb3Context } from "../../providers/Web3Provider";
+import { useAccount, useDisconnect } from "wagmi";
 
 interface NFTModalProps {
   nft: NFT;
@@ -20,7 +20,7 @@ const categoryEmojis = {
 };
 
 export default function NFTModal({ nft, isOpen, onClose }: NFTModalProps) {
-  const { isConnected, account, shortenAddress } = useWeb3Context();
+  const { isConnected, address } = useAccount();
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [activeTab, setActiveTab] = useState<
     "details" | "history" | "attributes"
@@ -77,7 +77,7 @@ export default function NFTModal({ nft, isOpen, onClose }: NFTModalProps) {
     alert("Funzionalità in arrivo!");
   };
 
-  const isOwner = account && account.toLowerCase() === nft.owner.toLowerCase();
+  const isOwner = address && address.toLowerCase() === nft.owner.toLowerCase();
 
   if (!isOpen) return null;
 

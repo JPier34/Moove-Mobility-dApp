@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { Auction, AuctionType, AuctionStatus } from "../../types/auction";
 import Button from "../ui/Button";
-import { useWeb3Context } from "../../providers/Web3Provider";
+import { useAccount } from "wagmi";
 import { shortenAddress } from "../../utils/shortenAddress";
 
 interface AuctionCardProps {
@@ -49,7 +49,7 @@ export default function AuctionCard({
   onClick,
   showEndedState = false,
 }: AuctionCardProps) {
-  const { isConnected } = useWeb3Context();
+  const { isConnected } = useAccount();
   const [timeLeft, setTimeLeft] = useState("");
   const [currentDutchPrice, setCurrentDutchPrice] = useState(
     auction.currentBid
