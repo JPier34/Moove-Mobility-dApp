@@ -5,18 +5,18 @@ import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect } from "wagmi";
 import { useTheme } from "@/providers/ThemeProvider";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 export default function Header() {
-  const { isConnected } = useAccount();
-  const { disconnect } = useDisconnect();
-  const { theme, resolvedTheme, toggleTheme } = useTheme();
-  const [showDisconnectModal, setShowDisconnectModal] = useState(false);
+  const pathname = usePathname();
+  const { resolvedTheme, toggleTheme } = useTheme();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const handleDisconnect = () => {
-    disconnect();
-    setShowDisconnectModal(false);
-  };
+  const navLinks = [
+    { href: "/", label: "Home" },
+    { href: "/marketplace", label: "Marketplace" },
+    { href: "/auctions", label: "Auctions" },
+  ];
 
   // Navigation items
   const navItems = [
@@ -34,23 +34,23 @@ export default function Header() {
             <div className="flex items-center">
               <Link href="/" className="flex items-center">
                 <div className="text-2xl font-bold text-moove-primary">
-                  M
+                  m
                   <span className="inline-block w-6 h-6 border-2 border-current rounded-full mx-1"></span>
                   <span className="inline-block w-6 h-6 border-2 border-current rounded-full mr-1"></span>
-                  VE
+                  ve
                 </div>
               </Link>
             </div>
 
             {/* Desktop Navigation */}
             <nav className="hidden md:flex items-center space-x-8">
-              {navItems.map((item) => (
+              {navItems.map((link) => (
                 <Link
-                  key={item.href}
-                  href={item.href}
+                  key={link.href}
+                  href={link.href}
                   className="text-gray-600 dark:text-gray-300 hover:text-moove-primary dark:hover:text-moove-primary transition-colors"
                 >
-                  {item.label}
+                  {link.label}
                 </Link>
               ))}
             </nav>
@@ -183,14 +183,14 @@ export default function Header() {
           {isMobileMenuOpen && (
             <div className="md:hidden border-t border-gray-200 dark:border-gray-700 py-4">
               <div className="flex flex-col space-y-4">
-                {navItems.map((item) => (
+                {navLinks.map((link) => (
                   <Link
-                    key={item.href}
-                    href={item.href}
+                    key={link.href}
+                    href={link.href}
                     className="text-gray-600 dark:text-gray-300 hover:text-moove-primary dark:hover:text-moove-primary transition-colors px-2"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
-                    {item.label}
+                    {link.label}
                   </Link>
                 ))}
 
