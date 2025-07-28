@@ -37,7 +37,7 @@ export default function Header() {
                   m
                   <span className="inline-block w-6 h-6 border-2 border-current rounded-full mx-1"></span>
                   <span className="inline-block w-6 h-6 border-2 border-current rounded-full mr-1"></span>
-                  ve
+                  v e
                 </div>
               </Link>
             </div>

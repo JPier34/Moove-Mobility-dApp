@@ -1,6 +1,7 @@
 import Hero from "@/components/sections/Hero";
 import Features from "@/components/sections/Features";
 import React from "react";
+import RentalHomepage from "@/components/layout/RentalHomepage";
 
 export const metadata = {
   title: "Moove NFT Platform - Mobilità Decentralizzata",
@@ -9,18 +10,5 @@ export const metadata = {
 };
 
 export default function HomePage() {
-  return (
-    <>
-      <Hero />
-
-      <Features />
-
-      {/* More sections to come */}
-      {/* 
-      <Stats />
-      <Testimonials />
-      <CTA />
-      */}
-    </>
-  );
+  return <RentalHomepage />;
 }
