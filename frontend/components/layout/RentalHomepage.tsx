@@ -40,7 +40,7 @@ const VEHICLE_OPTIONS: VehicleOption[] = [
     image: "/images/vehicles/e-bike-city.jpg",
     price: "€25",
     priceEth: "0.025 ETH",
-    description: "Perfect for city exploration and daily commutes",
+    description: "Perfect for city exploration",
     range: "25-50 km",
     features: [
       "30 days unlimited access",

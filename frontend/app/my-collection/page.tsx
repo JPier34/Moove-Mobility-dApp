@@ -723,6 +723,8 @@ function CodeGenerationModal({
     setAccessCode(code);
     setExpiresAt(expires);
     setIsGenerating(false);
+
+    return { code, expires };
   };
 
   useEffect(() => {

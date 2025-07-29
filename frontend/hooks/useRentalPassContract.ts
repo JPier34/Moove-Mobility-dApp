@@ -1,95 +1,165 @@
+import { useState, useEffect } from "react";
 import {
   useAccount,
-  useReadContract,
   useWriteContract,
+  useReadContract,
   useWaitForTransactionReceipt,
 } from "wagmi";
-import { parseEther } from "viem";
-import { useState, useEffect } from "react";
+import { parseEther, formatEther } from "viem";
+import { toast } from "react-hot-toast";
+import { VehicleType } from "@/types/nft";
 
-// Vehicle types enum matching smart contract
-export enum VehicleType {
-  BIKE = 0,
-  SCOOTER = 1,
-  MONOPATTINO = 2,
+// ============= TYPES =============
+export interface RentalPassData {
+  tokenId: bigint;
+  vehicleType: VehicleType;
+  cityId: string;
+  duration: bigint;
+  price: bigint;
+  purchaseDate: bigint;
+  expiryDate: bigint;
+  isActive: boolean;
+  owner: string;
 }
 
-// Smart Contract ABI (partial - key functions only)
+export interface AccessCode {
+  code: string;
+  tokenId: bigint;
+  expiresAt: bigint;
+  isUsed: boolean;
+}
+
+export interface MintPassParams {
+  vehicleType: VehicleType;
+  cityId: string;
+  duration?: number; // default 30 days
+}
+
+export interface VehicleAvailability {
+  vehicleType: VehicleType;
+  available: bigint;
+  priceWei: bigint;
+  name: string;
+  description: string;
+}
+
+export interface ContractError {
+  message: string;
+  code?: string;
+  data?: any;
+}
+
+// ============= CONSTANTS =============
+const VEHICLE_TYPE_NAMES = {
+  [VehicleType.BIKE]: "bike",
+  [VehicleType.SCOOTER]: "scooter",
+  [VehicleType.MONOPATTINO]: "monopattino",
+} as const;
+
+const VEHICLE_PRICES = {
+  [VehicleType.BIKE]: "0.025", // 25 EUR equivalent
+  [VehicleType.SCOOTER]: "0.035", // 35 EUR equivalent
+  [VehicleType.MONOPATTINO]: "0.045", // 45 EUR equivalent
+} as const;
+
+const VEHICLE_CONFIG = {
+  [VehicleType.BIKE]: {
+    name: "E-Bike Pass",
+    icon: "🚲",
+    description: "Perfect for city exploration and daily commutes",
+    features: [
+      "30 days unlimited access",
+      "All partner bike networks",
+      "Priority support",
+      "City-wide coverage",
+    ],
+    gradient: "from-green-400 to-emerald-600",
+  },
+  [VehicleType.SCOOTER]: {
+    name: "E-Scooter Pass",
+    icon: "🛴",
+    description: "Fast and convenient for short to medium trips",
+    features: [
+      "30 days unlimited access",
+      "Premium scooter fleet",
+      "Fast unlock speeds",
+      "Extended range vehicles",
+    ],
+    gradient: "from-blue-400 to-indigo-600",
+  },
+  [VehicleType.MONOPATTINO]: {
+    name: "Monopattino Pass",
+    icon: "🛵",
+    description: "Premium urban mobility with exclusive access",
+    features: [
+      "30 days unlimited access",
+      "Exclusive vehicle access",
+      "VIP customer support",
+      "Premium parking spots",
+    ],
+    gradient: "from-purple-400 to-pink-600",
+  },
+};
+
+// Smart Contract ABI (simplified for rental passes)
 const RENTAL_PASS_ABI = [
   {
     inputs: [
-      { type: "uint8", name: "vehicleType" },
-      { type: "string", name: "cityId" },
+      { name: "vehicleType", type: "uint8" },
+      { name: "cityId", type: "string" },
+      { name: "duration", type: "uint256" },
     ],
     name: "mintRentalPass",
-    outputs: [],
+    outputs: [{ name: "tokenId", type: "uint256" }],
     stateMutability: "payable",
     type: "function",
   },
   {
-    inputs: [{ type: "uint256", name: "tokenId" }],
-    name: "canGenerateCode",
-    outputs: [{ type: "bool", name: "isValid" }],
-    stateMutability: "view",
+    inputs: [{ name: "tokenId", type: "uint256" }],
+    name: "generateAccessCode",
+    outputs: [{ name: "code", type: "string" }],
+    stateMutability: "nonpayable",
     type: "function",
   },
   {
-    inputs: [{ type: "uint256", name: "tokenId" }],
-    name: "isPassValid",
-    outputs: [{ type: "bool", name: "isValid" }],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [{ type: "uint256", name: "tokenId" }],
-    name: "getPassInfo",
+    inputs: [{ name: "owner", type: "address" }],
+    name: "getUserRentalPasses",
     outputs: [
       {
+        name: "",
+        type: "tuple[]",
         components: [
-          { type: "uint8", name: "vehicleType" },
-          { type: "string", name: "cityId" },
-          { type: "uint256", name: "validUntil" },
-          { type: "uint256", name: "codesGenerated" },
-          { type: "bool", name: "isActive" },
-          { type: "uint256", name: "mintedAt" },
+          { name: "tokenId", type: "uint256" },
+          { name: "vehicleType", type: "uint8" },
+          { name: "cityId", type: "string" },
+          { name: "duration", type: "uint256" },
+          { name: "price", type: "uint256" },
+          { name: "purchaseDate", type: "uint256" },
+          { name: "expiryDate", type: "uint256" },
+          { name: "isActive", type: "bool" },
         ],
-        type: "tuple",
-        name: "pass",
       },
     ],
     stateMutability: "view",
     type: "function",
   },
   {
-    inputs: [
-      { type: "address", name: "user" },
-      { type: "string", name: "cityId" },
-      { type: "uint8", name: "vehicleType" },
-    ],
-    name: "getUserPasses",
-    outputs: [{ type: "uint256[]", name: "tokenIds" }],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [{ type: "address", name: "user" }],
-    name: "getAllUserPasses",
-    outputs: [{ type: "uint256[]", name: "tokenIds" }],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [{ type: "uint8", name: "vehicleType" }],
-    name: "getPassPricing",
+    inputs: [{ name: "tokenId", type: "uint256" }],
+    name: "getRentalPassDetails",
     outputs: [
       {
-        components: [
-          { type: "uint256", name: "price" },
-          { type: "uint256", name: "validityDays" },
-          { type: "bool", name: "isActive" },
-        ],
+        name: "",
         type: "tuple",
-        name: "pricing",
+        components: [
+          { name: "tokenId", type: "uint256" },
+          { name: "vehicleType", type: "uint8" },
+          { name: "cityId", type: "string" },
+          { name: "duration", type: "uint256" },
+          { name: "price", type: "uint256" },
+          { name: "purchaseDate", type: "uint256" },
+          { name: "expiryDate", type: "uint256" },
+          { name: "isActive", type: "bool" },
+        ],
       },
     ],
     stateMutability: "view",
@@ -97,398 +167,412 @@ const RENTAL_PASS_ABI = [
   },
   {
     inputs: [],
-    name: "totalSupply",
-    outputs: [{ type: "uint256", name: "supply" }],
+    name: "getAvailableVehicleTypes",
+    outputs: [
+      {
+        name: "",
+        type: "tuple[]",
+        components: [
+          { name: "vehicleType", type: "uint8" },
+          { name: "available", type: "uint256" },
+          { name: "priceWei", type: "uint256" },
+          { name: "isActive", type: "bool" },
+        ],
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "vehicleType", type: "uint8" }],
+    name: "getVehicleTypePrice",
+    outputs: [{ name: "", type: "uint256" }],
     stateMutability: "view",
     type: "function",
   },
 ] as const;
 
-// Contract address (deploy and update this)
-const RENTAL_PASS_CONTRACT_ADDRESS = "0x..."; // TODO: Add deployed contract address
+// Contract address
+const CONTRACT_ADDRESS = process.env
+  .NEXT_PUBLIC_RENTAL_PASS_CONTRACT as `0x${string}`;
 
-// Types
-interface RentalPass {
-  tokenId: number;
-  vehicleType: VehicleType;
-  cityId: string;
-  validUntil: number;
-  codesGenerated: number;
-  isActive: boolean;
-  mintedAt: number;
-  isValid: boolean;
-}
-
-interface PassPricing {
-  price: bigint;
-  validityDays: number;
-  isActive: boolean;
-}
-
-// Main hook for rental pass contract interaction
+// ============= CUSTOM HOOK =============
 export function useRentalPassContract() {
-  return {
-    address: RENTAL_PASS_CONTRACT_ADDRESS,
-    abi: RENTAL_PASS_ABI,
-  };
-}
+  const { address, isConnected } = useAccount();
+  const [error, setError] = useState<ContractError | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-// Hook to get pricing for all vehicle types
-export function usePassPricing() {
-  const { data: bikePricing } = useReadContract({
-    address: RENTAL_PASS_CONTRACT_ADDRESS,
-    abi: RENTAL_PASS_ABI,
-    functionName: "getPassPricing",
-    args: [VehicleType.BIKE],
-  });
-
-  const { data: scooterPricing } = useReadContract({
-    address: RENTAL_PASS_CONTRACT_ADDRESS,
-    abi: RENTAL_PASS_ABI,
-    functionName: "getPassPricing",
-    args: [VehicleType.SCOOTER],
-  });
-
-  const { data: monopatinoPricing } = useReadContract({
-    address: RENTAL_PASS_CONTRACT_ADDRESS,
-    abi: RENTAL_PASS_ABI,
-    functionName: "getPassPricing",
-    args: [VehicleType.MONOPATTINO],
-  });
-
-  return {
-    pricing: {
-      bike: bikePricing as PassPricing | undefined,
-      scooter: scooterPricing as PassPricing | undefined,
-      monopattino: monopatinoPricing as PassPricing | undefined,
-    },
-    isLoading: !bikePricing || !scooterPricing || !monopatinoPricing,
-  };
-}
-
-// Hook to mint rental pass
-export function useMintRentalPass() {
-  const [lastMintedTokenId, setLastMintedTokenId] = useState<number | null>(
-    null
-  );
-
+  // Write contract hook for minting
   const {
-    data: hash,
     writeContract,
-    error: writeError,
-    isPending: isWriteLoading,
+    data: mintTxHash,
+    isPending: isMintPending,
+    error: mintError,
   } = useWriteContract();
 
-  const {
-    isLoading: isTransactionLoading,
-    isSuccess,
-    data: receipt,
-  } = useWaitForTransactionReceipt({
-    hash, // ✅ Now correctly using hash from writeContract
-  });
-
-  useEffect(() => {
-    if (isSuccess && receipt) {
-      console.log("✅ Rental pass minted successfully", receipt);
-      // TODO: Extract token ID from receipt logs if needed
-    }
-  }, [isSuccess, receipt]);
-
-  const mintPass = (
-    vehicleType: VehicleType,
-    cityId: string,
-    price: bigint
-  ) => {
-    writeContract({
-      address: RENTAL_PASS_CONTRACT_ADDRESS,
-      abi: RENTAL_PASS_ABI,
-      functionName: "mintRentalPass",
-      args: [vehicleType, cityId],
-      value: price,
+  // Wait for transaction confirmation
+  const { isLoading: isConfirming, isSuccess: isConfirmed } =
+    useWaitForTransactionReceipt({
+      hash: mintTxHash,
     });
-  };
 
-  return {
-    mintPass,
-    data: hash,
-    error: writeError,
-    isLoading: isWriteLoading || isTransactionLoading,
-    isSuccess,
-    lastMintedTokenId,
-  };
-}
-
-// Hook to get user's rental passes
-export function useUserRentalPasses(
-  cityId?: string,
-  vehicleType?: VehicleType
-) {
-  const { address } = useAccount();
-
-  // Get all user passes
-  const { data: allTokenIds, isLoading: isLoadingTokenIds } = useReadContract({
-    address: RENTAL_PASS_CONTRACT_ADDRESS,
+  // Read user's rental passes
+  const {
+    data: userPassesData,
+    isLoading: isLoadingPasses,
+    refetch: refetchPasses,
+  } = useReadContract({
+    address: CONTRACT_ADDRESS,
     abi: RENTAL_PASS_ABI,
-    functionName: "getAllUserPasses",
+    functionName: "getUserRentalPasses",
     args: address ? [address] : undefined,
     query: {
-      enabled: !!address,
+      enabled: !!address && !!CONTRACT_ADDRESS,
     },
   });
 
-  // Get specific passes for city/vehicle type if specified
-  const { data: specificTokenIds } = useReadContract({
-    address: RENTAL_PASS_CONTRACT_ADDRESS,
-    abi: RENTAL_PASS_ABI,
-    functionName: "getUserPasses",
-    args:
-      address && cityId && vehicleType !== undefined
-        ? [address, cityId, vehicleType]
-        : undefined,
-    query: {
-      enabled: !!address && !!cityId && vehicleType !== undefined,
-    },
-  });
-
-  const [passes, setPasses] = useState<RentalPass[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Fetch pass details for each token ID
-  useEffect(() => {
-    async function fetchPassDetails() {
-      if (!allTokenIds || allTokenIds.length === 0) {
-        setPasses([]);
-        setIsLoading(false);
-        return;
-      }
-
-      setIsLoading(true);
-
-      try {
-        // TODO: Replace with actual contract calls using useReadContract for each token
-        // For now, return mock data structure
-        const mockPasses: RentalPass[] = allTokenIds.map(
-          (tokenId: bigint, index: number) => ({
-            tokenId: Number(tokenId),
-            vehicleType: index % 3, // Mock rotation between vehicle types
-            cityId: cityId || "milan",
-            validUntil: Date.now() + 30 * 24 * 60 * 60 * 1000, // 30 days from now
-            codesGenerated: Math.floor(Math.random() * 10),
-            isActive: true,
-            mintedAt: Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000, // Random time in last week
-            isValid: true,
-          })
-        );
-
-        setPasses(mockPasses);
-      } catch (error) {
-        console.error("Error fetching pass details:", error);
-        setPasses([]);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    fetchPassDetails();
-  }, [allTokenIds, cityId, vehicleType]);
-
-  return {
-    passes,
-    isLoading: isLoadingTokenIds || isLoading,
-    refetch: () => {
-      // Trigger re-fetch logic
-    },
-  };
-}
-
-// Hook to check if pass is valid
-export function usePassValidity(tokenId?: number) {
-  const { data: isValid, isLoading } = useReadContract({
-    address: RENTAL_PASS_CONTRACT_ADDRESS,
-    abi: RENTAL_PASS_ABI,
-    functionName: "isPassValid",
-    args: tokenId ? [BigInt(tokenId)] : undefined,
-    query: {
-      enabled: !!tokenId,
-    },
-  });
-
-  return {
-    isValid: isValid as boolean | undefined,
-    isLoading,
-  };
-}
-
-// Hook to check if pass can generate codes
-export function useCanGenerateCode(tokenId?: number) {
-  const { data: canGenerate, isLoading } = useReadContract({
-    address: RENTAL_PASS_CONTRACT_ADDRESS,
-    abi: RENTAL_PASS_ABI,
-    functionName: "canGenerateCode",
-    args: tokenId ? [BigInt(tokenId)] : undefined,
-    query: {
-      enabled: !!tokenId,
-    },
-  });
-
-  return {
-    canGenerate: canGenerate as boolean | undefined,
-    isLoading,
-  };
-}
-
-// Hook to get detailed pass information
-export function usePassInfo(tokenId?: number) {
-  const { data: passInfo, isLoading } = useReadContract({
-    address: RENTAL_PASS_CONTRACT_ADDRESS,
-    abi: RENTAL_PASS_ABI,
-    functionName: "getPassInfo",
-    args: tokenId ? [BigInt(tokenId)] : undefined,
-    query: {
-      enabled: !!tokenId,
-    },
-  });
-
-  return {
-    passInfo,
-    isLoading,
-  };
-}
-
-// Combined hook for rental pass management
-export function useRentalPassManager() {
-  const { address, isConnected } = useAccount();
-  const { pricing, isLoading: isPricingLoading } = usePassPricing();
-  const { passes, isLoading: isPassesLoading } = useUserRentalPasses();
+  // Read available vehicle types and availability
   const {
-    mintPass,
-    isLoading: isMinting,
-    isSuccess: mintSuccess,
-  } = useMintRentalPass();
+    data: availableVehiclesData,
+    isLoading: isLoadingVehicles,
+    refetch: refetchVehicles,
+  } = useReadContract({
+    address: CONTRACT_ADDRESS,
+    abi: RENTAL_PASS_ABI,
+    functionName: "getAvailableVehicleTypes",
+    query: {
+      enabled: !!CONTRACT_ADDRESS,
+    },
+  });
 
-  // Check if user has valid pass for specific city/vehicle
-  const hasValidPass = (cityId: string, vehicleType: VehicleType): boolean => {
-    return passes.some(
-      (pass) =>
-        pass.cityId.toLowerCase() === cityId.toLowerCase() &&
-        pass.vehicleType === vehicleType &&
-        pass.isValid &&
-        pass.isActive
-    );
+  // ============= UTILITY FUNCTIONS =============
+
+  /**
+   * Convert VehicleType enum to string
+   */
+  const vehicleTypeToString = (vehicleType: VehicleType): string => {
+    return VEHICLE_TYPE_NAMES[vehicleType];
   };
 
-  // Get best pass for rental (most time remaining)
-  const getBestPassForRental = (
-    cityId: string,
-    vehicleType: VehicleType
-  ): RentalPass | null => {
-    const validPasses = passes.filter(
-      (pass) =>
-        pass.cityId.toLowerCase() === cityId.toLowerCase() &&
-        pass.vehicleType === vehicleType &&
-        pass.isValid &&
-        pass.isActive
-    );
-
-    if (validPasses.length === 0) return null;
-
-    // Return pass with most time remaining
-    return validPasses.reduce((best, current) =>
-      current.validUntil > best.validUntil ? current : best
-    );
-  };
-
-  // Get pricing for vehicle type
-  const getPriceForVehicle = (vehicleType: VehicleType): bigint | null => {
-    switch (vehicleType) {
-      case VehicleType.BIKE:
-        return pricing.bike?.price || parseEther("0.025");
-      case VehicleType.SCOOTER:
-        return pricing.scooter?.price || parseEther("0.035");
-      case VehicleType.MONOPATTINO:
-        return pricing.monopattino?.price || parseEther("0.045");
+  /**
+   * Convert string to VehicleType enum
+   */
+  const stringToVehicleType = (vehicleString: string): VehicleType => {
+    switch (vehicleString.toLowerCase()) {
+      case "bike":
+        return VehicleType.BIKE;
+      case "scooter":
+        return VehicleType.SCOOTER;
+      case "monopattino":
+        return VehicleType.MONOPATTINO;
       default:
-        return null;
+        return VehicleType.BIKE;
     }
   };
 
-  // Purchase pass for specific vehicle and city
-  const purchasePass = async (vehicleType: VehicleType, cityId: string) => {
-    const price = getPriceForVehicle(vehicleType);
-    if (!price) {
-      throw new Error("Price not available");
-    }
-
-    mintPass(vehicleType, cityId, price);
+  /**
+   * Get vehicle configuration
+   */
+  const getVehicleConfig = (vehicleType: VehicleType) => {
+    return VEHICLE_CONFIG[vehicleType];
   };
 
-  // Generate access code (completely off-chain)
-  const generateAccessCode = async (
-    tokenId: number,
-    duration: number = 30 // minutes
-  ): Promise<{ code: string; expiresAt: number } | null> => {
-    const pass = passes.find((p) => p.tokenId === tokenId);
-    if (!pass || !pass.isValid) {
-      return null;
+  /**
+   * Format price from wei to ETH string
+   */
+  const formatPrice = (priceWei: bigint): string => {
+    return formatEther(priceWei);
+  };
+
+  /**
+   * Check if a pass is active (not expired)
+   */
+  const isPassActive = (pass: RentalPassData): boolean => {
+    const now = BigInt(Math.floor(Date.now() / 1000));
+    return pass.isActive && pass.expiryDate > now;
+  };
+
+  /**
+   * Get days remaining for a pass
+   */
+  const getDaysRemaining = (expiryDate: bigint): number => {
+    const now = Math.floor(Date.now() / 1000);
+    const expiry = Number(expiryDate);
+    const remaining = Math.max(0, expiry - now);
+    return Math.ceil(remaining / (24 * 60 * 60));
+  };
+
+  // ============= MAIN FUNCTIONS =============
+
+  /**
+   * Mint a new rental pass
+   */
+  const mintPass = async ({
+    vehicleType,
+    cityId,
+    duration = 30,
+  }: MintPassParams) => {
+    if (!isConnected || !address) {
+      throw new Error("Please connect your wallet first");
     }
 
-    // Completely off-chain generation - no blockchain interaction
-    const entropy = crypto.getRandomValues(new Uint8Array(16));
-    const timestamp = Date.now();
-    const expiresAt = timestamp + duration * 60 * 1000;
-
-    // Create secure seed
-    const seedData = `${address}-${timestamp}-${tokenId}-${duration}-${entropy.join(
-      ""
-    )}`;
-    const encoder = new TextEncoder();
-    const data = encoder.encode(seedData);
-
-    // Hash for additional security
-    const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-    const hashArray = new Uint8Array(hashBuffer);
-
-    // Generate 8-character code
-    const allowedChars = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
-    let code = "";
-
-    for (let i = 0; i < 8; i++) {
-      const index = hashArray[i] % allowedChars.length;
-      code += allowedChars[index];
+    if (!CONTRACT_ADDRESS) {
+      throw new Error("Contract address not configured");
     }
 
-    console.log("🔑 Generated access code (off-chain):", {
-      code,
-      tokenId,
-      duration: `${duration} minutes`,
-      expiresAt: new Date(expiresAt),
+    setError(null);
+    setIsLoading(true);
+
+    try {
+      const price = VEHICLE_PRICES[vehicleType];
+      const priceInWei = parseEther(price);
+
+      const txHash = await writeContract({
+        address: CONTRACT_ADDRESS,
+        abi: RENTAL_PASS_ABI,
+        functionName: "mintRentalPass",
+        args: [vehicleType, cityId, BigInt(duration)],
+        value: priceInWei,
+      });
+
+      toast.success("Transaction submitted! Waiting for confirmation...");
+
+      return {
+        txHash,
+        vehicleType,
+        cityId,
+        duration,
+        price: priceInWei,
+      };
+    } catch (err: any) {
+      const error: ContractError = {
+        message: err.message || "Failed to mint rental pass",
+        code: err.code,
+        data: err.data,
+      };
+      setError(error);
+      toast.error(error.message);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  /**
+   * Generate access code for a rental pass
+   */
+  const generateAccessCode = async (tokenId: bigint): Promise<AccessCode> => {
+    if (!isConnected || !address) {
+      throw new Error("Please connect your wallet first");
+    }
+
+    if (!CONTRACT_ADDRESS) {
+      throw new Error("Contract address not configured");
+    }
+
+    setError(null);
+    setIsLoading(true);
+
+    try {
+      const code = await writeContract({
+        address: CONTRACT_ADDRESS,
+        abi: RENTAL_PASS_ABI,
+        functionName: "generateAccessCode",
+        args: [tokenId],
+      });
+
+      toast.success("Access code generated successfully!");
+
+      return {
+        code: code!,
+        tokenId,
+        expiresAt: BigInt(Date.now() + 15 * 60 * 1000), // 15 minutes
+        isUsed: false,
+      };
+    } catch (err: any) {
+      const error: ContractError = {
+        message: err.message || "Failed to generate access code",
+        code: err.code,
+        data: err.data,
+      };
+      setError(error);
+      toast.error(error.message);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  /**
+   * Get formatted user passes
+   */
+  const getUserPasses = (): RentalPassData[] => {
+    if (!userPassesData) return [];
+
+    return (userPassesData as any[]).map((pass: any) => ({
+      tokenId: pass.tokenId,
+      vehicleType: pass.vehicleType as VehicleType,
       cityId: pass.cityId,
-      vehicleType: pass.vehicleType,
-    });
-
-    return { code, expiresAt };
+      duration: pass.duration,
+      price: pass.price,
+      purchaseDate: pass.purchaseDate,
+      expiryDate: pass.expiryDate,
+      isActive: pass.isActive,
+      owner: address!,
+    }));
   };
+
+  /**
+   * Get available vehicles with real-time availability
+   */
+  const getAvailableVehicles = (): VehicleAvailability[] => {
+    if (!availableVehiclesData) {
+      // Return default data if contract call fails
+      return [
+        {
+          vehicleType: VehicleType.BIKE,
+          available: BigInt(150),
+          priceWei: parseEther(VEHICLE_PRICES[VehicleType.BIKE]),
+          ...VEHICLE_CONFIG[VehicleType.BIKE],
+        },
+        {
+          vehicleType: VehicleType.SCOOTER,
+          available: BigInt(89),
+          priceWei: parseEther(VEHICLE_PRICES[VehicleType.SCOOTER]),
+          ...VEHICLE_CONFIG[VehicleType.SCOOTER],
+        },
+        {
+          vehicleType: VehicleType.MONOPATTINO,
+          available: BigInt(67),
+          priceWei: parseEther(VEHICLE_PRICES[VehicleType.MONOPATTINO]),
+          ...VEHICLE_CONFIG[VehicleType.MONOPATTINO],
+        },
+      ];
+    }
+
+    return (availableVehiclesData as any[]).map((vehicle: any) => ({
+      vehicleType: vehicle.vehicleType as VehicleType,
+      available: vehicle.available,
+      priceWei: vehicle.priceWei,
+      ...VEHICLE_CONFIG[vehicle.vehicleType as VehicleType],
+    }));
+  };
+
+  /**
+   * Check if user has a specific vehicle type pass
+   */
+  const userHasPass = (vehicleType: VehicleType): boolean => {
+    const userPasses = getUserPasses();
+    return userPasses.some(
+      (pass) => pass.vehicleType === vehicleType && isPassActive(pass)
+    );
+  };
+
+  /**
+   * Get user's active passes by vehicle type
+   */
+  const getActivePassesByType = (
+    vehicleType: VehicleType
+  ): RentalPassData[] => {
+    const userPasses = getUserPasses();
+    return userPasses.filter(
+      (pass) => pass.vehicleType === vehicleType && isPassActive(pass)
+    );
+  };
+
+  /**
+   * Get user's pass statistics
+   */
+  const getUserStats = () => {
+    const userPasses = getUserPasses();
+    const activePasses = userPasses.filter(isPassActive);
+    const totalValue = userPasses.reduce(
+      (sum, pass) => sum + Number(formatEther(pass.price)),
+      0
+    );
+
+    return {
+      totalPasses: userPasses.length,
+      activePasses: activePasses.length,
+      expiredPasses: userPasses.length - activePasses.length,
+      totalValue: totalValue.toFixed(3),
+      passesByType: {
+        [VehicleType.BIKE]: userPasses.filter(
+          (p) => p.vehicleType === VehicleType.BIKE
+        ).length,
+        [VehicleType.SCOOTER]: userPasses.filter(
+          (p) => p.vehicleType === VehicleType.SCOOTER
+        ).length,
+        [VehicleType.MONOPATTINO]: userPasses.filter(
+          (p) => p.vehicleType === VehicleType.MONOPATTINO
+        ).length,
+      },
+    };
+  };
+
+  // Handle transaction confirmation
+  useEffect(() => {
+    if (isConfirmed) {
+      toast.success("Rental pass minted successfully! 🎉");
+      refetchPasses(); // Refresh user passes
+      refetchVehicles(); // Refresh availability
+    }
+  }, [isConfirmed, refetchPasses, refetchVehicles]);
+
+  // Handle mint errors
+  useEffect(() => {
+    if (mintError) {
+      const error: ContractError = {
+        message: mintError.message || "Transaction failed",
+        data: mintError,
+      };
+      setError(error);
+      toast.error(error.message);
+    }
+  }, [mintError]);
 
   return {
-    // Data
-    passes,
-    pricing,
+    // State
+    isLoading: isLoading || isMintPending || isConfirming,
+    isLoadingPasses,
+    isLoadingVehicles,
+    error,
     isConnected,
+    address,
 
-    // Loading states
-    isLoading: isPricingLoading || isPassesLoading,
-    isMinting,
+    // Transaction status
+    mintTxHash,
+    isConfirmed,
+    isConfirming,
 
-    // Actions
-    purchasePass,
+    // Functions
+    mintPass,
     generateAccessCode,
+    getUserPasses,
+    getAvailableVehicles,
+    userHasPass,
+    getActivePassesByType,
+    getUserStats,
 
-    // Utilities
-    hasValidPass,
-    getBestPassForRental,
-    getPriceForVehicle,
+    // Utility functions
+    vehicleTypeToString,
+    stringToVehicleType,
+    getVehicleConfig,
+    formatPrice,
+    isPassActive,
+    getDaysRemaining,
 
-    // Status
-    mintSuccess,
+    // Data
+    userPasses: getUserPasses(),
+    availableVehicles: getAvailableVehicles(),
+    userStats: getUserStats(),
+
+    // Refetch functions
+    refetchPasses,
+    refetchVehicles,
+
+    // Constants
+    VehicleType,
+    VEHICLE_CONFIG,
   };
 }
