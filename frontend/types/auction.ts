@@ -32,6 +32,21 @@ export interface Auction {
   bidIncrement: string;
   currency: string;
   attributes: {
+    rarity?: string;
+    designer?: string;
+    collection?: string;
+    achievement?: string;
+    requirement?: string;
+    holders?: string;
+    effects?: string;
+    compatibility?: string;
+    special?: string;
+    traits?: string;
+    supply?: string;
+    mystery?: string;
+    unlocks?: string;
+    community?: string;
+    edition?: string;
     range: string;
     speed: string;
     battery: string;

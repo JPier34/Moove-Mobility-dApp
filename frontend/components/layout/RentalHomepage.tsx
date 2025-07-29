@@ -1,11 +1,11 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-//import { useAccount } from "wagmi";
-//import { VehicleGeolocationSystem } from "@/utils/vehicleGeoLocation";
+import { useAccount } from "wagmi";
+import { VehicleGeolocationSystem } from "@/utils/vehicleGeoLocation";
 import { EUROPEAN_CITIES, VehicleType } from "@/config/cities";
 import Link from "next/link";
-import { motion, useInView } from "framer-motion";
+import { motion, useScroll, useTransform, useInView } from "framer-motion";
 
 // ============= TYPES =============
 
@@ -419,17 +419,19 @@ function PremiumVehicleCard({ vehicle, onSelect, userHasPass }: any) {
           <span>30 days access</span>
         </div>
 
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          className={`w-full py-3 px-4 rounded-xl font-semibold transition-all duration-300 ${
-            userHasPass
-              ? "bg-green-500 hover:bg-green-600 text-white"
-              : "bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700 text-white shadow-lg hover:shadow-xl"
-          }`}
-        >
-          {userHasPass ? "Generate Code" : "Get Access Pass"}
-        </motion.button>
+        <Link href="/marketplace" passHref>
+          <motion.a
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className={`w-full py-3 px-4 rounded-xl font-semibold transition-all duration-300 ${
+              userHasPass
+                ? "bg-green-500 hover:bg-green-600 text-white"
+                : "bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700 text-white shadow-lg hover:shadow-xl"
+            }`}
+          >
+            {userHasPass ? "Generate Code" : "Get Access Pass"}
+          </motion.a>
+        </Link>
       </div>
     </motion.div>
   );
@@ -645,35 +647,16 @@ function NFTMarketplaceSection() {
             🎨 Explore Our NFT Universe
           </h2>
           <p className="text-xl text-white/90 mb-8 max-w-3xl mx-auto leading-relaxed">
-            Discover rental passes, exclusive decorative NFTs, and limited
-            edition collections. Own your digital mobility assets.
+            Discover our new section: the exclusive decorative. Own your digital
+            mobility assets.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
-            <Link href="/marketplace">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="group bg-white text-purple-600 font-bold py-4 px-8 rounded-full text-lg shadow-2xl hover:shadow-white/25 transition-all duration-300"
-              >
-                <span className="flex items-center">
-                  Browse Rental Passes
-                  <motion.span
-                    className="ml-2"
-                    animate={{ x: [0, 5, 0] }}
-                    transition={{ duration: 1.5, repeat: Infinity }}
-                  >
-                    🚲
-                  </motion.span>
-                </span>
-              </motion.button>
-            </Link>
-
             <Link href="/auctions">
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="group bg-white/10 backdrop-blur-sm border border-white/20 text-white font-semibold py-4 px-8 rounded-full text-lg hover:bg-white/20 transition-all duration-300"
+                className="group bg-white/30 backdrop-blur-sm border border-white/20 text-white font-semibold py-4 px-8 rounded-full text-lg hover:bg-white/20 transition-all duration-300"
               >
                 <span className="flex items-center">
                   Decorative Auctions
@@ -947,5 +930,45 @@ function HowItWorksSection() {
         </motion.div>
       </div>
     </motion.section>
+  );
+}
+
+export default function RentalHomepage() {
+  const { location, cityInfo, isLoading, canRent, error } = useGeolocation();
+
+  // Mock data per testing
+  const currentCity = EUROPEAN_CITIES[0] || {
+    name: "Rome",
+    id: "rome",
+    allowedVehicles: ["bike", "scooter", "monopattino"],
+  };
+  const userPasses: never[] = [];
+  const nearbyVehicles: never[] = [];
+
+  const handleRentVehicle = (vehicle: VehicleOption) => {
+    console.log("Renting:", vehicle);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        Loading...
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <StatsSection />
+      <VehicleSection
+        currentCity={currentCity}
+        vehicleOptions={VEHICLE_OPTIONS}
+        onRentVehicle={handleRentVehicle}
+        userPasses={userPasses}
+        nearbyVehicles={nearbyVehicles}
+      />
+      <NFTMarketplaceSection />
+      <HowItWorksSection />
+    </div>
   );
 }
