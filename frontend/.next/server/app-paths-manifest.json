@@ -2,8 +2,5 @@
   "/_not-found/page": "app/_not-found/page.js",
   "/page": "app/page.js",
   "/marketplace/page": "app/marketplace/page.js",
-  "/auctions/page": "app/auctions/page.js",
-  "/my-collection/page": "app/my-collection/page.js",
-  "/book/[vehicleType]/page": "app/book/[vehicleType]/page.js",
-  "/success/[transactionId]/page": "app/success/[transactionId]/page.js"
+  "/book/[vehicleType]/page": "app/book/[vehicleType]/page.js"
 }

@@ -1,4 +1,3 @@
-// /app/marketplace/page.tsx - CON TYPES UNIFICATI
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -17,7 +16,7 @@ interface VehiclePassDisplay {
   typeString: string;
   name: string;
   icon: string;
-  price: number; // in EUR approximation
+  price?: number; // in EUR
   priceETH: string;
   duration: number; // days
   description: string;
@@ -29,7 +28,6 @@ interface VehiclePassDisplay {
 
 // ============= UTILS =============
 function getCurrentCity() {
-  // In a real app, get from geolocation or user preference
   return (
     EUROPEAN_CITIES.find((city) => city.id === "rome") || EUROPEAN_CITIES[0]
   );
@@ -121,9 +119,9 @@ function MarketplaceHeader({ currentCity }: { currentCity: any }) {
       {/* Location Info */}
       <motion.div
         className="inline-flex items-center bg-green-500/10 backdrop-blur-sm border border-green-500/20 text-green-600 dark:text-green-400 px-6 py-3 rounded-full text-lg font-medium mb-8"
-        initial={{ scale: 0 }}
-        animate={{ scale: 1 }}
-        transition={{ delay: 0.4, type: "spring", stiffness: 300 }}
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.5, ease: "easeOut" }}
       >
         <span className="text-2xl mr-3">📍</span>
         Service available in {currentCity.name}
@@ -154,16 +152,16 @@ function MarketplaceHeader({ currentCity }: { currentCity: any }) {
 function ConnectWalletPrompt() {
   return (
     <motion.div
-      className="text-center py-20 bg-white dark:bg-gray-800 rounded-3xl shadow-xl"
+      className="text-center py-20 items-center bg-white dark:bg-gray-800 rounded-3xl shadow-xl"
       initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.8 }}
     >
       <motion.div
-        className="text-8xl mb-6"
+        className="text-8xl mb-6 block mx-auto"
         animate={{
-          scale: [1, 1.1, 1],
-          rotate: [0, -5, 5, 0],
+          scale: [1, 1.05, 1],
+          rotate: [0, -2, 2, 0],
         }}
         transition={{ duration: 3, repeat: Infinity }}
       >
@@ -424,13 +422,13 @@ export default function MarketplacePage() {
     refetchVehicles();
   };
 
-  // Auto-refresh every 30 seconds
+  // Auto-refresh every 5 minutes
   useEffect(() => {
     if (!isConnected) return;
 
     const interval = setInterval(() => {
       refetchVehicles();
-    }, 30000);
+    }, 360000);
 
     return () => clearInterval(interval);
   }, [isConnected, refetchVehicles]);
