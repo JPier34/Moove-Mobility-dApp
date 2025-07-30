@@ -1,4 +1,3 @@
-// /components/layout/RentalHomepage.tsx - CON MODAL LOCALIZZAZIONE
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
@@ -115,10 +114,27 @@ function useLocationWithModal(): [
 
   // Check if we already have location permission on mount
   useEffect(() => {
-    const checkExistingPermission = async () => {
+    const checkExistingPermission = async (): Promise<void> => {
       try {
         const geoSystem = new VehicleGeolocationSystem();
-        const permission = await geoSystem.checkLocationPermission();
+
+        // Check permissions first
+        let permission: "granted" | "denied" | "prompt" = "prompt";
+
+        if (navigator.permissions) {
+          try {
+            const permissionStatus = await navigator.permissions.query({
+              name: "geolocation" as PermissionName,
+            });
+            permission = permissionStatus.state as
+              | "granted"
+              | "denied"
+              | "prompt";
+          } catch (error) {
+            console.warn("Could not check location permission:", error);
+            permission = "prompt";
+          }
+        }
 
         if (permission === "granted") {
           // Try to get location without showing modal
@@ -130,6 +146,9 @@ function useLocationWithModal(): [
             // Permission granted but location failed, show modal
             setLocationState((prev) => ({ ...prev, showLocationModal: true }));
           }
+        } else {
+          // Permission not granted, show modal
+          setLocationState((prev) => ({ ...prev, showLocationModal: true }));
         }
       } catch (error) {
         // Permissions API not available, show modal

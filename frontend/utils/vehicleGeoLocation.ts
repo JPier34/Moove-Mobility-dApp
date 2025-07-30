@@ -2,7 +2,7 @@ import { VehicleType } from "@/config/cities";
 import { EUROPEAN_CITIES } from "@/config/cities";
 import { CityConfig } from "@/config/cities";
 
-// ============= TYPES =============
+// ============= TYPES (keep existing interfaces for compatibility) =============
 export interface LocationCoordinates {
   lat: number;
   lng: number;
@@ -19,14 +19,25 @@ export interface NearbyVehicle {
   vehicleId: string;
   vehicleType: VehicleType;
   location: LocationCoordinates;
-  distance: number; // in km
-  batteryLevel: number; // percentage
-  estimatedRange: number; // in km
+  distance: number;
+  batteryLevel: number;
+  estimatedRange: number;
   isAvailable: boolean;
   lastUpdate: Date;
   cityId: string;
 }
 
+// New simplified state interface
+interface LocationStateResult {
+  currentCity: any | null;
+  isLoading: boolean;
+  error: string | null;
+  canRent: boolean;
+  lastUpdated: number;
+  method: "gps" | "manual" | "cached";
+}
+
+// Vehicle location interface (for fleet management)
 interface VehicleLocation {
   vehicleId: string;
   vehicleType: VehicleType;
@@ -43,17 +54,17 @@ interface VehicleLocation {
 
 // ============= CONSTANTS =============
 const GEOLOCATION_OPTIONS: PositionOptions = {
-  enableHighAccuracy: true,
-  timeout: 15000, // 15 seconds
+  enableHighAccuracy: false, // Less resource intensive
+  timeout: 10000, // 10 seconds
   maximumAge: 300000, // 5 minutes cache
 };
+
+const STORAGE_KEY = "moove_city_location";
+const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
 
 export class VehicleGeolocationSystem {
   private static instance: VehicleGeolocationSystem;
   private vehicleLocations: Map<string, VehicleLocation> = new Map();
-  private cachedLocation: LocationCoordinates | null = null;
-  private cacheTimestamp: number = 0;
-  private readonly CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
   static getInstance(): VehicleGeolocationSystem {
     if (!VehicleGeolocationSystem.instance) {
@@ -64,28 +75,62 @@ export class VehicleGeolocationSystem {
   }
 
   constructor() {
-    // Allow direct instantiation for new usage pattern
     if (!this.vehicleLocations.size) {
       this.initializeVehicleFleet();
     }
   }
 
-  // ============= GEOLOCATION METHODS (NUOVI) =============
+  // ============= PERSISTENT LOCATION MANAGEMENT =============
+
+  private saveLocationToStorage(state: LocationStateResult): void {
+    try {
+      if (typeof window !== "undefined" && window.sessionStorage) {
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      }
+    } catch (error) {
+      console.warn("Failed to save location:", error);
+    }
+  }
+
+  private loadLocationFromStorage(): LocationStateResult | null {
+    try {
+      if (typeof window === "undefined" || !window.sessionStorage) {
+        return null;
+      }
+
+      const stored = sessionStorage.getItem(STORAGE_KEY);
+      if (!stored) return null;
+
+      const data = JSON.parse(stored) as LocationStateResult;
+      const now = Date.now();
+
+      // Check if cache is still valid
+      if (now - data.lastUpdated > CACHE_DURATION) {
+        sessionStorage.removeItem(STORAGE_KEY);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.warn("Failed to load location:", error);
+      return null;
+    }
+  }
+
+  // ============= MAIN LOCATION METHODS =============
 
   /**
    * Get current user location with caching
    */
   async getCurrentLocation(): Promise<LocationCoordinates> {
-    // Check if we have a valid cached location
-    const now = Date.now();
-    if (
-      this.cachedLocation &&
-      now - this.cacheTimestamp < this.CACHE_DURATION
-    ) {
-      return this.cachedLocation;
+    // Try cache first for LocationCoordinates compatibility
+    const cached = this.loadLocationFromStorage();
+    if (cached && cached.currentCity) {
+      console.log("Using cached location");
+      return cached.currentCity.coordinates;
     }
 
-    // Check if geolocation is supported
+    // Get fresh location
     if (!navigator.geolocation) {
       throw new Error("Geolocation is not supported by this browser");
     }
@@ -93,40 +138,120 @@ export class VehicleGeolocationSystem {
     return new Promise<LocationCoordinates>((resolve, reject) => {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          const location: LocationCoordinates = {
+          const coordinates: LocationCoordinates = {
             lat: position.coords.latitude,
             lng: position.coords.longitude,
           };
 
-          // Cache the location
-          this.cachedLocation = location;
-          this.cacheTimestamp = now;
+          // Find and cache nearest city
+          const nearestCity = this.findNearestSupportedCity(coordinates);
+          this.saveLocationState(coordinates, nearestCity);
 
-          resolve(location);
+          resolve(coordinates);
         },
         (error) => {
           let message: string;
           switch (error.code) {
             case error.PERMISSION_DENIED:
               message =
-                "Location access denied. Please enable location services and refresh the page.";
+                "Location access denied. Please enable location services.";
               break;
             case error.POSITION_UNAVAILABLE:
-              message =
-                "Location information unavailable. Please check your GPS settings.";
+              message = "Location information unavailable.";
               break;
             case error.TIMEOUT:
-              message = "Location request timed out. Please try again.";
+              message = "Location request timed out.";
               break;
             default:
-              message =
-                "An unknown error occurred while getting your location.";
+              message = "Unknown location error.";
           }
           reject(new Error(message));
         },
         GEOLOCATION_OPTIONS
       );
     });
+  }
+
+  /**
+   * Get current location state (new method for compatibility)
+   */
+  async getCurrentLocationState(): Promise<LocationStateResult> {
+    // Try cache first
+    const cached = this.loadLocationFromStorage();
+    if (cached) {
+      console.log("Using cached location state");
+      return cached;
+    }
+
+    // Get fresh location
+    try {
+      const coordinates = await this.getCurrentLocation();
+      const nearestCity = this.findNearestSupportedCity(coordinates);
+      return this.saveLocationState(coordinates, nearestCity);
+    } catch (error: any) {
+      return {
+        currentCity: null,
+        isLoading: false,
+        error: error.message,
+        canRent: false,
+        lastUpdated: Date.now(),
+        method: "gps",
+      };
+    }
+  }
+
+  private saveLocationState(
+    coordinates: LocationCoordinates,
+    nearestCity: any | null
+  ): LocationStateResult {
+    const state: LocationStateResult = {
+      currentCity: nearestCity,
+      isLoading: false,
+      error: null,
+      canRent: !!nearestCity,
+      lastUpdated: Date.now(),
+      method: "gps",
+    };
+
+    this.saveLocationToStorage(state);
+    return state;
+  }
+
+  private findNearestSupportedCity(
+    coordinates: LocationCoordinates
+  ): any | null {
+    let nearestCity = null;
+    let minDistance = Infinity;
+
+    for (const city of EUROPEAN_CITIES) {
+      const { bounds } = city;
+
+      // Check if inside city bounds first
+      if (
+        coordinates.lat >= bounds.south &&
+        coordinates.lat <= bounds.north &&
+        coordinates.lng >= bounds.west &&
+        coordinates.lng <= bounds.east
+      ) {
+        return city; // Inside city, return immediately
+      }
+
+      // Calculate distance to city center
+      const distance = this.calculateDistance(
+        coordinates.lat,
+        coordinates.lng,
+        city.coordinates.lat,
+        city.coordinates.lng
+      );
+
+      if (distance < minDistance) {
+        minDistance = distance;
+        nearestCity = city;
+      }
+    }
+
+    // Only return city if within reasonable distance (100km)
+    return minDistance <= 100 ? nearestCity : null;
   }
 
   /**
@@ -174,6 +299,67 @@ export class VehicleGeolocationSystem {
     };
   }
 
+  // ============= DEVELOPMENT/TESTING METHODS =============
+
+  /**
+   * Set manual location for testing
+   */
+  async setTestLocation(cityId: string): Promise<LocationStateResult> {
+    const city = EUROPEAN_CITIES.find((c) => c.id === cityId);
+
+    if (!city) {
+      throw new Error(`City ${cityId} not found`);
+    }
+
+    const state: LocationStateResult = {
+      currentCity: city,
+      isLoading: false,
+      error: null,
+      canRent: true,
+      lastUpdated: Date.now(),
+      method: "manual",
+    };
+
+    this.saveLocationToStorage(state);
+    console.log(`🧪 Test location set: ${city.name}`);
+    return state;
+  }
+
+  /**
+   * Clear location cache
+   */
+  clearLocationCache(): void {
+    try {
+      if (typeof window !== "undefined" && window.sessionStorage) {
+        sessionStorage.removeItem(STORAGE_KEY);
+      }
+      console.log("Location cache cleared");
+    } catch (error) {
+      console.warn("Failed to clear location:", error);
+    }
+  }
+
+  /**
+   * Check location permission (for compatibility)
+   */
+  async checkLocationPermission(): Promise<"granted" | "denied" | "prompt"> {
+    if (!navigator.permissions) {
+      return "prompt";
+    }
+
+    try {
+      const permission = await navigator.permissions.query({
+        name: "geolocation" as PermissionName,
+      });
+      return permission.state as "granted" | "denied" | "prompt";
+    } catch (error) {
+      console.warn("Could not check location permission:", error);
+      return "prompt";
+    }
+  }
+
+  // ============= NEARBY VEHICLES METHODS (existing functionality) =============
+
   /**
    * Get nearby vehicles within specified radius
    */
@@ -183,58 +369,127 @@ export class VehicleGeolocationSystem {
     vehicleType?: VehicleType,
     onlyAvailable: boolean = true
   ): Promise<NearbyVehicle[]> {
-    try {
-      // Simulate API delay
-      await new Promise((resolve) => setTimeout(resolve, 300));
+    // Simulate API delay
+    await new Promise((resolve) => setTimeout(resolve, 300));
 
-      const nearbyVehicles: NearbyVehicle[] = [];
+    const nearbyVehicles: NearbyVehicle[] = [];
 
-      this.vehicleLocations.forEach((vehicle) => {
-        // Filter by availability if requested
-        if (onlyAvailable && !vehicle.isAvailable) return;
+    this.vehicleLocations.forEach((vehicle) => {
+      // Filter by availability if requested
+      if (onlyAvailable && !vehicle.isAvailable) return;
 
-        // Filter by vehicle type if specified
-        if (vehicleType && vehicle.vehicleType !== vehicleType) return;
+      // Filter by vehicle type if specified
+      if (vehicleType && vehicle.vehicleType !== vehicleType) return;
 
-        const distance = this.calculateDistance(
-          location.lat,
-          location.lng,
-          vehicle.coordinates.lat,
-          vehicle.coordinates.lng
-        );
+      const distance = this.calculateDistance(
+        location.lat,
+        location.lng,
+        vehicle.coordinates.lat,
+        vehicle.coordinates.lng
+      );
 
-        if (distance <= radiusKm) {
-          nearbyVehicles.push({
-            vehicleId: vehicle.vehicleId,
-            vehicleType: vehicle.vehicleType,
-            location: {
-              lat: vehicle.coordinates.lat,
-              lng: vehicle.coordinates.lng,
-            },
-            distance,
-            batteryLevel: vehicle.batteryLevel,
-            estimatedRange: vehicle.estimatedRange,
-            isAvailable: vehicle.isAvailable,
-            lastUpdate: vehicle.lastUpdate,
-            cityId: vehicle.cityId,
-          });
-        }
-      });
+      if (distance <= radiusKm) {
+        nearbyVehicles.push({
+          vehicleId: vehicle.vehicleId,
+          vehicleType: vehicle.vehicleType,
+          location: {
+            lat: vehicle.coordinates.lat,
+            lng: vehicle.coordinates.lng,
+          },
+          distance,
+          batteryLevel: vehicle.batteryLevel,
+          estimatedRange: vehicle.estimatedRange,
+          isAvailable: vehicle.isAvailable,
+          lastUpdate: vehicle.lastUpdate,
+          cityId: vehicle.cityId,
+        });
+      }
+    });
 
-      // Sort by distance
-      return nearbyVehicles.sort((a, b) => a.distance - b.distance);
-    } catch (error) {
-      console.error("Error fetching nearby vehicles:", error);
-      throw new Error("Failed to fetch nearby vehicles. Please try again.");
-    }
+    // Sort by distance
+    return nearbyVehicles.sort((a, b) => a.distance - b.distance);
   }
 
-  // ============= FLEET MANAGEMENT METHODS (ESISTENTI) =============
+  // Get vehicles near user location
+  getVehiclesNearLocation(
+    userLat: number,
+    userLng: number,
+    radiusKm: number = 2,
+    vehicleType?: VehicleType
+  ): (VehicleLocation & { distance: number })[] {
+    const nearbyVehicles: (VehicleLocation & { distance: number })[] = [];
 
-  // Generate random vehicles in cities
+    this.vehicleLocations.forEach((vehicle) => {
+      if (!vehicle.isAvailable) return;
+      if (vehicleType && vehicle.vehicleType !== vehicleType) return;
+
+      const distance = this.calculateDistance(
+        userLat,
+        userLng,
+        vehicle.coordinates.lat,
+        vehicle.coordinates.lng
+      );
+
+      if (distance <= radiusKm) {
+        nearbyVehicles.push({
+          ...vehicle,
+          distance,
+        });
+      }
+    });
+
+    return nearbyVehicles.sort((a, b) => a.distance - b.distance);
+  }
+
+  // Get vehicles in specific city
+  getVehiclesInCity(
+    cityId: string,
+    vehicleType?: VehicleType
+  ): VehicleLocation[] {
+    const cityVehicles: VehicleLocation[] = [];
+
+    this.vehicleLocations.forEach((vehicle) => {
+      if (vehicle.cityId !== cityId) return;
+      if (!vehicle.isAvailable) return;
+      if (vehicleType && vehicle.vehicleType !== vehicleType) return;
+
+      cityVehicles.push(vehicle);
+    });
+
+    return cityVehicles;
+  }
+
+  // ============= UTILITY METHODS =============
+
+  private calculateDistance(
+    lat1: number,
+    lng1: number,
+    lat2: number,
+    lng2: number
+  ): number {
+    const R = 6371; // Earth's radius in kilometers
+    const dLat = this.toRadians(lat2 - lat1);
+    const dLng = this.toRadians(lng2 - lng1);
+
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(this.toRadians(lat1)) *
+        Math.cos(this.toRadians(lat2)) *
+        Math.sin(dLng / 2) *
+        Math.sin(dLng / 2);
+
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
+
+  private toRadians(degrees: number): number {
+    return degrees * (Math.PI / 180);
+  }
+
+  // ============= VEHICLE FLEET METHODS (existing) =============
+
   initializeVehicleFleet(): void {
     EUROPEAN_CITIES.forEach((city) => {
-      // Generate vehicles for each type based on city limits
       Object.entries(city.vehicleLimit).forEach(([vehicleType, limit]) => {
         if (
           limit > 0 &&
@@ -305,152 +560,7 @@ export class VehicleGeolocationSystem {
     return Math.floor(Math.random() * (max - min + 1)) + min;
   }
 
-  // Get vehicles near user location (AGGIORNATO per compatibilità)
-  getVehiclesNearLocation(
-    userLat: number,
-    userLng: number,
-    radiusKm: number = 2,
-    vehicleType?: VehicleType
-  ): (VehicleLocation & { distance: number })[] {
-    const nearbyVehicles: (VehicleLocation & { distance: number })[] = [];
-
-    this.vehicleLocations.forEach((vehicle) => {
-      if (!vehicle.isAvailable) return;
-      if (vehicleType && vehicle.vehicleType !== vehicleType) return;
-
-      const distance = this.calculateDistance(
-        userLat,
-        userLng,
-        vehicle.coordinates.lat,
-        vehicle.coordinates.lng
-      );
-
-      if (distance <= radiusKm) {
-        nearbyVehicles.push({
-          ...vehicle,
-          distance,
-        });
-      }
-    });
-
-    // Sort by distance
-    return nearbyVehicles.sort((a, b) => a.distance - b.distance);
-  }
-
-  // Get vehicles in specific city
-  getVehiclesInCity(
-    cityId: string,
-    vehicleType?: VehicleType
-  ): VehicleLocation[] {
-    const cityVehicles: VehicleLocation[] = [];
-
-    this.vehicleLocations.forEach((vehicle) => {
-      if (vehicle.cityId !== cityId) return;
-      if (!vehicle.isAvailable) return;
-      if (vehicleType && vehicle.vehicleType !== vehicleType) return;
-
-      cityVehicles.push(vehicle);
-    });
-
-    return cityVehicles;
-  }
-
-  // Calculate distance between two points (Haversine formula)
-  private calculateDistance(
-    lat1: number,
-    lng1: number,
-    lat2: number,
-    lng2: number
-  ): number {
-    const R = 6371; // Earth's radius in kilometers
-    const dLat = this.toRadians(lat2 - lat1);
-    const dLng = this.toRadians(lng2 - lng1);
-
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(this.toRadians(lat1)) *
-        Math.cos(this.toRadians(lat2)) *
-        Math.sin(dLng / 2) *
-        Math.sin(dLng / 2);
-
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-  }
-
-  private toRadians(degrees: number): number {
-    return degrees * (Math.PI / 180);
-  }
-
-  // ============= UTILITY METHODS (NUOVI) =============
-
-  /**
-   * Clear location cache
-   */
-  clearLocationCache(): void {
-    this.cachedLocation = null;
-    this.cacheTimestamp = 0;
-  }
-
-  /**
-   * Get cached location if available
-   */
-  getCachedLocation(): LocationCoordinates | null {
-    const now = Date.now();
-    if (
-      this.cachedLocation &&
-      now - this.cacheTimestamp < this.CACHE_DURATION
-    ) {
-      return this.cachedLocation;
-    }
-    return null;
-  }
-
-  /**
-   * Check if location permissions are granted
-   */
-  async checkLocationPermission(): Promise<"granted" | "denied" | "prompt"> {
-    if (!navigator.permissions) {
-      return "prompt"; // Assume prompt if Permissions API not available
-    }
-
-    try {
-      const permission = await navigator.permissions.query({
-        name: "geolocation",
-      });
-      return permission.state;
-    } catch (error) {
-      console.warn("Could not check location permission:", error);
-      return "prompt";
-    }
-  }
-
-  /**
-   * Get distance to nearest supported city
-   */
-  async getDistanceToNearestCity(location?: LocationCoordinates): Promise<{
-    city: string;
-    distance: number;
-  }> {
-    const userLocation = location || (await this.getCurrentLocation());
-
-    const distances = EUROPEAN_CITIES.map((city) => ({
-      city: city.name,
-      distance: this.calculateDistance(
-        userLocation.lat,
-        userLocation.lng,
-        city.coordinates.lat,
-        city.coordinates.lng
-      ),
-    }));
-
-    return distances.reduce((min, curr) =>
-      curr.distance < min.distance ? curr : min
-    );
-  }
-
-  // ============= VEHICLE MANAGEMENT METHODS (ESISTENTI) =============
-
-  // Reserve a vehicle
+  // Vehicle management methods (existing)
   reserveVehicle(vehicleId: string): boolean {
     const vehicle = this.vehicleLocations.get(vehicleId);
     if (vehicle && vehicle.isAvailable) {
@@ -461,7 +571,6 @@ export class VehicleGeolocationSystem {
     return false;
   }
 
-  // Release a vehicle
   releaseVehicle(
     vehicleId: string,
     newLocation?: { lat: number; lng: number }
@@ -473,7 +582,6 @@ export class VehicleGeolocationSystem {
       if (newLocation) {
         vehicle.coordinates = newLocation;
       }
-      // Simulate battery drain
       vehicle.batteryLevel = Math.max(
         0,
         vehicle.batteryLevel - Math.floor(Math.random() * 20)
@@ -481,17 +589,14 @@ export class VehicleGeolocationSystem {
     }
   }
 
-  // Get vehicle by ID
   getVehicle(vehicleId: string): VehicleLocation | undefined {
     return this.vehicleLocations.get(vehicleId);
   }
 
-  // Get all vehicles (for admin)
   getAllVehicles(): VehicleLocation[] {
     return Array.from(this.vehicleLocations.values());
   }
 
-  // Update vehicle location (simulate movement)
   updateVehicleLocation(
     vehicleId: string,
     newLocation: { lat: number; lng: number }
@@ -502,66 +607,10 @@ export class VehicleGeolocationSystem {
       vehicle.lastUpdate = new Date();
     }
   }
-
-  // ============= STATISTICS METHODS (NUOVI) =============
-
-  /**
-   * Get vehicle statistics for a city
-   */
-  getCityStats(cityId: string): {
-    total: number;
-    available: number;
-    inUse: number;
-    byType: Record<VehicleType, number>;
-  } {
-    const vehicles = Array.from(this.vehicleLocations.values()).filter(
-      (v) => v.cityId === cityId
-    );
-
-    const stats = {
-      total: vehicles.length,
-      available: vehicles.filter((v) => v.isAvailable).length,
-      inUse: vehicles.filter((v) => !v.isAvailable).length,
-      byType: {
-        bike: vehicles.filter((v) => v.vehicleType === "bike").length,
-        scooter: vehicles.filter((v) => v.vehicleType === "scooter").length,
-        monopattino: vehicles.filter((v) => v.vehicleType === "monopattino")
-          .length,
-      } as Record<VehicleType, number>,
-    };
-
-    return stats;
-  }
-
-  /**
-   * Get global fleet statistics
-   */
-  getGlobalStats(): {
-    totalVehicles: number;
-    availableVehicles: number;
-    activeCities: number;
-    averageBattery: number;
-  } {
-    const allVehicles = Array.from(this.vehicleLocations.values());
-    const activeCities = new Set(allVehicles.map((v) => v.cityId)).size;
-    const avgBattery =
-      allVehicles.reduce((sum, v) => sum + v.batteryLevel, 0) /
-      allVehicles.length;
-
-    return {
-      totalVehicles: allVehicles.length,
-      availableVehicles: allVehicles.filter((v) => v.isAvailable).length,
-      activeCities,
-      averageBattery: Math.round(avgBattery),
-    };
-  }
 }
 
-// ============= HELPER FUNCTIONS =============
+// ============= HELPER FUNCTIONS (existing) =============
 
-/**
- * Format distance for display
- */
 export function formatDistance(distanceKm: number): string {
   if (distanceKm < 0.1) {
     return "Very close";
@@ -572,18 +621,12 @@ export function formatDistance(distanceKm: number): string {
   }
 }
 
-/**
- * Get battery level color
- */
 export function getBatteryColor(level: number): string {
   if (level > 70) return "text-green-600";
   if (level > 30) return "text-yellow-600";
   return "text-red-600";
 }
 
-/**
- * Get vehicle type emoji
- */
 export function getVehicleEmoji(type: VehicleType): string {
   switch (type) {
     case "bike":
@@ -597,5 +640,5 @@ export function getVehicleEmoji(type: VehicleType): string {
   }
 }
 
-// Export default per compatibilità
+// Export default for compatibility
 export default VehicleGeolocationSystem;
