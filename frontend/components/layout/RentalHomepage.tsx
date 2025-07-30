@@ -1,20 +1,23 @@
+// /components/layout/RentalHomepage.tsx - CON MODAL LOCALIZZAZIONE
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { useAccount } from "wagmi";
-import { VehicleGeolocationSystem } from "@/utils/vehicleGeoLocation";
 import { EUROPEAN_CITIES, VehicleType } from "@/config/cities";
 import Link from "next/link";
-import { motion, useScroll, useTransform, useInView } from "framer-motion";
+import { motion, useInView } from "framer-motion";
+import { VehicleGeolocationSystem } from "@/utils/vehicleGeoLocation";
+import LocationPermissionModal from "@/components/modals/LocationPermissionModal";
+import type {
+  LocationCoordinates,
+  NearbyVehicle,
+} from "@/utils/vehicleGeoLocation";
 
 // ============= TYPES =============
-
 interface VehicleOption {
   type: VehicleType;
   name: string;
   icon: string;
   image: string;
-  price: string;
   priceEth: string;
   description: string;
   range: string;
@@ -22,25 +25,26 @@ interface VehicleOption {
   gradient: string;
 }
 
-interface GeolocationResult {
-  location: { lat: number; lng: number } | null;
-  cityInfo: { inCity: boolean; cityName?: string; distance?: number } | null;
+interface LocationState {
+  currentCity: any | null;
   isLoading: boolean;
-  canRent: boolean;
   error: string | null;
+  canRent: boolean;
+  nearbyVehicles: NearbyVehicle[];
+  location: LocationCoordinates | null;
+  showLocationModal: boolean;
+  locationMethod: "gps" | "manual" | "none";
 }
 
 // ============= DATA =============
-
 const VEHICLE_OPTIONS: VehicleOption[] = [
   {
     type: "bike",
     name: "E-Bike Access",
     icon: "🚲",
     image: "/images/vehicles/e-bike-city.jpg",
-    price: "€25",
     priceEth: "0.025 ETH",
-    description: "Perfect for city exploration",
+    description: "Perfect for city exploration and daily commutes",
     range: "25-50 km",
     features: [
       "30 days unlimited access",
@@ -54,7 +58,6 @@ const VEHICLE_OPTIONS: VehicleOption[] = [
     name: "E-Scooter Access",
     icon: "🛴",
     image: "/images/vehicles/scooter-urban.jpg",
-    price: "€35",
     priceEth: "0.035 ETH",
     description: "Fast and convenient for short to medium trips",
     range: "30-60 km",
@@ -70,7 +73,6 @@ const VEHICLE_OPTIONS: VehicleOption[] = [
     name: "Monopattino Access",
     icon: "🛵",
     image: "/images/vehicles/monopattino-premium.jpg",
-    price: "€45",
     priceEth: "0.045 ETH",
     description: "Premium urban mobility experience",
     range: "15-35 km",
@@ -90,97 +92,148 @@ const STATS = [
   { label: "CO₂ Saved (tons)", value: 450, suffix: "+" },
 ];
 
-// ============= UTILS =============
-
-function calculateDistance(
-  point1: { lat: number; lng: number },
-  point2: { lat: number; lng: number }
-): number {
-  const R = 6371;
-  const dLat = toRad(point2.lat - point1.lat);
-  const dLng = toRad(point2.lng - point1.lng);
-
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRad(point1.lat)) *
-      Math.cos(toRad(point2.lat)) *
-      Math.sin(dLng / 2) *
-      Math.sin(dLng / 2);
-
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
-
-function toRad(degrees: number): number {
-  return degrees * (Math.PI / 180);
-}
-
-function checkCitySupport(location: { lat: number; lng: number }) {
-  for (const city of EUROPEAN_CITIES) {
-    const { bounds } = city;
-    if (
-      location.lat >= bounds.south &&
-      location.lat <= bounds.north &&
-      location.lng >= bounds.west &&
-      location.lng <= bounds.east
-    ) {
-      return { inCity: true, cityName: city.id, distance: 0 };
-    }
-  }
-
-  const distances = EUROPEAN_CITIES.map((city) => ({
-    name: city.id,
-    distance: calculateDistance(location, city.coordinates),
-  }));
-
-  const nearest = distances.reduce((min, curr) =>
-    curr.distance < min.distance ? curr : min
-  );
-
-  return { inCity: false, distance: nearest.distance };
-}
-
 // ============= HOOKS =============
+function useLocationWithModal(): [
+  LocationState,
+  {
+    handleLocationGranted: (location: LocationCoordinates) => void;
+    handleLocationDenied: () => void;
+    handleManualCitySelect: (cityId: string) => void;
+    requestLocationAgain: () => void;
+  }
+] {
+  const [locationState, setLocationState] = useState<LocationState>({
+    currentCity: null,
+    isLoading: false,
+    error: null,
+    canRent: false,
+    nearbyVehicles: [],
+    location: null,
+    showLocationModal: true, // Show modal on first load
+    locationMethod: "none",
+  });
 
-function useGeolocation(): GeolocationResult {
-  const [location, setLocation] = useState<{ lat: number; lng: number } | null>(
-    null
-  );
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
+  // Check if we already have location permission on mount
   useEffect(() => {
-    if (!navigator.geolocation) {
-      setError("Geolocation not supported");
-      setIsLoading(false);
-      return;
-    }
+    const checkExistingPermission = async () => {
+      try {
+        const geoSystem = new VehicleGeolocationSystem();
+        const permission = await geoSystem.checkLocationPermission();
 
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setLocation({
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-        });
-        setIsLoading(false);
-      },
-      (error) => {
-        setError(error.message);
-        setIsLoading(false);
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
-    );
+        if (permission === "granted") {
+          // Try to get location without showing modal
+          try {
+            const location = await geoSystem.getCurrentLocation();
+            handleLocationGranted(location);
+            setLocationState((prev) => ({ ...prev, showLocationModal: false }));
+          } catch (error) {
+            // Permission granted but location failed, show modal
+            setLocationState((prev) => ({ ...prev, showLocationModal: true }));
+          }
+        }
+      } catch (error) {
+        // Permissions API not available, show modal
+        setLocationState((prev) => ({ ...prev, showLocationModal: true }));
+      }
+    };
+
+    checkExistingPermission();
   }, []);
 
-  const cityInfo = location ? checkCitySupport(location) : null;
-  const canRent = cityInfo?.inCity || false;
+  const handleLocationGranted = async (location: LocationCoordinates) => {
+    setLocationState((prev) => ({
+      ...prev,
+      isLoading: true,
+      showLocationModal: false,
+      locationMethod: "gps",
+    }));
 
-  return { location, cityInfo, isLoading, canRent, error };
+    try {
+      const geoSystem = new VehicleGeolocationSystem();
+      const cityCheck = geoSystem.checkCitySupport(location);
+
+      let currentCity = null;
+      let canRent = false;
+      let nearbyVehicles: NearbyVehicle[] = [];
+
+      if (cityCheck.inCity && cityCheck.cityName) {
+        currentCity = EUROPEAN_CITIES.find(
+          (city) => city.id === cityCheck.cityName
+        );
+        canRent = true;
+
+        try {
+          nearbyVehicles = await geoSystem.getNearbyVehicles(location, 2);
+        } catch (error) {
+          console.warn("Could not fetch nearby vehicles:", error);
+        }
+      }
+
+      setLocationState((prev) => ({
+        ...prev,
+        currentCity,
+        location,
+        canRent,
+        nearbyVehicles,
+        isLoading: false,
+        error: null,
+      }));
+    } catch (error: any) {
+      setLocationState((prev) => ({
+        ...prev,
+        isLoading: false,
+        error: error.message || "Failed to process location",
+      }));
+    }
+  };
+
+  const handleLocationDenied = () => {
+    setLocationState((prev) => ({
+      ...prev,
+      showLocationModal: false,
+      locationMethod: "none",
+      error: "Location access denied",
+    }));
+  };
+
+  const handleManualCitySelect = (cityId: string) => {
+    const selectedCity = EUROPEAN_CITIES.find((city) => city.id === cityId);
+
+    if (selectedCity) {
+      setLocationState((prev) => ({
+        ...prev,
+        currentCity: selectedCity,
+        canRent: true,
+        showLocationModal: false,
+        locationMethod: "manual",
+        location: selectedCity.coordinates,
+        nearbyVehicles: [], // No nearby vehicles without GPS
+        error: null,
+      }));
+    }
+  };
+
+  const requestLocationAgain = () => {
+    setLocationState((prev) => ({
+      ...prev,
+      showLocationModal: true,
+      error: null,
+    }));
+  };
+
+  return [
+    locationState,
+    {
+      handleLocationGranted,
+      handleLocationDenied,
+      handleManualCitySelect,
+      requestLocationAgain,
+    },
+  ];
 }
 
 // ============= COMPONENTS =============
 
-// Animated Counter Component
 function AnimatedCounter({
   target,
   suffix,
@@ -221,22 +274,35 @@ function AnimatedCounter({
   );
 }
 
-// Location Status Banner
 function LocationStatusBanner({
-  cityInfo,
-  canRent,
-  currentCity,
-  geoError,
-}: any) {
-  if (geoError) {
+  locationState,
+  onRequestLocation,
+}: {
+  locationState: LocationState;
+  onRequestLocation: () => void;
+}) {
+  const {
+    currentCity,
+    isLoading,
+    error,
+    canRent,
+    nearbyVehicles,
+    locationMethod,
+  } = locationState;
+
+  if (isLoading) {
     return (
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="inline-flex items-center bg-red-500/10 backdrop-blur-sm border border-red-500/20 text-red-200 px-6 py-3 rounded-full text-lg font-medium"
+        className="inline-flex items-center bg-blue-500/10 backdrop-blur-sm border border-blue-500/20 text-blue-200 px-6 py-3 rounded-full text-lg font-medium"
       >
-        <span className="text-2xl mr-3">❌</span>
-        Location access required - Please enable location services
+        <motion.div
+          className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full mr-3"
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+        />
+        Processing your location...
       </motion.div>
     );
   }
@@ -248,11 +314,40 @@ function LocationStatusBanner({
         animate={{ opacity: 1, y: 0 }}
         className="inline-flex items-center bg-green-500/10 backdrop-blur-sm border border-green-500/20 text-green-200 px-6 py-3 rounded-full text-lg font-medium"
       >
-        <span className="text-2xl mr-3">📍</span>
-        Service available in {currentCity.name}
-        <span className="ml-3 bg-green-500/20 px-3 py-1 rounded-full text-sm">
-          {currentCity.allowedVehicles.length} vehicle types
+        <span className="text-2xl mr-3">
+          {locationMethod === "gps" ? "📍" : "🏙️"}
         </span>
+        <div className="text-left">
+          <div>Service available in {currentCity.name}</div>
+          <div className="text-sm opacity-75">
+            {locationMethod === "gps"
+              ? `${nearbyVehicles.length} vehicles nearby`
+              : "Manual city selection"}
+          </div>
+        </div>
+      </motion.div>
+    );
+  }
+
+  if (error) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="inline-flex items-center bg-yellow-500/10 backdrop-blur-sm border border-yellow-500/20 text-yellow-200 px-6 py-3 rounded-full text-lg font-medium"
+      >
+        <span className="text-2xl mr-3">⚠️</span>
+        <div className="text-left">
+          <div>Location not available</div>
+          <div className="text-sm opacity-75">
+            <button
+              onClick={onRequestLocation}
+              className="underline hover:no-underline"
+            >
+              Click here to set location
+            </button>
+          </div>
+        </div>
       </motion.div>
     );
   }
@@ -264,17 +359,21 @@ function LocationStatusBanner({
       className="inline-flex items-center bg-white/10 backdrop-blur-sm border border-white/20 text-white px-6 py-3 rounded-full text-lg font-medium"
     >
       <span className="text-2xl mr-3">🌍</span>
-      Currently available in {EUROPEAN_CITIES.length} European cities
-      {cityInfo?.distance && (
-        <span className="ml-3 bg-white/10 px-3 py-1 rounded-full text-sm">
-          {cityInfo.distance.toFixed(1)} km to nearest city
-        </span>
-      )}
+      <div className="text-left">
+        <div>Available in {EUROPEAN_CITIES.length} European cities</div>
+        <div className="text-sm opacity-75">
+          <button
+            onClick={onRequestLocation}
+            className="underline hover:no-underline"
+          >
+            Set your location to get started
+          </button>
+        </div>
+      </div>
     </motion.div>
   );
 }
 
-// Stats Section
 function StatsSection() {
   const ref = useRef<HTMLDivElement>(null);
   const isInView = useInView(ref, { once: true, amount: 0.3 });
@@ -340,8 +439,144 @@ function StatsSection() {
   );
 }
 
-// Premium Vehicle Card
-function PremiumVehicleCard({ vehicle, onSelect, userHasPass }: any) {
+function VehicleSection({
+  locationState,
+  onRentVehicle,
+}: {
+  locationState: LocationState;
+  onRentVehicle: (vehicle: VehicleOption) => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const isInView = useInView(ref, { once: true, amount: 0.2 });
+  const { currentCity, canRent, nearbyVehicles } = locationState;
+
+  return (
+    <motion.section
+      ref={ref}
+      className="py-20 bg-gradient-to-br from-gray-50 to-blue-50 dark:from-gray-900 dark:to-gray-800"
+    >
+      <div className="max-w-7xl mx-auto px-6">
+        {canRent && currentCity ? (
+          <>
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={isInView ? { opacity: 1, y: 0 } : {}}
+              transition={{ duration: 0.8 }}
+              className="text-center mb-16"
+            >
+              <h2 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-6">
+                Available in{" "}
+                <span className="text-green-600">{currentCity.name}</span>
+              </h2>
+              <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
+                Choose your preferred vehicle type and get instant access to our
+                premium fleet
+              </p>
+            </motion.div>
+
+            <motion.div
+              className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-20"
+              variants={{
+                hidden: { opacity: 0 },
+                show: {
+                  opacity: 1,
+                  transition: { staggerChildren: 0.2 },
+                },
+              }}
+              initial="hidden"
+              animate={isInView ? "show" : "hidden"}
+            >
+              {VEHICLE_OPTIONS.filter(
+                (vehicle) =>
+                  currentCity.allowedVehicles?.includes(vehicle.type) || true
+              ).map((vehicle: VehicleOption) => (
+                <PremiumVehicleCard
+                  key={vehicle.type}
+                  vehicle={vehicle}
+                  onSelect={() => onRentVehicle(vehicle)}
+                  userHasPass={false} // Will be determined by smart contract
+                />
+              ))}
+            </motion.div>
+
+            {nearbyVehicles.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                animate={isInView ? { opacity: 1, y: 0 } : {}}
+                transition={{ duration: 0.8, delay: 0.8 }}
+              >
+                <NearbyVehiclesSection vehicles={nearbyVehicles} />
+              </motion.div>
+            )}
+          </>
+        ) : (
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-center py-16"
+          >
+            <div className="text-8xl mb-6">🗺️</div>
+            <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+              Explore Our Service Areas
+            </h2>
+            <p className="text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-2xl mx-auto">
+              Moove is available in major European cities. Set your location to
+              see what's available near you.
+            </p>
+
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-w-4xl mx-auto mb-8">
+              {EUROPEAN_CITIES.slice(0, 8).map((city) => (
+                <motion.div
+                  key={city.id}
+                  className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-lg"
+                  whileHover={{ scale: 1.02, y: -2 }}
+                  transition={{ type: "spring", stiffness: 300 }}
+                >
+                  <div className="text-2xl mb-2">{city.emoji || "🏙️"}</div>
+                  <div className="font-semibold text-gray-900 dark:text-white">
+                    {city.name}
+                  </div>
+                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                    {city.country}
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+
+            <Link href="/marketplace">
+              <motion.button
+                className="bg-gradient-to-r from-green-500 to-blue-600 text-white font-bold py-4 px-8 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300"
+                whileHover={{ scale: 1.05, y: -2 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <span className="flex items-center">
+                  🛒 Browse Marketplace
+                  <motion.span
+                    className="ml-2"
+                    animate={{ x: [0, 5, 0] }}
+                    transition={{ duration: 1.5, repeat: Infinity }}
+                  >
+                    →
+                  </motion.span>
+                </span>
+              </motion.button>
+            </Link>
+          </motion.div>
+        )}
+      </div>
+    </motion.section>
+  );
+}
+
+function PremiumVehicleCard({
+  vehicle,
+  onSelect,
+  userHasPass,
+}: {
+  vehicle: VehicleOption;
+  onSelect: () => void;
+  userHasPass: boolean;
+}) {
   return (
     <motion.div
       variants={{
@@ -378,10 +613,10 @@ function PremiumVehicleCard({ vehicle, onSelect, userHasPass }: any) {
         <div className="absolute bottom-4 left-4">
           <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-full px-4 py-2 shadow-lg">
             <div className="text-lg font-bold text-gray-900 dark:text-white">
-              {vehicle.price}
+              {vehicle.priceEth}
             </div>
             <div className="text-xs text-gray-500 dark:text-gray-400">
-              {vehicle.priceEth}
+              30 days access
             </div>
           </div>
         </div>
@@ -419,99 +654,23 @@ function PremiumVehicleCard({ vehicle, onSelect, userHasPass }: any) {
           <span>30 days access</span>
         </div>
 
-        <Link href="/marketplace" passHref>
-          <motion.a
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className={`w-full py-3 px-4 rounded-xl font-semibold transition-all duration-300 ${
-              userHasPass
-                ? "bg-green-500 hover:bg-green-600 text-white"
-                : "bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700 text-white shadow-lg hover:shadow-xl"
-            }`}
-          >
-            {userHasPass ? "Generate Code" : "Get Access Pass"}
-          </motion.a>
-        </Link>
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          className={`w-full py-3 px-4 rounded-xl font-semibold transition-all duration-300 ${
+            userHasPass
+              ? "bg-green-500 hover:bg-green-600 text-white"
+              : "bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700 text-white shadow-lg hover:shadow-xl"
+          }`}
+        >
+          {userHasPass ? "Generate Code" : "Get Access Pass"}
+        </motion.button>
       </div>
     </motion.div>
   );
 }
 
-// Vehicle Section
-function VehicleSection({
-  currentCity,
-  vehicleOptions,
-  onRentVehicle,
-  userPasses,
-  nearbyVehicles,
-}: any) {
-  const ref = useRef<HTMLDivElement>(null);
-  const isInView = useInView(ref, { once: true, amount: 0.2 });
-
-  return (
-    <motion.section
-      ref={ref}
-      className="py-20 bg-gradient-to-br from-gray-50 to-blue-50 dark:from-gray-900 dark:to-gray-800"
-    >
-      <div className="max-w-7xl mx-auto px-6">
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={isInView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.8 }}
-          className="text-center mb-16"
-        >
-          <h2 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-6">
-            Available in{" "}
-            <span className="text-green-600">{currentCity.name}</span>
-          </h2>
-          <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-            Choose your preferred vehicle type and get instant access to our
-            premium fleet
-          </p>
-        </motion.div>
-
-        <motion.div
-          className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-20"
-          variants={{
-            hidden: { opacity: 0 },
-            show: {
-              opacity: 1,
-              transition: { staggerChildren: 0.2 },
-            },
-          }}
-          initial="hidden"
-          animate={isInView ? "show" : "hidden"}
-        >
-          {vehicleOptions.map((vehicle: VehicleOption) => (
-            <PremiumVehicleCard
-              key={vehicle.type}
-              vehicle={vehicle}
-              onSelect={() => onRentVehicle(vehicle)}
-              userHasPass={userPasses.some(
-                (pass: any) =>
-                  pass.vehicleType === vehicle.type &&
-                  pass.cityId === currentCity.id
-              )}
-            />
-          ))}
-        </motion.div>
-
-        {nearbyVehicles.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={isInView ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.8, delay: 0.8 }}
-          >
-            <NearbyVehiclesSection vehicles={nearbyVehicles} />
-          </motion.div>
-        )}
-      </div>
-    </motion.section>
-  );
-}
-
-// Nearby Vehicles Section
-function NearbyVehiclesSection({ vehicles }: { vehicles: any[] }) {
+function NearbyVehiclesSection({ vehicles }: { vehicles: NearbyVehicle[] }) {
   return (
     <motion.div
       className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-3xl p-8 border border-white/20 dark:border-gray-700/20"
@@ -530,7 +689,7 @@ function NearbyVehiclesSection({ vehicles }: { vehicles: any[] }) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {vehicles.map((vehicle, index) => (
+        {vehicles.slice(0, 6).map((vehicle, index) => (
           <motion.div
             key={vehicle.vehicleId}
             className="bg-gray-50 dark:bg-gray-700 rounded-xl p-4 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors duration-300"
@@ -594,19 +753,20 @@ function NearbyVehiclesSection({ vehicles }: { vehicles: any[] }) {
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
           💡 Get a Moove Pass to unlock any compatible vehicle instantly
         </p>
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors shadow-lg hover:shadow-xl"
-        >
-          View on Map
-        </motion.button>
+        <Link href="/marketplace">
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors shadow-lg hover:shadow-xl font-medium"
+          >
+            🛒 Get Access Pass
+          </motion.button>
+        </Link>
       </div>
     </motion.div>
   );
 }
 
-// NFT Marketplace Section
 function NFTMarketplaceSection() {
   const ref = useRef<HTMLDivElement>(null);
   const isInView = useInView(ref, { once: true, amount: 0.3 });
@@ -647,16 +807,35 @@ function NFTMarketplaceSection() {
             🎨 Explore Our NFT Universe
           </h2>
           <p className="text-xl text-white/90 mb-8 max-w-3xl mx-auto leading-relaxed">
-            Discover our new section: the exclusive decorative. Own your digital
-            mobility assets.
+            Discover rental passes, exclusive decorative NFTs, and limited
+            edition collections. Own your digital mobility assets.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
+            <Link href="/marketplace">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="group bg-white text-purple-600 font-bold py-4 px-8 rounded-full text-lg shadow-2xl hover:shadow-white/25 transition-all duration-300"
+              >
+                <span className="flex items-center">
+                  Browse Rental Passes
+                  <motion.span
+                    className="ml-2"
+                    animate={{ x: [0, 5, 0] }}
+                    transition={{ duration: 1.5, repeat: Infinity }}
+                  >
+                    🚲
+                  </motion.span>
+                </span>
+              </motion.button>
+            </Link>
+
             <Link href="/auctions">
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="group bg-white/30 backdrop-blur-sm border border-white/20 text-white font-semibold py-4 px-8 rounded-full text-lg hover:bg-white/20 transition-all duration-300"
+                className="group bg-white/10 backdrop-blur-sm border border-white/20 text-white font-semibold py-4 px-8 rounded-full text-lg hover:bg-white/20 transition-all duration-300"
               >
                 <span className="flex items-center">
                   Decorative Auctions
@@ -681,7 +860,6 @@ function NFTMarketplaceSection() {
   );
 }
 
-// How It Works Section
 function HowItWorksSection() {
   const ref = useRef<HTMLDivElement>(null);
   const isInView = useInView(ref, { once: true, amount: 0.2 });
@@ -689,10 +867,9 @@ function HowItWorksSection() {
   const steps = [
     {
       step: "1",
-      title: "Choose Your Vehicle",
-      description:
-        "Select from bikes, scooters, or monopattinos based on your needs",
-      icon: "🎯",
+      title: "Set Your Location",
+      description: "Allow location access or manually select your city",
+      icon: "📍",
     },
     {
       step: "2",
@@ -826,34 +1003,7 @@ function HowItWorksSection() {
                   <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
                     {step.description}
                   </p>
-
-                  {/* Animated progress dots */}
-                  <div className="flex justify-center mt-6 space-x-1">
-                    {[...Array(4)].map((_, dotIndex) => (
-                      <motion.div
-                        key={dotIndex}
-                        className={`w-2 h-2 rounded-full transition-colors duration-300 ${
-                          dotIndex <= index
-                            ? "bg-gradient-to-r from-green-500 to-blue-500"
-                            : "bg-gray-200 dark:bg-gray-600"
-                        }`}
-                        initial={{ scale: 0 }}
-                        animate={isInView ? { scale: 1 } : { scale: 0 }}
-                        transition={{
-                          duration: 0.3,
-                          delay: index * 0.2 + dotIndex * 0.1 + 1,
-                        }}
-                        whileHover={{ scale: 1.5 }}
-                      />
-                    ))}
-                  </div>
                 </div>
-
-                {/* Hover Effect Background */}
-                <motion.div
-                  className="absolute inset-0 bg-gradient-to-br from-green-400/10 to-blue-600/10 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
-                  initial={false}
-                />
               </motion.div>
             </motion.div>
           ))}
@@ -887,7 +1037,7 @@ function HowItWorksSection() {
           </motion.div>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <Link href="/rent">
+            <Link href="/marketplace">
               <motion.button
                 whileHover={{ scale: 1.05, y: -2 }}
                 whileTap={{ scale: 0.95 }}
@@ -916,56 +1066,102 @@ function HowItWorksSection() {
               </motion.button>
             </Link>
           </div>
-
-          {/* Additional Info */}
-          <motion.p
-            className="text-sm text-gray-500 dark:text-gray-400 mt-6 max-w-md mx-auto"
-            initial={{ opacity: 0 }}
-            animate={isInView ? { opacity: 1 } : {}}
-            transition={{ duration: 0.8, delay: 1.6 }}
-          >
-            🔒 Secure blockchain technology • 🌱 100% eco-friendly • 🚀 Instant
-            access
-          </motion.p>
         </motion.div>
       </div>
     </motion.section>
   );
 }
 
+// ============= MAIN COMPONENT =============
 export default function RentalHomepage() {
-  const { location, cityInfo, isLoading, canRent, error } = useGeolocation();
-
-  // Mock data per testing
-  const currentCity = EUROPEAN_CITIES[0] || {
-    name: "Rome",
-    id: "rome",
-    allowedVehicles: ["bike", "scooter", "monopattino"],
-  };
-  const userPasses: never[] = [];
-  const nearbyVehicles: never[] = [];
+  const [
+    locationState,
+    {
+      handleLocationGranted,
+      handleLocationDenied,
+      handleManualCitySelect,
+      requestLocationAgain,
+    },
+  ] = useLocationWithModal();
 
   const handleRentVehicle = (vehicle: VehicleOption) => {
-    console.log("Renting:", vehicle);
+    if (locationState.canRent) {
+      // Redirect to marketplace with vehicle pre-selected and city info
+      const cityParam = locationState.currentCity?.id
+        ? `&city=${locationState.currentCity.id}`
+        : "";
+      window.location.href = `/marketplace?vehicle=${vehicle.type}${cityParam}`;
+    } else {
+      // Redirect to marketplace for location setup
+      window.location.href = "/marketplace";
+    }
   };
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        Loading...
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Location Permission Modal */}
+      <LocationPermissionModal
+        isOpen={locationState.showLocationModal}
+        onLocationGranted={handleLocationGranted}
+        onLocationDenied={handleLocationDenied}
+        onManualCitySelect={handleManualCitySelect}
+      />
+
+      {/* Hero Section with Dynamic Location Status */}
+      <section className="py-20 bg-gradient-to-br from-blue-600 via-purple-600 to-green-600 text-white relative overflow-hidden">
+        <div className="absolute inset-0">
+          <motion.div
+            className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full bg-white/10 blur-3xl"
+            animate={{
+              x: [0, 100, 0],
+              y: [0, -50, 0],
+              scale: [1, 1.2, 1],
+            }}
+            transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
+          />
+        </div>
+
+        <div className="max-w-7xl mx-auto px-6 text-center relative z-10">
+          <motion.h1
+            className="text-5xl md:text-7xl font-bold mb-8"
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
+          >
+            Welcome to{" "}
+            <span className="bg-gradient-to-r from-green-400 to-blue-400 bg-clip-text text-transparent">
+              Moove
+            </span>
+          </motion.h1>
+
+          <motion.p
+            className="text-2xl mb-12 max-w-4xl mx-auto leading-relaxed"
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.2 }}
+          >
+            The future of urban mobility is here. Rent electric vehicles with
+            blockchain-powered NFT passes.
+          </motion.p>
+
+          <motion.div
+            className="mb-12"
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.4 }}
+          >
+            <LocationStatusBanner
+              locationState={locationState}
+              onRequestLocation={requestLocationAgain}
+            />
+          </motion.div>
+        </div>
+      </section>
+
       <StatsSection />
       <VehicleSection
-        currentCity={currentCity}
-        vehicleOptions={VEHICLE_OPTIONS}
+        locationState={locationState}
         onRentVehicle={handleRentVehicle}
-        userPasses={userPasses}
-        nearbyVehicles={nearbyVehicles}
       />
       <NFTMarketplaceSection />
       <HowItWorksSection />

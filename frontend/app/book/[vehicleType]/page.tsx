@@ -92,7 +92,8 @@ function BookingSteps({ steps }: { steps: BookingStep[] }) {
             {step.completed ? "✓" : step.id}
           </motion.div>
 
-          <div className="ml-3 mr-6">
+          {/* Title (hidden on mobile) */}
+          <div className="hidden sm:block ml-3 mr-6">
             <div
               className={`text-sm font-medium ${
                 step.active
@@ -366,7 +367,7 @@ export default function BookingPage() {
       // Simulate blockchain transaction
       await new Promise((resolve) => setTimeout(resolve, 3000));
 
-      // Here you would call the actual contract
+      // Call the actual contract:
       // const result = await mintPass(vehicleType, cityId);
 
       // Update steps

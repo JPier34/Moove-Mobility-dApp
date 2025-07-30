@@ -13,6 +13,7 @@ export interface CityConfig {
     west: number;
   };
   timezone: string;
+  emoji?: string;
   allowedVehicles: VehicleType[];
   vehicleLimit: {
     bike: number;

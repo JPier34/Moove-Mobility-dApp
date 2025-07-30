@@ -1,13 +1,15 @@
+// /app/marketplace/page.tsx - SOLO ETH, CON GEOLOCALIZZAZIONE
 "use client";
 
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useAccount } from "wagmi";
 import { useRentalPassContract } from "@/hooks/useRentalPassContract";
 import { VehicleType } from "@/types/nft";
+import { VehicleGeolocationSystem } from "@/utils/vehicleGeoLocation";
 import { EUROPEAN_CITIES } from "@/config/cities";
 
 // ============= TYPES =============
@@ -16,9 +18,8 @@ interface VehiclePassDisplay {
   typeString: string;
   name: string;
   icon: string;
-  price?: number; // in EUR
   priceETH: string;
-  duration: number; // days
+  duration: number;
   description: string;
   features: string[];
   availability: number;
@@ -26,13 +27,79 @@ interface VehiclePassDisplay {
   priceWei: bigint;
 }
 
-// ============= UTILS =============
-function getCurrentCity() {
-  return (
-    EUROPEAN_CITIES.find((city) => city.id === "rome") || EUROPEAN_CITIES[0]
-  );
+interface LocationState {
+  currentCity: any | null;
+  isLoading: boolean;
+  error: string | null;
+  canRent: boolean;
 }
 
+// ============= HOOKS =============
+function useLocationAndCity(): LocationState {
+  const [locationState, setLocationState] = useState<LocationState>({
+    currentCity: null,
+    isLoading: true,
+    error: null,
+    canRent: false,
+  });
+
+  useEffect(() => {
+    let mounted = true;
+    const geoSystem = new VehicleGeolocationSystem();
+
+    const initializeLocation = async () => {
+      try {
+        setLocationState((prev) => ({ ...prev, isLoading: true, error: null }));
+
+        // Get user location
+        const location = await geoSystem.getCurrentLocation();
+
+        if (!mounted) return;
+
+        // Check city support
+        const cityCheck = geoSystem.checkCitySupport(location);
+
+        let currentCity = null;
+        let canRent = false;
+
+        if (cityCheck.inCity && cityCheck.cityName) {
+          currentCity = EUROPEAN_CITIES.find(
+            (city) => city.id === cityCheck.cityName
+          );
+          canRent = true;
+        }
+
+        if (!mounted) return;
+
+        setLocationState({
+          currentCity,
+          isLoading: false,
+          error: null,
+          canRent,
+        });
+      } catch (error: any) {
+        if (!mounted) return;
+
+        setLocationState({
+          currentCity: null,
+          isLoading: false,
+          error: error.message || "Location access failed",
+          canRent: false,
+        });
+      }
+    };
+
+    initializeLocation();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  return locationState;
+}
+
+// ============= UTILS =============
 function formatAvailability(count: number): string {
   if (count > 100) return "100+";
   if (count > 50) return `${count}`;
@@ -97,7 +164,115 @@ function ErrorState({
   );
 }
 
-function MarketplaceHeader({ currentCity }: { currentCity: any }) {
+function LocationStatusHeader({
+  locationState,
+}: {
+  locationState: LocationState;
+}) {
+  const { currentCity, isLoading, error, canRent } = locationState;
+
+  if (isLoading) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="inline-flex items-center bg-blue-500/10 backdrop-blur-sm border border-blue-500/20 text-blue-600 dark:text-blue-400 px-6 py-3 rounded-full text-lg font-medium mb-8"
+      >
+        <motion.div
+          className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full mr-3"
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+        />
+        Detecting your location...
+      </motion.div>
+    );
+  }
+
+  if (error) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-2xl p-6 mb-8"
+      >
+        <div className="text-center">
+          <div className="text-4xl mb-3">⚠️</div>
+          <h3 className="text-lg font-semibold text-yellow-800 dark:text-yellow-200 mb-2">
+            Location Required for Purchase
+          </h3>
+          <p className="text-yellow-700 dark:text-yellow-300 mb-4">
+            We need your location to generate city-specific access codes. Please
+            enable location services to continue.
+          </p>
+          <motion.button
+            onClick={() => window.location.reload()}
+            className="bg-yellow-600 text-white py-2 px-6 rounded-lg hover:bg-yellow-700 transition-colors font-medium"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            🔄 Retry Location Access
+          </motion.button>
+        </div>
+      </motion.div>
+    );
+  }
+
+  if (canRent && currentCity) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="inline-flex items-center bg-green-500/10 backdrop-blur-sm border border-green-500/20 text-green-600 dark:text-green-400 px-6 py-3 rounded-full text-lg font-medium mb-8"
+      >
+        <span className="text-2xl mr-3">📍</span>
+        Service available in {currentCity.name}
+        <span className="ml-3 bg-green-500/20 px-3 py-1 rounded-full text-sm">
+          All vehicle types supported
+        </span>
+      </motion.div>
+    );
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-6 mb-8"
+    >
+      <div className="text-center">
+        <div className="text-4xl mb-3">🌍</div>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+          Service Not Available in Your Area
+        </h3>
+        <p className="text-gray-600 dark:text-gray-300 mb-4">
+          Moove is currently available in {EUROPEAN_CITIES.length} European
+          cities. Visit a supported city to purchase passes.
+        </p>
+        <div className="flex flex-wrap justify-center gap-2">
+          {EUROPEAN_CITIES.slice(0, 6).map((city) => (
+            <span
+              key={city.id}
+              className="bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-3 py-1 rounded-full text-sm"
+            >
+              {city.name}
+            </span>
+          ))}
+          {EUROPEAN_CITIES.length > 6 && (
+            <span className="text-gray-500 dark:text-gray-400 px-3 py-1 text-sm">
+              +{EUROPEAN_CITIES.length - 6} more
+            </span>
+          )}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+function MarketplaceHeader({
+  locationState,
+}: {
+  locationState: LocationState;
+}) {
   return (
     <motion.div
       className="text-center mb-16"
@@ -116,33 +291,21 @@ function MarketplaceHeader({ currentCity }: { currentCity: any }) {
         and start your sustainable journey today.
       </p>
 
-      {/* Location Info */}
-      <motion.div
-        className="inline-flex items-center bg-green-500/10 backdrop-blur-sm border border-green-500/20 text-green-600 dark:text-green-400 px-6 py-3 rounded-full text-lg font-medium mb-8"
-        initial={{ opacity: 0, x: -20 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.5, ease: "easeOut" }}
-      >
-        <span className="text-2xl mr-3">📍</span>
-        Service available in {currentCity.name}
-        <span className="ml-3 bg-green-500/20 px-3 py-1 rounded-full text-sm">
-          3 vehicle types
-        </span>
-      </motion.div>
+      <LocationStatusHeader locationState={locationState} />
 
       {/* Quick Stats */}
       <div className="flex flex-wrap justify-center gap-6 text-sm text-gray-500 dark:text-gray-400">
         <span className="flex items-center">
           <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
-          20+ European Cities
+          Blockchain Secured NFTs
         </span>
         <span className="flex items-center">
           <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
-          Blockchain Secured
+          Instant Access Codes
         </span>
         <span className="flex items-center">
           <span className="w-2 h-2 bg-purple-500 rounded-full mr-2"></span>
-          Instant Access
+          30-Day Unlimited Access
         </span>
       </div>
     </motion.div>
@@ -152,16 +315,16 @@ function MarketplaceHeader({ currentCity }: { currentCity: any }) {
 function ConnectWalletPrompt() {
   return (
     <motion.div
-      className="text-center py-20 items-center bg-white dark:bg-gray-800 rounded-3xl shadow-xl"
+      className="text-center py-20 bg-white dark:bg-gray-800 rounded-3xl shadow-xl"
       initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.8 }}
     >
       <motion.div
-        className="text-8xl mb-6 block mx-auto"
+        className="text-8xl mb-6"
         animate={{
-          scale: [1, 1.05, 1],
-          rotate: [0, -2, 2, 0],
+          scale: [1, 1.1, 1],
+          rotate: [0, -5, 5, 0],
         }}
         transition={{ duration: 3, repeat: Infinity }}
       >
@@ -207,27 +370,45 @@ function VehiclePassCard({
   onSelect,
   userHasPass,
   isLoading,
+  isLocationRequired,
 }: {
   pass: VehiclePassDisplay;
   onSelect: () => void;
   userHasPass: boolean;
   isLoading: boolean;
+  isLocationRequired: boolean;
 }) {
+  const isDisabled = isLoading || isLocationRequired;
+
   return (
     <motion.div
       variants={{
         hidden: { opacity: 0, y: 30 },
         show: { opacity: 1, y: 0 },
       }}
-      whileHover={{ y: -10, scale: 1.02 }}
+      whileHover={!isDisabled ? { y: -10, scale: 1.02 } : {}}
       transition={{ type: "spring", stiffness: 300 }}
-      className="group relative bg-white dark:bg-gray-800 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden cursor-pointer"
-      onClick={!isLoading ? onSelect : undefined}
+      className={`group relative bg-white dark:bg-gray-800 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden ${
+        isDisabled ? "opacity-60 cursor-not-allowed" : "cursor-pointer"
+      }`}
+      onClick={!isDisabled ? onSelect : undefined}
     >
       {/* Gradient Overlay */}
       <div
         className={`absolute inset-0 bg-gradient-to-br ${pass.gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-500`}
       />
+
+      {/* Location Required Overlay */}
+      {isLocationRequired && (
+        <div className="absolute inset-0 bg-black/20 backdrop-blur-[1px] z-20 flex items-center justify-center">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-xl text-center">
+            <div className="text-2xl mb-2">📍</div>
+            <div className="text-sm font-medium text-gray-900 dark:text-white">
+              Location Required
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Availability Badge */}
       <div className="absolute top-4 right-4 z-10">
@@ -235,7 +416,7 @@ function VehiclePassCard({
           className={`px-3 py-1 rounded-full text-xs font-medium ${getAvailabilityColor(
             pass.availability
           )}`}
-          whileHover={{ scale: 1.1 }}
+          whileHover={!isDisabled ? { scale: 1.1 } : {}}
           animate={
             pass.availability < 20
               ? {
@@ -267,20 +448,20 @@ function VehiclePassCard({
       <div className="relative h-48 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-600 flex items-center justify-center">
         <motion.div
           className="text-8xl group-hover:scale-110 transition-transform duration-500"
-          whileHover={{ rotate: [0, -5, 5, 0] }}
+          whileHover={!isDisabled ? { rotate: [0, -5, 5, 0] } : {}}
           transition={{ duration: 0.5 }}
         >
           {pass.icon}
         </motion.div>
 
-        {/* Real-time Price Badge */}
+        {/* ETH Price Badge - Updated Design */}
         <div className="absolute bottom-4 left-4">
-          <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-2xl px-4 py-3 shadow-lg">
+          <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-2xl px-4 py-3 shadow-lg border border-gray-200/50">
             <div className="text-2xl font-bold text-gray-900 dark:text-white">
-              €{pass.price}
+              {pass.priceETH}
             </div>
-            <div className="text-sm text-gray-500 dark:text-gray-400">
-              {pass.priceETH} ETH
+            <div className="text-xs text-gray-500 dark:text-gray-400 text-center">
+              {pass.duration} days
             </div>
           </div>
         </div>
@@ -293,7 +474,7 @@ function VehiclePassCard({
             {pass.name}
           </h3>
           <span className="text-sm text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded-full">
-            {pass.duration} days
+            Unlimited
           </span>
         </div>
 
@@ -313,7 +494,7 @@ function VehiclePassCard({
             >
               <motion.span
                 className="text-green-500 mr-3 text-lg"
-                whileHover={{ scale: 1.2 }}
+                whileHover={!isDisabled ? { scale: 1.2 } : {}}
               >
                 ✓
               </motion.span>
@@ -324,11 +505,11 @@ function VehiclePassCard({
 
         {/* Action Button */}
         <motion.button
-          whileHover={!isLoading ? { scale: 1.02 } : {}}
-          whileTap={!isLoading ? { scale: 0.98 } : {}}
-          disabled={isLoading}
+          whileHover={!isDisabled ? { scale: 1.02 } : {}}
+          whileTap={!isDisabled ? { scale: 0.98 } : {}}
+          disabled={isDisabled}
           className={`w-full py-4 px-6 rounded-2xl font-bold text-lg transition-all duration-300 ${
-            isLoading
+            isDisabled
               ? "bg-gray-400 cursor-not-allowed text-white"
               : userHasPass
               ? "bg-green-500 hover:bg-green-600 text-white"
@@ -344,6 +525,8 @@ function VehiclePassCard({
               />
               Loading...
             </div>
+          ) : isLocationRequired ? (
+            "📍 Location Required"
           ) : userHasPass ? (
             "Generate Access Code"
           ) : (
@@ -351,16 +534,6 @@ function VehiclePassCard({
           )}
         </motion.button>
       </div>
-
-      {/* Hover Effect Border */}
-      <motion.div
-        className="absolute inset-0 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
-        style={{
-          background: `linear-gradient(135deg, transparent 0%, rgba(255,255,255,0.1) 50%, transparent 100%)`,
-          border: "2px solid transparent",
-          backgroundClip: "padding-box",
-        }}
-      />
     </motion.div>
   );
 }
@@ -368,10 +541,11 @@ function VehiclePassCard({
 // ============= MAIN COMPONENT =============
 export default function MarketplacePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { isConnected } = useAccount();
-  const [currentCity] = useState(getCurrentCity());
+  const locationState = useLocationAndCity();
 
-  // Smart contract integration with unified types
+  // Smart contract integration
   const {
     isLoading,
     isLoadingVehicles,
@@ -385,7 +559,10 @@ export default function MarketplacePage() {
     VehicleType,
   } = useRentalPassContract();
 
-  // Convert contract data to UI format with proper types
+  // Pre-selected vehicle from URL params
+  const preSelectedVehicle = searchParams?.get("vehicle") ?? null;
+
+  // Convert contract data to UI format (ETH only)
   const vehicleOptions: VehiclePassDisplay[] = React.useMemo(() => {
     return availableVehicles.map((vehicle) => {
       const config = getVehicleConfig(vehicle.vehicleType);
@@ -400,7 +577,6 @@ export default function MarketplacePage() {
         description: config.description,
         features: config.features,
         gradient: config.gradient,
-        price: Math.round(parseFloat(priceETH) * 1000), // Convert to EUR approximation
         priceETH,
         priceWei: vehicle.priceWei,
         duration: 30,
@@ -410,12 +586,12 @@ export default function MarketplacePage() {
   }, [availableVehicles, formatPrice, vehicleTypeToString, getVehicleConfig]);
 
   const handleSelectVehicle = (vehicleType: VehicleType) => {
-    if (!isConnected) {
+    if (!isConnected || !locationState.canRent) {
       return;
     }
 
     const typeString = vehicleTypeToString(vehicleType);
-    router.push(`/book/${typeString}`);
+    router.push(`/book/${typeString}?city=${locationState.currentCity?.id}`);
   };
 
   const handleRetry = () => {
@@ -433,10 +609,20 @@ export default function MarketplacePage() {
     return () => clearInterval(interval);
   }, [isConnected, refetchVehicles]);
 
+  // Scroll to pre-selected vehicle
+  useEffect(() => {
+    if (preSelectedVehicle && vehicleOptions.length > 0) {
+      const element = document.getElementById(`vehicle-${preSelectedVehicle}`);
+      if (element) {
+        element.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }
+  }, [preSelectedVehicle, vehicleOptions.length]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 dark:from-gray-900 dark:to-gray-800">
       <div className="max-w-7xl mx-auto px-6 py-20">
-        <MarketplaceHeader currentCity={currentCity} />
+        <MarketplaceHeader locationState={locationState} />
 
         {/* Wallet Connection Check */}
         {!isConnected ? (
@@ -466,20 +652,30 @@ export default function MarketplacePage() {
                 animate="show"
               >
                 {vehicleOptions.map((pass) => (
-                  <VehiclePassCard
+                  <div
                     key={pass.type}
-                    pass={pass}
-                    onSelect={() => handleSelectVehicle(pass.type)}
-                    userHasPass={userHasPass(pass.type)}
-                    isLoading={isLoading}
-                  />
+                    id={`vehicle-${pass.typeString}`}
+                    className={
+                      preSelectedVehicle === pass.typeString
+                        ? "ring-4 ring-blue-500 ring-opacity-50 rounded-3xl"
+                        : ""
+                    }
+                  >
+                    <VehiclePassCard
+                      pass={pass}
+                      onSelect={() => handleSelectVehicle(pass.type)}
+                      userHasPass={userHasPass(pass.type)}
+                      isLoading={isLoading}
+                      isLocationRequired={!locationState.canRent}
+                    />
+                  </div>
                 ))}
               </motion.div>
             )}
           </>
         )}
 
-        {/* Bottom CTA - Only show if connected */}
+        {/* Bottom CTA - Enhanced for location awareness */}
         {isConnected && !isLoadingVehicles && !error && (
           <motion.div
             className="text-center mt-20"
@@ -489,64 +685,77 @@ export default function MarketplacePage() {
           >
             <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-3xl p-8 border border-white/20 dark:border-gray-700/20">
               <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-                💡 Smart Contract Features
+                💡 How It Works
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
                 <div>
-                  <div className="text-3xl mb-2">🔒</div>
+                  <div className="text-3xl mb-2">🗺️</div>
                   <div className="font-semibold text-gray-900 dark:text-white">
-                    Blockchain Secured
+                    Location-Based
                   </div>
                   <div className="text-sm text-gray-600 dark:text-gray-300">
-                    Your passes are NFTs stored securely on-chain
+                    Access codes are tied to your current city
                   </div>
                 </div>
                 <div>
                   <div className="text-3xl mb-2">⚡</div>
                   <div className="font-semibold text-gray-900 dark:text-white">
-                    Instant Access
+                    Instant Purchase
                   </div>
                   <div className="text-sm text-gray-600 dark:text-gray-300">
-                    Generate access codes instantly when you need them
+                    Pay in ETH, receive NFT pass immediately
                   </div>
                 </div>
                 <div>
-                  <div className="text-3xl mb-2">🌍</div>
+                  <div className="text-3xl mb-2">🔐</div>
                   <div className="font-semibold text-gray-900 dark:text-white">
-                    Multi-City Support
+                    Secure Access
                   </div>
                   <div className="text-sm text-gray-600 dark:text-gray-300">
-                    Use your passes across all partner cities
+                    Generate temporary codes when you need them
                   </div>
                 </div>
               </div>
             </div>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center mt-8">
-              <Link href="/vehicle-finder">
+              {locationState.canRent ? (
+                <>
+                  <Link href="/vehicle-finder">
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="bg-white dark:bg-gray-800 border-2 border-green-500 text-green-600 dark:text-green-400 font-semibold py-3 px-8 rounded-full hover:bg-green-50 dark:hover:bg-gray-700 transition-all duration-300"
+                    >
+                      🎯 Find Vehicles Near Me
+                    </motion.button>
+                  </Link>
+                  <Link href="/my-collection">
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold py-3 px-8 rounded-full hover:bg-gray-300 dark:hover:bg-gray-600 transition-all duration-300"
+                    >
+                      📚 View My Collection
+                    </motion.button>
+                  </Link>
+                </>
+              ) : (
                 <motion.button
+                  onClick={() => window.location.reload()}
+                  className="bg-blue-500 text-white font-semibold py-3 px-8 rounded-full hover:bg-blue-600 transition-all duration-300"
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  className="bg-white dark:bg-gray-800 border-2 border-green-500 text-green-600 dark:text-green-400 font-semibold py-3 px-8 rounded-full hover:bg-green-50 dark:hover:bg-gray-700 transition-all duration-300"
                 >
-                  🎯 Find Vehicles Near Me
+                  📍 Enable Location to Purchase
                 </motion.button>
-              </Link>
-              <Link href="/my-collection">
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold py-3 px-8 rounded-full hover:bg-gray-300 dark:hover:bg-gray-600 transition-all duration-300"
-                >
-                  📚 View My Collection
-                </motion.button>
-              </Link>
+              )}
             </div>
           </motion.div>
         )}
 
         {/* Real-time Updates Indicator */}
-        {isConnected && (
+        {isConnected && locationState.canRent && (
           <motion.div
             className="fixed bottom-6 right-6 z-50"
             initial={{ opacity: 0, scale: 0 }}
@@ -567,7 +776,7 @@ export default function MarketplacePage() {
                 transition={{ duration: 1, repeat: Infinity }}
               />
               <span className="text-gray-600 dark:text-gray-300">
-                Real-time updates
+                Live prices • {locationState.currentCity?.name}
               </span>
             </motion.div>
           </motion.div>
