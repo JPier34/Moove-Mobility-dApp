@@ -545,11 +545,14 @@ contract MooveRentalPass is
         VehicleType vehicleType,
         string memory cityId
     ) internal pure returns (string memory) {
-        // For now, return a placeholder
         return
             string(
                 abi.encodePacked(
                     "https://api.moove.com/metadata/rental-pass/",
+                    Strings.toString(uint256(vehicleType)), // Convert enum to uint
+                    "/",
+                    cityId,
+                    "/",
                     Strings.toString(tokenId)
                 )
             );

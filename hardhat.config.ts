@@ -4,6 +4,7 @@ import "hardhat-gas-reporter";
 import "solidity-coverage";
 import "@nomicfoundation/hardhat-verify";
 import * as dotenv from "dotenv";
+require("dotenv").config();
 require("hardhat-contract-sizer");
 
 dotenv.config();
@@ -56,6 +57,7 @@ const config: HardhatUserConfig = {
   },
   mocha: {
     timeout: 40000,
+    require: [`ts-node/register`],
   },
 };
 
