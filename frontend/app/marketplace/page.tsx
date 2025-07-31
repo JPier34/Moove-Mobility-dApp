@@ -9,10 +9,9 @@ import { useAccount } from "wagmi";
 import { useRentalPassContract } from "@/hooks/useRentalPassContract";
 import { VehicleType } from "@/types/nft";
 import { useLocationAndCity } from "@/hooks/useLocationAndCity";
-import { LocationDevTools } from "@/components/LocationDevTools";
 import { EUROPEAN_CITIES } from "@/config/cities";
 
-// ============= TYPES (unchanged) =============
+// ============= TYPES =============
 interface VehiclePassDisplay {
   type: VehicleType;
   typeString: string;
@@ -68,45 +67,48 @@ function EnhancedLocationStatusHeader({
     );
   }
 
-  if (error) {
+  if (error || !canRent) {
     return (
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-2xl p-6 mb-8"
-      >
-        <div className="text-center">
-          <div className="text-4xl mb-3">⚠️</div>
-          <h3 className="text-lg font-semibold text-yellow-800 dark:text-yellow-200 mb-2">
-            Location Detection Failed
-          </h3>
-          <p className="text-yellow-700 dark:text-yellow-300 mb-4 text-sm">
-            {error}
-          </p>
+      <>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-2xl p-6 mb-8"
+        >
+          <div className="text-center">
+            <div className="text-4xl mb-3">⚠️</div>
+            <h3 className="text-lg font-semibold text-yellow-800 dark:text-yellow-200 mb-2">
+              {error ? "Location Detection Failed" : "Service Not Available"}
+            </h3>
+            <p className="text-yellow-700 dark:text-yellow-300 mb-4 text-sm">
+              {error ||
+                "Your location is outside our service area. Please try a test location."}
+            </p>
 
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <motion.button
-              onClick={onRefreshLocation}
-              className="bg-yellow-600 text-white py-2 px-6 rounded-lg hover:bg-yellow-700 transition-colors font-medium"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              🔄 Retry Location Access
-            </motion.button>
-
-            {process.env.NODE_ENV === "development" && (
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <motion.button
-                onClick={() => onSetTestLocation("rome")}
-                className="bg-blue-600 text-white py-2 px-6 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                onClick={onRefreshLocation}
+                className="bg-yellow-600 text-white py-2 px-6 rounded-lg hover:bg-yellow-700 transition-colors font-medium"
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
               >
-                🧪 Use Test Location
+                🔄 Retry Location Access
               </motion.button>
-            )}
+
+              {process.env.NODE_ENV === "development" && (
+                <motion.button
+                  onClick={() => onSetTestLocation("rome")}
+                  className="bg-blue-600 text-white py-2 px-6 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  🧪 Use Test Location
+                </motion.button>
+              )}
+            </div>
           </div>
-        </div>
-      </motion.div>
+        </motion.div>
+      </>
     );
   }
 
@@ -120,11 +122,11 @@ function EnhancedLocationStatusHeader({
         <span className="text-2xl mr-3">📍</span>
         Service available in {currentCity.name}
         <span className="ml-3 bg-green-500/20 px-3 py-1 rounded-full text-sm">
-          {locationMethod === "cached"
-            ? "Cached location"
-            : locationMethod === "manual"
-            ? "Test location"
-            : "Live location"}
+          {locationMethod === "manual"
+            ? "Manual"
+            : locationMethod === "gps"
+            ? "GPS"
+            : "None"}
         </span>
       </motion.div>
     );
@@ -471,19 +473,12 @@ export default function EnhancedMarketplacePage() {
             </motion.div>
           </motion.div>
         )}
-
-        {/* Development Tools */}
-        <LocationDevTools
-          onTestLocation={locationHook.setTestLocation}
-          onClearLocation={locationHook.clearLocation}
-          currentState={locationHook}
-        />
       </div>
     </div>
   );
 }
 
-// ============= EXISTING COMPONENTS (da mantenere invariati) =============
+// ============= COMPONENTS =============
 
 function LoadingSpinner() {
   return (
@@ -543,7 +538,7 @@ function ConnectWalletPrompt() {
       <motion.div
         className="text-8xl mb-6"
         animate={{
-          scale: [1, 1.1, 1],
+          scale: [1, 1.04, 1],
           rotate: [0, -5, 5, 0],
         }}
         transition={{ duration: 3, repeat: Infinity }}

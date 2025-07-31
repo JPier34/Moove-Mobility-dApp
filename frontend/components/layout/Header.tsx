@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { useAccount, useDisconnect } from "wagmi";
+import { LocationIndicator } from "@/components/layout/LocationIndicator";
 import { useTheme } from "@/providers/ThemeProvider";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -12,13 +12,6 @@ export default function Header() {
   const { resolvedTheme, toggleTheme } = useTheme();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const navLinks = [
-    { href: "/", label: "Home" },
-    { href: "/marketplace", label: "Marketplace" },
-    { href: "/auctions", label: "Auctions" },
-  ];
-
-  // Navigation items
   const navItems = [
     { label: "Marketplace", href: "/marketplace" },
     { label: "Auctions", href: "/auctions" },
@@ -57,6 +50,9 @@ export default function Header() {
 
             {/* Desktop Actions */}
             <div className="hidden md:flex items-center space-x-4">
+              {/* Location Indicator */}
+              <LocationIndicator />
+
               {/* Theme Toggle */}
               <button
                 onClick={toggleTheme}
@@ -183,7 +179,15 @@ export default function Header() {
           {isMobileMenuOpen && (
             <div className="md:hidden border-t border-gray-200 dark:border-gray-700 py-4">
               <div className="flex flex-col space-y-4">
-                {navLinks.map((link) => (
+                {/* Mobile Location Indicator */}
+                <div className="px-2 py-2 border-b border-gray-200 dark:border-gray-700">
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                    Current Location:
+                  </div>
+                  <LocationIndicator />
+                </div>
+
+                {navItems.map((link) => (
                   <Link
                     key={link.href}
                     href={link.href}

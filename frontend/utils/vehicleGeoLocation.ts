@@ -173,44 +173,22 @@ export class VehicleGeolocationSystem {
   }
 
   /**
-   * Get current location state (new method for compatibility)
+   * Get current location state
    */
-  async getCurrentLocationState(): Promise<LocationStateResult> {
-    // Try cache first
-    const cached = this.loadLocationFromStorage();
-    if (cached) {
-      console.log("Using cached location state");
-      return cached;
-    }
-
-    // Get fresh location
-    try {
-      const coordinates = await this.getCurrentLocation();
-      const nearestCity = this.findNearestSupportedCity(coordinates);
-      return this.saveLocationState(coordinates, nearestCity);
-    } catch (error: any) {
-      return {
-        currentCity: null,
-        isLoading: false,
-        error: error.message,
-        canRent: false,
-        lastUpdated: Date.now(),
-        method: "gps",
-      };
-    }
-  }
 
   private saveLocationState(
     coordinates: LocationCoordinates,
-    nearestCity: any | null
+    nearestCity: any | null,
+    method: "gps" | "manual" | "cached" = "gps",
+    error: string | null = null
   ): LocationStateResult {
     const state: LocationStateResult = {
       currentCity: nearestCity,
       isLoading: false,
-      error: null,
-      canRent: !!nearestCity,
+      error: error,
+      canRent: !!nearestCity, // Can rent if we have any city (even fallback)
       lastUpdated: Date.now(),
-      method: "gps",
+      method: method,
     };
 
     this.saveLocationToStorage(state);
@@ -250,8 +228,81 @@ export class VehicleGeolocationSystem {
       }
     }
 
-    // Only return city if within reasonable distance (100km)
-    return minDistance <= 100 ? nearestCity : null;
+    // Only return city if within reasonable distance (200km)
+    return minDistance <= 200 ? nearestCity : null;
+  }
+
+  // Fallback method for distances >= 200kms
+  private getIntelligentFallbackCity(
+    coordinates: LocationCoordinates
+  ): any | null {
+    const lat = coordinates.lat;
+    const lng = coordinates.lng;
+
+    // European regions - provide sensible defaults based on geography
+    if (lat >= 35 && lat <= 47 && lng >= 6 && lng <= 20) {
+      // Central/Southern Europe (Italy, parts of Germany, Austria, etc.)
+      if (lat >= 41 && lng >= 8 && lng <= 19) {
+        return EUROPEAN_CITIES.find((c) => c.id === "rome"); // Italy area
+      } else if (lat >= 45 && lng >= 6 && lng <= 15) {
+        return EUROPEAN_CITIES.find((c) => c.id === "milan"); // Northern Italy/Alps
+      } else if (lat >= 50 && lng >= 10 && lng <= 15) {
+        return EUROPEAN_CITIES.find((c) => c.id === "berlin"); // Germany area
+      }
+    } else if (lat >= 43 && lat <= 51 && lng >= -5 && lng <= 8) {
+      // Western Europe (France, Spain, UK)
+      if (lat <= 46) {
+        return EUROPEAN_CITIES.find((c) => c.id === "madrid"); // Spain area
+      } else {
+        return EUROPEAN_CITIES.find((c) => c.id === "paris"); // France area
+      }
+    }
+
+    // Default fallback - Rome (central Europe)
+    return EUROPEAN_CITIES.find((c) => c.id === "rome");
+  }
+
+  /**
+   * Get current location state
+   */
+
+  async getCurrentLocationState(): Promise<LocationStateResult> {
+    // Try cache first
+    const cached = this.loadLocationFromStorage();
+    if (cached) {
+      console.log("Using cached location state");
+      return cached;
+    }
+
+    // Get fresh location
+    try {
+      const coordinates = await this.getCurrentLocation();
+      let nearestCity = this.findNearestSupportedCity(coordinates);
+      let method: "gps" | "manual" | "cached" = "gps";
+      let error: string | null = null;
+
+      // If no city found within 200km, use intelligent fallback
+      if (!nearestCity) {
+        nearestCity = this.getIntelligentFallbackCity(coordinates);
+        method = "manual"; // Mark as manual since it's a fallback
+        error = `You're outside our service area. We've selected ${nearestCity?.name} as the nearest supported city.`;
+
+        console.log(
+          `📍 User location outside 200km service area. Fallback: ${nearestCity?.name}`
+        );
+      }
+
+      return this.saveLocationState(coordinates, nearestCity, method, error);
+    } catch (error: any) {
+      return {
+        currentCity: null,
+        isLoading: false,
+        error: error.message,
+        canRent: false,
+        lastUpdated: Date.now(),
+        method: "gps",
+      };
+    }
   }
 
   /**
@@ -358,7 +409,7 @@ export class VehicleGeolocationSystem {
     }
   }
 
-  // ============= NEARBY VEHICLES METHODS (existing functionality) =============
+  // ============= NEARBY VEHICLES METHODS =============
 
   /**
    * Get nearby vehicles within specified radius
