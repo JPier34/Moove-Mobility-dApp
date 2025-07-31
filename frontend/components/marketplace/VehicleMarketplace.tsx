@@ -10,7 +10,7 @@ interface VehiclePass {
   type: "bike" | "scooter" | "monopattino";
   name: string;
   icon: string;
-  price: number; // in EUR
+  price?: number; // in EUR
   priceETH: string;
   duration: number; // days
   description: string;
