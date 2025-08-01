@@ -16,15 +16,10 @@
       "static/chunks/main-app.js",
       "static/chunks/app/marketplace/page.js"
     ],
-    "/book/[vehicleType]/page": [
+    "/my-collection/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/book/[vehicleType]/page.js"
-    ],
-    "/success/[transactionId]/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/success/[transactionId]/page.js"
+      "static/chunks/app/my-collection/page.js"
     ]
   }
 }

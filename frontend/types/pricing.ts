@@ -14,60 +14,6 @@ export interface PricingTier {
 }
 
 export const PRICING_TIERS: PricingTier[] = [
-  // Hourly
-  {
-    id: "hourly_bike",
-    name: "Bike Hourly",
-    description: "Perfect for short rides",
-    duration: "hourly",
-    priceETH: "0.005",
-    priceEUR: "2.50",
-    features: ["Unlock + 1 hour", "GPS tracking", "Basic insurance"],
-    vehicleTypes: ["bike"],
-    freeMinutes: 5,
-  },
-  {
-    id: "hourly_scooter",
-    name: "Scooter Hourly",
-    description: "Quick city travels",
-    duration: "hourly",
-    priceETH: "0.008",
-    priceEUR: "4.00",
-    features: ["Unlock + 1 hour", "GPS tracking", "Premium insurance"],
-    vehicleTypes: ["scooter"],
-    freeMinutes: 5,
-  },
-  {
-    id: "hourly_monopattino",
-    name: "E-Scooter Hourly",
-    description: "Urban mobility",
-    duration: "hourly",
-    priceETH: "0.006",
-    priceEUR: "3.00",
-    features: ["Unlock + 1 hour", "GPS tracking", "Basic insurance"],
-    vehicleTypes: ["monopattino"],
-    freeMinutes: 5,
-  },
-
-  // Daily
-  {
-    id: "daily_all",
-    name: "Daily Pass",
-    description: "Full day access to all vehicles",
-    duration: "daily",
-    priceETH: "0.025",
-    priceEUR: "12.50",
-    features: [
-      "24h unlimited rides",
-      "All vehicle types",
-      "Premium support",
-      "Free parking",
-    ],
-    vehicleTypes: ["bike", "scooter", "monopattino"],
-    maxRides: 10,
-    freeMinutes: 15,
-  },
-
   // Monthly
   {
     id: "monthly_basic",
