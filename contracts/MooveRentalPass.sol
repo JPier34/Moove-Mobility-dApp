@@ -9,8 +9,8 @@ import "./MooveAccessControl.sol";
 
 /**
  * @title MooveRentalPass
- * @dev NFT contract for vehicle rental access passes
- * @notice Provides access to Moove vehicle rental network across European cities
+ * @dev NFT contract for 30-day vehicle access passes - NON-TRANSFERABLE
+ * @notice These NFTs provide access codes for vehicles and cannot be traded
  */
 contract MooveRentalPass is
     ERC721,
@@ -18,7 +18,37 @@ contract MooveRentalPass is
     ReentrancyGuard,
     Pausable
 {
-    // ============= ENUMS =============
+    // ============= STATE VARIABLES =============
+
+    /// @dev Reference to access control contract
+    MooveAccessControl public immutable accessControl;
+
+    /// @dev Counter for token IDs
+    uint256 private _tokenIdCounter;
+
+    /// @dev Mapping from token ID to rental pass details
+    mapping(uint256 => RentalPass) public rentalPasses;
+
+    /// @dev Mapping from access code to token ID (for validation)
+    mapping(string => uint256) public accessCodeToToken;
+
+    /// @dev Mapping from user to active passes (for UI display)
+    mapping(address => uint256[]) public userActivePasses;
+
+    /// @dev Mapping to track if pass is active
+    mapping(uint256 => bool) public isPassActive;
+
+    // ============= STRUCTS =============
+
+    struct RentalPass {
+        VehicleType vehicleType;
+        string accessCode;
+        uint256 expirationDate;
+        uint256 purchasePrice;
+        string location;
+        bool isActive;
+        address originalOwner;
+    }
 
     enum VehicleType {
         BIKE,
@@ -26,573 +56,477 @@ contract MooveRentalPass is
         MONOPATTINO
     }
 
-    // ============= STRUCTS =============
-
-    struct RentalPass {
-        VehicleType vehicleType;
-        string cityId;
-        uint256 validUntil;
-        uint256 codesGenerated;
-        bool isActive;
-        uint256 mintedAt;
-    }
-
-    struct PassPricing {
-        uint256 price;
-        uint256 validityDays;
-        bool isActive;
-    }
-
-    // ============= STATE VARIABLES =============
-
-    MooveAccessControl public accessControl;
-
-    uint256 private _tokenIdCounter = 1;
-    uint256 public constant MAX_SUPPLY = 50000;
-
-    // Pass pricing per vehicle type
-    mapping(VehicleType => PassPricing) public passPricing;
-
-    // NFT data
-    mapping(uint256 => RentalPass) public rentalPasses;
-
-    // Supported cities
-    mapping(string => bool) public supportedCities;
-
-    // User limits per city/vehicle type
-    mapping(address => mapping(string => mapping(VehicleType => uint256)))
-        public userPassCounts;
-
-    // Platform fee recipient
-    address public feeRecipient;
-
-    // Maximum passes per user per city per vehicle type
-    uint256 public constant MAX_PASSES_PER_USER_PER_TYPE = 3;
-
     // ============= EVENTS =============
 
     event RentalPassMinted(
         uint256 indexed tokenId,
         address indexed owner,
         VehicleType vehicleType,
-        string cityId,
-        uint256 validUntil
+        string accessCode,
+        uint256 expirationDate,
+        uint256 price
     );
 
-    event PassPricingUpdated(
-        VehicleType vehicleType,
-        uint256 price,
-        uint256 validityDays
-    );
-
-    event CityStatusUpdated(string cityId, bool supported);
-
-    event CodeGenerated(
+    event AccessCodeUsed(
         uint256 indexed tokenId,
-        address indexed user,
-        uint256 timestamp
+        string accessCode,
+        address indexed user
     );
 
-    event PassExtended(uint256 indexed tokenId, uint256 newValidUntil);
+    event PassExpired(uint256 indexed tokenId, string accessCode);
 
-    // ============= ERRORS =============
-
-    error MooveRentalPass__NotAuthorized();
-    error MooveRentalPass__CityNotSupported();
-    error MooveRentalPass__InsufficientPayment();
-    error MooveRentalPass__MaxSupplyReached();
-    error MooveRentalPass__PassExpired();
-    error MooveRentalPass__PassNotActive();
-    error MooveRentalPass__MaxPassesReached();
-    error MooveRentalPass__InvalidVehicleType();
-    error MooveRentalPass__TokenNotExists();
+    event PassDeactivated(
+        uint256 indexed tokenId,
+        string accessCode,
+        string reason
+    );
 
     // ============= MODIFIERS =============
 
-    modifier onlyAuthorized() {
-        if (!accessControl.canMint(msg.sender)) {
-            revert MooveRentalPass__NotAuthorized();
-        }
+    modifier onlyAccessControlRole(bytes32 role) {
+        accessControl.validateRole(role, msg.sender);
         _;
     }
 
-    modifier validCity(string memory cityId) {
-        if (!supportedCities[cityId]) {
-            revert MooveRentalPass__CityNotSupported();
-        }
+    modifier onlyValidToken(uint256 tokenId) {
+        require(_ownerOf(tokenId) != address(0), "Token does not exist");
         _;
     }
 
-    modifier tokenExists(uint256 tokenId) {
-        if (_ownerOf(tokenId) == address(0)) {
-            revert MooveRentalPass__TokenNotExists();
-        }
+    modifier onlyNonExpired(uint256 tokenId) {
+        require(
+            block.timestamp < rentalPasses[tokenId].expirationDate,
+            "Pass expired"
+        );
         _;
     }
 
     // ============= CONSTRUCTOR =============
 
-    constructor(
-        address _accessControl,
-        address _feeRecipient
-    ) ERC721("Moove Rental Pass", "MVRP") {
+    constructor(address _accessControl) ERC721("Moove Rental Pass", "MRP") {
+        require(_accessControl != address(0), "Invalid access control address");
         accessControl = MooveAccessControl(_accessControl);
-        feeRecipient = _feeRecipient;
-
-        // Initialize default pricing (in wei) - More competitive pricing
-        passPricing[VehicleType.BIKE] = PassPricing({
-            price: 0.025 ether, // ~€25
-            validityDays: 30,
-            isActive: true
-        });
-
-        passPricing[VehicleType.SCOOTER] = PassPricing({
-            price: 0.035 ether, // ~€35
-            validityDays: 30,
-            isActive: true
-        });
-
-        passPricing[VehicleType.MONOPATTINO] = PassPricing({
-            price: 0.045 ether, // ~€45
-            validityDays: 30,
-            isActive: true
-        });
-
-        // Initialize supported cities
-        _initializeSupportedCities();
-    }
-
-    // ============= INITIALIZATION =============
-
-    function _initializeSupportedCities() internal {
-        // European cities from config
-        string[20] memory cities = [
-            "milan",
-            "rome",
-            "naples",
-            "madrid",
-            "barcelona",
-            "paris",
-            "lyon",
-            "berlin",
-            "munich",
-            "amsterdam",
-            "rotterdam",
-            "brussels",
-            "vienna",
-            "lisbon",
-            "prague",
-            "copenhagen",
-            "stockholm",
-            "zurich",
-            "warsaw",
-            "budapest"
-        ];
-
-        for (uint256 i = 0; i < cities.length; i++) {
-            supportedCities[cities[i]] = true;
-        }
     }
 
     // ============= MINTING FUNCTIONS =============
 
     /**
-     * @dev Public mint function for rental passes
-     * @param vehicleType Type of vehicle access (bike, scooter, monopattino)
-     * @param cityId City identifier where pass is valid
+     * @dev Mint a new rental pass NFT
+     * @param to Address to mint the NFT to
+     * @param vehicleType Type of vehicle (BIKE, SCOOTER, MONOPATTINO)
+     * @param accessCode Unique access code for the vehicle
+     * @param location Location where the vehicle can be used
+     * @param price Price paid for the rental pass
+     * @param tokenURI Metadata URI for the NFT
      */
     function mintRentalPass(
+        address to,
         VehicleType vehicleType,
-        string memory cityId
-    ) external payable nonReentrant whenNotPaused validCity(cityId) {
-        PassPricing memory pricing = passPricing[vehicleType];
+        string memory accessCode,
+        string memory location,
+        uint256 price,
+        string memory tokenURI
+    ) external onlyAccessControlRole(accessControl.MINTER_ROLE()) nonReentrant {
+        require(to != address(0), "Invalid recipient address");
+        require(bytes(accessCode).length > 0, "Access code required");
+        require(
+            accessCodeToToken[accessCode] == 0,
+            "Access code already exists"
+        );
+        require(bytes(location).length > 0, "Location required");
 
-        if (!pricing.isActive) {
-            revert MooveRentalPass__InvalidVehicleType();
-        }
+        uint256 tokenId = _tokenIdCounter++;
+        uint256 expirationDate = block.timestamp + 30 days;
 
-        if (msg.value < pricing.price) {
-            revert MooveRentalPass__InsufficientPayment();
-        }
-
-        if (_tokenIdCounter > MAX_SUPPLY) {
-            revert MooveRentalPass__MaxSupplyReached();
-        }
-
-        // Check user limits
-        if (
-            userPassCounts[msg.sender][cityId][vehicleType] >=
-            MAX_PASSES_PER_USER_PER_TYPE
-        ) {
-            revert MooveRentalPass__MaxPassesReached();
-        }
-
-        uint256 tokenId = _tokenIdCounter;
-        _tokenIdCounter++;
-
-        uint256 validUntil = block.timestamp + (pricing.validityDays * 1 days);
-
-        // Mint NFT
-        _safeMint(msg.sender, tokenId);
-
-        // Set pass data
+        // Create rental pass struct
         rentalPasses[tokenId] = RentalPass({
             vehicleType: vehicleType,
-            cityId: cityId,
-            validUntil: validUntil,
-            codesGenerated: 0,
+            accessCode: accessCode,
+            expirationDate: expirationDate,
+            purchasePrice: price,
+            location: location,
             isActive: true,
-            mintedAt: block.timestamp
+            originalOwner: to
         });
 
-        // Update user count
-        userPassCounts[msg.sender][cityId][vehicleType]++;
+        // Map access code to token
+        accessCodeToToken[accessCode] = tokenId;
 
-        // Set metadata URI
-        string memory metadataURI = _generateMetadataURI(
-            tokenId,
-            vehicleType,
-            cityId
-        );
-        _setTokenURI(tokenId, metadataURI);
+        // Add to user's active passes
+        userActivePasses[to].push(tokenId);
+        isPassActive[tokenId] = true;
 
-        // Transfer payment to fee recipient
-        (bool success, ) = payable(feeRecipient).call{value: msg.value}("");
-        require(success, "Payment transfer failed");
+        // Mint the NFT
+        _safeMint(to, tokenId);
+        _setTokenURI(tokenId, tokenURI);
 
         emit RentalPassMinted(
             tokenId,
-            msg.sender,
+            to,
             vehicleType,
-            cityId,
-            validUntil
+            accessCode,
+            expirationDate,
+            price
         );
     }
 
     /**
-     * @dev Admin batch mint for promotional purposes
+     * @dev Batch mint rental passes for efficiency
      */
-    function batchMintRentalPass(
-        address[] memory recipients,
-        VehicleType[] memory vehicleTypes,
-        string[] memory cityIds
-    ) external onlyAuthorized {
+    function batchMintRentalPasses(
+        address[] calldata recipients,
+        VehicleType[] calldata vehicleTypes,
+        string[] calldata accessCodes,
+        string[] calldata locations,
+        uint256[] calldata prices,
+        string[] calldata tokenURIs
+    ) external onlyAccessControlRole(accessControl.MINTER_ROLE()) nonReentrant {
         require(
-            recipients.length == vehicleTypes.length &&
-                recipients.length == cityIds.length,
+            recipients.length == vehicleTypes.length,
             "Array length mismatch"
         );
-        require(recipients.length <= 50, "Batch size too large");
+        require(
+            recipients.length == accessCodes.length,
+            "Array length mismatch"
+        );
+        require(recipients.length == locations.length, "Array length mismatch");
+        require(recipients.length == prices.length, "Array length mismatch");
+        require(recipients.length == tokenURIs.length, "Array length mismatch");
 
         for (uint256 i = 0; i < recipients.length; i++) {
-            if (supportedCities[cityIds[i]] && _tokenIdCounter <= MAX_SUPPLY) {
-                _mintPassForUser(recipients[i], vehicleTypes[i], cityIds[i]);
-            }
+            mintRentalPass(
+                recipients[i],
+                vehicleTypes[i],
+                accessCodes[i],
+                locations[i],
+                prices[i],
+                tokenURIs[i]
+            );
         }
     }
 
-    function _mintPassForUser(
-        address recipient,
-        VehicleType vehicleType,
-        string memory cityId
-    ) internal {
-        uint256 tokenId = _tokenIdCounter;
-        _tokenIdCounter++;
-
-        PassPricing memory pricing = passPricing[vehicleType];
-        uint256 validUntil = block.timestamp + (pricing.validityDays * 1 days);
-
-        _safeMint(recipient, tokenId);
-
-        rentalPasses[tokenId] = RentalPass({
-            vehicleType: vehicleType,
-            cityId: cityId,
-            validUntil: validUntil,
-            codesGenerated: 0,
-            isActive: true,
-            mintedAt: block.timestamp
-        });
-
-        string memory metadataURI = _generateMetadataURI(
-            tokenId,
-            vehicleType,
-            cityId
-        );
-        _setTokenURI(tokenId, metadataURI);
-
-        emit RentalPassMinted(
-            tokenId,
-            recipient,
-            vehicleType,
-            cityId,
-            validUntil
-        );
-    }
-
-    // ============= RENTAL FUNCTIONS =============
+    // ============= ACCESS VALIDATION =============
 
     /**
-     * @dev Check if a pass is valid for rental (no on-chain code tracking)
-     * @param tokenId The rental pass token ID
-     * @return isValid True if pass can be used for rental
+     * @dev Validate access code and mark as used
+     * @param accessCode The access code to validate
+     * @return tokenId The token ID associated with the code
+     * @return owner The owner of the pass
+     * @return vehicleType The type of vehicle
      */
-    function canGenerateCode(
-        uint256 tokenId
-    ) external view returns (bool isValid) {
-        if (_ownerOf(tokenId) == address(0)) return false;
+    function validateAndUseAccessCode(
+        string memory accessCode
+    )
+        external
+        onlyAccessControlRole(accessControl.MINTER_ROLE())
+        returns (uint256 tokenId, address owner, VehicleType vehicleType)
+    {
+        tokenId = accessCodeToToken[accessCode];
+        require(tokenId != 0, "Invalid access code");
+
+        RentalPass storage pass = rentalPasses[tokenId];
+        require(pass.isActive, "Pass is not active");
+        require(block.timestamp < pass.expirationDate, "Pass expired");
+
+        owner = _ownerOf(tokenId);
+        vehicleType = pass.vehicleType;
+
+        emit AccessCodeUsed(tokenId, accessCode, owner);
+    }
+
+    /**
+     * @dev Check if access code is valid without using it
+     */
+    function isAccessCodeValid(
+        string memory accessCode
+    )
+        external
+        view
+        returns (bool valid, uint256 tokenId, uint256 expirationDate)
+    {
+        tokenId = accessCodeToToken[accessCode];
+        if (tokenId == 0) return (false, 0, 0);
 
         RentalPass memory pass = rentalPasses[tokenId];
-        return pass.isActive && block.timestamp <= pass.validUntil;
+        valid = pass.isActive && block.timestamp < pass.expirationDate;
+        expirationDate = pass.expirationDate;
     }
 
-    /**
-     * @dev Extend pass validity (admin function)
-     * @param tokenId The rental pass token ID
-     * @param additionalDays Days to add to validity
-     */
-    function extendPassValidity(
-        uint256 tokenId,
-        uint256 additionalDays
-    ) external onlyAuthorized tokenExists(tokenId) {
-        RentalPass storage pass = rentalPasses[tokenId];
-        pass.validUntil += additionalDays * 1 days;
-
-        emit PassExtended(tokenId, pass.validUntil);
-    }
+    // ============= PASS MANAGEMENT =============
 
     /**
-     * @dev Deactivate a pass (admin function)
-     * @param tokenId The rental pass token ID
+     * @dev Deactivate a rental pass (admin function)
+     * @param tokenId Token ID to deactivate
+     * @param reason Reason for deactivation
      */
     function deactivatePass(
-        uint256 tokenId
-    ) external onlyAuthorized tokenExists(tokenId) {
-        rentalPasses[tokenId].isActive = false;
+        uint256 tokenId,
+        string memory reason
+    )
+        external
+        onlyAccessControlRole(accessControl.MASTER_ADMIN_ROLE())
+        onlyValidToken(tokenId)
+    {
+        RentalPass storage pass = rentalPasses[tokenId];
+        require(pass.isActive, "Pass already inactive");
+
+        pass.isActive = false;
+        isPassActive[tokenId] = false;
+
+        // Remove from user's active passes
+        _removeFromActivePasses(_ownerOf(tokenId), tokenId);
+
+        emit PassDeactivated(tokenId, pass.accessCode, reason);
+    }
+
+    /**
+     * @dev Cleanup expired passes (can be called by anyone to maintain state)
+     */
+    function cleanupExpiredPasses(uint256[] calldata tokenIds) external {
+        for (uint256 i = 0; i < tokenIds.length; i++) {
+            uint256 tokenId = tokenIds[i];
+            if (_ownerOf(tokenId) != address(0)) {
+                RentalPass storage pass = rentalPasses[tokenId];
+                if (pass.isActive && block.timestamp >= pass.expirationDate) {
+                    pass.isActive = false;
+                    isPassActive[tokenId] = false;
+
+                    // Remove from user's active passes
+                    _removeFromActivePasses(_ownerOf(tokenId), tokenId);
+
+                    emit PassExpired(tokenId, pass.accessCode);
+                }
+            }
+        }
     }
 
     // ============= VIEW FUNCTIONS =============
 
     /**
-     * @dev Check if a pass is valid for rental
-     * @param tokenId The rental pass token ID
-     * @return isValid True if pass can be used for rental
+     * @dev Get rental pass details
      */
-    function isPassValid(uint256 tokenId) external view returns (bool isValid) {
-        if (_ownerOf(tokenId) == address(0)) return false;
-
-        RentalPass memory pass = rentalPasses[tokenId];
-        return pass.isActive && block.timestamp <= pass.validUntil;
-    }
-
-    /**
-     * @dev Get pass information
-     * @param tokenId The rental pass token ID
-     * @return pass The rental pass data
-     */
-    function getPassInfo(
+    function getRentalPass(
         uint256 tokenId
-    ) external view tokenExists(tokenId) returns (RentalPass memory pass) {
+    ) external view onlyValidToken(tokenId) returns (RentalPass memory) {
         return rentalPasses[tokenId];
     }
 
     /**
-     * @dev Get user's passes for a specific city and vehicle type
-     * @param user User address
-     * @param cityId City identifier
-     * @param vehicleType Vehicle type
-     * @return tokenIds Array of token IDs owned by user
+     * @dev Get user's active passes
      */
-    function getUserPasses(
-        address user,
-        string memory cityId,
-        VehicleType vehicleType
-    ) external view returns (uint256[] memory tokenIds) {
-        uint256 balance = balanceOf(user);
-        uint256[] memory tempTokenIds = new uint256[](balance);
-        uint256 count = 0;
+    function getUserActivePasses(
+        address user
+    ) external view returns (uint256[] memory) {
+        return userActivePasses[user];
+    }
 
-        for (uint256 i = 1; i < _tokenIdCounter; i++) {
-            if (_ownerOf(i) != address(0) && ownerOf(i) == user) {
-                RentalPass memory pass = rentalPasses[i];
-                if (
-                    keccak256(bytes(pass.cityId)) == keccak256(bytes(cityId)) &&
-                    pass.vehicleType == vehicleType &&
-                    pass.isActive &&
-                    block.timestamp <= pass.validUntil
-                ) {
-                    tempTokenIds[count] = i;
-                    count++;
-                }
-            }
-        }
+    /**
+     * @dev Get user's active passes with details
+     */
+    function getUserActivePassesWithDetails(
+        address user
+    ) external view returns (RentalPass[] memory activePasses) {
+        uint256[] memory tokenIds = userActivePasses[user];
+        activePasses = new RentalPass[](tokenIds.length);
 
-        tokenIds = new uint256[](count);
-        for (uint256 i = 0; i < count; i++) {
-            tokenIds[i] = tempTokenIds[i];
+        for (uint256 i = 0; i < tokenIds.length; i++) {
+            activePasses[i] = rentalPasses[tokenIds[i]];
         }
     }
 
     /**
-     * @dev Get all passes for a user
-     * @param user User address
-     * @return tokenIds Array of all token IDs owned by user
+     * @dev Get total supply of rental passes
      */
-    function getAllUserPasses(
+    function totalSupply() external view returns (uint256) {
+        return _tokenIdCounter;
+    }
+
+    /**
+     * @dev Check if pass is expired
+     */
+    function isPassExpired(
+        uint256 tokenId
+    ) external view onlyValidToken(tokenId) returns (bool) {
+        return block.timestamp >= rentalPasses[tokenId].expirationDate;
+    }
+
+    /**
+     * @dev Get passes expiring soon (within next 24 hours)
+     */
+    function getPassesExpiringSoon(
         address user
-    ) external view returns (uint256[] memory tokenIds) {
-        uint256 balance = balanceOf(user);
-        tokenIds = new uint256[](balance);
+    ) external view returns (uint256[] memory expiringPasses) {
+        uint256[] memory userPasses = userActivePasses[user];
         uint256 count = 0;
 
-        for (uint256 i = 1; i < _tokenIdCounter; i++) {
-            if (_ownerOf(i) != address(0) && ownerOf(i) == user) {
-                tokenIds[count] = i;
+        // Count expiring passes
+        for (uint256 i = 0; i < userPasses.length; i++) {
+            if (
+                rentalPasses[userPasses[i]].expirationDate <=
+                block.timestamp + 24 hours
+            ) {
                 count++;
             }
         }
+
+        // Fill array
+        expiringPasses = new uint256[](count);
+        uint256 index = 0;
+        for (uint256 i = 0; i < userPasses.length; i++) {
+            if (
+                rentalPasses[userPasses[i]].expirationDate <=
+                block.timestamp + 24 hours
+            ) {
+                expiringPasses[index++] = userPasses[i];
+            }
+        }
     }
 
-    /**
-     * @dev Get pricing for vehicle type
-     * @param vehicleType Vehicle type to query
-     * @return pricing PassPricing struct
-     */
-    function getPassPricing(
-        VehicleType vehicleType
-    ) external view returns (PassPricing memory pricing) {
-        return passPricing[vehicleType];
-    }
+    // ============= OVERRIDE FUNCTIONS =============
 
     /**
-     * @dev Get total supply of minted passes
-     * @return supply Current total supply
+     * @dev Override transfer functions to make NFTs non-transferable
      */
-    function totalSupply() external view returns (uint256 supply) {
-        return _tokenIdCounter - 1;
-    }
-
-    // ============= ADMIN FUNCTIONS =============
-
-    /**
-     * @dev Update pricing for vehicle type
-     * @param vehicleType Vehicle type to update
-     * @param price New price in wei
-     * @param validityDays New validity period in days
-     */
-    function updatePassPricing(
-        VehicleType vehicleType,
-        uint256 price,
-        uint256 validityDays
-    ) external onlyAuthorized {
-        require(price > 0, "Price must be greater than 0");
-        require(
-            validityDays > 0 && validityDays <= 365,
-            "Invalid validity period"
-        );
-
-        passPricing[vehicleType] = PassPricing({
-            price: price,
-            validityDays: validityDays,
-            isActive: true
-        });
-
-        emit PassPricingUpdated(vehicleType, price, validityDays);
-    }
-
-    /**
-     * @dev Add or remove supported city
-     * @param cityId City identifier
-     * @param supported Whether city is supported
-     */
-    function setCitySupport(
-        string memory cityId,
-        bool supported
-    ) external onlyAuthorized {
-        supportedCities[cityId] = supported;
-        emit CityStatusUpdated(cityId, supported);
-    }
-
-    /**
-     * @dev Update fee recipient
-     * @param newFeeRecipient New fee recipient address
-     */
-    function setFeeRecipient(address newFeeRecipient) external onlyAuthorized {
-        require(newFeeRecipient != address(0), "Invalid address");
-        feeRecipient = newFeeRecipient;
-    }
-
-    /**
-     * @dev Pause contract
-     */
-    function pause() external onlyAuthorized {
-        _pause();
-    }
-
-    /**
-     * @dev Unpause contract
-     */
-    function unpause() external onlyAuthorized {
-        _unpause();
-    }
-
-    // ============= METADATA FUNCTIONS =============
-
-    /**
-     * @dev Generate metadata URI for pass
-     */
-    function _generateMetadataURI(
+    function _beforeTokenTransfer(
+        address from,
+        address to,
         uint256 tokenId,
-        VehicleType vehicleType,
-        string memory cityId
-    ) internal pure returns (string memory) {
-        return
-            string(
-                abi.encodePacked(
-                    "https://api.moove.com/metadata/rental-pass/",
-                    Strings.toString(uint256(vehicleType)), // Convert enum to uint
-                    "/",
-                    cityId,
-                    "/",
-                    Strings.toString(tokenId)
-                )
-            );
+        uint256 batchSize
+    ) internal override {
+        super._beforeTokenTransfer(from, to, tokenId, batchSize);
+
+        // Allow minting (from == address(0)) but block all transfers
+        require(from == address(0), "Rental passes are non-transferable");
     }
 
     /**
-     * @dev Update metadata for a token
-     * @param tokenId Token ID to update
+     * @dev Override approve to prevent approvals
      */
-    function updateTokenMetadata(
-        uint256 tokenId
-    ) external onlyAuthorized tokenExists(tokenId) {
-        RentalPass memory pass = rentalPasses[tokenId];
-        string memory newURI = _generateMetadataURI(
-            tokenId,
-            pass.vehicleType,
-            pass.cityId
-        );
-        _setTokenURI(tokenId, newURI);
+    function approve(address, uint256) public pure override {
+        revert("Rental passes cannot be approved for transfer");
     }
 
-    // ============= OVERRIDES =============
+    /**
+     * @dev Override setApprovalForAll to prevent batch approvals
+     */
+    function setApprovalForAll(address, bool) public pure override {
+        revert("Rental passes cannot be approved for transfer");
+    }
 
+    /**
+     * @dev Override transferFrom to prevent transfers
+     */
+    function transferFrom(address, address, uint256) public pure override {
+        revert("Rental passes are non-transferable");
+    }
+
+    /**
+     * @dev Override safeTransferFrom to prevent safe transfers
+     */
+    function safeTransferFrom(
+        address,
+        address,
+        uint256,
+        bytes memory
+    ) public pure override {
+        revert("Rental passes are non-transferable");
+    }
+
+    /**
+     * @dev Override safeTransferFrom to prevent safe transfers
+     */
+    function safeTransferFrom(address, address, uint256) public pure override {
+        revert("Rental passes are non-transferable");
+    }
+
+    /**
+     * @dev Override tokenURI to handle both storage patterns
+     */
     function tokenURI(
         uint256 tokenId
     ) public view override(ERC721, ERC721URIStorage) returns (string memory) {
         return super.tokenURI(tokenId);
     }
 
+    /**
+     * @dev Override supportsInterface
+     */
     function supportsInterface(
         bytes4 interfaceId
     ) public view override(ERC721, ERC721URIStorage) returns (bool) {
         return super.supportsInterface(interfaceId);
     }
 
-    function _update(
-        address to,
-        uint256 tokenId,
-        address auth
-    ) internal override whenNotPaused returns (address) {
-        return super._update(to, tokenId, auth);
+    // ============= INTERNAL FUNCTIONS =============
+
+    /**
+     * @dev Remove token from user's active passes array
+     */
+    function _removeFromActivePasses(address user, uint256 tokenId) internal {
+        uint256[] storage passes = userActivePasses[user];
+        for (uint256 i = 0; i < passes.length; i++) {
+            if (passes[i] == tokenId) {
+                passes[i] = passes[passes.length - 1];
+                passes.pop();
+                break;
+            }
+        }
     }
+
+    /**
+     * @dev Override _burn to handle cleanup
+     */
+    function _burn(
+        uint256 tokenId
+    ) internal override(ERC721, ERC721URIStorage) {
+        super._burn(tokenId);
+
+        // Cleanup pass data
+        RentalPass storage pass = rentalPasses[tokenId];
+        delete accessCodeToToken[pass.accessCode];
+        delete rentalPasses[tokenId];
+        delete isPassActive[tokenId];
+    }
+
+    // ============= EMERGENCY FUNCTIONS =============
+
+    /**
+     * @dev Emergency pause contract
+     */
+    function pause()
+        external
+        onlyAccessControlRole(accessControl.PAUSER_ROLE())
+    {
+        _pause();
+    }
+
+    /**
+     * @dev Unpause contract
+     */
+    function unpause()
+        external
+        onlyAccessControlRole(accessControl.MASTER_ADMIN_ROLE())
+    {
+        _unpause();
+    }
+
+    /**
+     * @dev Emergency function to update access control (for upgrades)
+     */
+    function updateAccessControl(
+        address newAccessControl
+    ) external onlyAccessControlRole(accessControl.UPGRADER_ROLE()) {
+        require(
+            newAccessControl != address(0),
+            "Invalid access control address"
+        );
+        // This would require more complex upgrade logic in practice
+        // For now, just emit an event
+        emit AccessControlUpdated(address(accessControl), newAccessControl);
+    }
+
+    event AccessControlUpdated(
+        address indexed oldAccessControl,
+        address indexed newAccessControl
+    );
 }

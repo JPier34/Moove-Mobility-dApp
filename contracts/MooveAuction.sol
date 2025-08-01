@@ -1,67 +1,85 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
+import "@openzeppelin/contracts/interfaces/IERC721.sol";
+import "@openzeppelin/contracts/interfaces/IERC2981.sol";
+import "./MooveAccessControl.sol";
 
 /**
  * @title MooveAuction
- * @dev Auction contract supporting 4 auction types:
- * - Traditional (Public Bid)
- * - English Auction
- * - Dutch Auction
- * - Sealed Bid Auction
- * @notice Compatible with OpenZeppelin 5.x
+ * @dev Advanced auction system with 4 different auction types for Moove Sticker NFTs
+ * @notice Supports English, Dutch, Sealed Bid, and Reserve auctions
  */
-contract MooveAuction is AccessControl, ReentrancyGuard, Pausable {
-    // ============ ROLES ============
-    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
-    bytes32 public constant AUCTIONEER_ROLE = keccak256("AUCTIONEER_ROLE");
+contract MooveAuction is ReentrancyGuard, Pausable {
+    // ============= STATE VARIABLES =============
 
-    // ============ ENUMS ============
-    enum AuctionType {
-        TRADITIONAL, // Public bid, fixed duration
-        ENGLISH, // Ascending price, auto-extend
-        DUTCH, // Descending price
-        SEALED_BID // Hidden bids, reveal phase
-    }
+    /// @dev Reference to access control contract
+    MooveAccessControl public immutable accessControl;
 
-    enum AuctionStatus {
-        ACTIVE,
-        ENDED,
-        CANCELLED,
-        REVEALING // Only for sealed bid auctions
-    }
+    /// @dev Counter for auction IDs
+    uint256 private _auctionIdCounter;
 
-    // ============ STRUCTS ============
+    /// @dev Mapping from auction ID to auction details
+    mapping(uint256 => Auction) public auctions;
+
+    /// @dev Mapping from auction ID to bids
+    mapping(uint256 => Bid[]) public auctionBids;
+
+    /// @dev Mapping from auction ID to sealed bids (for sealed bid auctions)
+    mapping(uint256 => mapping(address => bytes32)) public sealedBids;
+
+    /// @dev Mapping from auction ID to bidder reveal status
+    mapping(uint256 => mapping(address => bool)) public hasRevealed;
+
+    /// @dev Mapping from user to their active auctions
+    mapping(address => uint256[]) public userAuctions;
+
+    /// @dev Mapping from user to their active bids
+    mapping(address => uint256[]) public userBids;
+
+    /// @dev Platform fee percentage (250 = 2.5%)
+    uint256 public platformFeePercentage = 250;
+
+    /// @dev Minimum bid increment percentage (500 = 5%)
+    uint256 public minimumBidIncrement = 500;
+
+    /// @dev Maximum auction duration (30 days)
+    uint256 public constant MAX_AUCTION_DURATION = 30 days;
+
+    /// @dev Minimum auction duration (1 hour)
+    uint256 public constant MIN_AUCTION_DURATION = 1 hours;
+
+    // ============= STRUCTS =============
+
     struct Auction {
         uint256 auctionId;
-        uint256 nftId;
         address nftContract;
+        uint256 tokenId;
         address seller;
         AuctionType auctionType;
-        AuctionStatus status;
-        uint256 startPrice;
+        uint256 startingPrice;
         uint256 reservePrice;
-        uint256 buyNowPrice; // For immediate purchase
+        uint256 buyNowPrice;
+        uint256 currentPrice;
         uint256 startTime;
         uint256 endTime;
-        uint256 extensionTime; // For English auctions
+        uint256 bidIncrement;
         address highestBidder;
         uint256 highestBid;
-        uint256 bidIncrement; // Minimum bid increase
-        bool nftClaimed;
-        bool sellerPaid;
+        AuctionStatus status;
+        bool allowPartialFulfillment;
+        uint256 minBidders;
+        uint256 totalBidders;
     }
 
     struct Bid {
         address bidder;
         uint256 amount;
         uint256 timestamp;
-        bool isRevealed; // For sealed bid auctions
-        bytes32 bidHash; // For sealed bid auctions
+        bool isWinning;
+        bool isRefunded;
     }
 
     struct SealedBidReveal {
@@ -69,41 +87,39 @@ contract MooveAuction is AccessControl, ReentrancyGuard, Pausable {
         uint256 nonce;
     }
 
-    // ============ STATE VARIABLES ============
+    enum AuctionType {
+        ENGLISH, // Traditional ascending bid auction
+        DUTCH, // Descending price auction
+        SEALED_BID, // Sealed bid auction with reveal phase
+        RESERVE // Reserve auction with hidden minimum
+    }
 
-    /// @dev Counter for auction IDs (replaces Counters.Counter)
-    uint256 private _auctionIdCounter;
+    enum AuctionStatus {
+        PENDING, // Created but not started
+        ACTIVE, // Currently accepting bids
+        REVEAL, // Sealed bid reveal phase
+        ENDED, // Finished, awaiting settlement
+        SETTLED, // Completed and settled
+        CANCELLED // Cancelled by seller or admin
+    }
 
-    // Mappings
-    mapping(uint256 => Auction) public auctions;
-    mapping(uint256 => Bid[]) public auctionBids;
-    mapping(uint256 => mapping(address => uint256)) public bidderDeposits;
-    mapping(uint256 => mapping(address => bytes32)) public sealedBids;
-    mapping(uint256 => mapping(address => bool)) public hasRevealed;
+    // ============= EVENTS =============
 
-    // Platform settings
-    address public platformOwner;
-    uint256 public platformFeePercentage = 250; // 2.5%
-    uint256 public constant MIN_AUCTION_DURATION = 1 minutes;
-    uint256 public constant MAX_AUCTION_DURATION = 30 days;
-    uint256 public constant ENGLISH_EXTENSION_TIME = 10 minutes;
-    uint256 public constant REVEAL_PHASE_DURATION = 24 hours;
-
-    // ============ EVENTS ============
     event AuctionCreated(
         uint256 indexed auctionId,
-        uint256 indexed nftId,
         address indexed seller,
+        address indexed nftContract,
+        uint256 tokenId,
         AuctionType auctionType,
-        uint256 startPrice,
-        uint256 endTime
+        uint256 startingPrice,
+        uint256 duration
     );
 
     event BidPlaced(
         uint256 indexed auctionId,
         address indexed bidder,
         uint256 amount,
-        uint256 timestamp
+        bool isHighestBid
     );
 
     event SealedBidSubmitted(
@@ -118,274 +134,281 @@ contract MooveAuction is AccessControl, ReentrancyGuard, Pausable {
         uint256 amount
     );
 
-    event AuctionEnded(
+    event AuctionSettled(
         uint256 indexed auctionId,
         address indexed winner,
-        uint256 winningBid
+        uint256 finalPrice,
+        uint256 platformFee,
+        uint256 royaltyFee
     );
 
-    event AuctionCancelled(uint256 indexed auctionId);
-    event NFTClaimed(uint256 indexed auctionId, address indexed winner);
-    event PaymentClaimed(
-        uint256 indexed auctionId,
-        address indexed seller,
-        uint256 amount
-    );
+    event AuctionCancelled(uint256 indexed auctionId, string reason);
+
     event BidRefunded(
         uint256 indexed auctionId,
         address indexed bidder,
         uint256 amount
     );
 
-    // ============ ERRORS ============
-    error MooveAuction__NotAuthorized();
-    error MooveAuction__AuctionNotFound();
-    error MooveAuction__AuctionNotActive();
-    error MooveAuction__AuctionEnded();
-    error MooveAuction__BidTooLow();
-    error MooveAuction__InvalidDuration();
-    error MooveAuction__AlreadyClaimed();
-    error MooveAuction__NoValidBids();
-    error MooveAuction__RevealPhaseActive();
-    error MooveAuction__InvalidReveal();
-    error MooveAuction__ReserveNotMet();
+    event DutchPriceUpdate(uint256 indexed auctionId, uint256 newPrice);
 
-    // ============ MODIFIERS ============
-    modifier onlyAuctionSeller(uint256 auctionId) {
-        if (auctions[auctionId].seller != msg.sender) {
-            revert MooveAuction__NotAuthorized();
-        }
+    event ReserveReached(uint256 indexed auctionId, uint256 reservePrice);
+
+    // ============= MODIFIERS =============
+
+    modifier onlyAccessControlRole(bytes32 role) {
+        accessControl.validateRole(role, msg.sender);
         _;
     }
 
-    modifier auctionExists(uint256 auctionId) {
-        if (auctions[auctionId].auctionId == 0) {
-            revert MooveAuction__AuctionNotFound();
-        }
+    modifier validAuction(uint256 auctionId) {
+        require(auctionId < _auctionIdCounter, "Auction does not exist");
+        _;
+    }
+
+    modifier onlyAuctionSeller(uint256 auctionId) {
+        require(auctions[auctionId].seller == msg.sender, "Not auction seller");
         _;
     }
 
     modifier auctionActive(uint256 auctionId) {
-        if (auctions[auctionId].status != AuctionStatus.ACTIVE) {
-            revert MooveAuction__AuctionNotActive();
-        }
+        require(
+            auctions[auctionId].status == AuctionStatus.ACTIVE,
+            "Auction not active"
+        );
+        require(
+            block.timestamp <= auctions[auctionId].endTime,
+            "Auction ended"
+        );
         _;
     }
 
     modifier auctionEnded(uint256 auctionId) {
-        if (auctions[auctionId].status != AuctionStatus.ENDED) {
-            revert MooveAuction__AuctionEnded();
-        }
-        _;
-    }
-
-    modifier auctionInRevealPhase(uint256 auctionId) {
-        if (
-            auctions[auctionId].status != AuctionStatus.REVEALING &&
-            auctions[auctionId].auctionType == AuctionType.SEALED_BID
-        ) {
-            revert MooveAuction__RevealPhaseActive();
-        }
-        _;
-    }
-
-    modifier onlyRoleOrAuctioneer(bytes32 role) {
         require(
-            hasRole(role, msg.sender) || hasRole(AUCTIONEER_ROLE, msg.sender),
-            "Not authorized"
+            auctions[auctionId].status == AuctionStatus.ENDED ||
+                block.timestamp > auctions[auctionId].endTime,
+            "Auction still active"
         );
         _;
     }
 
-    modifier noValidBids(uint256 auctionId) {
-        Auction storage auction = auctions[auctionId];
-        if (auction.highestBidder != address(0) || auction.highestBid > 0) {
-            revert MooveAuction__NoValidBids();
-        }
-        _;
+    // ============= CONSTRUCTOR =============
+
+    constructor(address _accessControl) {
+        require(_accessControl != address(0), "Invalid access control address");
+        accessControl = MooveAccessControl(_accessControl);
     }
 
-    modifier alreadyClaimed(uint256 auctionId) {
-        Auction storage auction = auctions[auctionId];
-        if (auction.nftClaimed || auction.sellerPaid) {
-            revert MooveAuction__AlreadyClaimed();
-        }
-        _;
-    }
+    // ============= AUCTION CREATION =============
 
-    // ============ CONSTRUCTOR ============
-    constructor(address _platformOwner) {
-        require(_platformOwner != address(0), "Invalid platform owner");
-        platformOwner = _platformOwner;
-
-        _grantRole(DEFAULT_ADMIN_ROLE, _platformOwner);
-        _grantRole(ADMIN_ROLE, _platformOwner);
-        _grantRole(AUCTIONEER_ROLE, _platformOwner);
-
-        // Start auction counter from 1 (0 reserved for "not exists")
-        _auctionIdCounter = 1;
-    }
-
-    // ============ AUCTION CREATION ============
     /**
      * @dev Create a new auction
+     * @param nftContract Address of the NFT contract
+     * @param tokenId Token ID to auction
+     * @param auctionType Type of auction
+     * @param startingPrice Starting price for the auction
+     * @param reservePrice Reserve price (minimum acceptable price)
+     * @param buyNowPrice Buy now price (0 if not applicable)
+     * @param duration Duration of the auction in seconds
+     * @param bidIncrement Minimum bid increment (0 for default)
      */
     function createAuction(
-        uint256 nftId,
         address nftContract,
+        uint256 tokenId,
         AuctionType auctionType,
-        uint256 startPrice,
+        uint256 startingPrice,
         uint256 reservePrice,
         uint256 buyNowPrice,
         uint256 duration,
         uint256 bidIncrement
-    ) external nonReentrant whenNotPaused returns (uint256) {
-        // Validate inputs
-        if (
-            duration < MIN_AUCTION_DURATION || duration > MAX_AUCTION_DURATION
-        ) {
-            revert MooveAuction__InvalidDuration();
-        }
-
+    ) external nonReentrant whenNotPaused returns (uint256 auctionId) {
         require(nftContract != address(0), "Invalid NFT contract");
-        require(startPrice > 0, "Start price must be positive");
-        if (auctionType == AuctionType.DUTCH) {
-            require(
-                startPrice >= reservePrice,
-                "Dutch: start price must be >= reserve"
-            );
-        } else {
-            require(reservePrice >= startPrice, "Reserve price too low");
-        }
-        require(bidIncrement > 0, "Bid increment must be positive");
-
-        // Verify NFT ownership
-        IERC721 nft = IERC721(nftContract);
-        require(nft.ownerOf(nftId) == msg.sender, "Not NFT owner");
+        require(startingPrice > 0, "Starting price must be greater than 0");
         require(
-            nft.isApprovedForAll(msg.sender, address(this)) ||
-                nft.getApproved(nftId) == address(this),
-            "Contract not approved"
+            duration >= MIN_AUCTION_DURATION &&
+                duration <= MAX_AUCTION_DURATION,
+            "Invalid duration"
         );
 
-        // Generate new auction ID
-        uint256 auctionId = _auctionIdCounter++;
+        // Verify NFT ownership and approval
+        IERC721 nft = IERC721(nftContract);
+        require(nft.ownerOf(tokenId) == msg.sender, "Not NFT owner");
+        require(
+            nft.isApprovedForAll(msg.sender, address(this)) ||
+                nft.getApproved(tokenId) == address(this),
+            "NFT not approved"
+        );
 
-        uint256 endTime = block.timestamp + duration;
+        // Validate auction parameters based on type
+        _validateAuctionParameters(
+            auctionType,
+            startingPrice,
+            reservePrice,
+            buyNowPrice
+        );
 
-        // For sealed bid auctions, add reveal phase
-        if (auctionType == AuctionType.SEALED_BID) {
-            endTime = block.timestamp + duration + REVEAL_PHASE_DURATION;
+        auctionId = _auctionIdCounter++;
+        uint256 startTime = block.timestamp;
+        uint256 endTime = startTime + duration;
+
+        // Set bid increment
+        if (bidIncrement == 0) {
+            bidIncrement = (startingPrice * minimumBidIncrement) / 10000;
+            if (bidIncrement == 0) bidIncrement = 0.001 ether;
         }
 
+        // Create auction
         auctions[auctionId] = Auction({
             auctionId: auctionId,
-            nftId: nftId,
             nftContract: nftContract,
+            tokenId: tokenId,
             seller: msg.sender,
             auctionType: auctionType,
-            status: AuctionStatus.ACTIVE,
-            startPrice: startPrice,
+            startingPrice: startingPrice,
             reservePrice: reservePrice,
             buyNowPrice: buyNowPrice,
-            startTime: block.timestamp,
+            currentPrice: auctionType == AuctionType.DUTCH ? startingPrice : 0,
+            startTime: startTime,
             endTime: endTime,
-            extensionTime: auctionType == AuctionType.ENGLISH
-                ? ENGLISH_EXTENSION_TIME
-                : 0,
+            bidIncrement: bidIncrement,
             highestBidder: address(0),
             highestBid: 0,
-            bidIncrement: bidIncrement,
-            nftClaimed: false,
-            sellerPaid: false
+            status: AuctionStatus.ACTIVE,
+            allowPartialFulfillment: false,
+            minBidders: auctionType == AuctionType.SEALED_BID ? 2 : 1,
+            totalBidders: 0
         });
 
-        // Transfer NFT to contract
-        nft.transferFrom(msg.sender, address(this), nftId);
+        // Add to user's auctions
+        userAuctions[msg.sender].push(auctionId);
+
+        // Transfer NFT to contract (escrow)
+        nft.transferFrom(msg.sender, address(this), tokenId);
 
         emit AuctionCreated(
             auctionId,
-            nftId,
             msg.sender,
+            nftContract,
+            tokenId,
             auctionType,
-            startPrice,
-            endTime
+            startingPrice,
+            duration
         );
-
-        return auctionId;
     }
 
-    // ============ BIDDING FUNCTIONS ============
+    // ============= BIDDING FUNCTIONS =============
+
     /**
-     * @dev Place a bid on traditional, English, or Dutch auction
+     * @dev Place a bid on an English or Reserve auction
      */
     function placeBid(
         uint256 auctionId
     )
         external
         payable
-        nonReentrant
-        auctionExists(auctionId)
+        validAuction(auctionId)
         auctionActive(auctionId)
-        whenNotPaused
+        nonReentrant
     {
         Auction storage auction = auctions[auctionId];
-
-        require(block.timestamp <= auction.endTime, "Auction ended");
-        if (msg.sender == auction.seller) {
-            revert MooveAuction__NotAuthorized();
-        }
         require(
-            auction.auctionType != AuctionType.SEALED_BID,
-            "Use submitSealedBid for sealed auctions"
+            auction.auctionType == AuctionType.ENGLISH ||
+                auction.auctionType == AuctionType.RESERVE,
+            "Invalid auction type for this bid method"
         );
+        require(msg.sender != auction.seller, "Seller cannot bid");
+        require(msg.value > 0, "Bid must be greater than 0");
 
-        uint256 bidAmount = msg.value;
-        uint256 minBid = _calculateMinBid(auctionId);
+        // Check minimum bid requirements
+        uint256 minimumBid = auction.highestBid == 0
+            ? auction.startingPrice
+            : auction.highestBid + auction.bidIncrement;
 
-        if (bidAmount < minBid) {
-            revert MooveAuction__BidTooLow();
-        }
+        require(msg.value >= minimumBid, "Bid too low");
 
         // Handle buy now price
-        if (auction.buyNowPrice > 0 && bidAmount >= auction.buyNowPrice) {
-            _executeBuyNow(auctionId, msg.sender, bidAmount);
+        if (auction.buyNowPrice > 0 && msg.value >= auction.buyNowPrice) {
+            _executeBuyNow(auctionId, msg.sender, msg.value);
             return;
         }
 
         // Refund previous highest bidder
         if (auction.highestBidder != address(0)) {
-            bidderDeposits[auctionId][auction.highestBidder] += auction
-                .highestBid;
+            _refundBid(auctionId, auction.highestBidder, auction.highestBid);
         }
 
         // Update auction state
         auction.highestBidder = msg.sender;
-        auction.highestBid = bidAmount;
+        auction.highestBid = msg.value;
 
-        // Store bid
+        // Track unique bidders
+        if (!_hasUserBid(auctionId, msg.sender)) {
+            auction.totalBidders++;
+            userBids[msg.sender].push(auctionId);
+        }
+
+        // Add bid to history
         auctionBids[auctionId].push(
             Bid({
                 bidder: msg.sender,
-                amount: bidAmount,
+                amount: msg.value,
                 timestamp: block.timestamp,
-                isRevealed: true,
-                bidHash: bytes32(0)
+                isWinning: true,
+                isRefunded: false
             })
         );
 
-        // English auction auto-extension
-        if (auction.auctionType == AuctionType.ENGLISH) {
-            if (block.timestamp > auction.endTime - auction.extensionTime) {
-                auction.endTime = block.timestamp + auction.extensionTime;
+        // Mark previous bids as not winning
+        if (auctionBids[auctionId].length > 1) {
+            for (uint256 i = 0; i < auctionBids[auctionId].length - 1; i++) {
+                auctionBids[auctionId][i].isWinning = false;
             }
         }
 
-        emit BidPlaced(auctionId, msg.sender, bidAmount, block.timestamp);
+        // Check if reserve is reached
+        if (
+            auction.auctionType == AuctionType.RESERVE &&
+            auction.reservePrice > 0 &&
+            msg.value >= auction.reservePrice
+        ) {
+            emit ReserveReached(auctionId, auction.reservePrice);
+        }
+
+        emit BidPlaced(auctionId, msg.sender, msg.value, true);
     }
 
     /**
-     * @dev Submit sealed bid (hash of amount + nonce)
+     * @dev Purchase at current price for Dutch auction
+     */
+    function buyNowDutch(
+        uint256 auctionId
+    )
+        external
+        payable
+        validAuction(auctionId)
+        auctionActive(auctionId)
+        nonReentrant
+    {
+        Auction storage auction = auctions[auctionId];
+        require(
+            auction.auctionType == AuctionType.DUTCH,
+            "Not a Dutch auction"
+        );
+        require(msg.sender != auction.seller, "Seller cannot buy");
+
+        uint256 currentPrice = _getDutchPrice(auctionId);
+        require(msg.value >= currentPrice, "Insufficient payment");
+
+        _executeBuyNow(auctionId, msg.sender, currentPrice);
+
+        // Refund excess payment
+        if (msg.value > currentPrice) {
+            payable(msg.sender).transfer(msg.value - currentPrice);
+        }
+    }
+
+    /**
+     * @dev Submit sealed bid (commitment phase)
      */
     function submitSealedBid(
         uint256 auctionId,
@@ -393,30 +416,41 @@ contract MooveAuction is AccessControl, ReentrancyGuard, Pausable {
     )
         external
         payable
-        nonReentrant
-        auctionExists(auctionId)
+        validAuction(auctionId)
         auctionActive(auctionId)
-        whenNotPaused
+        nonReentrant
     {
         Auction storage auction = auctions[auctionId];
-
         require(
             auction.auctionType == AuctionType.SEALED_BID,
             "Not a sealed bid auction"
         );
-        require(
-            block.timestamp <= auction.endTime - REVEAL_PHASE_DURATION,
-            "Bidding phase ended"
-        );
-        require(msg.value >= auction.startPrice, "Deposit too low");
+        require(msg.sender != auction.seller, "Seller cannot bid");
+        require(msg.value >= auction.startingPrice, "Bid below minimum");
         require(
             sealedBids[auctionId][msg.sender] == bytes32(0),
-            "Already submitted bid"
+            "Bid already submitted"
         );
 
-        // Store sealed bid and deposit
+        // Store sealed bid hash and escrow payment
         sealedBids[auctionId][msg.sender] = bidHash;
-        bidderDeposits[auctionId][msg.sender] = msg.value;
+
+        // Track bidder
+        if (!_hasUserBid(auctionId, msg.sender)) {
+            auction.totalBidders++;
+            userBids[msg.sender].push(auctionId);
+        }
+
+        // Add to bid history (amount hidden)
+        auctionBids[auctionId].push(
+            Bid({
+                bidder: msg.sender,
+                amount: msg.value, // Escrowed amount, not actual bid
+                timestamp: block.timestamp,
+                isWinning: false,
+                isRefunded: false
+            })
+        );
 
         emit SealedBidSubmitted(auctionId, msg.sender, bidHash);
     }
@@ -426,212 +460,423 @@ contract MooveAuction is AccessControl, ReentrancyGuard, Pausable {
      */
     function revealSealedBid(
         uint256 auctionId,
-        uint256 amount,
+        uint256 bidAmount,
         uint256 nonce
-    ) external nonReentrant auctionExists(auctionId) whenNotPaused {
+    ) external validAuction(auctionId) nonReentrant {
         Auction storage auction = auctions[auctionId];
-
         require(
             auction.auctionType == AuctionType.SEALED_BID,
             "Not a sealed bid auction"
         );
-        require(
-            block.timestamp > auction.endTime - REVEAL_PHASE_DURATION,
-            "Reveal phase not started"
-        );
-        require(block.timestamp <= auction.endTime, "Reveal phase ended");
+        require(auction.status == AuctionStatus.REVEAL, "Not in reveal phase");
         require(!hasRevealed[auctionId][msg.sender], "Already revealed");
+        require(
+            sealedBids[auctionId][msg.sender] != bytes32(0),
+            "No sealed bid submitted"
+        );
 
-        bytes32 hash = keccak256(abi.encodePacked(amount, nonce, msg.sender));
-        if (hash != sealedBids[auctionId][msg.sender]) {
-            revert MooveAuction__InvalidReveal();
-        }
+        // Verify bid hash
+        bytes32 bidHash = keccak256(
+            abi.encodePacked(bidAmount, nonce, msg.sender)
+        );
+        require(
+            sealedBids[auctionId][msg.sender] == bidHash,
+            "Invalid bid reveal"
+        );
 
         hasRevealed[auctionId][msg.sender] = true;
 
-        // Check if this is a valid bid
-        if (
-            amount >= auction.startPrice &&
-            bidderDeposits[auctionId][msg.sender] >= amount
-        ) {
-            // Update highest bid if this is better
-            if (amount > auction.highestBid) {
-                auction.highestBidder = msg.sender;
-                auction.highestBid = amount;
+        // Find and update the bid in history
+        for (uint256 i = 0; i < auctionBids[auctionId].length; i++) {
+            if (auctionBids[auctionId][i].bidder == msg.sender) {
+                // Check if user escrowed enough
+                require(
+                    auctionBids[auctionId][i].amount >= bidAmount,
+                    "Insufficient escrow"
+                );
+
+                // Update with actual bid amount
+                auctionBids[auctionId][i].amount = bidAmount;
+                break;
             }
-
-            // Store the revealed bid
-            auctionBids[auctionId].push(
-                Bid({
-                    bidder: msg.sender,
-                    amount: amount,
-                    timestamp: block.timestamp,
-                    isRevealed: true,
-                    bidHash: hash
-                })
-            );
-
-            emit SealedBidRevealed(auctionId, msg.sender, amount);
         }
+
+        // Check if this is the new highest bid
+        if (bidAmount > auction.highestBid) {
+            auction.highestBidder = msg.sender;
+            auction.highestBid = bidAmount;
+        }
+
+        emit SealedBidRevealed(auctionId, msg.sender, bidAmount);
     }
 
-    // ============ AUCTION ENDING ============
-    /**
-     * @dev End an auction
-     */
-    function endAuction(
-        uint256 auctionId
-    ) external nonReentrant auctionExists(auctionId) whenNotPaused {
-        Auction storage auction = auctions[auctionId];
+    // ============= AUCTION SETTLEMENT =============
 
-        require(block.timestamp >= auction.endTime, "Auction still active");
+    /**
+     * @dev Settle auction and transfer NFT to winner
+     */
+    function settleAuction(
+        uint256 auctionId
+    ) external validAuction(auctionId) auctionEnded(auctionId) nonReentrant {
+        Auction storage auction = auctions[auctionId];
         require(
-            auction.status == AuctionStatus.ACTIVE,
-            "Auction already ended"
+            auction.status == AuctionStatus.ENDED,
+            "Auction not ready for settlement"
         );
 
-        auction.status = AuctionStatus.ENDED;
+        // For sealed bid auctions, check if reveal phase is complete
+        if (auction.auctionType == AuctionType.SEALED_BID) {
+            require(
+                auction.status == AuctionStatus.REVEAL,
+                "Reveal phase not started"
+            );
+            // Transition to ended if reveal phase is over
+            if (block.timestamp > auction.endTime + 24 hours) {
+                // 24h reveal phase
+                auction.status = AuctionStatus.ENDED;
+            } else {
+                revert("Reveal phase still active");
+            }
+        }
 
-        // Check if reserve price met
+        // Check if reserve price is met (for reserve auctions)
         if (
-            auction.highestBid >= auction.reservePrice &&
-            auction.highestBidder != address(0)
+            auction.auctionType == AuctionType.RESERVE &&
+            auction.reservePrice > 0 &&
+            auction.highestBid < auction.reservePrice
         ) {
-            emit AuctionEnded(
-                auctionId,
-                auction.highestBidder,
-                auction.highestBid
-            );
-        } else {
-            // Reserve not met, return NFT to seller
-            IERC721(auction.nftContract).transferFrom(
-                address(this),
-                auction.seller,
-                auction.nftId
-            );
-            emit AuctionEnded(auctionId, address(0), 0);
-        }
-    }
-
-    /**
-     * @dev Execute buy now purchase
-     */
-    function _executeBuyNow(
-        uint256 auctionId,
-        address buyer,
-        uint256 amount
-    ) internal {
-        Auction storage auction = auctions[auctionId];
-
-        auction.status = AuctionStatus.ENDED;
-        auction.highestBidder = buyer;
-        auction.highestBid = amount;
-
-        emit AuctionEnded(auctionId, buyer, amount);
-    }
-
-    // ============ CLAIM FUNCTIONS ============
-    /**
-     * @dev Claim NFT (winner only)
-     */
-    function claimNFT(
-        uint256 auctionId
-    ) external nonReentrant auctionExists(auctionId) {
-        Auction storage auction = auctions[auctionId];
-
-        require(auction.status == AuctionStatus.ENDED, "Auction not ended");
-        require(msg.sender == auction.highestBidder, "Not the winner");
-        if (auction.nftClaimed) {
-            revert MooveAuction__AlreadyClaimed();
-        }
-        if (auction.highestBid < auction.reservePrice) {
-            revert MooveAuction__ReserveNotMet();
+            _cancelAuctionAndRefund(auctionId, "Reserve price not met");
+            return;
         }
 
-        auction.nftClaimed = true;
+        // Check minimum bidders requirement
+        if (auction.totalBidders < auction.minBidders) {
+            _cancelAuctionAndRefund(auctionId, "Minimum bidders not reached");
+            return;
+        }
+
+        address winner = auction.highestBidder;
+        uint256 winningBid = auction.highestBid;
+
+        require(winner != address(0), "No valid winner");
+        require(winningBid > 0, "No valid winning bid");
+
+        // Calculate fees
+        (
+            uint256 platformFee,
+            uint256 royaltyFee,
+            address royaltyRecipient
+        ) = _calculateFees(auction.nftContract, auction.tokenId, winningBid);
+
+        uint256 sellerProceeds = winningBid - platformFee - royaltyFee;
 
         // Transfer NFT to winner
         IERC721(auction.nftContract).transferFrom(
             address(this),
-            msg.sender,
-            auction.nftId
+            winner,
+            auction.tokenId
         );
-
-        emit NFTClaimed(auctionId, msg.sender);
-    }
-
-    /**
-     * @dev Claim payment (seller only)
-     */
-    function claimPayment(
-        uint256 auctionId
-    )
-        external
-        nonReentrant
-        auctionExists(auctionId)
-        onlyAuctionSeller(auctionId)
-    {
-        Auction storage auction = auctions[auctionId];
-
-        require(auction.status == AuctionStatus.ENDED, "Auction not ended");
-        require(!auction.sellerPaid, "Payment already claimed");
-        require(auction.highestBid >= auction.reservePrice, "Reserve not met");
-
-        auction.sellerPaid = true;
-
-        // Calculate fees
-        uint256 platformFee = (auction.highestBid * platformFeePercentage) /
-            10000;
-        uint256 sellerAmount = auction.highestBid - platformFee;
 
         // Transfer payments
-        (bool success1, ) = payable(auction.seller).call{value: sellerAmount}(
-            ""
+        if (sellerProceeds > 0) {
+            payable(auction.seller).transfer(sellerProceeds);
+        }
+        if (royaltyFee > 0 && royaltyRecipient != address(0)) {
+            payable(royaltyRecipient).transfer(royaltyFee);
+        }
+        // Platform fee stays in contract
+
+        // Refund losing bidders
+        _refundLosingBidders(auctionId);
+
+        // Update auction status
+        auction.status = AuctionStatus.SETTLED;
+
+        emit AuctionSettled(
+            auctionId,
+            winner,
+            winningBid,
+            platformFee,
+            royaltyFee
         );
-        (bool success2, ) = payable(platformOwner).call{value: platformFee}("");
-
-        require(success1 && success2, "Payment transfer failed");
-
-        emit PaymentClaimed(auctionId, auction.seller, sellerAmount);
     }
 
     /**
-     * @dev Claim refund for non-winning bidders
+     * @dev Start reveal phase for sealed bid auctions
      */
-    function claimRefund(
+    function startRevealPhase(
         uint256 auctionId
-    ) external nonReentrant auctionExists(auctionId) {
+    ) external validAuction(auctionId) {
+        Auction storage auction = auctions[auctionId];
+        require(
+            auction.auctionType == AuctionType.SEALED_BID,
+            "Not a sealed bid auction"
+        );
+        require(auction.status == AuctionStatus.ACTIVE, "Auction not active");
+        require(block.timestamp > auction.endTime, "Auction still active");
+
+        auction.status = AuctionStatus.REVEAL;
+        // Reveal phase lasts 24 hours
+        auction.endTime = block.timestamp + 24 hours;
+    }
+
+    // ============= AUCTION MANAGEMENT =============
+
+    /**
+     * @dev Cancel auction (seller or admin only)
+     */
+    function cancelAuction(
+        uint256 auctionId,
+        string memory reason
+    ) external validAuction(auctionId) nonReentrant {
         Auction storage auction = auctions[auctionId];
 
-        require(auction.status == AuctionStatus.ENDED, "Auction not ended");
+        require(
+            msg.sender == auction.seller ||
+                accessControl.hasRole(
+                    accessControl.MASTER_ADMIN_ROLE(),
+                    msg.sender
+                ),
+            "Not authorized to cancel"
+        );
 
-        uint256 refundAmount = bidderDeposits[auctionId][msg.sender];
-        require(refundAmount > 0, "No refund available");
+        require(
+            auction.status == AuctionStatus.PENDING ||
+                auction.status == AuctionStatus.ACTIVE,
+            "Cannot cancel auction in current state"
+        );
 
-        // Winner doesn't get refund (they won the auction)
-        if (
-            msg.sender == auction.highestBidder &&
-            auction.highestBid >= auction.reservePrice
-        ) {
-            revert MooveAuction__NotAuthorized();
+        _cancelAuctionAndRefund(auctionId, reason);
+    }
+
+    /**
+     * @dev Emergency cancel by admin
+     */
+    function emergencyCancel(
+        uint256 auctionId,
+        string memory reason
+    ) external onlyAccessControlRole(accessControl.MASTER_ADMIN_ROLE()) {
+        _cancelAuctionAndRefund(auctionId, reason);
+    }
+
+    /**
+     * @dev Extend auction duration (admin only, emergency situations)
+     */
+    function extendAuction(
+        uint256 auctionId,
+        uint256 additionalTime
+    )
+        external
+        validAuction(auctionId)
+        onlyAccessControlRole(accessControl.AUCTION_MANAGER_ROLE())
+    {
+        Auction storage auction = auctions[auctionId];
+        require(auction.status == AuctionStatus.ACTIVE, "Auction not active");
+        require(additionalTime <= 24 hours, "Extension too long");
+
+        auction.endTime += additionalTime;
+    }
+
+    // ============= VIEW FUNCTIONS =============
+
+    /**
+     * @dev Get auction details
+     */
+    function getAuction(
+        uint256 auctionId
+    ) external view validAuction(auctionId) returns (Auction memory) {
+        return auctions[auctionId];
+    }
+
+    /**
+     * @dev Get auction bids
+     */
+    function getAuctionBids(
+        uint256 auctionId
+    ) external view validAuction(auctionId) returns (Bid[] memory) {
+        return auctionBids[auctionId];
+    }
+
+    /**
+     * @dev Get current price for Dutch auction
+     */
+    function getDutchPrice(
+        uint256 auctionId
+    ) external view validAuction(auctionId) returns (uint256) {
+        return _getDutchPrice(auctionId);
+    }
+
+    /**
+     * @dev Get user's auctions
+     */
+    function getUserAuctions(
+        address user
+    ) external view returns (uint256[] memory) {
+        return userAuctions[user];
+    }
+
+    /**
+     * @dev Get user's bids
+     */
+    function getUserBids(
+        address user
+    ) external view returns (uint256[] memory) {
+        return userBids[user];
+    }
+
+    /**
+     * @dev Get active auctions
+     */
+    function getActiveAuctions()
+        external
+        view
+        returns (uint256[] memory activeAuctions)
+    {
+        // Count active auctions
+        uint256 count = 0;
+        for (uint256 i = 0; i < _auctionIdCounter; i++) {
+            if (
+                auctions[i].status == AuctionStatus.ACTIVE &&
+                block.timestamp <= auctions[i].endTime
+            ) {
+                count++;
+            }
         }
 
-        bidderDeposits[auctionId][msg.sender] = 0;
-
-        (bool success, ) = payable(msg.sender).call{value: refundAmount}("");
-        require(success, "Refund transfer failed");
-
-        emit BidRefunded(auctionId, msg.sender, refundAmount);
+        // Fill array
+        activeAuctions = new uint256[](count);
+        uint256 index = 0;
+        for (uint256 i = 0; i < _auctionIdCounter; i++) {
+            if (
+                auctions[i].status == AuctionStatus.ACTIVE &&
+                block.timestamp <= auctions[i].endTime
+            ) {
+                activeAuctions[index++] = i;
+            }
+        }
     }
 
-    // ============ PRICE CALCULATION ============
     /**
-     * @dev Calculate current Dutch auction price
+     * @dev Get auctions by type
      */
-    function getCurrentDutchPrice(
-        uint256 auctionId
-    ) public view auctionExists(auctionId) returns (uint256) {
-        Auction storage auction = auctions[auctionId];
+    function getAuctionsByType(
+        AuctionType auctionType
+    ) external view returns (uint256[] memory matchingAuctions) {
+        // Count matching auctions
+        uint256 count = 0;
+        for (uint256 i = 0; i < _auctionIdCounter; i++) {
+            if (auctions[i].auctionType == auctionType) {
+                count++;
+            }
+        }
+
+        // Fill array
+        matchingAuctions = new uint256[](count);
+        uint256 index = 0;
+        for (uint256 i = 0; i < _auctionIdCounter; i++) {
+            if (auctions[i].auctionType == auctionType) {
+                matchingAuctions[index++] = i;
+            }
+        }
+    }
+
+    /**
+     * @dev Get ending soon auctions (within next 24 hours)
+     */
+    function getEndingSoonAuctions()
+        external
+        view
+        returns (uint256[] memory endingSoon)
+    {
+        uint256 count = 0;
+        uint256 deadline = block.timestamp + 24 hours;
+
+        // Count ending soon auctions
+        for (uint256 i = 0; i < _auctionIdCounter; i++) {
+            if (
+                auctions[i].status == AuctionStatus.ACTIVE &&
+                auctions[i].endTime <= deadline &&
+                auctions[i].endTime > block.timestamp
+            ) {
+                count++;
+            }
+        }
+
+        // Fill array
+        endingSoon = new uint256[](count);
+        uint256 index = 0;
+        for (uint256 i = 0; i < _auctionIdCounter; i++) {
+            if (
+                auctions[i].status == AuctionStatus.ACTIVE &&
+                auctions[i].endTime <= deadline &&
+                auctions[i].endTime > block.timestamp
+            ) {
+                endingSoon[index++] = i;
+            }
+        }
+    }
+
+    /**
+     * @dev Check if user has bid on auction
+     */
+    function hasUserBid(
+        uint256 auctionId,
+        address user
+    ) external view validAuction(auctionId) returns (bool) {
+        return _hasUserBid(auctionId, user);
+    }
+
+    /**
+     * @dev Get total number of auctions
+     */
+    function totalAuctions() external view returns (uint256) {
+        return _auctionIdCounter;
+    }
+
+    // ============= INTERNAL FUNCTIONS =============
+
+    /**
+     * @dev Validate auction parameters based on type
+     */
+    function _validateAuctionParameters(
+        AuctionType auctionType,
+        uint256 startingPrice,
+        uint256 reservePrice,
+        uint256 buyNowPrice
+    ) internal pure {
+        if (auctionType == AuctionType.RESERVE) {
+            require(
+                reservePrice >= startingPrice,
+                "Reserve price must be >= starting price"
+            );
+        }
+
+        if (buyNowPrice > 0) {
+            require(
+                buyNowPrice > startingPrice,
+                "Buy now price must be > starting price"
+            );
+            if (reservePrice > 0) {
+                require(
+                    buyNowPrice >= reservePrice,
+                    "Buy now price must be >= reserve price"
+                );
+            }
+        }
+
+        if (auctionType == AuctionType.DUTCH) {
+            require(
+                reservePrice > 0 && reservePrice < startingPrice,
+                "Dutch auction needs valid reserve < starting price"
+            );
+        }
+    }
+
+    /**
+     * @dev Calculate Dutch auction current price
+     */
+    function _getDutchPrice(uint256 auctionId) internal view returns (uint256) {
+        Auction memory auction = auctions[auctionId];
         require(
             auction.auctionType == AuctionType.DUTCH,
             "Not a Dutch auction"
@@ -641,202 +886,301 @@ contract MooveAuction is AccessControl, ReentrancyGuard, Pausable {
             return auction.reservePrice;
         }
 
-        uint256 elapsed = block.timestamp - auction.startTime;
-        uint256 duration = auction.endTime - auction.startTime;
-        uint256 priceReduction = ((auction.startPrice - auction.reservePrice) *
-            elapsed) / duration;
+        uint256 timeElapsed = block.timestamp - auction.startTime;
+        uint256 totalDuration = auction.endTime - auction.startTime;
+        uint256 priceRange = auction.startingPrice - auction.reservePrice;
 
-        return auction.startPrice - priceReduction;
+        uint256 priceDecrease = (priceRange * timeElapsed) / totalDuration;
+        return auction.startingPrice - priceDecrease;
     }
 
     /**
-     * @dev Calculate minimum bid for auction
+     * @dev Execute buy now purchase
      */
-    function _calculateMinBid(
-        uint256 auctionId
-    ) internal view returns (uint256) {
+    function _executeBuyNow(
+        uint256 auctionId,
+        address buyer,
+        uint256 price
+    ) internal {
         Auction storage auction = auctions[auctionId];
 
-        if (auction.auctionType == AuctionType.DUTCH) {
-            return getCurrentDutchPrice(auctionId);
+        auction.highestBidder = buyer;
+        auction.highestBid = price;
+        auction.status = AuctionStatus.ENDED;
+        auction.totalBidders = 1;
+
+        // Add to user bids if not already present
+        if (!_hasUserBid(auctionId, buyer)) {
+            userBids[buyer].push(auctionId);
         }
 
-        if (auction.highestBid == 0) {
-            return auction.startPrice;
-        }
+        // Add bid to history
+        auctionBids[auctionId].push(
+            Bid({
+                bidder: buyer,
+                amount: price,
+                timestamp: block.timestamp,
+                isWinning: true,
+                isRefunded: false
+            })
+        );
 
-        return auction.highestBid + auction.bidIncrement;
+        emit BidPlaced(auctionId, buyer, price, true);
     }
 
-    // ============ ADMIN FUNCTIONS ============
     /**
-     * @dev Cancel auction (emergency only)
+     * @dev Cancel auction and refund all bidders
      */
-    function cancelAuction(
-        uint256 auctionId
-    ) external onlyRole(ADMIN_ROLE) auctionExists(auctionId) {
+    function _cancelAuctionAndRefund(
+        uint256 auctionId,
+        string memory reason
+    ) internal {
         Auction storage auction = auctions[auctionId];
-        require(auction.status == AuctionStatus.ACTIVE, "Auction not active");
-
-        auction.status = AuctionStatus.CANCELLED;
 
         // Return NFT to seller
         IERC721(auction.nftContract).transferFrom(
             address(this),
             auction.seller,
-            auction.nftId
+            auction.tokenId
         );
 
-        emit AuctionCancelled(auctionId);
+        // Refund all bidders
+        _refundAllBidders(auctionId);
+
+        auction.status = AuctionStatus.CANCELLED;
+
+        emit AuctionCancelled(auctionId, reason);
     }
 
     /**
-     * @dev Update platform fee
+     * @dev Refund a specific bid
      */
-    function setPlatformFee(
+    function _refundBid(
+        uint256 auctionId,
+        address bidder,
+        uint256 amount
+    ) internal {
+        if (amount > 0) {
+            payable(bidder).transfer(amount);
+            emit BidRefunded(auctionId, bidder, amount);
+        }
+    }
+
+    /**
+     * @dev Refund all bidders except winner
+     */
+    function _refundLosingBidders(uint256 auctionId) internal {
+        Bid[] storage bids = auctionBids[auctionId];
+        address winner = auctions[auctionId].highestBidder;
+
+        for (uint256 i = 0; i < bids.length; i++) {
+            if (bids[i].bidder != winner && !bids[i].isRefunded) {
+                bids[i].isRefunded = true;
+                _refundBid(auctionId, bids[i].bidder, bids[i].amount);
+            }
+        }
+    }
+
+    /**
+     * @dev Refund all bidders (for cancelled auctions)
+     */
+    function _refundAllBidders(uint256 auctionId) internal {
+        Bid[] storage bids = auctionBids[auctionId];
+
+        for (uint256 i = 0; i < bids.length; i++) {
+            if (!bids[i].isRefunded) {
+                bids[i].isRefunded = true;
+                _refundBid(auctionId, bids[i].bidder, bids[i].amount);
+            }
+        }
+    }
+
+    /**
+     * @dev Check if user has placed a bid on auction
+     */
+    function _hasUserBid(
+        uint256 auctionId,
+        address user
+    ) internal view returns (bool) {
+        uint256[] memory userBidsArray = userBids[user];
+        for (uint256 i = 0; i < userBidsArray.length; i++) {
+            if (userBidsArray[i] == auctionId) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * @dev Calculate platform and royalty fees
+     */
+    function _calculateFees(
+        address nftContract,
+        uint256 tokenId,
+        uint256 salePrice
+    )
+        internal
+        view
+        returns (
+            uint256 platformFee,
+            uint256 royaltyFee,
+            address royaltyRecipient
+        )
+    {
+        // Calculate platform fee
+        platformFee = (salePrice * platformFeePercentage) / 10000;
+
+        // Calculate royalty fee if contract supports EIP-2981
+        try IERC2981(nftContract).royaltyInfo(tokenId, salePrice) returns (
+            address recipient,
+            uint256 royaltyAmount
+        ) {
+            royaltyFee = royaltyAmount;
+            royaltyRecipient = recipient;
+        } catch {
+            royaltyFee = 0;
+            royaltyRecipient = address(0);
+        }
+
+        // Ensure fees don't exceed sale price
+        require(
+            platformFee + royaltyFee <= salePrice,
+            "Fees exceed sale price"
+        );
+    }
+
+    // ============= ADMIN FUNCTIONS =============
+
+    /**
+     * @dev Update platform fee percentage
+     */
+    function updatePlatformFee(
         uint256 newFeePercentage
-    ) external onlyRole(ADMIN_ROLE) {
+    ) external onlyAccessControlRole(accessControl.PRICE_MANAGER_ROLE()) {
         require(newFeePercentage <= 1000, "Fee too high"); // Max 10%
         platformFeePercentage = newFeePercentage;
     }
 
     /**
-     * @dev Update platform owner
+     * @dev Update minimum bid increment
      */
-    function setPlatformOwner(address newOwner) external onlyRole(ADMIN_ROLE) {
-        require(newOwner != address(0), "Invalid address");
-        platformOwner = newOwner;
-    }
-
-    // ============ VIEW FUNCTIONS ============
-    /**
-     * @dev Get auction details
-     */
-    function getAuction(
-        uint256 auctionId
-    ) external view auctionExists(auctionId) returns (Auction memory) {
-        return auctions[auctionId];
+    function updateMinimumBidIncrement(
+        uint256 newIncrement
+    ) external onlyAccessControlRole(accessControl.PRICE_MANAGER_ROLE()) {
+        require(newIncrement <= 2000, "Increment too high"); // Max 20%
+        minimumBidIncrement = newIncrement;
     }
 
     /**
-     * @dev Get auction bids
+     * @dev Withdraw platform fees
      */
-    function getAuctionBids(
-        uint256 auctionId
-    ) external view auctionExists(auctionId) returns (Bid[] memory) {
-        return auctionBids[auctionId];
+    function withdrawPlatformFees(
+        address to,
+        uint256 amount
+    )
+        external
+        onlyAccessControlRole(accessControl.WITHDRAWER_ROLE())
+        nonReentrant
+    {
+        require(to != address(0), "Invalid recipient");
+        require(amount <= address(this).balance, "Insufficient balance");
+
+        payable(to).transfer(amount);
     }
 
     /**
-     * @dev Get active auctions
+     * @dev Emergency pause
      */
-    function getActiveAuctions() external view returns (uint256[] memory) {
-        uint256[] memory activeAuctions = new uint256[](_auctionIdCounter);
-        uint256 currentIndex = 0;
-
-        for (uint256 i = 1; i < _auctionIdCounter; i++) {
-            if (auctions[i].status == AuctionStatus.ACTIVE) {
-                activeAuctions[currentIndex] = i;
-                currentIndex++;
-            }
-        }
-
-        // Resize array
-        uint256[] memory result = new uint256[](currentIndex);
-        for (uint256 i = 0; i < currentIndex; i++) {
-            result[i] = activeAuctions[i];
-        }
-
-        return result;
-    }
-
-    /**
-     * @dev Get auctions by seller
-     */
-    function getAuctionsBySeller(
-        address seller
-    ) external view returns (uint256[] memory) {
-        uint256[] memory sellerAuctions = new uint256[](_auctionIdCounter);
-        uint256 currentIndex = 0;
-
-        for (uint256 i = 1; i < _auctionIdCounter; i++) {
-            if (auctions[i].seller == seller) {
-                sellerAuctions[currentIndex] = i;
-                currentIndex++;
-            }
-        }
-
-        // Resize array
-        uint256[] memory result = new uint256[](currentIndex);
-        for (uint256 i = 0; i < currentIndex; i++) {
-            result[i] = sellerAuctions[i];
-        }
-
-        return result;
-    }
-
-    /**
-     * @dev Check if user has participated in auction
-     */
-    function hasUserBid(
-        uint256 auctionId,
-        address user
-    ) external view returns (bool) {
-        return
-            bidderDeposits[auctionId][user] > 0 ||
-            sealedBids[auctionId][user] != bytes32(0) ||
-            auctions[auctionId].highestBidder == user;
-    }
-
-    /**
-     * @dev Get current auction counter
-     */
-    function getCurrentAuctionId() external view returns (uint256) {
-        return _auctionIdCounter;
-    }
-
-    /**
-     * @dev Get total number of auctions created
-     */
-    function getTotalAuctions() external view returns (uint256) {
-        return _auctionIdCounter - 1; // Subtract 1 because counter starts at 1
-    }
-
-    // ============ PAUSE FUNCTIONS ============
-    function pause() external onlyRole(ADMIN_ROLE) {
+    function pause()
+        external
+        onlyAccessControlRole(accessControl.PAUSER_ROLE())
+    {
         _pause();
     }
 
-    function unpause() external onlyRole(ADMIN_ROLE) {
+    /**
+     * @dev Unpause
+     */
+    function unpause()
+        external
+        onlyAccessControlRole(accessControl.MASTER_ADMIN_ROLE())
+    {
         _unpause();
     }
 
-    // ============ UTILITY FUNCTIONS ============
+    // ============= STATISTICS FUNCTIONS =============
+
     /**
-     * @dev Generate sealed bid hash
+     * @dev Get auction statistics
      */
-    function generateBidHash(
-        uint256 amount,
-        uint256 nonce,
-        address bidder
-    ) external pure returns (bytes32) {
-        return keccak256(abi.encodePacked(amount, nonce, bidder));
+    function getAuctionStats()
+        external
+        view
+        returns (
+            uint256 totalAuctionsCount,
+            uint256 activeAuctionsCount,
+            uint256 settledAuctionsCount,
+            uint256 cancelledAuctionsCount,
+            uint256 totalVolume
+        )
+    {
+        totalAuctionsCount = _auctionIdCounter;
+
+        for (uint256 i = 0; i < _auctionIdCounter; i++) {
+            AuctionStatus status = auctions[i].status;
+
+            if (status == AuctionStatus.ACTIVE) {
+                activeAuctionsCount++;
+            } else if (status == AuctionStatus.SETTLED) {
+                settledAuctionsCount++;
+                totalVolume += auctions[i].highestBid;
+            } else if (status == AuctionStatus.CANCELLED) {
+                cancelledAuctionsCount++;
+            }
+        }
     }
 
     /**
-     * @dev Emergency withdraw (admin only)
+     * @dev Get auction type distribution
      */
-    function emergencyWithdraw() external onlyRole(ADMIN_ROLE) {
-        (bool success, ) = payable(platformOwner).call{
-            value: address(this).balance
-        }("");
-        require(success, "Emergency withdraw failed");
+    function getAuctionTypeDistribution()
+        external
+        view
+        returns (
+            uint256 englishCount,
+            uint256 dutchCount,
+            uint256 sealedBidCount,
+            uint256 reserveCount
+        )
+    {
+        for (uint256 i = 0; i < _auctionIdCounter; i++) {
+            AuctionType auctionType = auctions[i].auctionType;
+
+            if (auctionType == AuctionType.ENGLISH) {
+                englishCount++;
+            } else if (auctionType == AuctionType.DUTCH) {
+                dutchCount++;
+            } else if (auctionType == AuctionType.SEALED_BID) {
+                sealedBidCount++;
+            } else if (auctionType == AuctionType.RESERVE) {
+                reserveCount++;
+            }
+        }
     }
 
+    // ============= RECEIVE FUNCTION =============
+
     /**
-     * @dev Receive function to accept ETH
+     * @dev Receive function to handle direct ETH transfers
      */
     receive() external payable {
-        // Contract can receive ETH for bids
+        // Accept ETH for fee collection
+    }
+
+    /**
+     * @dev Fallback function
+     */
+    fallback() external payable {
+        revert("Function not found");
     }
 }

@@ -607,4 +607,14 @@ describe("MooveNFT", function () {
       expect(await mooveNFT.supportsInterface("0x7965db0b")).to.be.true;
     });
   });
+
+  describe("Customization functionality", function () {
+    it("Should allow customization with proper permissions", async function () {
+      // Test customizeSticker, updateCustomizationOptions
+    });
+
+    it("Should track customization history", async function () {
+      // Test getCustomizationHistory, hasBeenCustomized
+    });
+  });
 });

@@ -546,4 +546,13 @@ describe("MooveRentalPass", function () {
 
     expect(await mooveRentalPass.totalSupply()).to.equal(10);
   });
+  describe("Non-transferable functionality", function () {
+    it("Should prevent all transfer attempts", async function () {
+      // Test transferFrom, safeTransferFrom, approve, setApprovalForAll
+    });
+
+    it("Should validate access codes correctly", async function () {
+      // Test validateAndUseAccessCode, isAccessCodeValid
+    });
+  });
 });

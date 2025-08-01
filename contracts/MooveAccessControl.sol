@@ -44,6 +44,10 @@ contract MooveAccessControl is AccessControl, Pausable, ReentrancyGuard {
     bytes32 public constant METADATA_MANAGER_ROLE =
         keccak256("METADATA_MANAGER_ROLE");
 
+    bytes32 public constant TRADER_ROLE = keccak256("TRADER_ROLE");
+    bytes32 public constant MARKETPLACE_MANAGER_ROLE =
+        keccak256("MARKETPLACE_MANAGER_ROLE");
+
     // ============= STATE VARIABLES =============
 
     /// @dev Mapping to track authorized contract addresses
@@ -174,6 +178,8 @@ contract MooveAccessControl is AccessControl, Pausable, ReentrancyGuard {
         _setRoleAdmin(WITHDRAWER_ROLE, MASTER_ADMIN_ROLE);
         _setRoleAdmin(UPGRADER_ROLE, MASTER_ADMIN_ROLE);
         _setRoleAdmin(METADATA_MANAGER_ROLE, MASTER_ADMIN_ROLE);
+        _setRoleAdmin(TRADER_ROLE, MASTER_ADMIN_ROLE);
+        _setRoleAdmin(MARKETPLACE_MANAGER_ROLE, MASTER_ADMIN_ROLE);
 
         // Add initial admin as emergency contact
         emergencyContacts[initialAdmin] = true;
@@ -295,6 +301,32 @@ contract MooveAccessControl is AccessControl, Pausable, ReentrancyGuard {
                 emit ContractAuthorizationChanged(contractAddresses[i], true);
             }
         }
+    }
+
+    /**
+     * @dev Check if user is able to trade
+     * @param account Account check
+     */
+
+    function canTrade(
+        address account
+    ) external view returns (bool hasTraderRole) {
+        return
+            hasRole(TRADER_ROLE, account) ||
+            hasRole(MASTER_ADMIN_ROLE, account);
+    }
+
+    /**
+     * @dev Check if user is able to use Marketplace
+     * @param account Account check
+     */
+
+    function canManageMarketplace(
+        address account
+    ) external view returns (bool hasMarketplaceRole) {
+        return
+            hasRole(MARKETPLACE_MANAGER_ROLE, account) ||
+            hasRole(MASTER_ADMIN_ROLE, account);
     }
 
     // ============= EMERGENCY MANAGEMENT =============

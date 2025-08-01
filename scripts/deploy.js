@@ -2,162 +2,148 @@ const { ethers } = require("hardhat");
 const fs = require("fs");
 const path = require("path");
 
+/**
+ * Deploy script per MooveAccessControl
+ * Gestisce la configurazione iniziale dei ruoli e permessi per l'ecosistema Moove
+ */
 async function main() {
-  console.log("🚀 Starting Moove NFT Platform deployment...");
+  console.log("🔐 Starting MooveAccessControl deployment...");
 
   // Get deployment account
   const [deployer] = await ethers.getSigners();
   console.log("Deploying contracts with account:", deployer.address);
   console.log(
     "Account balance:",
-    ethers.formatEther(await deployer.getBalance())
+    ethers.formatEther(await ethers.provider.getBalance(deployer.address))
   );
 
-  // Deploy MooveNFT
-  console.log("\n📄 Deploying MooveNFT...");
-  const MooveNFT = await ethers.getContractFactory("MooveNFT");
-  const mooveNFT = await MooveNFT.waitForDeployment(
-    "MooveNFT",
-    "MNFT",
-    deployer.address
+  // Deploy MooveAccessControl
+  console.log("\n🔐 Deploying MooveAccessControl...");
+  const MooveAccessControl = await ethers.getContractFactory(
+    "MooveAccessControl"
   );
-  await mooveNFT.waitForDepolyment();
-  console.log("✅ MooveNFT waitForDepolyment to:", mooveNFT.address);
 
-  // Deploy MooveAuction
-  console.log("\n🏛️ Deploying MooveAuction...");
-  const MooveAuction = await ethers.getContractFactory("MooveAuction");
-  const mooveAuction = await MooveAuction.waitForDeployment(deployer.address);
-  await mooveAuction.waitForDepolyment();
-  console.log("✅ MooveAuction waitForDepolyment to:", mooveAuction.address);
+  const mooveAccessControl = await MooveAccessControl.deploy(deployer.address);
+  await mooveAccessControl.waitForDeployment();
 
-  // Setup roles and permissions
-  console.log("\n🔑 Setting up roles and permissions...");
+  const accessControlAddress = await mooveAccessControl.getAddress();
+  console.log("✅ MooveAccessControl deployed to:", accessControlAddress);
 
-  // Grant auction contract approval to transfer NFTs
-  await mooveNFT.setApprovalForAll(mooveAuction.address, true);
-  console.log("✅ Auction contract approved for NFT transfers");
+  // Setup initial configuration
+  console.log("\n⚙️ Setting up initial configuration...");
 
-  // Grant minter role to deployer for initial setup
-  const MINTER_ROLE = await mooveNFT.MINTER_ROLE();
-  await mooveNFT.grantRole(MINTER_ROLE, deployer.address);
-  console.log("✅ Minter role granted to deployer");
+  // Get role constants
+  const MINTER_ROLE = await mooveAccessControl.MINTER_ROLE();
+  const AUCTION_MANAGER_ROLE = await mooveAccessControl.AUCTION_MANAGER_ROLE();
+  const CUSTOMIZATION_ADMIN_ROLE =
+    await mooveAccessControl.CUSTOMIZATION_ADMIN_ROLE();
+  const PRICE_MANAGER_ROLE = await mooveAccessControl.PRICE_MANAGER_ROLE();
+  const PAUSER_ROLE = await mooveAccessControl.PAUSER_ROLE();
+  const WITHDRAWER_ROLE = await mooveAccessControl.WITHDRAWER_ROLE();
 
-  // Mint sample NFTs for testing
-  console.log("\n🚲 Minting sample NFTs...");
+  // Grant essential roles to deployer for initial setup
+  console.log("🎭 Granting initial roles to deployer...");
 
-  const vehicleTypes = [0, 1, 2]; // 'BIKE', 'SCOOTER', 'MONOPATTINO'
-  const names = [
-    "Electric Bike #001",
-    "Electric Scooter #001",
-    "Electric Monopattino #001",
+  const rolesToGrant = [
+    { role: MINTER_ROLE, name: "MINTER_ROLE" },
+    { role: AUCTION_MANAGER_ROLE, name: "AUCTION_MANAGER_ROLE" },
+    { role: CUSTOMIZATION_ADMIN_ROLE, name: "CUSTOMIZATION_ADMIN_ROLE" },
+    { role: PRICE_MANAGER_ROLE, name: "PRICE_MANAGER_ROLE" },
+    { role: PAUSER_ROLE, name: "PAUSER_ROLE" },
+    { role: WITHDRAWER_ROLE, name: "WITHDRAWER_ROLE" },
   ];
-  const descriptions = [
-    "High-performance electric bike for urban mobility",
-    "Eco-friendly electric scooter with premium features",
-    "Compact electric monopattino perfect for city rides",
-  ];
-  const metadataURIs = [
-    "https://ipfs.io/ipfs/QmBikeHash1",
-    "https://ipfs.io/ipfs/QmScooterHash1",
-    "https://ipfs.io/ipfs/QmMonopattinoHash1",
-  ];
-  const dailyRates = [
-    ethers.parseEther("0.05"), // 0.05 ETH/day
-    ethers.parseEther("0.08"), // 0.08 ETH/day
-    ethers.parseEther("0.06"), // 0.06 ETH/day
-  ];
-  const locations = ["Milan Center", "Rome Center", "Naples Center"];
 
-  for (let i = 0; i < 3; i++) {
-    const tx = await mooveNFT.mintVehicleNFT(
-      deployer.address,
-      vehicleTypes[i],
-      names[i],
-      descriptions[i],
-      metadataURIs[i],
-      dailyRates[i],
-      locations[i]
-    );
+  for (const { role, name } of rolesToGrant) {
+    const tx = await mooveAccessControl.grantRole(role, deployer.address);
     await tx.wait();
-    console.log(`✅ Minted ${names[i]} (Token ID: ${i})`);
+    console.log(`✅ Granted ${name} to deployer`);
   }
 
-  // Set some NFTs for sale
-  console.log("\n💰 Setting NFTs for sale...");
+  // Setup additional emergency contacts (esempio con indirizzi di team members)
+  console.log("\n🚨 Setting up emergency contacts...");
 
-  const salePrices = [
-    ethers.parseEther("1.0"), // 1 ETH
-    ethers.parseEther("1.5"), // 1.5 ETH
-    ethers.parseEther("1.2"), // 1.2 ETH
+  // Esempio di indirizzi emergency (sostituisci con indirizzi reali del team)
+  const emergencyContacts = [
+    // "0x1234567890123456789012345678901234567890", // Team Member 1
+    // "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd", // Team Member 2
   ];
 
-  for (let i = 0; i < 3; i++) {
-    const tx = await mooveNFT.setForSale(i, salePrices[i]);
-    await tx.wait();
-    console.log(
-      `✅ Set Token ID ${i} for sale at ${ethers.formatEther(
-        salePrices[i]
-      )} ETH`
-    );
+  for (const contact of emergencyContacts) {
+    if (contact && contact !== deployer.address) {
+      try {
+        const tx = await mooveAccessControl.addEmergencyContact(contact);
+        await tx.wait();
+        console.log(`✅ Added emergency contact: ${contact}`);
+      } catch (error) {
+        console.log(
+          `⚠️ Failed to add emergency contact ${contact}:`,
+          error.message
+        );
+      }
+    }
   }
 
-  // Create sample auctions
-  console.log("\n🏛️ Creating sample auctions...");
+  // Verify deployment and roles
+  console.log("\n🔍 Verifying deployment...");
 
-  // First, mint more NFTs for auctions
-  for (let i = 3; i < 6; i++) {
-    const tx = await mooveNFT.mintVehicleNFT(
-      deployer.address,
-      vehicleTypes[i % 3],
-      `${names[i % 3].replace("#001", `#${String(i + 1).padStart(3, "0")}`)}`,
-      descriptions[i % 3],
-      metadataURIs[i % 3].replace("Hash1", `Hash${i + 1}`),
-      dailyRates[i % 3],
-      locations[i % 3]
-    );
-    await tx.wait();
+  // Check master admin count
+  const masterAdminCount = await mooveAccessControl.masterAdminCount();
+  console.log(`👥 Master admin count: ${masterAdminCount}`);
+
+  // Check deployer roles
+  const deployerRoles = [];
+  for (const { role, name } of rolesToGrant) {
+    const hasRole = await mooveAccessControl.hasRole(role, deployer.address);
+    if (hasRole) {
+      deployerRoles.push(name);
+    }
   }
+  console.log(`🎭 Deployer roles: ${deployerRoles.join(", ")}`);
 
-  // Approve auction contract to handle these NFTs
-  for (let i = 3; i < 6; i++) {
-    await mooveNFT.approve(mooveAuction.address, i);
-  }
+  // Check contract state
+  const isGloballyPaused = await mooveAccessControl.isGloballyPaused();
+  const timeLockDuration = await mooveAccessControl.timeLockDuration();
 
-  const auctionTypes = [0, 1, 2]; // TRADITIONAL, ENGLISH, DUTCH
-  const startPrices = [
-    ethers.parseEther("0.5"),
-    ethers.parseEther("0.8"),
-    ethers.parseEther("2.0"),
-  ];
-  const reservePrices = [
-    ethers.parseEther("0.7"),
-    ethers.parseEther("1.0"),
-    ethers.parseEther("1.5"),
-  ];
-  const buyNowPrices = [
-    ethers.parseEther("2.0"),
-    ethers.parseEther("3.0"),
-    ethers.parseEther("2.5"),
-  ];
+  console.log(`⏸️ Globally paused: ${isGloballyPaused}`);
+  console.log(
+    `⏰ Time lock duration: ${timeLockDuration} seconds (${
+      timeLockDuration / 3600
+    } hours)`
+  );
 
-  for (let i = 0; i < 3; i++) {
-    const tx = await mooveAuction.createAuction(
-      i + 3, // NFT ID
-      mooveNFT.address,
-      auctionTypes[i],
-      startPrices[i],
-      reservePrices[i],
-      buyNowPrices[i],
-      24 * 60 * 60, // 24 hours duration
-      ethers.parseEther("0.01") // 0.01 ETH bid increment
+  // Test core functionality
+  console.log("\n🧪 Testing core functionality...");
+
+  try {
+    // Test role checking functions
+    const canMint = await mooveAccessControl.canMint(deployer.address);
+    const canManageAuctions = await mooveAccessControl.canManageAuctions(
+      deployer.address
     );
-    await tx.wait();
-    console.log(
-      `✅ Created ${
-        ["Traditional", "English", "Dutch"][i]
-      } auction for Token ID ${i + 3}`
+    const canPause = await mooveAccessControl.canPause(deployer.address);
+
+    console.log(`✅ canMint: ${canMint}`);
+    console.log(`✅ canManageAuctions: ${canManageAuctions}`);
+    console.log(`✅ canPause: ${canPause}`);
+
+    // Test time lock scheduling (non-destructive test)
+    const testOperationId = ethers.keccak256(
+      ethers.toUtf8Bytes("test_operation")
     );
+    const scheduleTx = await mooveAccessControl.scheduleTimeLockOperation(
+      testOperationId
+    );
+    await scheduleTx.wait();
+    console.log("✅ Time lock operation scheduled successfully");
+
+    // Cancel the test operation
+    const cancelTx = await mooveAccessControl.cancelTimeLockOperation(
+      testOperationId
+    );
+    await cancelTx.wait();
+    console.log("✅ Time lock operation cancelled successfully");
+  } catch (error) {
+    console.error("❌ Error during functionality testing:", error.message);
   }
 
   // Save deployment information
@@ -165,14 +151,29 @@ async function main() {
     network: hre.network.name,
     deployer: deployer.address,
     contracts: {
-      MooveNFT: {
-        address: mooveNFT.address,
-        constructorArgs: ["MooveNFT", "MNFT", deployer.address],
-      },
-      MooveAuction: {
-        address: mooveAuction.address,
+      MooveAccessControl: {
+        address: accessControlAddress,
         constructorArgs: [deployer.address],
+        roles: {
+          MASTER_ADMIN_ROLE: await mooveAccessControl.MASTER_ADMIN_ROLE(),
+          MINTER_ROLE: await mooveAccessControl.MINTER_ROLE(),
+          AUCTION_MANAGER_ROLE: await mooveAccessControl.AUCTION_MANAGER_ROLE(),
+          CUSTOMIZATION_ADMIN_ROLE:
+            await mooveAccessControl.CUSTOMIZATION_ADMIN_ROLE(),
+          PRICE_MANAGER_ROLE: await mooveAccessControl.PRICE_MANAGER_ROLE(),
+          PAUSER_ROLE: await mooveAccessControl.PAUSER_ROLE(),
+          WITHDRAWER_ROLE: await mooveAccessControl.WITHDRAWER_ROLE(),
+          UPGRADER_ROLE: await mooveAccessControl.UPGRADER_ROLE(),
+          METADATA_MANAGER_ROLE:
+            await mooveAccessControl.METADATA_MANAGER_ROLE(),
+        },
       },
+    },
+    configuration: {
+      masterAdminCount: Number(masterAdminCount),
+      timeLockDuration: Number(timeLockDuration),
+      emergencyContacts: emergencyContacts.length,
+      globallyPaused: isGloballyPaused,
     },
     deploymentTime: new Date().toISOString(),
     blockNumber: await ethers.provider.getBlockNumber(),
@@ -184,71 +185,140 @@ async function main() {
     fs.mkdirSync(deploymentsDir, { recursive: true });
   }
 
-  const deploymentFile = path.join(deploymentsDir, `${hre.network.name}.json`);
+  const deploymentFile = path.join(
+    deploymentsDir,
+    `${hre.network.name}_access_control.json`
+  );
   fs.writeFileSync(deploymentFile, JSON.stringify(deploymentInfo, null, 2));
 
-  // Generate ABI files for frontend
+  // Generate ABI file for frontend
   const abisDir = path.join(__dirname, "..", "frontend", "src", "abis");
   if (!fs.existsSync(abisDir)) {
     fs.mkdirSync(abisDir, { recursive: true });
   }
 
-  // Copy ABI files
-  const mooveNFTArtifact = await hre.artifacts.readArtifact("MooveNFT");
-  const mooveAuctionArtifact = await hre.artifacts.readArtifact("MooveAuction");
-
-  fs.writeFileSync(
-    path.join(abisDir, "MooveNFT.json"),
-    JSON.stringify(mooveNFTArtifact.abi, null, 2)
+  const mooveAccessControlArtifact = await hre.artifacts.readArtifact(
+    "MooveAccessControl"
   );
   fs.writeFileSync(
-    path.join(abisDir, "MooveAuction.json"),
-    JSON.stringify(mooveAuctionArtifact.abi, null, 2)
+    path.join(abisDir, "MooveAccessControl.json"),
+    JSON.stringify(mooveAccessControlArtifact.abi, null, 2)
   );
 
-  // Generate contracts configuration for frontend
-  const contractsConfig = {
-    MooveNFT: {
-      address: mooveNFT.address,
-      abi: mooveNFTArtifact.abi,
-    },
-    MooveAuction: {
-      address: mooveAuction.address,
-      abi: mooveAuctionArtifact.abi,
+  // Update contracts configuration for frontend
+  const contractsConfigPath = path.join(
+    __dirname,
+    "..",
+    "frontend",
+    "src",
+    "utils",
+    "contracts.ts"
+  );
+
+  // Read existing config if it exists
+  let existingConfig = {};
+  if (fs.existsSync(contractsConfigPath)) {
+    try {
+      const configContent = fs.readFileSync(contractsConfigPath, "utf8");
+      // Simple parsing to extract existing contracts
+      const contractsMatch = configContent.match(
+        /export const contracts = ({[\s\S]*?}) as const;/
+      );
+      if (contractsMatch) {
+        existingConfig = eval(`(${contractsMatch[1]})`);
+      }
+    } catch (error) {
+      console.log(
+        "⚠️ Could not parse existing contracts config, will overwrite"
+      );
+    }
+  }
+
+  // Add MooveAccessControl to existing config
+  const updatedConfig = {
+    ...existingConfig,
+    MooveAccessControl: {
+      address: accessControlAddress,
+      abi: mooveAccessControlArtifact.abi,
     },
   };
 
-  fs.writeFileSync(
-    path.join(__dirname, "..", "frontend", "src", "utils", "contracts.ts"),
-    `// Auto-generated contract configuration
-export const contracts = ${JSON.stringify(contractsConfig, null, 2)} as const;
+  const contractsConfigContent = `// Auto-generated contract configuration
+export const contracts = ${JSON.stringify(updatedConfig, null, 2)} as const;
 
 export const CONTRACT_ADDRESSES = {
-    MOOVE_NFT: "${mooveNFT.address}",
-    MOOVE_AUCTION: "${mooveAuction.address}"
+    ${Object.keys(updatedConfig)
+      .map((name) => `${name.toUpperCase()}: "${updatedConfig[name].address}"`)
+      .join(",\n    ")}
 } as const;
-`
-  );
 
-  console.log("\n🎉 Deployment completed successfully!");
+// Role constants for MooveAccessControl
+export const ACCESS_CONTROL_ROLES = ${JSON.stringify(
+    deploymentInfo.contracts.MooveAccessControl.roles,
+    null,
+    2
+  )} as const;
+`;
+
+  fs.writeFileSync(contractsConfigPath, contractsConfigContent);
+
+  console.log("\n🎉 MooveAccessControl deployment completed successfully!");
   console.log("\n📋 Summary:");
   console.log("=====================================");
   console.log(`🏠 Network: ${hre.network.name}`);
   console.log(`👤 Deployer: ${deployer.address}`);
-  console.log(`📄 MooveNFT: ${mooveNFT.address}`);
-  console.log(`🏛️ MooveAuction: ${mooveAuction.address}`);
-  console.log(`🚲 NFTs Minted: 6 (3 for sale, 3 in auctions)`);
+  console.log(`🔐 MooveAccessControl: ${accessControlAddress}`);
+  console.log(`👥 Master Admins: ${masterAdminCount}`);
+  console.log(`⏰ Time Lock: ${timeLockDuration / 3600} hours`);
+  console.log(`🚨 Emergency Contacts: ${emergencyContacts.length + 1}`); // +1 for deployer
   console.log(`💾 Config saved to: ${deploymentFile}`);
   console.log("=====================================");
 
+  // Verification command
   if (hre.network.name !== "hardhat" && hre.network.name !== "localhost") {
-    console.log("\n🔍 Verification Commands:");
+    console.log("\n🔍 Verification Command:");
     console.log(
-      `npx hardhat verify --network ${hre.network.name} ${mooveNFT.address} "MooveNFT" "MNFT" "${deployer.address}"`
+      `npx hardhat verify --network ${hre.network.name} ${accessControlAddress} "${deployer.address}"`
     );
-    console.log(
-      `npx hardhat verify --network ${hre.network.name} ${mooveAuction.address} "${deployer.address}"`
-    );
+  }
+
+  console.log("\n📝 Next Steps:");
+  console.log(
+    "1. Update your NFT and Auction contracts to use this AccessControl"
+  );
+  console.log(
+    "2. Authorize your NFT and Auction contracts using authorizeContract()"
+  );
+  console.log("3. Grant specific roles to team members as needed");
+  console.log("4. Test integration with your existing contracts");
+  console.log(
+    "5. Consider implementing trading-specific extensions (see analysis)"
+  );
+}
+
+// Helper function to verify contract authorization
+async function authorizeContractsAfterDeploy(
+  accessControlAddress,
+  contractsToAuthorize
+) {
+  console.log("\n🔗 Authorizing contracts...");
+
+  const MooveAccessControl = await ethers.getContractFactory(
+    "MooveAccessControl"
+  );
+  const accessControl = MooveAccessControl.attach(accessControlAddress);
+
+  for (const contractAddress of contractsToAuthorize) {
+    try {
+      const tx = await accessControl.authorizeContract(contractAddress);
+      await tx.wait();
+      console.log(`✅ Authorized contract: ${contractAddress}`);
+    } catch (error) {
+      console.error(
+        `❌ Failed to authorize contract ${contractAddress}:`,
+        error.message
+      );
+    }
   }
 }
 
@@ -259,45 +329,5 @@ main()
     process.exit(1);
   });
 
-// scripts/verify.js
-const { run } = require("hardhat");
-const deployments = require("../deployments");
-
-async function main() {
-  const networkName = hre.network.name;
-  const deployment = deployments[networkName];
-
-  if (!deployment) {
-    console.error(`No deployment found for network: ${networkName}`);
-    return;
-  }
-
-  console.log(`🔍 Verifying contracts on ${networkName}...`);
-
-  try {
-    // Verify MooveNFT
-    console.log("Verifying MooveNFT...");
-    await run("verify:verify", {
-      address: deployment.contracts.MooveNFT.address,
-      constructorArguments: deployment.contracts.MooveNFT.constructorArgs,
-    });
-    console.log("✅ MooveNFT verified!");
-
-    // Verify MooveAuction
-    console.log("Verifying MooveAuction...");
-    await run("verify:verify", {
-      address: deployment.contracts.MooveAuction.address,
-      constructorArguments: deployment.contracts.MooveAuction.constructorArgs,
-    });
-    console.log("✅ MooveAuction verified!");
-  } catch (error) {
-    console.error("❌ Verification failed:", error);
-  }
-}
-
-main()
-  .then(() => process.exit(0))
-  .catch((error) => {
-    console.error(error);
-    process.exit(1);
-  });
+// Export helper function for use in other scripts
+module.exports = { authorizeContractsAfterDeploy };
