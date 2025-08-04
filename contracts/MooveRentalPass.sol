@@ -24,7 +24,7 @@ contract MooveRentalPass is
     MooveAccessControl public immutable accessControl;
 
     /// @dev Counter for token IDs
-    uint256 private _tokenIdCounter;
+    uint256 private _tokenIdCounter = 1;
 
     /// @dev Mapping from token ID to rental pass details
     mapping(uint256 => RentalPass) public rentalPasses;
@@ -60,10 +60,10 @@ contract MooveRentalPass is
 
     event RentalPassMinted(
         uint256 indexed tokenId,
-        address indexed owner,
+        address indexed to,
         VehicleType vehicleType,
         string accessCode,
-        uint256 expirationDate,
+        string location, // Fixed: string instead of uint256
         uint256 price
     );
 
@@ -111,22 +111,16 @@ contract MooveRentalPass is
     // ============= MINTING FUNCTIONS =============
 
     /**
-     * @dev Mint a new rental pass NFT
-     * @param to Address to mint the NFT to
-     * @param vehicleType Type of vehicle (BIKE, SCOOTER, MONOPATTINO)
-     * @param accessCode Unique access code for the vehicle
-     * @param location Location where the vehicle can be used
-     * @param price Price paid for the rental pass
-     * @param tokenURI Metadata URI for the NFT
+     * @dev Internal function to mint a new rental pass NFT
      */
-    function mintRentalPass(
+    function _mintRentalPass(
         address to,
         VehicleType vehicleType,
         string memory accessCode,
         string memory location,
         uint256 price,
-        string memory tokenURI
-    ) external onlyAccessControlRole(accessControl.MINTER_ROLE()) nonReentrant {
+        string memory _tokenURI
+    ) internal {
         require(to != address(0), "Invalid recipient address");
         require(bytes(accessCode).length > 0, "Access code required");
         require(
@@ -149,24 +143,48 @@ contract MooveRentalPass is
             originalOwner: to
         });
 
-        // Map access code to token
+        // Map access code to token ID
         accessCodeToToken[accessCode] = tokenId;
+        isPassActive[tokenId] = true;
 
         // Add to user's active passes
         userActivePasses[to].push(tokenId);
-        isPassActive[tokenId] = true;
 
         // Mint the NFT
-        _safeMint(to, tokenId);
-        _setTokenURI(tokenId, tokenURI);
+        _mint(to, tokenId);
 
+        // Set token URI
+        _setTokenURI(tokenId, _tokenURI);
+
+        // Emit event
         emit RentalPassMinted(
             tokenId,
             to,
             vehicleType,
             accessCode,
-            expirationDate,
+            location,
             price
+        );
+    }
+
+    /**
+     * @dev Public function for single minting
+     */
+    function mintRentalPass(
+        address to,
+        VehicleType vehicleType,
+        string memory accessCode,
+        string memory location,
+        uint256 price,
+        string memory _tokenURI
+    ) external onlyAccessControlRole(accessControl.MINTER_ROLE()) nonReentrant {
+        _mintRentalPass(
+            to,
+            vehicleType,
+            accessCode,
+            location,
+            price,
+            _tokenURI
         );
     }
 
@@ -192,9 +210,10 @@ contract MooveRentalPass is
         require(recipients.length == locations.length, "Array length mismatch");
         require(recipients.length == prices.length, "Array length mismatch");
         require(recipients.length == tokenURIs.length, "Array length mismatch");
+        require(recipients.length <= 50, "Batch size too large");
 
         for (uint256 i = 0; i < recipients.length; i++) {
-            mintRentalPass(
+            _mintRentalPass(
                 recipients[i],
                 vehicleTypes[i],
                 accessCodes[i],
@@ -209,10 +228,6 @@ contract MooveRentalPass is
 
     /**
      * @dev Validate access code and mark as used
-     * @param accessCode The access code to validate
-     * @return tokenId The token ID associated with the code
-     * @return owner The owner of the pass
-     * @return vehicleType The type of vehicle
      */
     function validateAndUseAccessCode(
         string memory accessCode
@@ -256,8 +271,6 @@ contract MooveRentalPass is
 
     /**
      * @dev Deactivate a rental pass (admin function)
-     * @param tokenId Token ID to deactivate
-     * @param reason Reason for deactivation
      */
     function deactivatePass(
         uint256 tokenId,
@@ -338,7 +351,7 @@ contract MooveRentalPass is
      * @dev Get total supply of rental passes
      */
     function totalSupply() external view returns (uint256) {
-        return _tokenIdCounter;
+        return _tokenIdCounter - 1; // Subtract 1 because counter starts at 1
     }
 
     /**
@@ -348,6 +361,17 @@ contract MooveRentalPass is
         uint256 tokenId
     ) external view onlyValidToken(tokenId) returns (bool) {
         return block.timestamp >= rentalPasses[tokenId].expirationDate;
+    }
+
+    /**
+     * @dev Get token ID by access code
+     */
+    function getTokenByAccessCode(
+        string memory accessCode
+    ) external view returns (uint256) {
+        uint256 tokenId = accessCodeToToken[accessCode];
+        require(tokenId != 0, "Access code not found");
+        return tokenId;
     }
 
     /**
@@ -382,65 +406,45 @@ contract MooveRentalPass is
         }
     }
 
+    // ============= INTERNAL FUNCTIONS =============
+
+    /**
+     * @dev Remove token from user's active passes array
+     */
+    function _removeFromActivePasses(address user, uint256 tokenId) internal {
+        uint256[] storage passes = userActivePasses[user];
+        for (uint256 i = 0; i < passes.length; i++) {
+            if (passes[i] == tokenId) {
+                // Move last element to current position and remove last element
+                passes[i] = passes[passes.length - 1];
+                passes.pop();
+                break;
+            }
+        }
+    }
+
     // ============= OVERRIDE FUNCTIONS =============
 
     /**
-     * @dev Override transfer functions to make NFTs non-transferable
+     * @dev Override _update to prevent transfers but allow minting (OpenZeppelin v5.x)
      */
-    function _beforeTokenTransfer(
-        address from,
+    function _update(
         address to,
         uint256 tokenId,
-        uint256 batchSize
-    ) internal override {
-        super._beforeTokenTransfer(from, to, tokenId, batchSize);
+        address auth
+    ) internal override returns (address) {
+        address from = _ownerOf(tokenId);
 
         // Allow minting (from == address(0)) but block all transfers
-        require(from == address(0), "Rental passes are non-transferable");
+        if (from != address(0)) {
+            revert("Rental passes are non-transferable");
+        }
+
+        return super._update(to, tokenId, auth);
     }
 
     /**
-     * @dev Override approve to prevent approvals
-     */
-    function approve(address, uint256) public pure override {
-        revert("Rental passes cannot be approved for transfer");
-    }
-
-    /**
-     * @dev Override setApprovalForAll to prevent batch approvals
-     */
-    function setApprovalForAll(address, bool) public pure override {
-        revert("Rental passes cannot be approved for transfer");
-    }
-
-    /**
-     * @dev Override transferFrom to prevent transfers
-     */
-    function transferFrom(address, address, uint256) public pure override {
-        revert("Rental passes are non-transferable");
-    }
-
-    /**
-     * @dev Override safeTransferFrom to prevent safe transfers
-     */
-    function safeTransferFrom(
-        address,
-        address,
-        uint256,
-        bytes memory
-    ) public pure override {
-        revert("Rental passes are non-transferable");
-    }
-
-    /**
-     * @dev Override safeTransferFrom to prevent safe transfers
-     */
-    function safeTransferFrom(address, address, uint256) public pure override {
-        revert("Rental passes are non-transferable");
-    }
-
-    /**
-     * @dev Override tokenURI to handle both storage patterns
+     * @dev Override tokenURI
      */
     function tokenURI(
         uint256 tokenId
@@ -457,35 +461,37 @@ contract MooveRentalPass is
         return super.supportsInterface(interfaceId);
     }
 
-    // ============= INTERNAL FUNCTIONS =============
+    // ============= BURN FUNCTIONALITY =============
 
     /**
-     * @dev Remove token from user's active passes array
+     * @dev Burn a rental pass and cleanup associated data
+     * @param tokenId Token ID to burn
      */
-    function _removeFromActivePasses(address user, uint256 tokenId) internal {
-        uint256[] storage passes = userActivePasses[user];
-        for (uint256 i = 0; i < passes.length; i++) {
-            if (passes[i] == tokenId) {
-                passes[i] = passes[passes.length - 1];
-                passes.pop();
-                break;
-            }
-        }
-    }
+    function burnRentalPass(uint256 tokenId) external {
+        require(_ownerOf(tokenId) != address(0), "Token does not exist");
+        require(
+            ownerOf(tokenId) == msg.sender ||
+                accessControl.hasRole(
+                    accessControl.MASTER_ADMIN_ROLE(),
+                    msg.sender
+                ),
+            "Not authorized to burn"
+        );
 
-    /**
-     * @dev Override _burn to handle cleanup
-     */
-    function _burn(
-        uint256 tokenId
-    ) internal override(ERC721, ERC721URIStorage) {
-        super._burn(tokenId);
-
-        // Cleanup pass data
+        // Get pass data before burning (needed for cleanup)
         RentalPass storage pass = rentalPasses[tokenId];
+        address owner = ownerOf(tokenId);
+
+        // Remove from user's active passes
+        _removeFromActivePasses(owner, tokenId);
+
+        // Cleanup mapping data
         delete accessCodeToToken[pass.accessCode];
         delete rentalPasses[tokenId];
         delete isPassActive[tokenId];
+
+        // Call parent _burn function (this will work in v5)
+        _burn(tokenId);
     }
 
     // ============= EMERGENCY FUNCTIONS =============
@@ -509,24 +515,4 @@ contract MooveRentalPass is
     {
         _unpause();
     }
-
-    /**
-     * @dev Emergency function to update access control (for upgrades)
-     */
-    function updateAccessControl(
-        address newAccessControl
-    ) external onlyAccessControlRole(accessControl.UPGRADER_ROLE()) {
-        require(
-            newAccessControl != address(0),
-            "Invalid access control address"
-        );
-        // This would require more complex upgrade logic in practice
-        // For now, just emit an event
-        emit AccessControlUpdated(address(accessControl), newAccessControl);
-    }
-
-    event AccessControlUpdated(
-        address indexed oldAccessControl,
-        address indexed newAccessControl
-    );
 }

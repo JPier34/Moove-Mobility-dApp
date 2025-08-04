@@ -185,7 +185,7 @@ contract MooveNFT is
         bool isLimitedEdition,
         uint256 editionSize,
         CustomizationOptions memory customizationOptions,
-        string memory tokenURI,
+        string memory _tokenURI,
         address royaltyRecipient,
         uint96 royaltyPercentage
     )
@@ -203,7 +203,7 @@ contract MooveNFT is
             isLimitedEdition,
             editionSize,
             customizationOptions,
-            tokenURI,
+            _tokenURI,
             royaltyRecipient,
             royaltyPercentage
         );
@@ -214,7 +214,7 @@ contract MooveNFT is
      */
     function mintNFT(
         address to,
-        string memory tokenURI
+        string memory _tokenURI
     ) external onlyAccessControlRole(keccak256("MINTER_ROLE")) {
         // Create basic sticker with default options
         CustomizationOptions memory defaultOptions = CustomizationOptions({
@@ -241,7 +241,7 @@ contract MooveNFT is
             false,
             0,
             defaultOptions,
-            tokenURI,
+            _tokenURI,
             address(0),
             0
         );
@@ -299,13 +299,13 @@ contract MooveNFT is
         bool isLimitedEdition,
         uint256 editionSize,
         CustomizationOptions memory customizationOptions,
-        string memory tokenURI,
+        string memory _tokenURI,
         address royaltyRecipient,
         uint96 royaltyPercentage
     ) internal {
         require(to != address(0), "Invalid recipient address");
         require(bytes(stickerName).length > 0, "Name required");
-        require(bytes(tokenURI).length > 0, "Token URI required");
+        require(bytes(_tokenURI).length > 0, "Token URI required");
 
         if (isLimitedEdition) {
             require(editionSize > 0, "Edition size must be greater than 0");
@@ -345,7 +345,7 @@ contract MooveNFT is
 
         // Mint the NFT
         _safeMint(to, tokenId);
-        _setTokenURI(tokenId, tokenURI);
+        _setTokenURI(tokenId, _tokenURI);
 
         emit StickerMinted(
             tokenId,
@@ -627,19 +627,32 @@ contract MooveNFT is
     /**
      * @dev Override _burn - OpenZeppelin v5 pattern
      */
-    function _burn(uint256 tokenId) internal override {
+    /**
+     * @dev Burn an NFT and cleanup associated data
+     */
+    function burnNFT(uint256 tokenId) external {
+        require(_exists(tokenId), "Token does not exist");
+        require(
+            ownerOf(tokenId) == msg.sender ||
+                accessControl.hasRole(
+                    keccak256("MASTER_ADMIN_ROLE"),
+                    msg.sender
+                ),
+            "Not authorized to burn"
+        );
+
         address creator = stickers[tokenId].creator;
 
-        // Call parent _burn (handles ERC721URIStorage and ERC721Royalty)
-        super._burn(tokenId);
-
-        // Cleanup sticker data
+        // Cleanup sticker data BEFORE burning
         delete stickers[tokenId];
         delete customizationHistory[tokenId];
         delete isCustomizable[tokenId];
 
         // Remove from creator's stickers
         _removeFromCreatorStickers(creator, tokenId);
+
+        // Call parent _burn function
+        _burn(tokenId);
     }
 
     // ============= INTERNAL FUNCTIONS =============
