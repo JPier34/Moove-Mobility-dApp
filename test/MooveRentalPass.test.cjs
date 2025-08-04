@@ -1,307 +1,504 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
+const {
+  loadFixture,
+  time,
+} = require("@nomicfoundation/hardhat-network-helpers");
 
 describe("MooveRentalPass", function () {
-  let mooveRentalPass;
-  let accessControl;
-  let owner;
-  let user1;
-  let user2;
-
-  // Vehicle types enum - matches contract
+  // ============= ENUMS =============
   const VehicleType = {
     BIKE: 0,
     SCOOTER: 1,
     MONOPATTINO: 2,
   };
 
-  beforeEach(async function () {
-    [owner, user1, user2] = await ethers.getSigners();
+  // ============= FIXTURES =============
+  async function deployRentalPassFixture() {
+    const [owner, user1, user2, user3] = await ethers.getSigners();
 
     // Deploy MooveAccessControl first
-    const MooveAccessControlFactory = await ethers.getContractFactory(
+    const MooveAccessControl = await ethers.getContractFactory(
       "MooveAccessControl"
     );
-    accessControl = await MooveAccessControlFactory.deploy(owner.address);
+    const accessControl = await MooveAccessControl.deploy(owner.address);
     await accessControl.waitForDeployment();
 
-    // Deploy MooveRentalPass with required parameters
-    const MooveRentalPassFactory = await ethers.getContractFactory(
-      "MooveRentalPass"
-    );
-    mooveRentalPass = await MooveRentalPassFactory.deploy(
+    // Deploy MooveRentalPass
+    const MooveRentalPass = await ethers.getContractFactory("MooveRentalPass");
+    const mooveRentalPass = await MooveRentalPass.deploy(
       await accessControl.getAddress()
     );
     await mooveRentalPass.waitForDeployment();
-  });
 
+    // Grant MINTER_ROLE to owner for admin functions
+    const MINTER_ROLE = ethers.keccak256(ethers.toUtf8Bytes("MINTER_ROLE"));
+    await accessControl.grantRole(MINTER_ROLE, owner.address);
+
+    // CRITICAL: Authorize the MooveRentalPass contract to call AccessControl functions
+    await accessControl.authorizeContract(await mooveRentalPass.getAddress());
+
+    return {
+      mooveRentalPass,
+      accessControl,
+      owner,
+      user1,
+      user2,
+      user3,
+      MINTER_ROLE,
+    };
+  }
+
+  async function deployWithMintedPass() {
+    const fixture = await loadFixture(deployRentalPassFixture);
+    const { mooveRentalPass, owner, user1 } = fixture;
+
+    // Mint a rental pass for testing
+    await mooveRentalPass
+      .connect(owner)
+      .mintRentalPass(
+        user1.address,
+        VehicleType.BIKE,
+        "ACCESS123",
+        "Milano",
+        ethers.parseEther("0.025"),
+        "ipfs://QmTestRentalPass123"
+      );
+
+    return { ...fixture, tokenId: 1 };
+  }
+
+  // ============= DEPLOYMENT TESTS =============
   describe("Deployment", function () {
     it("Should deploy successfully", async function () {
-      expect(await mooveRentalPass.getAddress()).to.be.properAddress;
-    });
+      const { mooveRentalPass, accessControl } = await loadFixture(
+        deployRentalPassFixture
+      );
 
-    it("Should set correct access control and fee recipient", async function () {
+      expect(await mooveRentalPass.getAddress()).to.be.properAddress;
       expect(await mooveRentalPass.accessControl()).to.equal(
         await accessControl.getAddress()
       );
     });
 
-    it("Should initialize with correct default pricing", async function () {
-      expect(bikePricing.price).to.equal(ethers.parseEther("0.025"));
-      expect(scooterPricing.price).to.equal(ethers.parseEther("0.035"));
-      expect(monopatinoPricing.price).to.equal(ethers.parseEther("0.045"));
+    it("Should set correct name and symbol", async function () {
+      const { mooveRentalPass } = await loadFixture(deployRentalPassFixture);
 
-      expect(bikePricing.validityDays).to.equal(30);
-      expect(scooterPricing.validityDays).to.equal(30);
-      expect(monopatinoPricing.validityDays).to.equal(30);
-
-      expect(bikePricing.isActive).to.be.true;
-      expect(scooterPricing.isActive).to.be.true;
-      expect(monopatinoPricing.isActive).to.be.true;
+      expect(await mooveRentalPass.name()).to.equal("Moove Rental Pass");
+      expect(await mooveRentalPass.symbol()).to.equal("MRP");
     });
 
-    it("Should initialize supported cities", async function () {});
+    it("Should initialize with zero total supply", async function () {
+      const { mooveRentalPass } = await loadFixture(deployRentalPassFixture);
+
+      expect(await mooveRentalPass.totalSupply()).to.equal(0);
+    });
   });
 
-  describe("Pass Minting", function () {
-    it("Should mint rental pass with correct payment", async function () {
-      // Check initial state
-      expect(await mooveRentalPass.balanceOf(user1.address)).to.equal(0);
+  // ============= MINTING TESTS =============
+  describe("Minting", function () {
+    it("Should mint rental pass successfully", async function () {
+      const { mooveRentalPass, owner, user1 } = await loadFixture(
+        deployRentalPassFixture
+      );
 
-      // Mint pass
-      await mooveRentalPass
-        .connect(user1)
-        .mintRentalPass(VehicleType.BIKE, "rome", { value: bikePricing.price });
+      await expect(
+        mooveRentalPass
+          .connect(owner)
+          .mintRentalPass(
+            user1.address,
+            VehicleType.BIKE,
+            "ACCESS123",
+            "Milano",
+            ethers.parseEther("0.025"),
+            "ipfs://QmTestRentalPass123"
+          )
+      ).to.emit(mooveRentalPass, "RentalPassMinted");
 
-      // Check after minting
       expect(await mooveRentalPass.balanceOf(user1.address)).to.equal(1);
       expect(await mooveRentalPass.totalSupply()).to.equal(1);
+      expect(await mooveRentalPass.ownerOf(1)).to.equal(user1.address);
     });
 
-    it("Should fail with insufficient payment", async function () {
-      const insufficientAmount = bikePricing.price / 2n;
+    it("Should fail minting without MINTER_ROLE", async function () {
+      const { mooveRentalPass, user1, user2 } = await loadFixture(
+        deployRentalPassFixture
+      );
 
       await expect(
         mooveRentalPass
           .connect(user1)
-          .mintRentalPass(VehicleType.BIKE, "rome", {
-            value: insufficientAmount,
-          })
-      ).to.be.revertedWithCustomError(
-        mooveRentalPass,
-        "MooveRentalPass__InsufficientPayment"
-      );
+          .mintRentalPass(
+            user2.address,
+            VehicleType.BIKE,
+            "ACCESS123",
+            "Milano",
+            ethers.parseEther("0.025"),
+            "ipfs://QmTestRentalPass123"
+          )
+      ).to.be.revertedWith("Access Denied");
     });
 
-    it("Should fail for unsupported city", async function () {
-      await expect(
-        mooveRentalPass
-          .connect(user1)
-          .mintRentalPass(VehicleType.BIKE, "unsupported_city", {
-            value: bikePricing.price,
-          })
-      ).to.be.revertedWithCustomError(
-        mooveRentalPass,
-        "MooveRentalPass__CityNotSupported"
-      );
-    });
-
-    it("Should respect max passes per user per type per city", async function () {
-      // Mint maximum allowed passes (3)
-      for (let i = 0; i < 3; i++) {
-        await mooveRentalPass
-          .connect(user1)
-          .mintRentalPass(VehicleType.BIKE, "rome", {
-            value: bikePricing.price,
-          });
-      }
-
-      // Fourth attempt should fail
-      await expect(
-        mooveRentalPass
-          .connect(user1)
-          .mintRentalPass(VehicleType.BIKE, "rome", {
-            value: bikePricing.price,
-          })
-      ).to.be.revertedWithCustomError(
-        mooveRentalPass,
-        "MooveRentalPass__MaxPassesReached"
-      );
-    });
-
-    it("Should allow minting different vehicle types", async function () {
-      // Mint bike pass
-      await mooveRentalPass
-        .connect(user1)
-        .mintRentalPass(VehicleType.BIKE, "rome", { value: bikePricing.price });
-
-      // Mint scooter pass
-      await mooveRentalPass
-        .connect(user1)
-        .mintRentalPass(VehicleType.SCOOTER, "rome", {
-          value: scooterPricing.price,
-        });
-
-      expect(await mooveRentalPass.balanceOf(user1.address)).to.equal(2);
-    });
-
-    it("Should handle overpayment correctly", async function () {
-      const overpayment = bikePricing.price * 2n;
-
-      await expect(
-        mooveRentalPass
-          .connect(user1)
-          .mintRentalPass(VehicleType.BIKE, "rome", { value: overpayment })
-      ).to.not.be.reverted;
-
-      expect(await mooveRentalPass.balanceOf(user1.address)).to.equal(1);
-    });
-  });
-
-  describe("Pass Management", function () {
-    let tokenId;
-
-    beforeEach(async function () {
-      await mooveRentalPass
-        .connect(user1)
-        .mintRentalPass(VehicleType.BIKE, "rome", { value: bikePricing.price });
-      tokenId = 1; // First token ID
-    });
-
-    it("Should validate pass correctly", async function () {
-      expect(await mooveRentalPass.isPassValid(tokenId)).to.be.true;
-      expect(await mooveRentalPass.canGenerateCode(tokenId)).to.be.true;
-    });
-
-    it("Should get pass information", async function () {
-      const passInfo = await mooveRentalPass.getPassInfo(tokenId);
-
-      expect(passInfo.vehicleType).to.equal(VehicleType.BIKE);
-      expect(passInfo.cityId).to.equal("rome");
-      expect(passInfo.isActive).to.be.true;
-      expect(passInfo.validUntil).to.be.greaterThan(0);
-    });
-
-    it("Should get user passes correctly", async function () {
-      const userPasses = await mooveRentalPass.getUserPasses(
-        user1.address,
-        "rome",
-        VehicleType.BIKE
+    it("Should prevent duplicate access codes", async function () {
+      const { mooveRentalPass, owner, user1, user2 } = await loadFixture(
+        deployRentalPassFixture
       );
 
-      expect(userPasses.length).to.equal(1);
-      expect(userPasses[0]).to.equal(tokenId);
-    });
-
-    it("Should get all user passes", async function () {
-      await mooveRentalPass
-        .connect(user1)
-        .mintRentalPass(VehicleType.SCOOTER, "milan", {
-          value: scooterPricing.price,
-        });
-
-      const allPasses = await mooveRentalPass.getAllUserPasses(user1.address);
-      expect(allPasses.length).to.equal(2);
-    });
-
-    it("Should handle expired passes correctly", async function () {
-      // Fast forward time by 31 days
-      await ethers.provider.send("evm_increaseTime", [31 * 24 * 60 * 60]);
-      await ethers.provider.send("evm_mine");
-
-      expect(await mooveRentalPass.isPassValid(tokenId)).to.be.false;
-      expect(await mooveRentalPass.canGenerateCode(tokenId)).to.be.false;
-    });
-  });
-
-  describe("Admin Functions", function () {
-    it("Should allow admin to update pricing", async function () {
-      const newPrice = ethers.parseEther("0.05");
-      const newValidityDays = 60;
-
+      // Mint first pass
       await mooveRentalPass
         .connect(owner)
-        .updatePassPricing(VehicleType.BIKE, newPrice, newValidityDays);
+        .mintRentalPass(
+          user1.address,
+          VehicleType.BIKE,
+          "ACCESS123",
+          "Milano",
+          ethers.parseEther("0.025"),
+          "ipfs://QmTestRentalPass123"
+        );
 
-      expect(updatedPricing.price).to.equal(newPrice);
-      expect(updatedPricing.validityDays).to.equal(newValidityDays);
+      // Try to mint with same access code
+      await expect(
+        mooveRentalPass.connect(owner).mintRentalPass(
+          user2.address,
+          VehicleType.SCOOTER,
+          "ACCESS123", // Same access code
+          "Roma",
+          ethers.parseEther("0.035"),
+          "ipfs://QmTestRentalPass456"
+        )
+      ).to.be.revertedWith("Access code already exists");
     });
 
-    it("Should allow admin to add/remove cities", async function () {
-      const newCity = "london";
+    it("Should require valid parameters", async function () {
+      const { mooveRentalPass, owner, user1 } = await loadFixture(
+        deployRentalPassFixture
+      );
 
-      // Initially not supported
-      expect(await mooveRentalPass.supportedCities(newCity)).to.be.false;
+      // Invalid recipient
+      await expect(
+        mooveRentalPass
+          .connect(owner)
+          .mintRentalPass(
+            ethers.ZeroAddress,
+            VehicleType.BIKE,
+            "ACCESS123",
+            "Milano",
+            ethers.parseEther("0.025"),
+            "ipfs://QmTestRentalPass123"
+          )
+      ).to.be.revertedWith("Invalid recipient address");
 
-      // Add city
-      await mooveRentalPass.connect(owner).setCitySupport(newCity, true);
-      expect(await mooveRentalPass.supportedCities(newCity)).to.be.true;
+      // Empty access code
+      await expect(
+        mooveRentalPass
+          .connect(owner)
+          .mintRentalPass(
+            user1.address,
+            VehicleType.BIKE,
+            "",
+            "Milano",
+            ethers.parseEther("0.025"),
+            "ipfs://QmTestRentalPass123"
+          )
+      ).to.be.revertedWith("Access code required");
 
-      // Remove city
-      await mooveRentalPass.connect(owner).setCitySupport(newCity, false);
-      expect(await mooveRentalPass.supportedCities(newCity)).to.be.false;
+      // Empty location
+      await expect(
+        mooveRentalPass
+          .connect(owner)
+          .mintRentalPass(
+            user1.address,
+            VehicleType.BIKE,
+            "ACCESS123",
+            "",
+            ethers.parseEther("0.025"),
+            "ipfs://QmTestRentalPass123"
+          )
+      ).to.be.revertedWith("Location required");
     });
 
-    it("Should allow admin to extend pass validity", async function () {
-      await mooveRentalPass
-        .connect(user1)
-        .mintRentalPass(VehicleType.BIKE, "rome", { value: bikePricing.price });
+    it("Should batch mint multiple passes", async function () {
+      const { mooveRentalPass, owner, user1, user2 } = await loadFixture(
+        deployRentalPassFixture
+      );
 
-      const tokenId = 1;
-      const passInfoBefore = await mooveRentalPass.getPassInfo(tokenId);
-
-      // Extend validity by 10 days
-      await mooveRentalPass.connect(owner).extendPassValidity(tokenId, 10);
-
-      const passInfoAfter = await mooveRentalPass.getPassInfo(tokenId);
-      const expectedNewValidity =
-        passInfoBefore.validUntil + 10n * 24n * 60n * 60n;
-
-      expect(passInfoAfter.validUntil).to.equal(expectedNewValidity);
-    });
-
-    it("Should allow admin to deactivate pass", async function () {
-      await mooveRentalPass
-        .connect(user1)
-        .mintRentalPass(VehicleType.BIKE, "rome", { value: bikePricing.price });
-
-      const tokenId = 1;
-
-      // Initially active
-      expect(await mooveRentalPass.isPassValid(tokenId)).to.be.true;
-
-      // Deactivate
-      await mooveRentalPass.connect(owner).deactivatePass(tokenId);
-
-      // Should now be inactive
-      expect(await mooveRentalPass.isPassValid(tokenId)).to.be.false;
-    });
-
-    it("Should allow admin to batch mint passes", async function () {
       const recipients = [user1.address, user2.address];
       const vehicleTypes = [VehicleType.BIKE, VehicleType.SCOOTER];
-      const cityIds = ["rome", "milan"];
+      const accessCodes = ["ACCESS123", "ACCESS456"];
+      const locations = ["Milano", "Roma"];
+      const prices = [ethers.parseEther("0.025"), ethers.parseEther("0.035")];
+      const tokenURIs = ["ipfs://QmTest123", "ipfs://QmTest456"];
 
       await mooveRentalPass
         .connect(owner)
-        .batchMintRentalPass(recipients, vehicleTypes, cityIds);
+        .batchMintRentalPasses(
+          recipients,
+          vehicleTypes,
+          accessCodes,
+          locations,
+          prices,
+          tokenURIs
+        );
 
       expect(await mooveRentalPass.balanceOf(user1.address)).to.equal(1);
       expect(await mooveRentalPass.balanceOf(user2.address)).to.equal(1);
       expect(await mooveRentalPass.totalSupply()).to.equal(2);
     });
 
-    it("Should allow admin to pause/unpause", async function () {
+    it("Should fail batch mint with mismatched arrays", async function () {
+      const { mooveRentalPass, owner, user1 } = await loadFixture(
+        deployRentalPassFixture
+      );
+
+      const recipients = [user1.address];
+      const vehicleTypes = [VehicleType.BIKE, VehicleType.SCOOTER]; // Different length
+      const accessCodes = ["ACCESS123"];
+      const locations = ["Milano"];
+      const prices = [ethers.parseEther("0.025")];
+      const tokenURIs = ["ipfs://QmTest123"];
+
+      await expect(
+        mooveRentalPass
+          .connect(owner)
+          .batchMintRentalPasses(
+            recipients,
+            vehicleTypes,
+            accessCodes,
+            locations,
+            prices,
+            tokenURIs
+          )
+      ).to.be.revertedWith("Array length mismatch");
+    });
+  });
+
+  // ============= RENTAL PASS MANAGEMENT =============
+  describe("Rental Pass Management", function () {
+    it("Should get rental pass details", async function () {
+      const { mooveRentalPass, tokenId } = await loadFixture(
+        deployWithMintedPass
+      );
+
+      const rentalPass = await mooveRentalPass.getRentalPass(tokenId);
+
+      expect(rentalPass.vehicleType).to.equal(VehicleType.BIKE);
+      expect(rentalPass.accessCode).to.equal("ACCESS123");
+      expect(rentalPass.location).to.equal("Milano");
+      expect(rentalPass.purchasePrice).to.equal(ethers.parseEther("0.025"));
+      expect(rentalPass.isActive).to.be.true;
+      expect(rentalPass.expirationDate).to.be.greaterThan(0);
+    });
+
+    it("Should check if pass is expired", async function () {
+      const { mooveRentalPass, tokenId } = await loadFixture(
+        deployWithMintedPass
+      );
+
+      // Initially not expired
+      expect(await mooveRentalPass.isPassExpired(tokenId)).to.be.false;
+
+      // Fast forward 31 days
+      await time.increase(31 * 24 * 60 * 60);
+
+      // Now should be expired
+      expect(await mooveRentalPass.isPassExpired(tokenId)).to.be.true;
+    });
+
+    it("Should get token by access code", async function () {
+      const { mooveRentalPass, tokenId } = await loadFixture(
+        deployWithMintedPass
+      );
+
+      const foundTokenId = await mooveRentalPass.getTokenByAccessCode(
+        "ACCESS123"
+      );
+      expect(foundTokenId).to.equal(tokenId);
+    });
+
+    it("Should fail to get token for invalid access code", async function () {
+      const { mooveRentalPass } = await loadFixture(deployWithMintedPass);
+
+      await expect(
+        mooveRentalPass.getTokenByAccessCode("INVALID")
+      ).to.be.revertedWith("Access code not found");
+    });
+
+    it("Should get user active passes", async function () {
+      const { mooveRentalPass, owner, user1 } = await loadFixture(
+        deployWithMintedPass
+      );
+
+      // Mint another pass for the same user
+      await mooveRentalPass
+        .connect(owner)
+        .mintRentalPass(
+          user1.address,
+          VehicleType.SCOOTER,
+          "ACCESS456",
+          "Roma",
+          ethers.parseEther("0.035"),
+          "ipfs://QmTestRentalPass456"
+        );
+
+      const activePasses = await mooveRentalPass.getUserActivePasses(
+        user1.address
+      );
+      expect(activePasses.length).to.equal(2);
+      expect(activePasses).to.include(1n);
+      expect(activePasses).to.include(2n);
+    });
+
+    it("Should get passes expiring soon", async function () {
+      const { mooveRentalPass, owner, user1 } = await loadFixture(
+        deployRentalPassFixture
+      );
+
+      // Mint a pass that will expire soon
+      await mooveRentalPass
+        .connect(owner)
+        .mintRentalPass(
+          user1.address,
+          VehicleType.BIKE,
+          "ACCESS123",
+          "Milano",
+          ethers.parseEther("0.025"),
+          "ipfs://QmTestRentalPass123"
+        );
+
+      // Fast forward to near expiration (29.5 days)
+      await time.increase(29.5 * 24 * 60 * 60);
+
+      const expiringSoon = await mooveRentalPass.getPassesExpiringSoon(
+        user1.address
+      );
+      expect(expiringSoon.length).to.equal(1);
+      expect(expiringSoon[0]).to.equal(1);
+    });
+  });
+
+  // ============= ACCESS CODE VALIDATION =============
+  describe("Access Code Validation", function () {
+    it("Should validate and use access code", async function () {
+      const { mooveRentalPass, owner, tokenId } = await loadFixture(
+        deployWithMintedPass
+      );
+
+      const [tokenId_result, owner_result, vehicleType_result] =
+        await mooveRentalPass
+          .connect(owner)
+          .validateAndUseAccessCode("ACCESS123");
+      expect(tokenId_result).to.equal(tokenId);
+      expect(result.vehicleType).to.equal(VehicleType.BIKE);
+    });
+
+    it("Should check if access code is valid", async function () {
+      const { mooveRentalPass, tokenId } = await loadFixture(
+        deployWithMintedPass
+      );
+
+      const [tokenId_result, owner_result, vehicleType_result] =
+        await mooveRentalPass
+          .connect(owner)
+          .validateAndUseAccessCode("ACCESS123");
+
+      expect(result.valid).to.be.true;
+      expect(tokenId_result).to.equal(tokenId);
+      expect(result.expirationDate).to.be.greaterThan(0);
+    });
+
+    it("Should return false for invalid access code", async function () {
+      const { mooveRentalPass } = await loadFixture(deployWithMintedPass);
+
+      const result = await mooveRentalPass.isAccessCodeValid("INVALID");
+
+      expect(result.valid).to.be.false;
+      expect(result.tokenId).to.equal(0);
+      expect(result.expirationDate).to.equal(0);
+    });
+
+    it("Should return false for expired pass", async function () {
+      const { mooveRentalPass } = await loadFixture(deployWithMintedPass);
+
+      // Fast forward past expiration
+      await time.increase(31 * 24 * 60 * 60);
+
+      const result = await mooveRentalPass.isAccessCodeValid("ACCESS123");
+      expect(result.valid).to.be.false;
+    });
+
+    it("Should fail validation without proper role", async function () {
+      const { mooveRentalPass, user1 } = await loadFixture(
+        deployWithMintedPass
+      );
+
+      await expect(
+        mooveRentalPass.connect(user1).validateAndUseAccessCode("ACCESS123")
+      ).to.be.revertedWith("Access Denied");
+    });
+  });
+
+  // ============= ADMIN FUNCTIONS =============
+  describe("Admin Functions", function () {
+    it("Should deactivate pass", async function () {
+      const { mooveRentalPass, owner, tokenId } = await loadFixture(
+        deployWithMintedPass
+      );
+
+      await expect(
+        mooveRentalPass.connect(owner).deactivatePass(tokenId, "Violation")
+      ).to.emit(mooveRentalPass, "PassDeactivated");
+
+      const rentalPass = await mooveRentalPass.getRentalPass(tokenId);
+      expect(rentalPass.isActive).to.be.false;
+    });
+
+    it("Should cleanup expired passes", async function () {
+      const { mooveRentalPass, owner, user1, tokenId } = await loadFixture(
+        deployWithMintedPass
+      );
+
+      // Fast forward past expiration
+      await time.increase(31 * 24 * 60 * 60);
+
+      await expect(mooveRentalPass.cleanupExpiredPasses([tokenId])).to.emit(
+        mooveRentalPass,
+        "PassExpired"
+      );
+
+      const rentalPass = await mooveRentalPass.getRentalPass(tokenId);
+      expect(rentalPass.isActive).to.be.false;
+    });
+
+    it("Should fail admin functions without proper role", async function () {
+      const { mooveRentalPass, user1, tokenId } = await loadFixture(
+        deployWithMintedPass
+      );
+
+      await expect(
+        mooveRentalPass.connect(user1).deactivatePass(tokenId, "Violation")
+      ).to.be.revertedWith("Access denied");
+    });
+
+    it("Should pause and unpause contract", async function () {
+      const { mooveRentalPass, owner, user1 } = await loadFixture(
+        deployRentalPassFixture
+      );
+
       // Pause contract
       await mooveRentalPass.connect(owner).pause();
 
       // Should fail to mint when paused
       await expect(
         mooveRentalPass
-          .connect(user1)
-          .mintRentalPass(VehicleType.BIKE, "rome", {
-            value: bikePricing.price,
-          })
+          .connect(owner)
+          .mintRentalPass(
+            user1.address,
+            VehicleType.BIKE,
+            "ACCESS123",
+            "Milano",
+            ethers.parseEther("0.025"),
+            "ipfs://QmTestRentalPass123"
+          )
       ).to.be.revertedWithCustomError(mooveRentalPass, "EnforcedPause");
 
       // Unpause
@@ -310,174 +507,184 @@ describe("MooveRentalPass", function () {
       // Should work again
       await expect(
         mooveRentalPass
-          .connect(user1)
-          .mintRentalPass(VehicleType.BIKE, "rome", {
-            value: bikePricing.price,
-          })
+          .connect(owner)
+          .mintRentalPass(
+            user1.address,
+            VehicleType.BIKE,
+            "ACCESS123",
+            "Milano",
+            ethers.parseEther("0.025"),
+            "ipfs://QmTestRentalPass123"
+          )
       ).to.not.be.reverted;
     });
   });
 
-  describe("Security", function () {
-    it("Should reject non-admin pricing updates", async function () {
+  // ============= NON-TRANSFERABLE FUNCTIONALITY =============
+  describe("Non-transferable Functionality", function () {
+    it("Should prevent transfers", async function () {
+      const { mooveRentalPass, user1, user2, tokenId } = await loadFixture(
+        deployWithMintedPass
+      );
+
       await expect(
         mooveRentalPass
           .connect(user1)
-          .updatePassPricing(VehicleType.BIKE, ethers.parseEther("0.1"), 30)
-      ).to.be.revertedWithCustomError(
-        mooveRentalPass,
-        "MooveRentalPass__NotAuthorized"
-      );
+          .transferFrom(user1.address, user2.address, tokenId)
+      ).to.be.revertedWith("Rental passes are non-transferable");
     });
 
-    it("Should reject non-admin city management", async function () {
-      await expect(
-        mooveRentalPass.connect(user1).setCitySupport("london", true)
-      ).to.be.revertedWithCustomError(
-        mooveRentalPass,
-        "MooveRentalPass__NotAuthorized"
+    it("Should prevent safe transfers", async function () {
+      const { mooveRentalPass, user1, user2, tokenId } = await loadFixture(
+        deployWithMintedPass
       );
+
+      await expect(
+        mooveRentalPass
+          .connect(user1)
+          ["safeTransferFrom(address,address,uint256)"](
+            user1.address,
+            user2.address,
+            tokenId
+          )
+      ).to.be.revertedWith("Rental passes are non-transferable");
     });
 
-    it("Should reject non-admin pause", async function () {
-      await expect(
-        mooveRentalPass.connect(user1).pause()
-      ).to.be.revertedWithCustomError(
-        mooveRentalPass,
-        "MooveRentalPass__NotAuthorized"
+    it("Should prevent approvals", async function () {
+      const { mooveRentalPass, user1, user2, tokenId } = await loadFixture(
+        deployWithMintedPass
       );
+
+      await expect(
+        mooveRentalPass.connect(user1).approve(user2.address, tokenId)
+      ).to.be.revertedWith("Rental passes cannot be approved for transfer");
+    });
+
+    it("Should prevent approval for all", async function () {
+      const { mooveRentalPass, user1, user2 } = await loadFixture(
+        deployWithMintedPass
+      );
+
+      await expect(
+        mooveRentalPass.connect(user1).setApprovalForAll(user2.address, true)
+      ).to.be.revertedWith("Rental passes cannot be approved for transfer");
+    });
+
+    it("Should allow minting (zero address transfers)", async function () {
+      const { mooveRentalPass, owner, user1 } = await loadFixture(
+        deployRentalPassFixture
+      );
+
+      // Minting should work (from zero address)
+      await expect(
+        mooveRentalPass
+          .connect(owner)
+          .mintRentalPass(
+            user1.address,
+            VehicleType.BIKE,
+            "ACCESS123",
+            "Milano",
+            ethers.parseEther("0.025"),
+            "ipfs://QmTestRentalPass123"
+          )
+      ).to.not.be.reverted;
     });
   });
 
+  // ============= EDGE CASES =============
   describe("Edge Cases", function () {
-    it("Should handle max supply correctly", async function () {
-      // This test would be impractical with real max supply (50000)
-      // Just verify max supply constant is set
-      expect(await mooveRentalPass.MAX_SUPPLY()).to.equal(50000);
-    });
+    it("Should handle non-existent token queries", async function () {
+      const { mooveRentalPass } = await loadFixture(deployRentalPassFixture);
 
-    it("Should generate correct metadata URI", async function () {
-      await mooveRentalPass
-        .connect(user1)
-        .mintRentalPass(VehicleType.BIKE, "rome", { value: bikePricing.price });
-
-      const tokenId = 1;
-      const tokenURI = await mooveRentalPass.tokenURI(tokenId);
-
-      expect(tokenURI).to.include(
-        "https://api.moove.com/metadata/rental-pass/"
+      await expect(mooveRentalPass.getRentalPass(999)).to.be.revertedWith(
+        "Token does not exist"
       );
-      expect(tokenURI).to.include("rome");
-      expect(tokenURI).to.include(tokenId.toString());
+
+      await expect(mooveRentalPass.isPassExpired(999)).to.be.revertedWith(
+        "Token does not exist"
+      );
     });
 
-    it("Should validate pricing update parameters", async function () {
-      // Zero price should fail
+    it("Should handle empty user active passes", async function () {
+      const { mooveRentalPass, user1 } = await loadFixture(
+        deployRentalPassFixture
+      );
+
+      const activePasses = await mooveRentalPass.getUserActivePasses(
+        user1.address
+      );
+      expect(activePasses.length).to.equal(0);
+    });
+
+    it("Should handle cleanup of non-expired passes", async function () {
+      const { mooveRentalPass, tokenId } = await loadFixture(
+        deployWithMintedPass
+      );
+
+      // Try to cleanup non-expired pass (should not emit event)
+      await expect(mooveRentalPass.cleanupExpiredPasses([tokenId])).to.not.emit(
+        mooveRentalPass,
+        "PassExpired"
+      );
+    });
+
+    it("Should handle large batch operations", async function () {
+      const { mooveRentalPass, owner } = await loadFixture(
+        deployRentalPassFixture
+      );
+
+      // Create arrays for batch minting (10 passes)
+      const recipients = [];
+      const vehicleTypes = [];
+      const accessCodes = [];
+      const locations = [];
+      const prices = [];
+      const tokenURIs = [];
+
+      for (let i = 0; i < 10; i++) {
+        recipients.push(ethers.Wallet.createRandom().address);
+        vehicleTypes.push(i % 3); // Cycle through vehicle types
+        accessCodes.push(`ACCESS${i}`);
+        locations.push(`Location${i}`);
+        prices.push(ethers.parseEther("0.025"));
+        tokenURIs.push(`ipfs://QmTest${i}`);
+      }
+
       await expect(
         mooveRentalPass
           .connect(owner)
-          .updatePassPricing(VehicleType.BIKE, 0, 30)
-      ).to.be.revertedWith("Price must be greater than 0");
+          .batchMintRentalPasses(
+            recipients,
+            vehicleTypes,
+            accessCodes,
+            locations,
+            prices,
+            tokenURIs
+          )
+      ).to.not.be.reverted;
 
-      // Invalid validity days should fail
-      await expect(
-        mooveRentalPass
-          .connect(owner)
-          .updatePassPricing(VehicleType.BIKE, ethers.parseEther("0.1"), 0)
-      ).to.be.revertedWith("Invalid validity period");
-
-      await expect(
-        mooveRentalPass.connect(owner).updatePassPricing(
-          VehicleType.BIKE,
-          ethers.parseEther("0.1"),
-          400 // More than 365 days
-        )
-      ).to.be.revertedWith("Invalid validity period");
+      expect(await mooveRentalPass.totalSupply()).to.equal(10);
     });
   });
-  describe(
-    "More",
-    function () {
-      it("Should respect AccessControl role changes", async function () {
-        // Grant MINTER_ROLE to user1
-        const MINTER_ROLE = await accessControl.MINTER_ROLE();
-        await accessControl
-          .connect(owner)
-          .grantRole(MINTER_ROLE, user1.address);
 
-        // user1 should now be able to call admin functions
-        await expect(
-          mooveRentalPass
-            .connect(user1)
-            .updatePassPricing(VehicleType.BIKE, ethers.parseEther("0.1"), 30)
-        ).to.not.be.reverted;
-      });
-    },
+  // ============= INTERFACE SUPPORT =============
+  describe("Interface Support", function () {
+    it("Should support required interfaces", async function () {
+      const { mooveRentalPass } = await loadFixture(deployRentalPassFixture);
 
-    it("Should handle fee recipient changes correctly", async function () {
-      const newFeeRecipient = user2.address;
-      const initialBalance = await ethers.provider.getBalance(newFeeRecipient);
-
-      await mooveRentalPass.connect(owner).setFeeRecipient(newFeeRecipient);
-
-      await mooveRentalPass
-        .connect(user1)
-        .mintRentalPass(VehicleType.BIKE, "rome", { value: bikePricing.price });
-
-      const finalBalance = await ethers.provider.getBalance(newFeeRecipient);
-      expect(finalBalance).to.equal(initialBalance + bikePricing.price);
-    })
-  );
-
-  it("Should allow same user to have passes in different cities", async function () {
-    // Mint passes in different cities
-    await mooveRentalPass
-      .connect(user1)
-      .mintRentalPass(VehicleType.BIKE, "rome", { value: bikePricing.price });
-    await mooveRentalPass
-      .connect(user1)
-      .mintRentalPass(VehicleType.BIKE, "milan", { value: bikePricing.price });
-    await mooveRentalPass
-      .connect(user1)
-      .mintRentalPass(VehicleType.BIKE, "paris", { value: bikePricing.price });
-
-    expect(await mooveRentalPass.balanceOf(user1.address)).to.equal(3);
-  });
-
-  it("Should allow metadata updates", async function () {
-    await mooveRentalPass
-      .connect(user1)
-      .mintRentalPass(VehicleType.BIKE, "rome", { value: bikePricing.price });
-
-    const tokenId = 1;
-    const originalURI = await mooveRentalPass.tokenURI(tokenId);
-
-    await mooveRentalPass.connect(owner).updateTokenMetadata(tokenId);
-
-    const updatedURI = await mooveRentalPass.tokenURI(tokenId);
-    expect(updatedURI).to.equal(originalURI); // Should be same since data hasn't changed
-  });
-
-  it("Should handle batch operations efficiently", async function () {
-    const recipients = new Array(10)
-      .fill(0)
-      .map(() => ethers.Wallet.createRandom().address);
-    const vehicleTypes = new Array(10).fill(VehicleType.BIKE);
-    const cityIds = new Array(10).fill("rome");
-
-    await mooveRentalPass
-      .connect(owner)
-      .batchMintRentalPass(recipients, vehicleTypes, cityIds);
-
-    expect(await mooveRentalPass.totalSupply()).to.equal(10);
-  });
-  describe("Non-transferable functionality", function () {
-    it("Should prevent all transfer attempts", async function () {
-      // Test transferFrom, safeTransferFrom, approve, setApprovalForAll
+      // ERC721
+      expect(await mooveRentalPass.supportsInterface("0x80ac58cd")).to.be.true;
+      // ERC721Metadata
+      expect(await mooveRentalPass.supportsInterface("0x5b5e139f")).to.be.true;
     });
 
-    it("Should validate access codes correctly", async function () {
-      // Test validateAndUseAccessCode, isAccessCodeValid
+    it("Should have correct metadata", async function () {
+      const { mooveRentalPass, tokenId } = await loadFixture(
+        deployWithMintedPass
+      );
+
+      const tokenURI = await mooveRentalPass.tokenURI(tokenId);
+      expect(tokenURI).to.equal("ipfs://QmTestRentalPass123");
     });
   });
 });
