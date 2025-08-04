@@ -10,6 +10,17 @@ import "@openzeppelin/contracts/utils/Pausable.sol";
  * @dev Estensione per gestire il trading di NFT personalizzabili
  * @notice Gestisce commissioni, lock personalizzazioni e validazioni per il trading
  */
+
+interface IMooveTradingManager {
+    function recordAuctionSale(
+        address nftContract,
+        uint256 tokenId,
+        address seller,
+        address buyer,
+        uint256 price
+    ) external;
+}
+
 contract MooveTradingManager is ReentrancyGuard, Pausable {
     // ============= STORAGE VARIABLES =============
 

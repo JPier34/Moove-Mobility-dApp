@@ -10,10 +10,14 @@ describe("MooveNFT", function () {
 
     // Deploy MooveNFT
     const MooveNFT = await ethers.getContractFactory("MooveNFT");
+    const MooveAccessControl = await ethers.getContractFactory(
+      "MooveAccessControl"
+    );
+    const accessControl = await MooveAccessControl.deploy(owner.address);
     const mooveNFT = await MooveNFT.deploy(
-      "Moove Vehicle NFT",
-      "MOOVE",
-      owner.address
+      "Moove Sticker NFT",
+      "MST",
+      await accessControl.getAddress()
     );
     await mooveNFT.waitForDeployment();
 
@@ -26,13 +30,13 @@ describe("MooveNFT", function () {
     );
 
     // Mint an NFT for testing
-    await mooveNFT.mintVehicleNFT(
+    await mooveNFT.mintStickerNFT(
       addr1.address,
       0, // VehicleType.BIKE
       "Test Bike",
       "A test bike for the platform",
       "ipfs://QmTestHash123",
-      ethers.parseEther("0.1"), // ✅ FIX: parseEther senza utils
+      ethers.parseEther("0.1"),
       "Milano, Italy"
     );
 
@@ -45,7 +49,6 @@ describe("MooveNFT", function () {
     it("Should set the right owner and roles", async function () {
       const { mooveNFT, owner } = await loadFixture(deployMooveNFTFixture);
 
-      expect(await mooveNFT.platformOwner()).to.equal(owner.address);
       expect(
         await mooveNFT.hasRole(
           await mooveNFT.DEFAULT_ADMIN_ROLE(),
@@ -81,7 +84,7 @@ describe("MooveNFT", function () {
         deployMooveNFTFixture
       );
 
-      const tx = await mooveNFT.mintVehicleNFT(
+      const tx = await mooveNFT.mintStickerNFT(
         addr1.address,
         0, // VehicleType.BIKE
         "Test Bike",
@@ -95,7 +98,7 @@ describe("MooveNFT", function () {
         .to.emit(mooveNFT, "VehicleNFTMinted")
         .withArgs(1, addr1.address, 0, "Test Bike");
 
-      const vehicleInfo = await mooveNFT.getVehicleInfo(1);
+      const vehicleInfo = await mooveNFT.getSticker(1);
       expect(vehicleInfo.name).to.equal("Test Bike");
       expect(vehicleInfo.vehicleType).to.equal(0);
       expect(vehicleInfo.dailyRate).to.equal(ethers.parseEther("0.1"));
@@ -146,8 +149,8 @@ describe("MooveNFT", function () {
       expect(await mooveNFT.ownerOf(1)).to.equal(addr1.address);
       expect(await mooveNFT.ownerOf(2)).to.equal(addr2.address);
 
-      const vehicle1 = await mooveNFT.getVehicleInfo(1);
-      const vehicle2 = await mooveNFT.getVehicleInfo(2);
+      const vehicle1 = await mooveNFT.getSticker(1);
+      const vehicle2 = await mooveNFT.getSticker(2);
 
       expect(vehicle1.name).to.equal("Bike1");
       expect(vehicle2.name).to.equal("Scooter1");
@@ -187,7 +190,7 @@ describe("MooveNFT", function () {
         .to.emit(this.mooveNFT, "PriceUpdated")
         .withArgs(this.tokenId, price);
 
-      const vehicleInfo = await this.mooveNFT.getVehicleInfo(this.tokenId);
+      const vehicleInfo = await this.mooveNFT.getSticker(this.tokenId);
       expect(vehicleInfo.isForSale).to.be.true;
       expect(vehicleInfo.price).to.equal(price);
     });
@@ -205,7 +208,7 @@ describe("MooveNFT", function () {
         .to.emit(this.mooveNFT, "PriceUpdated")
         .withArgs(this.tokenId, 0);
 
-      const vehicleInfo = await this.mooveNFT.getVehicleInfo(this.tokenId);
+      const vehicleInfo = await this.mooveNFT.getSticker(this.tokenId);
       expect(vehicleInfo.isForSale).to.be.false;
       expect(vehicleInfo.price).to.equal(0);
     });
@@ -237,7 +240,7 @@ describe("MooveNFT", function () {
       );
 
       // Check NFT is removed from sale
-      const vehicleInfo = await this.mooveNFT.getVehicleInfo(this.tokenId);
+      const vehicleInfo = await this.mooveNFT.getSticker(this.tokenId);
       expect(vehicleInfo.isForSale).to.be.false;
       expect(vehicleInfo.price).to.equal(0);
 
@@ -291,7 +294,7 @@ describe("MooveNFT", function () {
         .setForSale(this.tokenId, ethers.parseEther("1.0"));
 
       // Mint another NFT
-      await this.mooveNFT.mintVehicleNFT(
+      await this.mooveNFT.mintStickerNFT(
         this.addr1.address,
         1, // SCOOTER
         "Test Scooter",
@@ -379,7 +382,7 @@ describe("MooveNFT", function () {
 
       await this.mooveNFT.setDailyRate(this.tokenId, newRate);
 
-      const vehicleInfo = await this.mooveNFT.getVehicleInfo(this.tokenId);
+      const vehicleInfo = await this.mooveNFT.getSticker(this.tokenId);
       expect(vehicleInfo.dailyRate).to.equal(newRate);
     });
 
@@ -388,7 +391,7 @@ describe("MooveNFT", function () {
         .to.emit(this.mooveNFT, "VehicleActivated")
         .withArgs(this.tokenId, false);
 
-      const vehicleInfo = await this.mooveNFT.getVehicleInfo(this.tokenId);
+      const vehicleInfo = await this.mooveNFT.getSticker(this.tokenId);
       expect(vehicleInfo.isActive).to.be.false;
     });
 
@@ -430,7 +433,7 @@ describe("MooveNFT", function () {
       Object.assign(this, fixture);
 
       // Mint additional NFTs for testing
-      await this.mooveNFT.mintVehicleNFT(
+      await this.mooveNFT.mintStickerNFT(
         this.addr1.address,
         1, // SCOOTER
         "Test Scooter",
@@ -440,7 +443,7 @@ describe("MooveNFT", function () {
         "Roma"
       );
 
-      await this.mooveNFT.mintVehicleNFT(
+      await this.mooveNFT.mintStickerNFT(
         this.addr2.address,
         2, // MONOPATTINO
         "Test Monopattino",
@@ -476,7 +479,7 @@ describe("MooveNFT", function () {
     });
 
     it("Should get vehicle info", async function () {
-      const vehicleInfo = await this.mooveNFT.getVehicleInfo(1);
+      const vehicleInfo = await this.mooveNFT.getSticker(1);
 
       expect(vehicleInfo.name).to.equal("Test Bike");
       expect(vehicleInfo.vehicleType).to.equal(0);
@@ -496,7 +499,7 @@ describe("MooveNFT", function () {
 
       // Try to mint while paused (should fail)
       await expect(
-        mooveNFT.mintVehicleNFT(
+        mooveNFT.mintStickerNFT(
           owner.address,
           0,
           "Test",
@@ -513,7 +516,7 @@ describe("MooveNFT", function () {
 
       // Should be able to mint again
       await expect(
-        mooveNFT.mintVehicleNFT(
+        mooveNFT.mintStickerNFT(
           owner.address,
           0,
           "Test",
@@ -556,7 +559,7 @@ describe("MooveNFT", function () {
     it("Should handle token that doesn't exist", async function () {
       const { mooveNFT } = await loadFixture(deployMooveNFTFixture);
 
-      await expect(mooveNFT.getVehicleInfo(999)).to.be.revertedWithCustomError(
+      await expect(mooveNFT.getSticker(999)).to.be.revertedWithCustomError(
         mooveNFT,
         "MooveNFT__TokenNotExists"
       );

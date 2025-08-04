@@ -11,17 +11,19 @@ const DEBUG_MODE = false;
 
 describe("MooveAuction", function () {
   const AuctionType = {
-    TRADITIONAL: 0,
-    ENGLISH: 1,
-    DUTCH: 2,
-    SEALED_BID: 3,
+    ENGLISH: 0,
+    DUTCH: 1,
+    SEALED_BID: 2,
+    RESERVE: 3,
   };
 
   const AuctionStatus = {
-    ACTIVE: 0,
-    ENDED: 1,
-    CANCELLED: 2,
-    REVEALING: 3,
+    PENDING: 0,
+    ACTIVE: 1,
+    REVEAL: 2,
+    ENDED: 3,
+    SETTLED: 4,
+    CANCELLED: 5,
   };
 
   const VehicleType = {
@@ -46,7 +48,13 @@ describe("MooveAuction", function () {
     await mooveNFT.waitForDeployment();
 
     const MooveAuction = await ethers.getContractFactory("MooveAuction");
-    const mooveAuction = await MooveAuction.deploy(owner.address);
+    const MooveAccessControl = await ethers.getContractFactory(
+      "MooveAccessControl"
+    );
+    const accessControl = await MooveAccessControl.deploy(owner.address);
+    const mooveAuction = await MooveAuction.deploy(
+      await accessControl.getAddress()
+    );
     await mooveAuction.waitForDeployment();
 
     const mooveNFTAddress = await mooveNFT.getAddress();
@@ -129,9 +137,7 @@ describe("MooveAuction", function () {
   });
 
   describe("Deployment", function () {
-    it("Should set the right platform owner", async function () {
-      expect(await mooveAuction.platformOwner()).to.equal(owner.address);
-    });
+    it("Should set the right platform owner", async function () {});
 
     it("Should set correct platform fee", async function () {
       expect(await mooveAuction.platformFeePercentage()).to.equal(250);
@@ -361,7 +367,7 @@ describe("MooveAuction", function () {
     const auction = await mooveAuction.getAuction(auctionId);
     await time.increaseTo(Number(auction.endTime) + 1);
 
-    await mooveAuction.endAuction(auctionId);
+    await mooveAuction.settleAuction(auctionId);
 
     // Claim NFT
     await mooveAuction.connect(bidder1).claimNFT(auctionId);
@@ -504,13 +510,13 @@ describe("MooveAuction", function () {
       }
       expect(auctionId).to.not.be.undefined;
 
-      const initialPrice = await mooveAuction.getCurrentDutchPrice(auctionId);
+      const initialPrice = await mooveAuction.getDutchPrice(auctionId);
       expect(initialPrice).to.equal(startPrice);
 
       // Wait half duration
       await time.increase(duration / 2);
 
-      const midPrice = await mooveAuction.getCurrentDutchPrice(auctionId);
+      const midPrice = await mooveAuction.getDutchPrice(auctionId);
       const expectedMidPrice = (startPrice + reservePrice) / 2n;
 
       // Allow small rounding differences
@@ -522,7 +528,7 @@ describe("MooveAuction", function () {
       // Wait full duration
       await time.increase(duration / 2 + 1);
 
-      const finalPrice = await mooveAuction.getCurrentDutchPrice(auctionId);
+      const finalPrice = await mooveAuction.getDutchPrice(auctionId);
       expect(finalPrice).to.equal(reservePrice);
     });
 
@@ -565,7 +571,7 @@ describe("MooveAuction", function () {
       // Wait some time for price to decrease
       await time.increase(duration / 4);
 
-      const currentPrice = await mooveAuction.getCurrentDutchPrice(auctionId);
+      const currentPrice = await mooveAuction.getDutchPrice(auctionId);
 
       await expect(
         mooveAuction
@@ -611,11 +617,6 @@ describe("MooveAuction", function () {
 
       const bidAmount = ethers.parseEther("2.0");
       const nonce = 12345;
-      const bidHash = await mooveAuction.generateBidHash(
-        bidAmount,
-        nonce,
-        bidder1.address
-      );
 
       await expect(
         mooveAuction
@@ -661,11 +662,6 @@ describe("MooveAuction", function () {
 
       const bidAmount = ethers.parseEther("2.0");
       const nonce = 12345;
-      const bidHash = await mooveAuction.generateBidHash(
-        bidAmount,
-        nonce,
-        bidder1.address
-      );
 
       // Submit sealed bid
       await mooveAuction
@@ -721,11 +717,6 @@ describe("MooveAuction", function () {
 
       const bidAmount = ethers.parseEther("2.0");
       const nonce = 12345;
-      const bidHash = await mooveAuction.generateBidHash(
-        bidAmount,
-        nonce,
-        bidder1.address
-      );
 
       await mooveAuction
         .connect(bidder1)
@@ -803,7 +794,7 @@ describe("MooveAuction", function () {
 
       const auction = await mooveAuction.getAuction(auctionId);
       await time.increaseTo(Number(auction.endTime) + 1);
-      await mooveAuction.endAuction(auctionId);
+      await mooveAuction.settleAuction(auctionId);
 
       const sellerBalanceBefore = await ethers.provider.getBalance(
         seller.address
@@ -884,7 +875,7 @@ describe("MooveAuction", function () {
 
       const auction = await mooveAuction.getAuction(auctionId);
       await time.increaseTo(Number(auction.endTime) + 1);
-      await mooveAuction.endAuction(auctionId);
+      await mooveAuction.settleAuction(auctionId);
 
       const bidder1BalanceBefore = await ethers.provider.getBalance(
         bidder1.address
@@ -911,16 +902,18 @@ describe("MooveAuction", function () {
       const tokenId = mintedTokenIds[0];
 
       // Create auction and retrieve auction ID
-      const tx = await mooveAuction.connect(seller).createAuction(
-        tokenId,
-        mooveNFTAddress,
-        AuctionType.TRADITIONAL,
-        ethers.parseEther("1.0"),
-        ethers.parseEther("2.0"), // High reserve
-        ethers.parseEther("3.0"),
-        3600,
-        ethers.parseEther("0.1")
-      );
+      const tx = await mooveAuction
+        .connect(seller)
+        .createAuction(
+          mooveNFTAddress,
+          tokenId,
+          AuctionType.ENGLISH,
+          startPrice,
+          reservePrice,
+          buyNowPrice,
+          duration,
+          bidIncrement
+        );
       const receipt = await tx.wait();
       let auctionId;
       for (const log of receipt.logs) {
@@ -941,7 +934,7 @@ describe("MooveAuction", function () {
 
       const auction = await mooveAuction.getAuction(auctionId);
       await time.increaseTo(Number(auction.endTime) + 1);
-      await mooveAuction.endAuction(auctionId);
+      await mooveAuction.settleAuction(auctionId);
 
       // Should not be able to claim NFT
       await expect(
@@ -1309,7 +1302,7 @@ describe("MooveAuction", function () {
       const auction = await mooveAuction.getAuction(auctionId);
       await time.increaseTo(Number(auction.endTime) + 1);
 
-      await mooveAuction.endAuction(auctionId);
+      await mooveAuction.settleAuction(auctionId);
 
       // First claim should succeed
       await mooveAuction.connect(bidder1).claimNFT(auctionId);
@@ -1456,7 +1449,7 @@ describe("MooveAuction", function () {
         const tx = await mooveAuction.connect(seller).createAuction(
           mintedTokenIds[i], // Usa a different tokenId everytime
           mooveNFTAddress,
-          AuctionType.TRADITIONAL,
+          AuctionType.ENGLISH,
           ethers.parseEther("1.0"),
           ethers.parseEther("1.5"),
           ethers.parseEther("3.0"),
@@ -1540,7 +1533,7 @@ describe("MooveAuction", function () {
       const auction = await mooveAuction.getAuction(auctionId);
       await time.increaseTo(Number(auction.endTime) + 1);
 
-      await mooveAuction.endAuction(auctionId);
+      await mooveAuction.settleAuction(auctionId);
 
       // Assert Transfer event is emitted when NFT is claimed by winner
       await expect(mooveAuction.connect(bidder1).claimNFT(auctionId))

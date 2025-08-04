@@ -194,9 +194,24 @@ contract MooveAuction is ReentrancyGuard, Pausable {
 
     // ============= CONSTRUCTOR =============
 
-    constructor(address _accessControl) {
+    address public immutable mooveNFTContract;
+    address public immutable rentalPassContract;
+
+    constructor(
+        address _accessControl,
+        address _mooveNFTContract,
+        address _rentalPassContract
+    ) {
         require(_accessControl != address(0), "Invalid access control address");
+        require(_mooveNFTContract != address(0), "Invalid MooveNFT address");
+        require(
+            _rentalPassContract != address(0),
+            "Invalid RentalPass address"
+        );
+
         accessControl = MooveAccessControl(_accessControl);
+        mooveNFTContract = _mooveNFTContract;
+        rentalPassContract = _rentalPassContract;
     }
 
     // ============= AUCTION CREATION =============
@@ -223,6 +238,14 @@ contract MooveAuction is ReentrancyGuard, Pausable {
         uint256 bidIncrement
     ) external nonReentrant whenNotPaused returns (uint256 auctionId) {
         require(nftContract != address(0), "Invalid NFT contract");
+        require(
+            nftContract == mooveNFTContract,
+            "Only MooveNFT can be auctioned"
+        );
+        require(
+            nftContract != rentalPassContract,
+            "RentalPasses cannot be auctioned"
+        );
         require(startingPrice > 0, "Starting price must be greater than 0");
         require(
             duration >= MIN_AUCTION_DURATION &&
