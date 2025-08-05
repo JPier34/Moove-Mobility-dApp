@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.21;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
@@ -168,23 +168,29 @@ contract MooveRentalPass is
     }
 
     /**
-     * @dev Public function for single minting
+     * @dev Mint a rental pass
+     * @param to Address to mint to
+     * @param vehicleType Type of vehicle
+     * @param passName Name of the pass
+     * @param passDescription Description of the pass
+     * @param duration Duration in seconds
+     * @param metadataURI URI for the token metadata
      */
     function mintRentalPass(
         address to,
         VehicleType vehicleType,
-        string memory accessCode,
-        string memory location,
-        uint256 price,
-        string memory _tokenURI
+        string memory passName,
+        string memory passDescription,
+        uint256 duration,
+        string memory metadataURI
     ) external onlyAccessControlRole(accessControl.MINTER_ROLE()) nonReentrant {
         _mintRentalPass(
             to,
             vehicleType,
-            accessCode,
-            location,
-            price,
-            _tokenURI
+            passName,
+            passDescription,
+            duration,
+            metadataURI
         );
     }
 

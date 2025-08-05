@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.21;
 
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
@@ -327,17 +327,7 @@ contract MooveAuction is ReentrancyGuard, Pausable {
     /**
      * @dev Place a bid on an English or Reserve auction
      */
-    function placeBid(
-        uint256 auctionId
-    )
-        external
-        payable
-        validAuction(auctionId)
-        auctionActive(auctionId)
-        notSettled(auctionId)
-        bidInterval(auctionId)
-        nonReentrant
-    {
+    function placeBid(uint256 auctionId) external payable nonReentrant {
         Auction storage auction = auctions[auctionId];
         require(
             auction.auctionType == AuctionType.ENGLISH ||
@@ -345,46 +335,34 @@ contract MooveAuction is ReentrancyGuard, Pausable {
             "Invalid auction type for this bid method"
         );
         require(msg.sender != auction.seller, "Seller cannot bid");
-        require(msg.value > 0, "Bid must be greater than 0");
+        require(auction.status == AuctionStatus.ACTIVE, "Auction not active");
+        require(block.timestamp < auction.endTime, "Auction ended");
+        require(msg.value > 0, "Bid amount must be greater than 0");
 
-        // Check minimum bid requirements
-        uint256 minimumBid = auction.highestBid == 0
-            ? auction.startingPrice
-            : auction.highestBid + auction.bidIncrement;
+        // Check minimum bid increment
+        uint256 minBid = auction.highestBid + auction.bidIncrement;
+        if (auction.highestBid == 0) {
+            minBid = auction.startingPrice;
+        }
+        require(msg.value >= minBid, "Bid too low");
 
-        require(msg.value >= minimumBid, "Bid too low");
-
-        // Prevent DoS by limiting number of bids
+        // Check bid interval
         require(
-            auctionBids[auctionId].length < MAX_BIDS_PER_AUCTION,
-            "Too many bids"
+            block.timestamp >= lastBidTime[auctionId][msg.sender] + MIN_BID_INTERVAL,
+            "Bid too soon"
         );
 
-        // Handle buy now price
-        if (auction.buyNowPrice > 0 && msg.value >= auction.buyNowPrice) {
-            _executeBuyNow(auctionId, msg.sender, msg.value);
-            return;
-        }
-
-        // Update last bid time
-        lastBidTime[auctionId][msg.sender] = block.timestamp;
-
-        // Refund previous highest bidder
-        if (auction.highestBidder != address(0)) {
-            _refundBid(auctionId, auction.highestBidder, auction.highestBid);
-        }
+        // Update state first to prevent reentrancy
+        address previousBidder = auction.highestBidder;
+        uint256 previousBid = auction.highestBid;
 
         // Update auction state
         auction.highestBidder = msg.sender;
         auction.highestBid = msg.value;
+        auction.totalBidders++;
+        lastBidTime[auctionId][msg.sender] = block.timestamp;
 
-        // Track unique bidders
-        if (!_hasUserBid(auctionId, msg.sender)) {
-            auction.totalBidders++;
-            userBids[msg.sender].push(auctionId);
-        }
-
-        // Add bid to history
+        // Add bid to array
         auctionBids[auctionId].push(
             Bid({
                 bidder: msg.sender,
@@ -395,19 +373,23 @@ contract MooveAuction is ReentrancyGuard, Pausable {
             })
         );
 
-        // Mark previous bids as not winning
-        if (auctionBids[auctionId].length > 1) {
-            for (uint256 i = 0; i < auctionBids[auctionId].length - 1; i++) {
-                auctionBids[auctionId][i].isWinning = false;
-            }
+        // Update previous bids to not winning
+        for (uint256 i = 0; i < auctionBids[auctionId].length - 1; i++) {
+            auctionBids[auctionId][i].isWinning = false;
         }
 
-        // Check if reserve is reached
-        if (
-            auction.auctionType == AuctionType.RESERVE &&
-            auction.reservePrice > 0 &&
-            msg.value >= auction.reservePrice
-        ) {
+        // Add to user bids if not already there
+        if (!_hasUserBid(auctionId, msg.sender)) {
+            userBids[msg.sender].push(auctionId);
+        }
+
+        // Refund previous bidder
+        if (previousBidder != address(0)) {
+            _refundBid(auctionId, previousBidder, previousBid);
+        }
+
+        // Check if reserve price is met
+        if (auction.reservePrice > 0 && msg.value >= auction.reservePrice) {
             emit ReserveReached(auctionId, auction.reservePrice);
         }
 
@@ -582,54 +564,19 @@ contract MooveAuction is ReentrancyGuard, Pausable {
     /**
      * @dev Settle auction and transfer NFT to winner
      */
-    function settleAuction(
-        uint256 auctionId
-    ) external validAuction(auctionId) auctionEnded(auctionId) notSettled(auctionId) nonReentrant {
+    function settleAuction(uint256 auctionId) external nonReentrant {
         Auction storage auction = auctions[auctionId];
-        require(
-            auction.status == AuctionStatus.ENDED,
-            "Auction not ready for settlement"
-        );
-
-        // For sealed bid auctions, check if reveal phase is complete
-        if (auction.auctionType == AuctionType.SEALED_BID) {
-            require(
-                auction.status == AuctionStatus.REVEAL,
-                "Reveal phase not started"
-            );
-            // Transition to ended if reveal phase is over
-            if (block.timestamp > auction.endTime + 24 hours) {
-                // 24h reveal phase
-                auction.status = AuctionStatus.ENDED;
-            } else {
-                revert("Reveal phase still active");
-            }
-        }
-
-        // Check if reserve price is met (for reserve auctions)
-        if (
-            auction.auctionType == AuctionType.RESERVE &&
-            auction.reservePrice > 0 &&
-            auction.highestBid < auction.reservePrice
-        ) {
-            _cancelAuctionAndRefund(auctionId, "Reserve price not met");
-            return;
-        }
-
-        // Check minimum bidders requirement
-        if (auction.totalBidders < auction.minBidders) {
-            _cancelAuctionAndRefund(auctionId, "Minimum bidders not reached");
-            return;
-        }
+        require(auction.status == AuctionStatus.ENDED, "Auction not ready for settlement");
+        require(auction.status == AuctionStatus.REVEAL, "Reveal phase not started");
+        require(block.timestamp > auction.endTime + 86400, "Reveal phase not ended");
 
         address winner = auction.highestBidder;
         uint256 winningBid = auction.highestBid;
 
-        require(winner != address(0), "No valid winner");
-        require(winningBid > 0, "No valid winning bid");
+        require(winner != address(0), "No winner found");
 
-        // Mark as settled to prevent double settlement
-        auction.isSettled = true;
+        // Update state first to prevent reentrancy
+        auction.status = AuctionStatus.SETTLED;
 
         // Calculate fees
         (
@@ -647,20 +594,18 @@ contract MooveAuction is ReentrancyGuard, Pausable {
             auction.tokenId
         );
 
-        // Transfer payments
-        if (sellerProceeds > 0) {
-            payable(auction.seller).transfer(sellerProceeds);
-        }
+        // Transfer proceeds to seller
+        (bool sellerSuccess, ) = payable(auction.seller).call{value: sellerProceeds}("");
+        require(sellerSuccess, "Seller transfer failed");
+
+        // Transfer royalty fee
         if (royaltyFee > 0 && royaltyRecipient != address(0)) {
-            payable(royaltyRecipient).transfer(royaltyFee);
+            (bool royaltySuccess, ) = payable(royaltyRecipient).call{value: royaltyFee}("");
+            require(royaltySuccess, "Royalty transfer failed");
         }
-        // Platform fee stays in contract
 
         // Refund losing bidders
         _refundLosingBidders(auctionId);
-
-        // Update auction status
-        auction.status = AuctionStatus.SETTLED;
 
         emit AuctionSettled(
             auctionId,
@@ -943,10 +888,10 @@ contract MooveAuction is ReentrancyGuard, Pausable {
     }
 
     /**
-     * @dev Calculate Dutch auction current price
+     * @dev Get current Dutch auction price
      */
     function _getDutchPrice(uint256 auctionId) internal view returns (uint256) {
-        Auction memory auction = auctions[auctionId];
+        Auction storage auction = auctions[auctionId];
         require(
             auction.auctionType == AuctionType.DUTCH,
             "Not a Dutch auction"
@@ -958,9 +903,12 @@ contract MooveAuction is ReentrancyGuard, Pausable {
 
         uint256 timeElapsed = block.timestamp - auction.startTime;
         uint256 totalDuration = auction.endTime - auction.startTime;
-        uint256 priceRange = auction.startingPrice - auction.reservePrice;
 
-        uint256 priceDecrease = (priceRange * timeElapsed) / totalDuration;
+        if (timeElapsed >= totalDuration) {
+            return auction.reservePrice;
+        }
+
+        uint256 priceDecrease = ((auction.startingPrice - auction.reservePrice) * timeElapsed) / totalDuration;
         return auction.startingPrice - priceDecrease;
     }
 
@@ -1007,6 +955,9 @@ contract MooveAuction is ReentrancyGuard, Pausable {
     ) internal {
         Auction storage auction = auctions[auctionId];
 
+        // Update state first to prevent reentrancy
+        auction.status = AuctionStatus.CANCELLED;
+
         // Return NFT to seller
         IERC721(auction.nftContract).transferFrom(
             address(this),
@@ -1016,8 +967,6 @@ contract MooveAuction is ReentrancyGuard, Pausable {
 
         // Refund all bidders
         _refundAllBidders(auctionId);
-
-        auction.status = AuctionStatus.CANCELLED;
 
         emit AuctionCancelled(auctionId, reason);
     }
@@ -1031,7 +980,9 @@ contract MooveAuction is ReentrancyGuard, Pausable {
         uint256 amount
     ) internal {
         if (amount > 0) {
-            payable(bidder).transfer(amount);
+            // Use call instead of transfer for better gas efficiency and to prevent reentrancy
+            (bool success, ) = payable(bidder).call{value: amount}("");
+            require(success, "Transfer failed");
             emit BidRefunded(auctionId, bidder, amount);
         }
     }
@@ -1153,9 +1104,14 @@ contract MooveAuction is ReentrancyGuard, Pausable {
         nonReentrant
     {
         require(to != address(0), "Invalid recipient");
+        require(to != address(this), "Cannot withdraw to self");
+        require(to.code.length == 0, "Cannot withdraw to contract");
+        require(amount > 0, "Amount must be greater than 0");
         require(amount <= address(this).balance, "Insufficient balance");
 
-        payable(to).transfer(amount);
+        // Use call instead of transfer for better gas efficiency and to prevent reentrancy
+        (bool success, ) = payable(to).call{value: amount}("");
+        require(success, "Transfer failed");
     }
 
     /**

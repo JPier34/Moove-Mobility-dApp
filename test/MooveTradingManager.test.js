@@ -313,7 +313,7 @@ describe("MooveTradingManager", function () {
           .executeNFTTrade(mooveNFTAddress, nonExistentTokenId, {
             value: salePrice,
           })
-      ).to.be.revertedWith("NFT not for sale");
+      ).to.be.revertedWith("Sale not active");
     });
 
     it("Should fail if buyer is seller", async function () {
@@ -321,7 +321,7 @@ describe("MooveTradingManager", function () {
         mooveTradingManager
           .connect(seller)
           .executeNFTTrade(mooveNFTAddress, tokenId, { value: salePrice })
-      ).to.be.revertedWith("Cannot buy own NFT");
+      ).to.be.revertedWith("Cannot buy your own NFT");
     });
 
     it("Should fail with insufficient payment", async function () {
@@ -331,7 +331,7 @@ describe("MooveTradingManager", function () {
         mooveTradingManager
           .connect(buyer)
           .executeNFTTrade(mooveNFTAddress, tokenId, { value: lowPayment })
-      ).to.be.revertedWith("Insufficient payment");
+      ).to.be.revertedWith("Incorrect payment amount");
     });
 
     it("Should refund excess payment", async function () {

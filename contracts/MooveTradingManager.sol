@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.21;
 
 import "./MooveAccessControl.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 /**
  * @title MooveTradingManager
@@ -34,7 +35,7 @@ contract MooveTradingManager is ReentrancyGuard, Pausable {
     uint256 public marketplaceFeePercentage = 100; // 1%
 
     /// @dev Minimum trading fee in wei
-    uint256 public minimumTradingFee = 0.001 ether;
+    uint256 public constant minimumTradingFee = 0.001 ether;
 
     /// @dev Maximum trading fee percentage (10%)
     uint256 public constant MAX_TRADING_FEE = 1000;
@@ -206,50 +207,46 @@ contract MooveTradingManager is ReentrancyGuard, Pausable {
     }
 
     /**
-     * @dev Execute NFT trade with fee calculation
+     * @dev Execute NFT trade
      * @param nftContract Address of the NFT contract
      * @param tokenId Token ID to trade
      */
     function executeNFTTrade(
         address nftContract,
         uint256 tokenId
-    )
-        external
-        payable
-        onlyAuthorizedNFT(nftContract)
-        onlyWhenNotPaused
-        nonReentrant
-    {
+    ) external payable nonReentrant {
         SaleInfo storage sale = activeSales[nftContract][tokenId];
-        require(sale.isActive, "NFT not for sale");
-        require(sale.seller != msg.sender, "Cannot buy own NFT");
-        require(msg.value >= sale.price, "Insufficient payment");
+        require(sale.isActive, "Sale not active");
+        require(msg.value == sale.price, "Incorrect payment amount");
+        require(msg.sender != sale.seller, "Cannot buy your own NFT");
 
-        // Calculate fees
+        // Update state first to prevent reentrancy
+        sale.isActive = false;
+        customizationLocked[nftContract][tokenId] = false;
+
+        // Calculate trade details
         TradeDetails memory trade = _calculateTradeDetails(
             nftContract,
             tokenId,
             sale.seller,
             msg.sender,
-            msg.value
+            sale.price
         );
-
-        // Update trading statistics
-        _updateTradingStats(trade);
 
         // Process payments
         _processTradePayments(trade);
 
-        // Unlock customization for new owner
-        customizationLocked[nftContract][tokenId] = false;
-
-        // Deactivate sale
-        sale.isActive = false;
+        // Transfer NFT - use safeTransferFrom to prevent arbitrary from
+        IERC721(nftContract).safeTransferFrom(sale.seller, msg.sender, tokenId);
 
         // Refund excess payment
         if (msg.value > sale.price) {
-            payable(msg.sender).transfer(msg.value - sale.price);
+            (bool refundSuccess, ) = payable(msg.sender).call{value: msg.value - sale.price}("");
+            require(refundSuccess, "Refund failed");
         }
+
+        // Update statistics
+        _updateTradingStats(trade);
 
         emit NFTTradeCompleted(
             nftContract,
@@ -443,9 +440,14 @@ contract MooveTradingManager is ReentrancyGuard, Pausable {
         validAddress(to)
         nonReentrant
     {
+        require(to != address(this), "Cannot withdraw to self");
+        require(to.code.length == 0, "Cannot withdraw to contract");
+        require(amount > 0, "Amount must be greater than 0");
         require(amount <= address(this).balance, "Insufficient balance");
 
-        payable(to).transfer(amount);
+        // Use call instead of transfer for better gas efficiency and to prevent reentrancy
+        (bool success, ) = payable(to).call{value: amount}("");
+        require(success, "Transfer failed");
         emit FeesWithdrawn(to, amount);
     }
 
@@ -554,23 +556,28 @@ contract MooveTradingManager is ReentrancyGuard, Pausable {
      * @dev Process payments for a trade
      */
     function _processTradePayments(TradeDetails memory trade) internal {
-        // Send proceeds to seller
-        payable(trade.seller).transfer(trade.sellerProceeds);
+        require(trade.seller != address(0), "Invalid seller address");
+        require(trade.seller.code.length == 0, "Seller cannot be a contract");
+        require(trade.sellerProceeds > 0, "Invalid seller proceeds");
+        
+        // Send proceeds to seller using call for better security
+        (bool success, ) = payable(trade.seller).call{value: trade.sellerProceeds}("");
+        require(success, "Transfer to seller failed");
 
         // Keep fees in contract for later withdrawal to treasury
         // Trading fee and marketplace fee stay in contract balance
     }
 
     /**
-     * @dev Emergency withdrawal function
+     * @dev Emergency withdraw all funds to treasury
      */
-    function emergencyWithdraw()
-        external
-        onlyAccessControlRole(accessControl.MASTER_ADMIN_ROLE())
-        nonReentrant
-    {
+    function emergencyWithdraw() external onlyAccessControlRole(accessControl.MASTER_ADMIN_ROLE()) nonReentrant {
         uint256 balance = address(this).balance;
-        payable(treasury).transfer(balance);
+        require(balance > 0, "No funds to withdraw");
+
+        // Use call instead of transfer for better gas efficiency and to prevent reentrancy
+        (bool success, ) = payable(treasury).call{value: balance}("");
+        require(success, "Transfer failed");
         emit FeesWithdrawn(treasury, balance);
     }
 

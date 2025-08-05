@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.21;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
@@ -51,10 +51,10 @@ contract MooveNFT is
         StickerCategory category;
         StickerRarity rarity;
         address creator;
-        uint256 creationDate;
+        uint32 creationDate; // Packed: reduced from uint256
         bool isLimitedEdition;
-        uint256 editionSize;
-        uint256 editionNumber;
+        uint32 editionSize; // Packed: reduced from uint256
+        uint32 editionNumber; // Packed: reduced from uint256
         CustomizationOptions customization;
     }
 
@@ -69,7 +69,7 @@ contract MooveNFT is
 
     struct CustomizationHistory {
         address customizer;
-        uint256 timestamp;
+        uint32 timestamp; // Packed: reduced from uint256
         string changeDescription;
         string previousState;
         string newState;
@@ -123,6 +123,12 @@ contract MooveNFT is
         uint96 feeNumerator
     );
 
+    event NFTMinted(
+        uint256 indexed tokenId,
+        address indexed creator,
+        address indexed owner
+    );
+
     // ============= MODIFIERS =============
 
     modifier onlyAccessControlRole(bytes32 role) {
@@ -160,10 +166,10 @@ contract MooveNFT is
     // ============= CONSTRUCTOR =============
 
     constructor(
-        string memory name,
-        string memory symbol,
+        string memory tokenName,
+        string memory tokenSymbol,
         address _accessControl
-    ) ERC721(name, symbol) {
+    ) ERC721(tokenName, tokenSymbol) {
         require(_accessControl != address(0), "Invalid access control address");
         accessControl = MooveAccessControl(_accessControl);
 
@@ -174,77 +180,62 @@ contract MooveNFT is
     // ============= MINTING FUNCTIONS =============
 
     /**
-     * @dev Mint a new sticker NFT (only admins can create stickers)
+     * @dev Mint a new sticker NFT
+     * @param to Address to mint to
+     * @param stickerName Name of the sticker
+     * @param metadataURI URI for the token metadata
+     * @param category Sticker category
+     * @param rarity Sticker rarity
+     * @param isLimitedEdition Whether this is a limited edition
+     * @param editionSize Size of the edition (if limited)
+     * @param customizationOptions Customization options
+     * @param editionName Name of the edition (if limited)
+     * @param royaltyRecipient Address to receive royalties
+     * @param royaltyPercentage Royalty percentage (basis points)
      */
     function mintStickerNFT(
         address to,
-        string memory stickerName,
-        string memory stickerDescription,
+        string calldata stickerName, // Optimized: changed from memory to calldata
+        string calldata metadataURI, // Optimized: changed from memory to calldata
         StickerCategory category,
         StickerRarity rarity,
         bool isLimitedEdition,
         uint256 editionSize,
-        CustomizationOptions memory customizationOptions,
-        string memory _tokenURI,
+        CustomizationOptions calldata customizationOptions, // Optimized: changed from memory to calldata
+        string calldata editionName, // Optimized: changed from memory to calldata
         address royaltyRecipient,
         uint96 royaltyPercentage
-    )
-        public
-        onlyAccessControlRole(keccak256("CUSTOMIZATION_ADMIN_ROLE"))
-        nonReentrant
-    {
-        // Modify the mintStickerNFT to use internal function
+    ) external onlyAccessControlRole(keccak256("CUSTOMIZATION_ADMIN_ROLE")) {
         _mintStickerInternal(
             to,
             stickerName,
-            stickerDescription,
+            metadataURI,
             category,
             rarity,
             isLimitedEdition,
             editionSize,
             customizationOptions,
-            _tokenURI,
+            editionName,
             royaltyRecipient,
             royaltyPercentage
         );
     }
 
     /**
-     * @dev Simplified mint function for basic stickers
+     * @dev Mint a basic NFT
+     * @param to Address to mint to
+     * @param metadataURI URI for the token metadata
+     * @return tokenId The ID of the newly minted token
      */
     function mintNFT(
         address to,
-        string memory _tokenURI
-    ) external onlyAccessControlRole(keccak256("MINTER_ROLE")) {
-        // Create basic sticker with default options
-        CustomizationOptions memory defaultOptions = CustomizationOptions({
-            allowColorChange: true,
-            allowTextChange: true,
-            allowSizeChange: false,
-            allowEffectsChange: false,
-            availableColors: new string[](0),
-            maxTextLength: 50
-        });
-
-        // Use internal mint function with basic parameters
-        uint256 tokenId = _tokenIdCounter;
-        string memory stickerName = string(
-            abi.encodePacked("Moove Sticker #", _toString(tokenId))
-        );
-
-        _mintStickerInternal(
-            to,
-            stickerName,
-            "Customizable Moove sticker",
-            StickerCategory.VEHICLE_DECORATION,
-            StickerRarity.COMMON,
-            false,
-            0,
-            defaultOptions,
-            _tokenURI,
-            address(0),
-            0
-        );
+        string memory metadataURI
+    ) external onlyAccessControlRole(keccak256("MINTER_ROLE")) returns (uint256 tokenId) {
+        tokenId = _tokenIdCounter++;
+        _safeMint(to, tokenId);
+        _setTokenURI(tokenId, metadataURI);
+        emit NFTMinted(tokenId, msg.sender, to);
+        return tokenId;
     }
 
     /**
@@ -252,12 +243,12 @@ contract MooveNFT is
      */
     function batchMintLimitedEdition(
         address[] calldata recipients,
-        string memory editionName,
-        string memory editionDescription,
+        string calldata editionName, // Optimized: changed from memory to calldata
+        string calldata editionDescription, // Optimized: changed from memory to calldata
         StickerCategory category,
         StickerRarity rarity,
         uint256 editionSize,
-        CustomizationOptions memory customizationOptions,
+        CustomizationOptions calldata customizationOptions, // Optimized: changed from memory to calldata
         string[] calldata tokenURIs,
         address royaltyRecipient,
         uint96 royaltyPercentage
@@ -269,7 +260,8 @@ contract MooveNFT is
         require(recipients.length == tokenURIs.length, "Array length mismatch");
         require(recipients.length <= editionSize, "Exceeds edition size");
 
-        for (uint256 i = 0; i < recipients.length; i++) {
+        uint256 length = recipients.length;
+        for (uint256 i = 0; i < length;) { // Optimized: use unchecked increment
             // Call internal mint to avoid external modifier issues
             _mintStickerInternal(
                 recipients[i],
@@ -284,6 +276,7 @@ contract MooveNFT is
                 royaltyRecipient,
                 royaltyPercentage
             );
+            unchecked { i++; } // Optimized: unchecked increment
         }
     }
 
@@ -292,14 +285,14 @@ contract MooveNFT is
      */
     function _mintStickerInternal(
         address to,
-        string memory stickerName,
-        string memory stickerDescription,
+        string calldata stickerName, // Optimized: changed from memory to calldata
+        string calldata stickerDescription, // Optimized: changed from memory to calldata
         StickerCategory category,
         StickerRarity rarity,
         bool isLimitedEdition,
         uint256 editionSize,
-        CustomizationOptions memory customizationOptions,
-        string memory _tokenURI,
+        CustomizationOptions calldata customizationOptions, // Optimized: changed from memory to calldata
+        string calldata _tokenURI, // Optimized: changed from memory to calldata
         address royaltyRecipient,
         uint96 royaltyPercentage
     ) internal {
@@ -316,17 +309,17 @@ contract MooveNFT is
             ? _getNextEditionNumber(msg.sender, stickerName, editionSize)
             : 0;
 
-        // Create sticker struct
+        // Create sticker struct with packed data types
         stickers[tokenId] = StickerNFT({
             name: stickerName,
             description: stickerDescription,
             category: category,
             rarity: rarity,
             creator: msg.sender,
-            creationDate: block.timestamp,
+            creationDate: uint32(block.timestamp), // Optimized: packed
             isLimitedEdition: isLimitedEdition,
-            editionSize: editionSize,
-            editionNumber: editionNumber,
+            editionSize: uint32(editionSize), // Optimized: packed
+            editionNumber: uint32(editionNumber), // Optimized: packed
             customization: customizationOptions
         });
 
@@ -369,9 +362,9 @@ contract MooveNFT is
      */
     function customizeSticker(
         uint256 tokenId,
-        string memory changeDescription,
-        string memory newState,
-        string memory newTokenURI
+        string calldata changeDescription, // Optimized: changed from memory to calldata
+        string calldata newState, // Optimized: changed from memory to calldata
+        string calldata newTokenURI // Optimized: changed from memory to calldata
     )
         external
         onlyValidToken(tokenId)
@@ -393,11 +386,11 @@ contract MooveNFT is
             previousState = tokenURI(tokenId);
         }
 
-        // Add to customization history
+        // Add to customization history with packed timestamp
         customizationHistory[tokenId].push(
             CustomizationHistory({
                 customizer: msg.sender,
-                timestamp: block.timestamp,
+                timestamp: uint32(block.timestamp), // Optimized: packed
                 changeDescription: changeDescription,
                 previousState: previousState,
                 newState: newState
@@ -420,7 +413,7 @@ contract MooveNFT is
      */
     function updateCustomizationOptions(
         uint256 tokenId,
-        CustomizationOptions memory newOptions
+        CustomizationOptions calldata newOptions // Optimized: changed from memory to calldata
     )
         external
         onlyValidToken(tokenId)
