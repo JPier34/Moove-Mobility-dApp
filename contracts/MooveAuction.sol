@@ -51,6 +51,15 @@ contract MooveAuction is ReentrancyGuard, Pausable {
     /// @dev Minimum auction duration (1 hour)
     uint256 public constant MIN_AUCTION_DURATION = 1 hours;
 
+    /// @dev Maximum number of bids per auction to prevent DoS
+    uint256 public constant MAX_BIDS_PER_AUCTION = 1000;
+
+    /// @dev Minimum time between bids to prevent spam (5 minutes)
+    uint256 public constant MIN_BID_INTERVAL = 5 minutes;
+
+    /// @dev Mapping to track last bid time per user per auction
+    mapping(uint256 => mapping(address => uint256)) public lastBidTime;
+
     // ============= STRUCTS =============
 
     struct Auction {
@@ -72,6 +81,7 @@ contract MooveAuction is ReentrancyGuard, Pausable {
         bool allowPartialFulfillment;
         uint256 minBidders;
         uint256 totalBidders;
+        bool isSettled; // New field to prevent double settlement
     }
 
     struct Bid {
@@ -144,6 +154,8 @@ contract MooveAuction is ReentrancyGuard, Pausable {
 
     event AuctionCancelled(uint256 indexed auctionId, string reason);
 
+    event AuctionEnded(uint256 indexed auctionId);
+
     event BidRefunded(
         uint256 indexed auctionId,
         address indexed bidder,
@@ -192,26 +204,24 @@ contract MooveAuction is ReentrancyGuard, Pausable {
         _;
     }
 
+    modifier notSettled(uint256 auctionId) {
+        require(!auctions[auctionId].isSettled, "Auction already settled");
+        _;
+    }
+
+    modifier bidInterval(uint256 auctionId) {
+        require(
+            block.timestamp >= lastBidTime[auctionId][msg.sender] + MIN_BID_INTERVAL,
+            "Bid too soon"
+        );
+        _;
+    }
+
     // ============= CONSTRUCTOR =============
 
-    address public immutable mooveNFTContract;
-    address public immutable rentalPassContract;
-
-    constructor(
-        address _accessControl,
-        address _mooveNFTContract,
-        address _rentalPassContract
-    ) {
+    constructor(address _accessControl) {
         require(_accessControl != address(0), "Invalid access control address");
-        require(_mooveNFTContract != address(0), "Invalid MooveNFT address");
-        require(
-            _rentalPassContract != address(0),
-            "Invalid RentalPass address"
-        );
-
         accessControl = MooveAccessControl(_accessControl);
-        mooveNFTContract = _mooveNFTContract;
-        rentalPassContract = _rentalPassContract;
     }
 
     // ============= AUCTION CREATION =============
@@ -238,14 +248,6 @@ contract MooveAuction is ReentrancyGuard, Pausable {
         uint256 bidIncrement
     ) external nonReentrant whenNotPaused returns (uint256 auctionId) {
         require(nftContract != address(0), "Invalid NFT contract");
-        require(
-            nftContract == mooveNFTContract,
-            "Only MooveNFT can be auctioned"
-        );
-        require(
-            nftContract != rentalPassContract,
-            "RentalPasses cannot be auctioned"
-        );
         require(startingPrice > 0, "Starting price must be greater than 0");
         require(
             duration >= MIN_AUCTION_DURATION &&
@@ -299,7 +301,8 @@ contract MooveAuction is ReentrancyGuard, Pausable {
             status: AuctionStatus.ACTIVE,
             allowPartialFulfillment: false,
             minBidders: auctionType == AuctionType.SEALED_BID ? 2 : 1,
-            totalBidders: 0
+            totalBidders: 0,
+            isSettled: false
         });
 
         // Add to user's auctions
@@ -331,6 +334,8 @@ contract MooveAuction is ReentrancyGuard, Pausable {
         payable
         validAuction(auctionId)
         auctionActive(auctionId)
+        notSettled(auctionId)
+        bidInterval(auctionId)
         nonReentrant
     {
         Auction storage auction = auctions[auctionId];
@@ -349,11 +354,20 @@ contract MooveAuction is ReentrancyGuard, Pausable {
 
         require(msg.value >= minimumBid, "Bid too low");
 
+        // Prevent DoS by limiting number of bids
+        require(
+            auctionBids[auctionId].length < MAX_BIDS_PER_AUCTION,
+            "Too many bids"
+        );
+
         // Handle buy now price
         if (auction.buyNowPrice > 0 && msg.value >= auction.buyNowPrice) {
             _executeBuyNow(auctionId, msg.sender, msg.value);
             return;
         }
+
+        // Update last bid time
+        lastBidTime[auctionId][msg.sender] = block.timestamp;
 
         // Refund previous highest bidder
         if (auction.highestBidder != address(0)) {
@@ -410,6 +424,7 @@ contract MooveAuction is ReentrancyGuard, Pausable {
         payable
         validAuction(auctionId)
         auctionActive(auctionId)
+        notSettled(auctionId)
         nonReentrant
     {
         Auction storage auction = auctions[auctionId];
@@ -441,6 +456,8 @@ contract MooveAuction is ReentrancyGuard, Pausable {
         payable
         validAuction(auctionId)
         auctionActive(auctionId)
+        notSettled(auctionId)
+        bidInterval(auctionId)
         nonReentrant
     {
         Auction storage auction = auctions[auctionId];
@@ -454,6 +471,15 @@ contract MooveAuction is ReentrancyGuard, Pausable {
             sealedBids[auctionId][msg.sender] == bytes32(0),
             "Bid already submitted"
         );
+
+        // Prevent DoS by limiting number of bidders
+        require(
+            auction.totalBidders < MAX_BIDS_PER_AUCTION,
+            "Too many bidders"
+        );
+
+        // Update last bid time
+        lastBidTime[auctionId][msg.sender] = block.timestamp;
 
         // Store sealed bid hash and escrow payment
         sealedBids[auctionId][msg.sender] = bidHash;
@@ -485,7 +511,7 @@ contract MooveAuction is ReentrancyGuard, Pausable {
         uint256 auctionId,
         uint256 bidAmount,
         uint256 nonce
-    ) external validAuction(auctionId) nonReentrant {
+    ) external validAuction(auctionId) notSettled(auctionId) nonReentrant {
         Auction storage auction = auctions[auctionId];
         require(
             auction.auctionType == AuctionType.SEALED_BID,
@@ -536,36 +562,30 @@ contract MooveAuction is ReentrancyGuard, Pausable {
     // ============= AUCTION SETTLEMENT =============
 
     /**
+     * @dev End auction when time expires (can be called by anyone)
+     */
+    function endAuction(uint256 auctionId) external validAuction(auctionId) {
+        Auction storage auction = auctions[auctionId];
+        require(
+            auction.status == AuctionStatus.ACTIVE,
+            "Auction not active"
+        );
+        require(
+            block.timestamp >= auction.endTime,
+            "Auction not ended yet"
+        );
+
+        auction.status = AuctionStatus.ENDED;
+        emit AuctionEnded(auctionId);
+    }
+
+    /**
      * @dev Settle auction and transfer NFT to winner
      */
     function settleAuction(
         uint256 auctionId
-    ) external validAuction(auctionId) auctionEnded(auctionId) nonReentrant {
+    ) external validAuction(auctionId) auctionEnded(auctionId) notSettled(auctionId) nonReentrant {
         Auction storage auction = auctions[auctionId];
-
-        if (
-            auction.status == AuctionStatus.ACTIVE &&
-            block.timestamp > auction.endTime
-        ) {
-            auction.status = AuctionStatus.ENDED;
-        }
-
-        if (auction.auctionType == AuctionType.SEALED_BID) {
-            if (
-                auction.status == AuctionStatus.ACTIVE &&
-                block.timestamp > auction.endTime
-            ) {
-                // Reveal phase started
-                auction.status = AuctionStatus.REVEAL;
-                auction.endTime = block.timestamp + 24 hours;
-                return;
-            } else if (
-                auction.status == AuctionStatus.REVEAL &&
-                block.timestamp > auction.endTime
-            ) {
-                auction.status = AuctionStatus.ENDED;
-            }
-        }
         require(
             auction.status == AuctionStatus.ENDED,
             "Auction not ready for settlement"
@@ -607,6 +627,9 @@ contract MooveAuction is ReentrancyGuard, Pausable {
 
         require(winner != address(0), "No valid winner");
         require(winningBid > 0, "No valid winning bid");
+
+        // Mark as settled to prevent double settlement
+        auction.isSettled = true;
 
         // Calculate fees
         (
@@ -675,7 +698,7 @@ contract MooveAuction is ReentrancyGuard, Pausable {
     function cancelAuction(
         uint256 auctionId,
         string memory reason
-    ) external validAuction(auctionId) nonReentrant {
+    ) external validAuction(auctionId) notSettled(auctionId) nonReentrant {
         Auction storage auction = auctions[auctionId];
 
         require(
