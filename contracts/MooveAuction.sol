@@ -542,6 +542,30 @@ contract MooveAuction is ReentrancyGuard, Pausable {
         uint256 auctionId
     ) external validAuction(auctionId) auctionEnded(auctionId) nonReentrant {
         Auction storage auction = auctions[auctionId];
+
+        if (
+            auction.status == AuctionStatus.ACTIVE &&
+            block.timestamp > auction.endTime
+        ) {
+            auction.status = AuctionStatus.ENDED;
+        }
+
+        if (auction.auctionType == AuctionType.SEALED_BID) {
+            if (
+                auction.status == AuctionStatus.ACTIVE &&
+                block.timestamp > auction.endTime
+            ) {
+                // Reveal phase started
+                auction.status = AuctionStatus.REVEAL;
+                auction.endTime = block.timestamp + 24 hours;
+                return;
+            } else if (
+                auction.status == AuctionStatus.REVEAL &&
+                block.timestamp > auction.endTime
+            ) {
+                auction.status = AuctionStatus.ENDED;
+            }
+        }
         require(
             auction.status == AuctionStatus.ENDED,
             "Auction not ready for settlement"
