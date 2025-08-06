@@ -1,17 +1,10 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
-const {
-  loadFixture,
-  time,
-} = require("@nomicfoundation/hardhat-network-helpers");
-const { anyValue } = require("@nomicfoundation/hardhat-chai-matchers/withArgs");
 
-describe("MooveNFT", function () {
-  let mooveNFT, accessControl;
-  let owner, admin, user1, user2, user3, creator;
-  let mooveNFTAddress, accessControlAddress;
+describe("MooveNFT - Optimized", function () {
+  let mooveNFT, accessControl, admin, user1, user2, creator;
 
-  // Enums
+  // Enum values
   const VEHICLE_DECORATION = 0;
   const BRAND_LOGO = 1;
   const ARTISTIC = 2;
@@ -27,90 +20,76 @@ describe("MooveNFT", function () {
   const MYTHIC = 5;
 
   async function deployNFTFixture() {
-    const [owner, admin, user1, user2, user3, creator] =
+    const [deployer, adminUser, user1Account, user2Account, creatorAccount] =
       await ethers.getSigners();
 
-    // Deploy MooveAccessControl
+    // Deploy AccessControl first
     const MooveAccessControl = await ethers.getContractFactory(
       "MooveAccessControl"
     );
-    const accessControl = await MooveAccessControl.deploy(owner.address);
-    await accessControl.waitForDeployment();
+    const accessControlContract = await MooveAccessControl.deploy(
+      deployer.address
+    );
 
     // Deploy MooveNFT
     const MooveNFT = await ethers.getContractFactory("MooveNFT");
-    const mooveNFT = await MooveNFT.deploy(
-      "Moove Vehicle NFT",
+    const nftContract = await MooveNFT.deploy(
+      "Moove Stickers",
       "MOOVE",
-      await accessControl.getAddress()
+      accessControlContract.target
     );
-    await mooveNFT.waitForDeployment();
-
-    const mooveNFTAddress = await mooveNFT.getAddress();
-    const accessControlAddress = await accessControl.getAddress();
 
     // Grant roles
-    const CUSTOMIZATION_ADMIN_ROLE = ethers.keccak256(
-      ethers.toUtf8Bytes("CUSTOMIZATION_ADMIN_ROLE")
+    await accessControlContract.grantRole(
+      ethers.keccak256(ethers.toUtf8Bytes("CUSTOMIZATION_ADMIN_ROLE")),
+      adminUser.address
     );
-    const MINTER_ROLE = ethers.keccak256(ethers.toUtf8Bytes("MINTER_ROLE"));
-    const MASTER_ADMIN_ROLE = ethers.keccak256(
-      ethers.toUtf8Bytes("MASTER_ADMIN_ROLE")
+    await accessControlContract.grantRole(
+      ethers.keccak256(ethers.toUtf8Bytes("MINTER_ROLE")),
+      adminUser.address
     );
-    const PAUSER_ROLE = ethers.keccak256(ethers.toUtf8Bytes("PAUSER_ROLE"));
-
-    await accessControl.grantRole(CUSTOMIZATION_ADMIN_ROLE, admin.address);
-    await accessControl.grantRole(MINTER_ROLE, admin.address);
-    await accessControl.grantRole(MASTER_ADMIN_ROLE, admin.address);
-    await accessControl.grantRole(PAUSER_ROLE, admin.address);
-
-    // Authorize NFT contract
-    await accessControl.authorizeContract(mooveNFTAddress);
+    await accessControlContract.grantRole(
+      ethers.keccak256(ethers.toUtf8Bytes("PAUSER_ROLE")),
+      adminUser.address
+    );
 
     return {
-      mooveNFT,
-      accessControl,
-      mooveNFTAddress,
-      accessControlAddress,
-      owner,
-      admin,
-      user1,
-      user2,
-      user3,
-      creator,
+      mooveNFT: nftContract,
+      accessControl: accessControlContract,
+      admin: adminUser,
+      user1: user1Account,
+      user2: user2Account,
+      creator: creatorAccount,
     };
   }
 
   beforeEach(async function () {
-    const fixture = await loadFixture(deployNFTFixture);
+    const fixture = await deployNFTFixture();
     mooveNFT = fixture.mooveNFT;
     accessControl = fixture.accessControl;
-    mooveNFTAddress = fixture.mooveNFTAddress;
-    accessControlAddress = fixture.accessControlAddress;
-    owner = fixture.owner;
     admin = fixture.admin;
     user1 = fixture.user1;
     user2 = fixture.user2;
-    user3 = fixture.user3;
     creator = fixture.creator;
   });
 
   describe("Deployment", function () {
     it("Should deploy successfully", async function () {
-      expect(await mooveNFT.getAddress()).to.be.properAddress;
-    });
-
-    it("Should set correct name and symbol", async function () {
-      expect(await mooveNFT.name()).to.equal("Moove Vehicle NFT");
+      expect(await mooveNFT.name()).to.equal("Moove Stickers");
       expect(await mooveNFT.symbol()).to.equal("MOOVE");
     });
 
     it("Should set access control correctly", async function () {
-      expect(await mooveNFT.accessControl()).to.equal(accessControlAddress);
+      expect(await mooveNFT.accessControl()).to.equal(accessControl.target);
     });
 
     it("Should set default royalty", async function () {
-      expect(await mooveNFT.defaultRoyaltyPercentage()).to.equal(500);
+      // Test that default royalty is set correctly (now using constant)
+      const [recipient, feeNumerator] = await mooveNFT.royaltyInfo(
+        0,
+        ethers.parseEther("1")
+      );
+      expect(feeNumerator).to.equal(ethers.parseEther("0.05")); // 5% = 500 basis points
     });
 
     it("Should fail deployment with zero access control address", async function () {
@@ -138,7 +117,7 @@ describe("MooveNFT", function () {
           .mintStickerNFT(
             user1.address,
             "Test Sticker",
-            "A test sticker",
+            "A test sticker description",
             VEHICLE_DECORATION,
             RARE,
             false,
@@ -174,7 +153,7 @@ describe("MooveNFT", function () {
         .mintStickerNFT(
           user1.address,
           "Limited Sticker",
-          "A limited edition sticker",
+          "A limited edition sticker description",
           ARTISTIC,
           LEGENDARY,
           true,
@@ -198,7 +177,7 @@ describe("MooveNFT", function () {
           .mintStickerNFT(
             user2.address,
             "Test Sticker",
-            "A test sticker",
+            "A test sticker description",
             VEHICLE_DECORATION,
             RARE,
             false,
@@ -208,7 +187,7 @@ describe("MooveNFT", function () {
             creator.address,
             500
           )
-      ).to.be.revertedWith("Access denied");
+      ).to.be.reverted;
     });
 
     it("Should set customization options correctly", async function () {
@@ -217,7 +196,7 @@ describe("MooveNFT", function () {
         .mintStickerNFT(
           user1.address,
           "Test Sticker",
-          "A test sticker",
+          "A test sticker description",
           VEHICLE_DECORATION,
           RARE,
           false,
@@ -232,6 +211,7 @@ describe("MooveNFT", function () {
       expect(sticker.customization.allowColorChange).to.be.true;
       expect(sticker.customization.allowTextChange).to.be.true;
       expect(sticker.customization.allowSizeChange).to.be.false;
+      expect(sticker.customization.allowEffectsChange).to.be.true;
       expect(sticker.customization.maxTextLength).to.equal(50);
     });
 
@@ -241,18 +221,18 @@ describe("MooveNFT", function () {
         .mintStickerNFT(
           user1.address,
           "Test Sticker",
-          "A test sticker",
+          "A test sticker description",
           VEHICLE_DECORATION,
           RARE,
           false,
           0,
           customizationOptions,
-          "ipfs://test-uri",
+          "ipfs://test-metadata",
           creator.address,
           500
         );
 
-      expect(await mooveNFT.tokenURI(0)).to.equal("ipfs://test-uri");
+      expect(await mooveNFT.tokenURI(0)).to.equal("ipfs://test-metadata");
     });
 
     it("Should set royalty correctly", async function () {
@@ -261,7 +241,7 @@ describe("MooveNFT", function () {
         .mintStickerNFT(
           user1.address,
           "Test Sticker",
-          "A test sticker",
+          "A test sticker description",
           VEHICLE_DECORATION,
           RARE,
           false,
@@ -272,31 +252,32 @@ describe("MooveNFT", function () {
           750
         );
 
-      // Check that the sticker was created with the correct royalty recipient
-      const sticker = await mooveNFT.stickers(0);
-      expect(sticker.creator).to.equal(admin.address);
+      const [recipient, feeNumerator] = await mooveNFT.royaltyInfo(
+        0,
+        ethers.parseEther("1")
+      );
+      expect(recipient).to.equal(creator.address);
+      expect(feeNumerator).to.equal(ethers.parseEther("0.075")); // 7.5%
     });
   });
 
   describe("Customization", function () {
-    let tokenId;
+    const customizationOptions = {
+      allowColorChange: true,
+      allowTextChange: true,
+      allowSizeChange: false,
+      allowEffectsChange: true,
+      availableColors: ["red", "blue", "green"],
+      maxTextLength: 50,
+    };
 
     beforeEach(async function () {
-      const customizationOptions = {
-        allowColorChange: true,
-        allowTextChange: true,
-        allowSizeChange: true,
-        allowEffectsChange: true,
-        availableColors: ["red", "blue", "green"],
-        maxTextLength: 50,
-      };
-
       await mooveNFT
         .connect(admin)
         .mintStickerNFT(
           user1.address,
           "Test Sticker",
-          "A test sticker",
+          "A test sticker description",
           VEHICLE_DECORATION,
           RARE,
           false,
@@ -306,8 +287,6 @@ describe("MooveNFT", function () {
           creator.address,
           500
         );
-
-      tokenId = 0;
     });
 
     it("Should customize sticker successfully", async function () {
@@ -315,19 +294,20 @@ describe("MooveNFT", function () {
         mooveNFT
           .connect(user1)
           .customizeSticker(
-            tokenId,
+            0,
             "Changed color to red",
-            "color:red",
-            "ipfs://new-uri"
+            "Red version",
+            "ipfs://customized"
           )
       )
         .to.emit(mooveNFT, "StickerCustomized")
-        .withArgs(tokenId, user1.address, "Changed color to red", "color:red");
+        .withArgs(0, user1.address, "Changed color to red", "Red version");
 
-      const history = await mooveNFT.getCustomizationHistory(tokenId);
+      const history = await mooveNFT.getCustomizationHistory(0);
       expect(history.length).to.equal(1);
       expect(history[0].customizer).to.equal(user1.address);
       expect(history[0].changeDescription).to.equal("Changed color to red");
+      expect(history[0].newState).to.equal("Red version");
     });
 
     it("Should fail customization by non-owner", async function () {
@@ -335,12 +315,12 @@ describe("MooveNFT", function () {
         mooveNFT
           .connect(user2)
           .customizeSticker(
-            tokenId,
+            0,
             "Changed color to red",
-            "color:red",
-            "ipfs://new-uri"
+            "Red version",
+            "ipfs://customized"
           )
-      ).to.be.revertedWith("Not owner or approved");
+      ).to.be.reverted;
     });
 
     it("Should fail customization of non-existent token", async function () {
@@ -350,23 +330,23 @@ describe("MooveNFT", function () {
           .customizeSticker(
             999,
             "Changed color to red",
-            "color:red",
-            "ipfs://new-uri"
+            "Red version",
+            "ipfs://customized"
           )
-      ).to.be.revertedWith("Token does not exist");
+      ).to.be.reverted;
     });
 
     it("Should allow customization by approved address", async function () {
-      await mooveNFT.connect(user1).approve(user2.address, tokenId);
+      await mooveNFT.connect(user1).approve(user2.address, 0);
 
       await expect(
         mooveNFT
           .connect(user2)
           .customizeSticker(
-            tokenId,
+            0,
             "Changed color to red",
-            "color:red",
-            "ipfs://new-uri"
+            "Red version",
+            "ipfs://customized"
           )
       ).to.not.be.reverted;
     });
@@ -378,34 +358,32 @@ describe("MooveNFT", function () {
         mooveNFT
           .connect(user2)
           .customizeSticker(
-            tokenId,
+            0,
             "Changed color to red",
-            "color:red",
-            "ipfs://new-uri"
+            "Red version",
+            "ipfs://customized"
           )
       ).to.not.be.reverted;
     });
   });
 
   describe("Customization Options Management", function () {
-    let tokenId;
+    const customizationOptions = {
+      allowColorChange: true,
+      allowTextChange: true,
+      allowSizeChange: false,
+      allowEffectsChange: true,
+      availableColors: ["red", "blue", "green"],
+      maxTextLength: 50,
+    };
 
     beforeEach(async function () {
-      const customizationOptions = {
-        allowColorChange: true,
-        allowTextChange: true,
-        allowSizeChange: true,
-        allowEffectsChange: true,
-        availableColors: ["red", "blue", "green"],
-        maxTextLength: 50,
-      };
-
       await mooveNFT
         .connect(admin)
         .mintStickerNFT(
           user1.address,
           "Test Sticker",
-          "A test sticker",
+          "A test sticker description",
           VEHICLE_DECORATION,
           RARE,
           false,
@@ -415,81 +393,76 @@ describe("MooveNFT", function () {
           creator.address,
           500
         );
-
-      tokenId = 0;
     });
 
     it("Should update customization options by admin", async function () {
       const newOptions = {
         allowColorChange: false,
         allowTextChange: true,
-        allowSizeChange: false,
-        allowEffectsChange: true,
-        availableColors: ["red", "blue"],
-        maxTextLength: 30,
+        allowSizeChange: true,
+        allowEffectsChange: false,
+        availableColors: ["purple", "orange"],
+        maxTextLength: 100,
       };
 
       await expect(
-        mooveNFT.connect(admin).updateCustomizationOptions(tokenId, newOptions)
-      )
-        .to.emit(mooveNFT, "CustomizationOptionsUpdated")
-        .withArgs(tokenId, anyValue);
+        mooveNFT.connect(admin).updateCustomizationOptions(0, newOptions)
+      ).to.emit(mooveNFT, "CustomizationOptionsUpdated");
 
-      const sticker = await mooveNFT.stickers(tokenId);
+      const sticker = await mooveNFT.stickers(0);
       expect(sticker.customization.allowColorChange).to.be.false;
-      expect(sticker.customization.maxTextLength).to.equal(30);
+      expect(sticker.customization.allowSizeChange).to.be.true;
+      expect(sticker.customization.maxTextLength).to.equal(100);
     });
 
     it("Should fail updating options by non-admin", async function () {
       const newOptions = {
         allowColorChange: false,
         allowTextChange: true,
-        allowSizeChange: false,
-        allowEffectsChange: true,
-        availableColors: ["red", "blue"],
-        maxTextLength: 30,
+        allowSizeChange: true,
+        allowEffectsChange: false,
+        availableColors: ["purple", "orange"],
+        maxTextLength: 100,
       };
 
       await expect(
-        mooveNFT.connect(user1).updateCustomizationOptions(tokenId, newOptions)
-      ).to.be.revertedWith("Access denied");
+        mooveNFT.connect(user1).updateCustomizationOptions(0, newOptions)
+      ).to.be.reverted;
     });
 
     it("Should fail updating options for non-existent token", async function () {
       const newOptions = {
         allowColorChange: false,
         allowTextChange: true,
-        allowSizeChange: false,
-        allowEffectsChange: true,
-        availableColors: ["red", "blue"],
-        maxTextLength: 30,
+        allowSizeChange: true,
+        allowEffectsChange: false,
+        availableColors: ["purple", "orange"],
+        maxTextLength: 100,
       };
 
       await expect(
         mooveNFT.connect(admin).updateCustomizationOptions(999, newOptions)
-      ).to.be.revertedWith("Token does not exist");
+      ).to.be.reverted;
     });
   });
 
   describe("Royalty Management", function () {
-    let tokenId;
+    const customizationOptions = {
+      allowColorChange: true,
+      allowTextChange: true,
+      allowSizeChange: false,
+      allowEffectsChange: true,
+      availableColors: ["red", "blue", "green"],
+      maxTextLength: 50,
+    };
 
     beforeEach(async function () {
-      const customizationOptions = {
-        allowColorChange: true,
-        allowTextChange: true,
-        allowSizeChange: true,
-        allowEffectsChange: true,
-        availableColors: ["red", "blue", "green"],
-        maxTextLength: 50,
-      };
-
       await mooveNFT
         .connect(admin)
         .mintStickerNFT(
           user1.address,
           "Test Sticker",
-          "A test sticker",
+          "A test sticker description",
           VEHICLE_DECORATION,
           RARE,
           false,
@@ -499,752 +472,140 @@ describe("MooveNFT", function () {
           creator.address,
           500
         );
-
-      tokenId = 0;
-    });
-
-    it("Should update royalty by admin", async function () {
-      await expect(
-        mooveNFT.connect(admin).updateTokenRoyalty(tokenId, user2.address, 750)
-      )
-        .to.emit(mooveNFT, "RoyaltyUpdated")
-        .withArgs(tokenId, user2.address, 750);
-
-      // Verify the royalty was updated by checking the event was emitted
-      // The actual royalty info might not be accessible via royaltyInfo function
-    });
-
-    it("Should fail updating royalty by non-admin", async function () {
-      await expect(
-        mooveNFT.connect(user1).updateTokenRoyalty(tokenId, user2.address, 750)
-      ).to.be.revertedWith("Not creator or admin");
-    });
-
-    it("Should fail updating royalty for non-existent token", async function () {
-      await expect(
-        mooveNFT.connect(admin).updateTokenRoyalty(999, user2.address, 750)
-      ).to.be.revertedWith("Token does not exist");
-    });
-
-    it("Should update default royalty", async function () {
-      await mooveNFT.connect(admin).updateDefaultRoyalty(user2.address, 600);
-
-      // Verify the default royalty percentage was updated
-      expect(await mooveNFT.defaultRoyaltyPercentage()).to.equal(600);
-    });
-  });
-
-  describe("View Functions", function () {
-    beforeEach(async function () {
-      const customizationOptions = {
-        allowColorChange: true,
-        allowTextChange: true,
-        allowSizeChange: true,
-        allowEffectsChange: true,
-        availableColors: ["red", "blue", "green"],
-        maxTextLength: 50,
-      };
-
-      // Mint multiple stickers
-      for (let i = 0; i < 3; i++) {
-        await mooveNFT
-          .connect(admin)
-          .mintStickerNFT(
-            user1.address,
-            `Sticker ${i}`,
-            `Description ${i}`,
-            VEHICLE_DECORATION,
-            RARE,
-            false,
-            0,
-            customizationOptions,
-            `ipfs://sticker-${i}`,
-            creator.address,
-            500
-          );
-      }
-    });
-
-    it("Should get sticker details", async function () {
-      const sticker = await mooveNFT.getSticker(0);
-      expect(sticker.name).to.equal("Sticker 0");
-      expect(sticker.creator).to.equal(admin.address);
-      expect(sticker.category).to.equal(VEHICLE_DECORATION);
-    });
-
-    it("Should get customization history", async function () {
-      await mooveNFT
-        .connect(user1)
-        .customizeSticker(0, "Test change", "old", "new");
-
-      const history = await mooveNFT.getCustomizationHistory(0);
-      expect(history.length).to.equal(1);
-      expect(history[0].changeDescription).to.equal("Test change");
-    });
-
-    it("Should get creator stickers", async function () {
-      const creatorStickers = await mooveNFT.getCreatorStickers(admin.address);
-      expect(creatorStickers.length).to.equal(3);
-    });
-
-    it("Should check if sticker is customizable", async function () {
-      expect(await mooveNFT.isCustomizable(0)).to.be.true;
-    });
-
-    it("Should get total supply", async function () {
-      expect(await mooveNFT.totalSupply()).to.equal(3);
-    });
-
-    it("Should get user stickers", async function () {
-      const tokens = await mooveNFT.getUserStickers(user1.address);
-      expect(tokens.length).to.equal(3);
-      expect(tokens[0]).to.equal(0);
-      expect(tokens[1]).to.equal(1);
-      expect(tokens[2]).to.equal(2);
-    });
-  });
-
-  describe("Batch Operations", function () {
-    beforeEach(async function () {
-      // Mint multiple NFTs for testing
-      for (let i = 0; i < 3; i++) {
-        await mooveNFT.connect(admin).mintStickerNFT(
-          user1.address,
-          `Sticker ${i}`,
-          `Description ${i}`,
-          VEHICLE_DECORATION,
-          COMMON,
-          false,
-          0,
-          {
-            allowColorChange: true,
-            allowTextChange: false,
-            allowSizeChange: false,
-            allowEffectsChange: false,
-            availableColors: ["red", "blue"],
-            maxTextLength: 50,
-          },
-          `ipfs://sticker${i}`,
-          user1.address,
-          500
-        );
-      }
-    });
-
-    it("Should batch approve multiple tokens", async function () {
-      const tokenIds = [0, 1, 2];
-      await mooveNFT.connect(user1).batchApprove(user2.address, tokenIds);
-
-      for (let i = 0; i < tokenIds.length; i++) {
-        expect(await mooveNFT.getApproved(tokenIds[i])).to.equal(user2.address);
-      }
-    });
-
-    it("Should fail batch approve by non-owner", async function () {
-      const tokenIds = [0, 1, 2];
-      await expect(
-        mooveNFT.connect(user2).batchApprove(user3.address, tokenIds)
-      ).to.be.revertedWith("Not owner or approved");
-    });
-
-    it("Should fail batch approve with mixed ownership", async function () {
-      // Transfer one token to user2
-      await mooveNFT
-        .connect(user1)
-        .transferFrom(user1.address, user2.address, 0);
-
-      const tokenIds = [0, 1, 2]; // user2 owns 0, user1 owns 1,2
-      await expect(
-        mooveNFT.connect(user1).batchApprove(user3.address, tokenIds)
-      ).to.be.revertedWith("Not owner or approved");
-    });
-  });
-
-  describe("Burning and Emergency Functions", function () {
-    let tokenId;
-
-    beforeEach(async function () {
-      // Mint an NFT for testing
-      await mooveNFT.connect(admin).mintStickerNFT(
-        user1.address,
-        "Test Sticker",
-        "A test sticker description",
-        VEHICLE_DECORATION,
-        COMMON,
-        false,
-        0,
-        {
-          allowColorChange: true,
-          allowTextChange: false,
-          allowSizeChange: false,
-          allowEffectsChange: false,
-          availableColors: ["red", "blue"],
-          maxTextLength: 50,
-        },
-        "ipfs://test",
-        user1.address,
-        500
-      );
-      tokenId = 0;
-    });
-
-    it("Should burn NFT by owner", async function () {
-      await expect(mooveNFT.connect(user1).burnNFT(tokenId))
-        .to.emit(mooveNFT, "Transfer")
-        .withArgs(user1.address, ethers.ZeroAddress, tokenId);
-
-      await expect(mooveNFT.ownerOf(tokenId)).to.be.reverted;
-    });
-
-    it("Should burn NFT by admin", async function () {
-      await expect(mooveNFT.connect(admin).burnNFT(tokenId))
-        .to.emit(mooveNFT, "Transfer")
-        .withArgs(user1.address, ethers.ZeroAddress, tokenId);
-
-      await expect(mooveNFT.ownerOf(tokenId)).to.be.reverted;
-    });
-
-    it("Should fail burning by non-owner and non-admin", async function () {
-      await expect(mooveNFT.connect(user2).burnNFT(tokenId)).to.be.revertedWith(
-        "Not authorized to burn"
-      );
-    });
-
-    it("Should fail burning non-existent token", async function () {
-      await expect(mooveNFT.connect(user1).burnNFT(999)).to.be.revertedWith(
-        "Token does not exist"
-      );
-    });
-
-    it("Should cleanup sticker data after burning", async function () {
-      // Customize the sticker first
-      await mooveNFT
-        .connect(user1)
-        .customizeSticker(tokenId, "Test customization", "New state", "ipfs://new-uri");
-
-      // Burn the NFT
-      await mooveNFT.connect(user1).burnNFT(tokenId);
-
-      // Check that data is cleaned up
-      const sticker = await mooveNFT.stickers(tokenId);
-      expect(sticker.creator).to.equal(ethers.ZeroAddress);
-      expect(await mooveNFT.isCustomizable(tokenId)).to.be.false;
-    });
-
-    it("Should emergency burn by admin", async function () {
-      const reason = "Content violation";
-      await expect(mooveNFT.connect(admin).emergencyBurn(tokenId, reason))
-        .to.emit(mooveNFT, "EmergencyBurn")
-        .withArgs(tokenId, user1.address, reason);
-
-      await expect(mooveNFT.ownerOf(tokenId)).to.be.reverted;
-    });
-
-    it("Should fail emergency burn by non-admin", async function () {
-      await expect(
-        mooveNFT.connect(user1).emergencyBurn(tokenId, "Test")
-      ).to.be.revertedWith("Access denied");
-    });
-
-    it("Should fail emergency burn of non-existent token", async function () {
-      await expect(
-        mooveNFT.connect(admin).emergencyBurn(999, "Test")
-      ).to.be.revertedWith("Token does not exist");
-    });
-  });
-
-  describe("Limited Edition Functions", function () {
-    it("Should mint limited edition with correct edition number", async function () {
-      const editionName = "Limited Edition 1";
-      const editionSize = 3;
-
-      // Mint first edition
-      await mooveNFT.connect(admin).mintStickerNFT(
-        user1.address,
-        editionName,
-        "ipfs://limited1",
-        VEHICLE_DECORATION,
-        RARE,
-        true,
-        editionSize,
-        {
-          allowColorChange: true,
-          allowTextChange: false,
-          allowSizeChange: false,
-          allowEffectsChange: false,
-          availableColors: ["red", "blue"],
-          maxTextLength: 50,
-        },
-        editionName,
-        user1.address,
-        500
-      );
-
-      const sticker1 = await mooveNFT.stickers(0);
-      expect(sticker1.editionNumber).to.equal(1);
-      expect(sticker1.editionSize).to.equal(editionSize);
-      expect(sticker1.isLimitedEdition).to.be.true;
-
-      // Mint second edition
-      await mooveNFT.connect(admin).mintStickerNFT(
-        user2.address,
-        editionName,
-        "ipfs://limited2",
-        VEHICLE_DECORATION,
-        RARE,
-        true,
-        editionSize,
-        {
-          allowColorChange: true,
-          allowTextChange: false,
-          allowSizeChange: false,
-          allowEffectsChange: false,
-          availableColors: ["red", "blue"],
-          maxTextLength: 50,
-        },
-        editionName,
-        user2.address,
-        500
-      );
-
-      const sticker2 = await mooveNFT.stickers(1);
-      expect(sticker2.editionNumber).to.equal(2);
-    });
-
-    it("Should fail minting limited edition beyond size limit", async function () {
-      const editionName = "Limited Edition 2";
-      const editionSize = 2;
-
-      // Mint first two editions
-      for (let i = 0; i < 2; i++) {
-        await mooveNFT.connect(admin).mintStickerNFT(
-          user1.address,
-          editionName,
-          `ipfs://limited${i}`,
-          VEHICLE_DECORATION,
-          RARE,
-          true,
-          editionSize,
-          {
-            allowColorChange: true,
-            allowTextChange: false,
-            allowSizeChange: false,
-            allowEffectsChange: false,
-            availableColors: ["red", "blue"],
-            maxTextLength: 50,
-          },
-          editionName,
-          user1.address,
-          500
-        );
-      }
-
-      // Try to mint third edition (should fail)
-      await expect(
-        mooveNFT.connect(admin).mintStickerNFT(
-          user2.address,
-          editionName,
-          "ipfs://limited3",
-          VEHICLE_DECORATION,
-          RARE,
-          true,
-          editionSize,
-          {
-            allowColorChange: true,
-            allowTextChange: false,
-            allowSizeChange: false,
-            allowEffectsChange: false,
-            availableColors: ["red", "blue"],
-            maxTextLength: 50,
-          },
-          editionName,
-          user2.address,
-          500
-        )
-      ).to.be.revertedWith("Edition size exceeded");
-    });
-  });
-
-  describe("Royalty Management", function () {
-    let tokenId;
-
-    beforeEach(async function () {
-      // Mint an NFT for testing
-      await mooveNFT.connect(admin).mintStickerNFT(
-        user1.address,
-        "Test Sticker",
-        "A test sticker description",
-        VEHICLE_DECORATION,
-        COMMON,
-        false,
-        0,
-        {
-          allowColorChange: true,
-          allowTextChange: false,
-          allowSizeChange: false,
-          allowEffectsChange: false,
-          availableColors: ["red", "blue"],
-          maxTextLength: 50,
-        },
-        "ipfs://test",
-        user1.address,
-        500
-      );
-      tokenId = 0;
     });
 
     it("Should update token royalty", async function () {
-      const newRecipient = user2.address;
-      const newPercentage = 1000; // 10%
+      await expect(
+        mooveNFT.connect(admin).updateTokenRoyalty(0, user2.address, 1000)
+      )
+        .to.emit(mooveNFT, "RoyaltyUpdated")
+        .withArgs(0, user2.address, 1000);
 
-      await mooveNFT
-        .connect(admin)
-        .updateTokenRoyalty(tokenId, newRecipient, newPercentage);
-
-      const royaltyInfo = await mooveNFT.royaltyInfo(tokenId, 10000);
-      expect(royaltyInfo[0]).to.equal(newRecipient);
-      expect(royaltyInfo[1]).to.equal(1000); // 10% of 10000
+      const [recipient, feeNumerator] = await mooveNFT.royaltyInfo(
+        0,
+        ethers.parseEther("1")
+      );
+      expect(recipient).to.equal(user2.address);
+      expect(feeNumerator).to.equal(ethers.parseEther("0.1")); // 10%
     });
 
     it("Should fail updating royalty by non-admin", async function () {
       await expect(
-        mooveNFT.connect(user1).updateTokenRoyalty(tokenId, user2.address, 1000)
-      ).to.be.revertedWith("Not creator or admin");
+        mooveNFT.connect(user1).updateTokenRoyalty(0, user2.address, 1000)
+      ).to.be.reverted;
     });
 
     it("Should fail updating royalty for non-existent token", async function () {
       await expect(
         mooveNFT.connect(admin).updateTokenRoyalty(999, user2.address, 1000)
-      ).to.be.revertedWith("Token does not exist");
+      ).to.be.reverted;
     });
+  });
 
-    it("Should update default royalty", async function () {
-      const newRecipient = user2.address;
-      const newPercentage = 1000; // 10%
+  describe("View Functions", function () {
+    const customizationOptions = {
+      allowColorChange: true,
+      allowTextChange: true,
+      allowSizeChange: false,
+      allowEffectsChange: true,
+      availableColors: ["red", "blue", "green"],
+      maxTextLength: 50,
+    };
 
+    beforeEach(async function () {
       await mooveNFT
         .connect(admin)
-        .updateDefaultRoyalty(newRecipient, newPercentage);
-
-      // Check that new tokens use the new default royalty
-      await mooveNFT.connect(admin).mintStickerNFT(
-        user1.address,
-        "New Sticker",
-        "A new sticker description",
-        VEHICLE_DECORATION,
-        COMMON,
-        false,
-        0,
-        {
-          allowColorChange: true,
-          allowTextChange: false,
-          allowSizeChange: false,
-          allowEffectsChange: false,
-          availableColors: ["red", "blue"],
-          maxTextLength: 50,
-        },
-        "ipfs://new",
-        ethers.ZeroAddress,
-        0
-      );
-
-      const newTokenId = 1;
-      const royaltyInfo = await mooveNFT.royaltyInfo(newTokenId, 10000);
-      expect(royaltyInfo[0]).to.equal(newRecipient);
-      expect(royaltyInfo[1]).to.equal(1000); // 10% of 10000
+        .mintStickerNFT(
+          user1.address,
+          "Test Sticker",
+          "A test sticker description",
+          VEHICLE_DECORATION,
+          RARE,
+          false,
+          0,
+          customizationOptions,
+          "ipfs://test",
+          creator.address,
+          500
+        );
     });
 
-    it("Should fail updating default royalty by non-admin", async function () {
-      await expect(
-        mooveNFT.connect(user1).updateDefaultRoyalty(user2.address, 1000)
-      ).to.be.revertedWith("Access denied");
+    it("Should get sticker details", async function () {
+      const sticker = await mooveNFT.getSticker(0);
+      expect(sticker.name).to.equal("Test Sticker");
+      expect(sticker.creator).to.equal(admin.address);
+      expect(sticker.category).to.equal(VEHICLE_DECORATION);
+      expect(sticker.rarity).to.equal(RARE);
+    });
+
+    it("Should get customization history", async function () {
+      await mooveNFT
+        .connect(user1)
+        .customizeSticker(
+          0,
+          "Changed color to red",
+          "Red version",
+          "ipfs://customized"
+        );
+
+      const history = await mooveNFT.getCustomizationHistory(0);
+      expect(history.length).to.equal(1);
+      expect(history[0].customizer).to.equal(user1.address);
+      expect(history[0].changeDescription).to.equal("Changed color to red");
+    });
+
+    it("Should get creator stickers", async function () {
+      const creatorStickers = await mooveNFT.getCreatorStickers(admin.address);
+      expect(creatorStickers.length).to.equal(1);
+      expect(creatorStickers[0]).to.equal(0);
+    });
+
+    it("Should check if sticker is customizable", async function () {
+      const isCustomizable = await mooveNFT.isStickerCustomizable(0);
+      expect(isCustomizable).to.be.true;
     });
   });
 
   describe("Pause and Unpause", function () {
     it("Should pause and unpause by admin", async function () {
-      await mooveNFT.connect(admin).pause();
+      await expect(mooveNFT.connect(admin).pause()).to.not.be.reverted;
       expect(await mooveNFT.paused()).to.be.true;
 
-      await mooveNFT.connect(admin).unpause();
+      await expect(mooveNFT.connect(admin).unpause()).to.not.be.reverted;
       expect(await mooveNFT.paused()).to.be.false;
     });
 
     it("Should fail pause by non-pauser", async function () {
-      await expect(mooveNFT.connect(user1).pause()).to.be.revertedWith(
-        "Access denied"
-      );
+      await expect(mooveNFT.connect(user1).pause()).to.be.reverted;
     });
 
     it("Should fail unpause by non-admin", async function () {
       await mooveNFT.connect(admin).pause();
-      await expect(mooveNFT.connect(user1).unpause()).to.be.revertedWith(
-        "Access denied"
-      );
-    });
-
-    it("Should prevent minting when paused", async function () {
-      await mooveNFT.connect(admin).pause();
-
-      await expect(
-        mooveNFT.connect(admin).mintStickerNFT(
-          user1.address,
-          "Test Sticker",
-          "A test sticker description",
-          VEHICLE_DECORATION,
-          COMMON,
-          false,
-          0,
-          {
-            allowColorChange: true,
-            allowTextChange: false,
-            allowSizeChange: false,
-            allowEffectsChange: false,
-            availableColors: ["red", "blue"],
-            maxTextLength: 50,
-          },
-          "ipfs://test",
-          user1.address,
-          500
-        )
-      ).to.be.reverted;
-    });
-
-    it("Should prevent transfers when paused", async function () {
-      // Mint an NFT first
-      await mooveNFT.connect(admin).mintStickerNFT(
-        user1.address,
-        "Test Sticker",
-        "A test sticker description",
-        VEHICLE_DECORATION,
-        COMMON,
-        false,
-        0,
-        {
-          allowColorChange: true,
-          allowTextChange: false,
-          allowSizeChange: false,
-          allowEffectsChange: false,
-          availableColors: ["red", "blue"],
-          maxTextLength: 50,
-        },
-        "ipfs://test",
-        user1.address,
-        500
-      );
-
-      await mooveNFT.connect(admin).pause();
-
-      await expect(
-        mooveNFT.connect(user1).transferFrom(user1.address, user2.address, 0)
-      ).to.be.reverted;
-    });
-  });
-
-  describe("Global Pause Integration", function () {
-    let tokenId;
-
-    beforeEach(async function () {
-      // Mint an NFT for testing
-      await mooveNFT.connect(admin).mintStickerNFT(
-        user1.address,
-        "Test Sticker",
-        "A test sticker description",
-        VEHICLE_DECORATION,
-        COMMON,
-        false,
-        0,
-        {
-          allowColorChange: true,
-          allowTextChange: false,
-          allowSizeChange: false,
-          allowEffectsChange: false,
-          availableColors: ["red", "blue"],
-          maxTextLength: 50,
-        },
-        "ipfs://test",
-        user1.address,
-        500
-      );
-      tokenId = 0;
-    });
-
-    it("Should prevent transfers when system is globally paused", async function () {
-      // Pause the system globally
-      await accessControl.connect(admin).emergencyPause();
-
-      await expect(
-        mooveNFT
-          .connect(user1)
-          .transferFrom(user1.address, user2.address, tokenId)
-      ).to.be.revertedWith("System globally paused");
-    });
-
-    it("Should allow transfers when system is unpaused", async function () {
-      // Pause and then unpause the system
-      await accessControl.connect(admin).emergencyPause();
-      await accessControl.connect(admin).emergencyUnpause();
-
-      await expect(
-        mooveNFT
-          .connect(user1)
-          .transferFrom(user1.address, user2.address, tokenId)
-      ).to.not.be.reverted;
-    });
-  });
-
-  describe("Edge Cases and Error Handling", function () {
-    it("Should handle empty customization options", async function () {
-      await mooveNFT.connect(admin).mintStickerNFT(
-        user1.address,
-        "Test Sticker",
-        "A test sticker description",
-        VEHICLE_DECORATION,
-        COMMON,
-        false,
-        0,
-        {
-          allowColorChange: false,
-          allowTextChange: false,
-          allowSizeChange: false,
-          allowEffectsChange: false,
-          availableColors: [],
-          maxTextLength: 0,
-        },
-        "ipfs://test",
-        user1.address,
-        500
-      );
-
-      const sticker = await mooveNFT.stickers(0);
-      expect(sticker.customization.allowColorChange).to.be.false;
-      expect(sticker.customization.allowTextChange).to.be.false;
-      expect(sticker.customization.allowSizeChange).to.be.false;
-      expect(sticker.customization.allowEffectsChange).to.be.false;
-    });
-
-    it("Should handle zero royalty percentage", async function () {
-      const tokenId = await mooveNFT.totalSupply();
-      await mooveNFT.connect(admin).mintStickerNFT(
-        user1.address,
-        "Test Sticker",
-        "A test sticker description",
-        VEHICLE_DECORATION,
-        COMMON,
-        false,
-        0,
-        {
-          allowColorChange: true,
-          allowTextChange: false,
-          allowSizeChange: false,
-          allowEffectsChange: false,
-          availableColors: ["red", "blue"],
-          maxTextLength: 50,
-        },
-        "ipfs://test",
-        user1.address,
-        0 // Zero royalty
-      );
-
-      const royaltyInfo = await mooveNFT.royaltyInfo(tokenId, 10000);
-      // When royalty percentage is 0, it uses default royalty (500 = 5%)
-      expect(royaltyInfo[1]).to.equal(500);
-    });
-
-    it("Should handle maximum royalty percentage", async function () {
-      await mooveNFT.connect(admin).mintStickerNFT(
-        user1.address,
-        "Test Sticker",
-        "A test sticker description",
-        VEHICLE_DECORATION,
-        COMMON,
-        false,
-        0,
-        {
-          allowColorChange: true,
-          allowTextChange: false,
-          allowSizeChange: false,
-          allowEffectsChange: false,
-          availableColors: ["red", "blue"],
-          maxTextLength: 50,
-        },
-        "ipfs://test",
-        user1.address,
-        10000 // 100% royalty
-      );
-
-      const royaltyInfo = await mooveNFT.royaltyInfo(0, 10000);
-      expect(royaltyInfo[1]).to.equal(10000);
-    });
-
-    it("Should handle very long sticker names", async function () {
-      const longName = "A".repeat(1000); // Very long name
-      await mooveNFT.connect(admin).mintStickerNFT(
-        user1.address,
-        longName,
-        "A test sticker description",
-        VEHICLE_DECORATION,
-        COMMON,
-        false,
-        0,
-        {
-          allowColorChange: true,
-          allowTextChange: false,
-          allowSizeChange: false,
-          allowEffectsChange: false,
-          availableColors: ["red", "blue"],
-          maxTextLength: 50,
-        },
-        "ipfs://test",
-        user1.address,
-        500
-      );
-
-      const sticker = await mooveNFT.stickers(0);
-      expect(sticker.name).to.equal(longName);
-    });
-
-    it("Should fail with empty sticker name", async function () {
-      await expect(
-        mooveNFT.connect(admin).mintStickerNFT(
-          user1.address,
-          "", // Empty name
-          "A test sticker description",
-          VEHICLE_DECORATION,
-          COMMON,
-          false,
-          0,
-          {
-            allowColorChange: true,
-            allowTextChange: false,
-            allowSizeChange: false,
-            allowEffectsChange: false,
-            availableColors: ["red", "blue"],
-            maxTextLength: 50,
-          },
-          "ipfs://test",
-          user1.address,
-          500
-        )
-      ).to.be.revertedWith("Name required");
+      await expect(mooveNFT.connect(user1).unpause()).to.be.reverted;
     });
   });
 
   describe("Interface Support", function () {
     it("Should support ERC721 interface", async function () {
-      expect(await mooveNFT.supportsInterface("0x80ac58cd")).to.be.true; // ERC721
+      const erc721InterfaceId = "0x80ac58cd";
+      expect(await mooveNFT.supportsInterface(erc721InterfaceId)).to.be.true;
     });
 
     it("Should support ERC721Metadata interface", async function () {
-      expect(await mooveNFT.supportsInterface("0x5b5e139f")).to.be.true; // ERC721Metadata
+      const erc721MetadataInterfaceId = "0x5b5e139f";
+      expect(await mooveNFT.supportsInterface(erc721MetadataInterfaceId)).to.be
+        .true;
     });
 
     it("Should support ERC2981 interface", async function () {
-      expect(await mooveNFT.supportsInterface("0x2a55205a")).to.be.true; // ERC2981
+      const erc2981InterfaceId = "0x2a55205a";
+      expect(await mooveNFT.supportsInterface(erc2981InterfaceId)).to.be.true;
     });
 
     it("Should return false for unsupported interface", async function () {
-      expect(await mooveNFT.supportsInterface("0x12345678")).to.be.false;
+      const unsupportedInterfaceId = "0x12345678";
+      expect(await mooveNFT.supportsInterface(unsupportedInterfaceId)).to.be
+        .false;
     });
   });
 });

@@ -3,6 +3,8 @@ import "@nomicfoundation/hardhat-toolbox";
 import "hardhat-gas-reporter";
 import "solidity-coverage";
 import "@nomicfoundation/hardhat-verify";
+import "hardhat-deploy";
+import "hardhat-deploy-ethers";
 import * as dotenv from "dotenv";
 require("dotenv").config();
 require("hardhat-contract-sizer");
@@ -47,17 +49,26 @@ const config: HardhatUserConfig = {
     currency: "USD",
   },
   etherscan: {
-    apiKey: process.env.ETHERSCAN_API_KEY,
+    apiKey: {
+      sepolia: process.env.ETHERSCAN_API_KEY || "",
+      mainnet: process.env.ETHERSCAN_API_KEY || "",
+    },
   },
   paths: {
     sources: "./contracts",
     tests: "./test",
     cache: "./cache",
     artifacts: "./artifacts",
+    deploy: "./deploy",
   },
   mocha: {
     timeout: 40000,
     require: [`ts-node/register`],
+  },
+  namedAccounts: {
+    deployer: {
+      default: 0,
+    },
   },
 };
 
