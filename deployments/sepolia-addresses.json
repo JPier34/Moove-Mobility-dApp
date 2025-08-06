@@ -1,0 +1,13 @@
+{
+  "network": "sepolia",
+  "deployer": "0x777382955f33Bb8540602E914D9b650C962EF6Cc",
+  "contracts": {
+    "accessControl": "0x005672EcC14b09A958742B960Ebb76eBE52Be44A",
+    "mooveNFT": "0x40E455515bf712144C1A5D859F19d64b537754f7",
+    "customization": "0x186243d36a19f05b6830AEdADB72a68079fB1852",
+    "rentalPass": "0x74aAb47A0439B728A5956A1d7faAc6716F1F18Df",
+    "tradingManager": "0x62E1C3c912DD70AC99241e3814Cf26e10A6AD889",
+    "auction": "0x329203985A29E3c78aD140B0D3e383D2fE58d832"
+  },
+  "deploymentTime": "2025-08-06T10:47:37.220Z"
+}

@@ -1,0 +1,1711 @@
+{
+  "address": "0x186243d36a19f05b6830AEdADB72a68079fB1852",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_mooveNFT",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "_admin",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "inputs": [],
+      "name": "AccessControlBadConfirmation",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "neededRole",
+          "type": "bytes32"
+        }
+      ],
+      "name": "AccessControlUnauthorizedAccount",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "EnforcedPause",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ExpectedPause",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ReentrancyGuardReentrantCall",
+      "type": "error"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "tokenId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "customizationId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "owner",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "price",
+          "type": "uint256"
+        }
+      ],
+      "name": "CustomizationApplied",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "customizationId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "indexed": false,
+          "internalType": "enum CustomizationType",
+          "name": "custType",
+          "type": "uint8"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "price",
+          "type": "uint256"
+        }
+      ],
+      "name": "CustomizationCreated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "customizationId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "oldPrice",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "newPrice",
+          "type": "uint256"
+        }
+      ],
+      "name": "CustomizationPriceUpdated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "tokenId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "customizationId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "owner",
+          "type": "address"
+        }
+      ],
+      "name": "CustomizationRemoved",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "Paused",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "role",
+          "type": "bytes32"
+        },
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "previousAdminRole",
+          "type": "bytes32"
+        },
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "newAdminRole",
+          "type": "bytes32"
+        }
+      ],
+      "name": "RoleAdminChanged",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "role",
+          "type": "bytes32"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "sender",
+          "type": "address"
+        }
+      ],
+      "name": "RoleGranted",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "role",
+          "type": "bytes32"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "sender",
+          "type": "address"
+        }
+      ],
+      "name": "RoleRevoked",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "Unpaused",
+      "type": "event"
+    },
+    {
+      "inputs": [],
+      "name": "CUSTOMIZATION_ADMIN_ROLE",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "DEFAULT_ADMIN_ROLE",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "MAX_CUSTOMIZATIONS_PER_VEHICLE",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "MAX_PERFORMANCE_BONUS",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "PRICE_MANAGER_ROLE",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "tokenId",
+          "type": "uint256"
+        },
+        {
+          "components": [
+            {
+              "internalType": "string",
+              "name": "colorCode",
+              "type": "string"
+            },
+            {
+              "internalType": "uint256",
+              "name": "skinId",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256[]",
+              "name": "decalIds",
+              "type": "uint256[]"
+            },
+            {
+              "internalType": "string",
+              "name": "customURI",
+              "type": "string"
+            }
+          ],
+          "internalType": "struct AestheticCustomization",
+          "name": "aesthetic",
+          "type": "tuple"
+        }
+      ],
+      "name": "applyAestheticCustomization",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "success",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "payable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "tokenId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "customizationId",
+          "type": "uint256"
+        }
+      ],
+      "name": "applyCustomization",
+      "outputs": [],
+      "stateMutability": "payable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "tokenId",
+          "type": "uint256"
+        },
+        {
+          "components": [
+            {
+              "internalType": "uint8",
+              "name": "speedBonus",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint8",
+              "name": "accelerationBonus",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint8",
+              "name": "handlingBonus",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint8",
+              "name": "durabilityBonus",
+              "type": "uint8"
+            }
+          ],
+          "internalType": "struct PerformanceUpgrade",
+          "name": "upgrade",
+          "type": "tuple"
+        }
+      ],
+      "name": "applyPerformanceUpgrade",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "success",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "payable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256[]",
+          "name": "customizationIds",
+          "type": "uint256[]"
+        }
+      ],
+      "name": "calculateTotalCost",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "totalCost",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "description",
+          "type": "string"
+        },
+        {
+          "internalType": "enum CustomizationType",
+          "name": "custType",
+          "type": "uint8"
+        },
+        {
+          "internalType": "uint256",
+          "name": "price",
+          "type": "uint256"
+        },
+        {
+          "internalType": "string",
+          "name": "imageURI",
+          "type": "string"
+        },
+        {
+          "internalType": "uint256",
+          "name": "maxSupply",
+          "type": "uint256"
+        }
+      ],
+      "name": "createCustomization",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "customizationId",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getActiveCustomizations",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "id",
+              "type": "uint256"
+            },
+            {
+              "internalType": "string",
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "description",
+              "type": "string"
+            },
+            {
+              "internalType": "enum CustomizationType",
+              "name": "custType",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint256",
+              "name": "price",
+              "type": "uint256"
+            },
+            {
+              "internalType": "string",
+              "name": "imageURI",
+              "type": "string"
+            },
+            {
+              "internalType": "bool",
+              "name": "isActive",
+              "type": "bool"
+            },
+            {
+              "internalType": "uint32",
+              "name": "maxSupply",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint32",
+              "name": "currentSupply",
+              "type": "uint32"
+            }
+          ],
+          "internalType": "struct Customization[]",
+          "name": "customizations",
+          "type": "tuple[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "customizationId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getCustomization",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "id",
+              "type": "uint256"
+            },
+            {
+              "internalType": "string",
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "description",
+              "type": "string"
+            },
+            {
+              "internalType": "enum CustomizationType",
+              "name": "custType",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint256",
+              "name": "price",
+              "type": "uint256"
+            },
+            {
+              "internalType": "string",
+              "name": "imageURI",
+              "type": "string"
+            },
+            {
+              "internalType": "bool",
+              "name": "isActive",
+              "type": "bool"
+            },
+            {
+              "internalType": "uint32",
+              "name": "maxSupply",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint32",
+              "name": "currentSupply",
+              "type": "uint32"
+            }
+          ],
+          "internalType": "struct Customization",
+          "name": "customization",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "enum CustomizationType",
+          "name": "custType",
+          "type": "uint8"
+        }
+      ],
+      "name": "getCustomizationsByType",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "id",
+              "type": "uint256"
+            },
+            {
+              "internalType": "string",
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "description",
+              "type": "string"
+            },
+            {
+              "internalType": "enum CustomizationType",
+              "name": "custType",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint256",
+              "name": "price",
+              "type": "uint256"
+            },
+            {
+              "internalType": "string",
+              "name": "imageURI",
+              "type": "string"
+            },
+            {
+              "internalType": "bool",
+              "name": "isActive",
+              "type": "bool"
+            },
+            {
+              "internalType": "uint32",
+              "name": "maxSupply",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint32",
+              "name": "currentSupply",
+              "type": "uint32"
+            }
+          ],
+          "internalType": "struct Customization[]",
+          "name": "customizations",
+          "type": "tuple[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "role",
+          "type": "bytes32"
+        }
+      ],
+      "name": "getRoleAdmin",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "tokenId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getVehicleAesthetics",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "string",
+              "name": "colorCode",
+              "type": "string"
+            },
+            {
+              "internalType": "uint256",
+              "name": "skinId",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256[]",
+              "name": "decalIds",
+              "type": "uint256[]"
+            },
+            {
+              "internalType": "string",
+              "name": "customURI",
+              "type": "string"
+            }
+          ],
+          "internalType": "struct AestheticCustomization",
+          "name": "aesthetic",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "tokenId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getVehicleCustomizations",
+      "outputs": [
+        {
+          "internalType": "uint256[]",
+          "name": "customizationIds",
+          "type": "uint256[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "tokenId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getVehiclePerformance",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint8",
+              "name": "speedBonus",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint8",
+              "name": "accelerationBonus",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint8",
+              "name": "handlingBonus",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint8",
+              "name": "durabilityBonus",
+              "type": "uint8"
+            }
+          ],
+          "internalType": "struct PerformanceUpgrade",
+          "name": "upgrade",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "role",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "grantRole",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "role",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "hasRole",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "tokenId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "customizationId",
+          "type": "uint256"
+        }
+      ],
+      "name": "isCustomizationApplied",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "isApplied",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "mooveNFT",
+      "outputs": [
+        {
+          "internalType": "contract IMooveNFT",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "pause",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "paused",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "tokenId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "customizationId",
+          "type": "uint256"
+        }
+      ],
+      "name": "removeCustomization",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "success",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "role",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "address",
+          "name": "callerConfirmation",
+          "type": "address"
+        }
+      ],
+      "name": "renounceRole",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "role",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "revokeRole",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "customizationId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bool",
+          "name": "isActive",
+          "type": "bool"
+        }
+      ],
+      "name": "setCustomizationActive",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes4",
+          "name": "interfaceId",
+          "type": "bytes4"
+        }
+      ],
+      "name": "supportsInterface",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "unpause",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "customizationId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "string",
+          "name": "newImageURI",
+          "type": "string"
+        }
+      ],
+      "name": "updateCustomizationImage",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "customizationId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "newPrice",
+          "type": "uint256"
+        }
+      ],
+      "name": "updateCustomizationPrice",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address payable",
+          "name": "to",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "withdraw",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "stateMutability": "payable",
+      "type": "receive"
+    }
+  ],
+  "transactionHash": "0x851ad1faef515fd8475f95cd6c7bcca00e7433bb95cb509b6a24b3ac4490dc72",
+  "receipt": {
+    "to": null,
+    "from": "0x777382955f33Bb8540602E914D9b650C962EF6Cc",
+    "contractAddress": "0x186243d36a19f05b6830AEdADB72a68079fB1852",
+    "transactionIndex": 7,
+    "gasUsed": "2924755",
+    "logsBloom": "0x00000004000000008000000000000000000400000000000000000040000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000200000000000000000120000000000000000000800008200000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000800000000000001000800000000000001000000040000000000000000000000000000000000000000000000000000100000000000020000000000000000000000000000000000000080000000000000402000000000000",
+    "blockHash": "0x5a784d5afa79a2264b897fc8f542b133b41c38060af7fa630e9f0f593acd66c8",
+    "transactionHash": "0x851ad1faef515fd8475f95cd6c7bcca00e7433bb95cb509b6a24b3ac4490dc72",
+    "logs": [
+      {
+        "transactionIndex": 7,
+        "blockNumber": 8924737,
+        "transactionHash": "0x851ad1faef515fd8475f95cd6c7bcca00e7433bb95cb509b6a24b3ac4490dc72",
+        "address": "0x186243d36a19f05b6830AEdADB72a68079fB1852",
+        "topics": [
+          "0x2f8788117e7eff1d82e926ec794901d17c78024a50270940304540a733656f0d",
+          "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "0x000000000000000000000000005672ecc14b09a958742b960ebb76ebe52be44a",
+          "0x000000000000000000000000777382955f33bb8540602e914d9b650c962ef6cc"
+        ],
+        "data": "0x",
+        "logIndex": 0,
+        "blockHash": "0x5a784d5afa79a2264b897fc8f542b133b41c38060af7fa630e9f0f593acd66c8"
+      },
+      {
+        "transactionIndex": 7,
+        "blockNumber": 8924737,
+        "transactionHash": "0x851ad1faef515fd8475f95cd6c7bcca00e7433bb95cb509b6a24b3ac4490dc72",
+        "address": "0x186243d36a19f05b6830AEdADB72a68079fB1852",
+        "topics": [
+          "0x2f8788117e7eff1d82e926ec794901d17c78024a50270940304540a733656f0d",
+          "0x368a0a902ce0a8be883cdf3d5cbaaae7bbbf3f9f0aa7ad2c137c77c3a72ca6b6",
+          "0x000000000000000000000000005672ecc14b09a958742b960ebb76ebe52be44a",
+          "0x000000000000000000000000777382955f33bb8540602e914d9b650c962ef6cc"
+        ],
+        "data": "0x",
+        "logIndex": 1,
+        "blockHash": "0x5a784d5afa79a2264b897fc8f542b133b41c38060af7fa630e9f0f593acd66c8"
+      },
+      {
+        "transactionIndex": 7,
+        "blockNumber": 8924737,
+        "transactionHash": "0x851ad1faef515fd8475f95cd6c7bcca00e7433bb95cb509b6a24b3ac4490dc72",
+        "address": "0x186243d36a19f05b6830AEdADB72a68079fB1852",
+        "topics": [
+          "0x2f8788117e7eff1d82e926ec794901d17c78024a50270940304540a733656f0d",
+          "0x3515f38d031dcbca5f1dac4c5afc1efca2020e42efdd9c5806ae7e963d18435a",
+          "0x000000000000000000000000005672ecc14b09a958742b960ebb76ebe52be44a",
+          "0x000000000000000000000000777382955f33bb8540602e914d9b650c962ef6cc"
+        ],
+        "data": "0x",
+        "logIndex": 2,
+        "blockHash": "0x5a784d5afa79a2264b897fc8f542b133b41c38060af7fa630e9f0f593acd66c8"
+      }
+    ],
+    "blockNumber": 8924737,
+    "cumulativeGasUsed": "3071755",
+    "status": 1,
+    "byzantium": true
+  },
+  "args": [
+    "0x40E455515bf712144C1A5D859F19d64b537754f7",
+    "0x005672EcC14b09A958742B960Ebb76eBE52Be44A"
+  ],
+  "numDeployments": 1,
+  "solcInputHash": "cf9183c5756e95f1fc92655ea94dc824",
+  "metadata": "{\"compiler\":{\"version\":\"0.8.21+commit.d9974bed\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_mooveNFT\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"_admin\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[],\"name\":\"AccessControlBadConfirmation\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"neededRole\",\"type\":\"bytes32\"}],\"name\":\"AccessControlUnauthorizedAccount\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"EnforcedPause\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"ExpectedPause\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"ReentrancyGuardReentrantCall\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"tokenId\",\"type\":\"uint256\"},{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"customizationId\",\"type\":\"uint256\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"price\",\"type\":\"uint256\"}],\"name\":\"CustomizationApplied\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"customizationId\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"},{\"indexed\":false,\"internalType\":\"enum CustomizationType\",\"name\":\"custType\",\"type\":\"uint8\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"price\",\"type\":\"uint256\"}],\"name\":\"CustomizationCreated\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"customizationId\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"oldPrice\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"newPrice\",\"type\":\"uint256\"}],\"name\":\"CustomizationPriceUpdated\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"tokenId\",\"type\":\"uint256\"},{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"customizationId\",\"type\":\"uint256\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"CustomizationRemoved\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"Paused\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"previousAdminRole\",\"type\":\"bytes32\"},{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"newAdminRole\",\"type\":\"bytes32\"}],\"name\":\"RoleAdminChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"}],\"name\":\"RoleGranted\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"}],\"name\":\"RoleRevoked\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"Unpaused\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"CUSTOMIZATION_ADMIN_ROLE\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"DEFAULT_ADMIN_ROLE\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"MAX_CUSTOMIZATIONS_PER_VEHICLE\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"MAX_PERFORMANCE_BONUS\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"PRICE_MANAGER_ROLE\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"tokenId\",\"type\":\"uint256\"},{\"components\":[{\"internalType\":\"string\",\"name\":\"colorCode\",\"type\":\"string\"},{\"internalType\":\"uint256\",\"name\":\"skinId\",\"type\":\"uint256\"},{\"internalType\":\"uint256[]\",\"name\":\"decalIds\",\"type\":\"uint256[]\"},{\"internalType\":\"string\",\"name\":\"customURI\",\"type\":\"string\"}],\"internalType\":\"struct AestheticCustomization\",\"name\":\"aesthetic\",\"type\":\"tuple\"}],\"name\":\"applyAestheticCustomization\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"success\",\"type\":\"bool\"}],\"stateMutability\":\"payable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"tokenId\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"customizationId\",\"type\":\"uint256\"}],\"name\":\"applyCustomization\",\"outputs\":[],\"stateMutability\":\"payable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"tokenId\",\"type\":\"uint256\"},{\"components\":[{\"internalType\":\"uint8\",\"name\":\"speedBonus\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"accelerationBonus\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"handlingBonus\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"durabilityBonus\",\"type\":\"uint8\"}],\"internalType\":\"struct PerformanceUpgrade\",\"name\":\"upgrade\",\"type\":\"tuple\"}],\"name\":\"applyPerformanceUpgrade\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"success\",\"type\":\"bool\"}],\"stateMutability\":\"payable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256[]\",\"name\":\"customizationIds\",\"type\":\"uint256[]\"}],\"name\":\"calculateTotalCost\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"totalCost\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"description\",\"type\":\"string\"},{\"internalType\":\"enum CustomizationType\",\"name\":\"custType\",\"type\":\"uint8\"},{\"internalType\":\"uint256\",\"name\":\"price\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"imageURI\",\"type\":\"string\"},{\"internalType\":\"uint256\",\"name\":\"maxSupply\",\"type\":\"uint256\"}],\"name\":\"createCustomization\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"customizationId\",\"type\":\"uint256\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getActiveCustomizations\",\"outputs\":[{\"components\":[{\"internalType\":\"uint256\",\"name\":\"id\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"description\",\"type\":\"string\"},{\"internalType\":\"enum CustomizationType\",\"name\":\"custType\",\"type\":\"uint8\"},{\"internalType\":\"uint256\",\"name\":\"price\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"imageURI\",\"type\":\"string\"},{\"internalType\":\"bool\",\"name\":\"isActive\",\"type\":\"bool\"},{\"internalType\":\"uint32\",\"name\":\"maxSupply\",\"type\":\"uint32\"},{\"internalType\":\"uint32\",\"name\":\"currentSupply\",\"type\":\"uint32\"}],\"internalType\":\"struct Customization[]\",\"name\":\"customizations\",\"type\":\"tuple[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"customizationId\",\"type\":\"uint256\"}],\"name\":\"getCustomization\",\"outputs\":[{\"components\":[{\"internalType\":\"uint256\",\"name\":\"id\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"description\",\"type\":\"string\"},{\"internalType\":\"enum CustomizationType\",\"name\":\"custType\",\"type\":\"uint8\"},{\"internalType\":\"uint256\",\"name\":\"price\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"imageURI\",\"type\":\"string\"},{\"internalType\":\"bool\",\"name\":\"isActive\",\"type\":\"bool\"},{\"internalType\":\"uint32\",\"name\":\"maxSupply\",\"type\":\"uint32\"},{\"internalType\":\"uint32\",\"name\":\"currentSupply\",\"type\":\"uint32\"}],\"internalType\":\"struct Customization\",\"name\":\"customization\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"enum CustomizationType\",\"name\":\"custType\",\"type\":\"uint8\"}],\"name\":\"getCustomizationsByType\",\"outputs\":[{\"components\":[{\"internalType\":\"uint256\",\"name\":\"id\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"description\",\"type\":\"string\"},{\"internalType\":\"enum CustomizationType\",\"name\":\"custType\",\"type\":\"uint8\"},{\"internalType\":\"uint256\",\"name\":\"price\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"imageURI\",\"type\":\"string\"},{\"internalType\":\"bool\",\"name\":\"isActive\",\"type\":\"bool\"},{\"internalType\":\"uint32\",\"name\":\"maxSupply\",\"type\":\"uint32\"},{\"internalType\":\"uint32\",\"name\":\"currentSupply\",\"type\":\"uint32\"}],\"internalType\":\"struct Customization[]\",\"name\":\"customizations\",\"type\":\"tuple[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"}],\"name\":\"getRoleAdmin\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"tokenId\",\"type\":\"uint256\"}],\"name\":\"getVehicleAesthetics\",\"outputs\":[{\"components\":[{\"internalType\":\"string\",\"name\":\"colorCode\",\"type\":\"string\"},{\"internalType\":\"uint256\",\"name\":\"skinId\",\"type\":\"uint256\"},{\"internalType\":\"uint256[]\",\"name\":\"decalIds\",\"type\":\"uint256[]\"},{\"internalType\":\"string\",\"name\":\"customURI\",\"type\":\"string\"}],\"internalType\":\"struct AestheticCustomization\",\"name\":\"aesthetic\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"tokenId\",\"type\":\"uint256\"}],\"name\":\"getVehicleCustomizations\",\"outputs\":[{\"internalType\":\"uint256[]\",\"name\":\"customizationIds\",\"type\":\"uint256[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"tokenId\",\"type\":\"uint256\"}],\"name\":\"getVehiclePerformance\",\"outputs\":[{\"components\":[{\"internalType\":\"uint8\",\"name\":\"speedBonus\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"accelerationBonus\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"handlingBonus\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"durabilityBonus\",\"type\":\"uint8\"}],\"internalType\":\"struct PerformanceUpgrade\",\"name\":\"upgrade\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"grantRole\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"hasRole\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"tokenId\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"customizationId\",\"type\":\"uint256\"}],\"name\":\"isCustomizationApplied\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"isApplied\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"mooveNFT\",\"outputs\":[{\"internalType\":\"contract IMooveNFT\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"pause\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"paused\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"tokenId\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"customizationId\",\"type\":\"uint256\"}],\"name\":\"removeCustomization\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"success\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"callerConfirmation\",\"type\":\"address\"}],\"name\":\"renounceRole\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"revokeRole\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"customizationId\",\"type\":\"uint256\"},{\"internalType\":\"bool\",\"name\":\"isActive\",\"type\":\"bool\"}],\"name\":\"setCustomizationActive\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes4\",\"name\":\"interfaceId\",\"type\":\"bytes4\"}],\"name\":\"supportsInterface\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"unpause\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"customizationId\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"newImageURI\",\"type\":\"string\"}],\"name\":\"updateCustomizationImage\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"customizationId\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"newPrice\",\"type\":\"uint256\"}],\"name\":\"updateCustomizationPrice\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address payable\",\"name\":\"to\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"withdraw\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"stateMutability\":\"payable\",\"type\":\"receive\"}],\"devdoc\":{\"details\":\"Implementation contract for virtual vehicle NFT customizations\",\"errors\":{\"AccessControlBadConfirmation()\":[{\"details\":\"The caller of a function is not the expected one. NOTE: Don't confuse with {AccessControlUnauthorizedAccount}.\"}],\"AccessControlUnauthorizedAccount(address,bytes32)\":[{\"details\":\"The `account` is missing a role.\"}],\"EnforcedPause()\":[{\"details\":\"The operation failed because the contract is paused.\"}],\"ExpectedPause()\":[{\"details\":\"The operation failed because the contract is not paused.\"}],\"ReentrancyGuardReentrantCall()\":[{\"details\":\"Unauthorized reentrant call.\"}]},\"events\":{\"Paused(address)\":{\"details\":\"Emitted when the pause is triggered by `account`.\"},\"RoleAdminChanged(bytes32,bytes32,bytes32)\":{\"details\":\"Emitted when `newAdminRole` is set as ``role``'s admin role, replacing `previousAdminRole` `DEFAULT_ADMIN_ROLE` is the starting admin for all roles, despite {RoleAdminChanged} not being emitted to signal this.\"},\"RoleGranted(bytes32,address,address)\":{\"details\":\"Emitted when `account` is granted `role`. `sender` is the account that originated the contract call. This account bears the admin role (for the granted role). Expected in cases where the role was granted using the internal {AccessControl-_grantRole}.\"},\"RoleRevoked(bytes32,address,address)\":{\"details\":\"Emitted when `account` is revoked `role`. `sender` is the account that originated the contract call:   - if using `revokeRole`, it is the admin role bearer   - if using `renounceRole`, it is the role bearer (i.e. `account`)\"},\"Unpaused(address)\":{\"details\":\"Emitted when the pause is lifted by `account`.\"}},\"kind\":\"dev\",\"methods\":{\"applyAestheticCustomization(uint256,(string,uint256,uint256[],string))\":{\"details\":\"Apply aesthetic customization to a vehicle NFT\"},\"applyCustomization(uint256,uint256)\":{\"details\":\"Apply customization to NFT\",\"params\":{\"customizationId\":\"Customization ID to apply\",\"tokenId\":\"Token ID to customize\"}},\"applyPerformanceUpgrade(uint256,(uint8,uint8,uint8,uint8))\":{\"details\":\"Apply performance upgrade to a vehicle NFT\"},\"calculateTotalCost(uint256[])\":{\"details\":\"Calculate total cost for multiple customizations\"},\"constructor\":{\"details\":\"Constructor sets the MooveNFT contract address and initial roles\",\"params\":{\"_admin\":\"Address to be granted admin roles\",\"_mooveNFT\":\"Address of the MooveNFT contract\"}},\"createCustomization(string,string,uint8,uint256,string,uint256)\":{\"details\":\"Create a new customization option\"},\"getActiveCustomizations()\":{\"details\":\"Get all active customizations\"},\"getCustomization(uint256)\":{\"details\":\"Get customization details by ID\"},\"getCustomizationsByType(uint8)\":{\"details\":\"Get customizations by type\"},\"getRoleAdmin(bytes32)\":{\"details\":\"Returns the admin role that controls `role`. See {grantRole} and {revokeRole}. To change a role's admin, use {_setRoleAdmin}.\"},\"getVehicleAesthetics(uint256)\":{\"details\":\"Get vehicle aesthetic customizations\"},\"getVehicleCustomizations(uint256)\":{\"details\":\"Get all customizations applied to a vehicle\"},\"getVehiclePerformance(uint256)\":{\"details\":\"Get vehicle performance stats\"},\"grantRole(bytes32,address)\":{\"details\":\"Grants `role` to `account`. If `account` had not been already granted `role`, emits a {RoleGranted} event. Requirements: - the caller must have ``role``'s admin role. May emit a {RoleGranted} event.\"},\"hasRole(bytes32,address)\":{\"details\":\"Returns `true` if `account` has been granted `role`.\"},\"isCustomizationApplied(uint256,uint256)\":{\"details\":\"Check if a customization is applied to a vehicle\"},\"pause()\":{\"details\":\"Emergency pause function\"},\"paused()\":{\"details\":\"Returns true if the contract is paused, and false otherwise.\"},\"removeCustomization(uint256,uint256)\":{\"details\":\"Remove a customization from a vehicle NFT\"},\"renounceRole(bytes32,address)\":{\"details\":\"Revokes `role` from the calling account. Roles are often managed via {grantRole} and {revokeRole}: this function's purpose is to provide a mechanism for accounts to lose their privileges if they are compromised (such as when a trusted device is misplaced). If the calling account had been revoked `role`, emits a {RoleRevoked} event. Requirements: - the caller must be `callerConfirmation`. May emit a {RoleRevoked} event.\"},\"revokeRole(bytes32,address)\":{\"details\":\"Revokes `role` from `account`. If `account` had been granted `role`, emits a {RoleRevoked} event. Requirements: - the caller must have ``role``'s admin role. May emit a {RoleRevoked} event.\"},\"setCustomizationActive(uint256,bool)\":{\"details\":\"Set customization active status\"},\"supportsInterface(bytes4)\":{\"details\":\"See {IERC165-supportsInterface}.\"},\"unpause()\":{\"details\":\"Unpause function\"},\"updateCustomizationImage(uint256,string)\":{\"details\":\"Update customization image URI\"},\"updateCustomizationPrice(uint256,uint256)\":{\"details\":\"Update customization price\"},\"withdraw(address,uint256)\":{\"details\":\"Withdraw contract balance\"}},\"stateVariables\":{\"_activeCustomizations\":{\"details\":\"Mapping to track active customizations\"},\"_customizationIdCounter\":{\"details\":\"Counter for customization IDs\"},\"_customizations\":{\"details\":\"Mapping from customization ID to Customization struct\"},\"_customizationsByType\":{\"details\":\"Arrays to track customizations by type for efficient querying\"},\"_isCustomizationApplied\":{\"details\":\"Mapping from token ID to customization ID to check if applied\"},\"_vehicleAesthetics\":{\"details\":\"Mapping from token ID to aesthetic customizations\"},\"_vehicleCustomizations\":{\"details\":\"Mapping from token ID to array of applied customization IDs\"},\"_vehiclePerformance\":{\"details\":\"Mapping from token ID to performance upgrades\"},\"mooveNFT\":{\"details\":\"Reference to the MooveNFT contract\"}},\"title\":\"MooveCustomization\",\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{},\"notice\":\"All customizations are purely virtual and affect only NFT metadata and visual representation\",\"version\":1}},\"settings\":{\"compilationTarget\":{\"contracts/MooveCustomization.sol\":\"MooveCustomization\"},\"evmVersion\":\"paris\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\",\"useLiteralContent\":true},\"optimizer\":{\"enabled\":true,\"runs\":200},\"remappings\":[],\"viaIR\":true},\"sources\":{\"@openzeppelin/contracts/access/AccessControl.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n// OpenZeppelin Contracts (last updated v5.3.0) (access/AccessControl.sol)\\n\\npragma solidity ^0.8.20;\\n\\nimport {IAccessControl} from \\\"./IAccessControl.sol\\\";\\nimport {Context} from \\\"../utils/Context.sol\\\";\\nimport {ERC165} from \\\"../utils/introspection/ERC165.sol\\\";\\n\\n/**\\n * @dev Contract module that allows children to implement role-based access\\n * control mechanisms. This is a lightweight version that doesn't allow enumerating role\\n * members except through off-chain means by accessing the contract event logs. Some\\n * applications may benefit from on-chain enumerability, for those cases see\\n * {AccessControlEnumerable}.\\n *\\n * Roles are referred to by their `bytes32` identifier. These should be exposed\\n * in the external API and be unique. The best way to achieve this is by\\n * using `public constant` hash digests:\\n *\\n * ```solidity\\n * bytes32 public constant MY_ROLE = keccak256(\\\"MY_ROLE\\\");\\n * ```\\n *\\n * Roles can be used to represent a set of permissions. To restrict access to a\\n * function call, use {hasRole}:\\n *\\n * ```solidity\\n * function foo() public {\\n *     require(hasRole(MY_ROLE, msg.sender));\\n *     ...\\n * }\\n * ```\\n *\\n * Roles can be granted and revoked dynamically via the {grantRole} and\\n * {revokeRole} functions. Each role has an associated admin role, and only\\n * accounts that have a role's admin role can call {grantRole} and {revokeRole}.\\n *\\n * By default, the admin role for all roles is `DEFAULT_ADMIN_ROLE`, which means\\n * that only accounts with this role will be able to grant or revoke other\\n * roles. More complex role relationships can be created by using\\n * {_setRoleAdmin}.\\n *\\n * WARNING: The `DEFAULT_ADMIN_ROLE` is also its own admin: it has permission to\\n * grant and revoke this role. Extra precautions should be taken to secure\\n * accounts that have been granted it. We recommend using {AccessControlDefaultAdminRules}\\n * to enforce additional security measures for this role.\\n */\\nabstract contract AccessControl is Context, IAccessControl, ERC165 {\\n    struct RoleData {\\n        mapping(address account => bool) hasRole;\\n        bytes32 adminRole;\\n    }\\n\\n    mapping(bytes32 role => RoleData) private _roles;\\n\\n    bytes32 public constant DEFAULT_ADMIN_ROLE = 0x00;\\n\\n    /**\\n     * @dev Modifier that checks that an account has a specific role. Reverts\\n     * with an {AccessControlUnauthorizedAccount} error including the required role.\\n     */\\n    modifier onlyRole(bytes32 role) {\\n        _checkRole(role);\\n        _;\\n    }\\n\\n    /**\\n     * @dev See {IERC165-supportsInterface}.\\n     */\\n    function supportsInterface(bytes4 interfaceId) public view virtual override returns (bool) {\\n        return interfaceId == type(IAccessControl).interfaceId || super.supportsInterface(interfaceId);\\n    }\\n\\n    /**\\n     * @dev Returns `true` if `account` has been granted `role`.\\n     */\\n    function hasRole(bytes32 role, address account) public view virtual returns (bool) {\\n        return _roles[role].hasRole[account];\\n    }\\n\\n    /**\\n     * @dev Reverts with an {AccessControlUnauthorizedAccount} error if `_msgSender()`\\n     * is missing `role`. Overriding this function changes the behavior of the {onlyRole} modifier.\\n     */\\n    function _checkRole(bytes32 role) internal view virtual {\\n        _checkRole(role, _msgSender());\\n    }\\n\\n    /**\\n     * @dev Reverts with an {AccessControlUnauthorizedAccount} error if `account`\\n     * is missing `role`.\\n     */\\n    function _checkRole(bytes32 role, address account) internal view virtual {\\n        if (!hasRole(role, account)) {\\n            revert AccessControlUnauthorizedAccount(account, role);\\n        }\\n    }\\n\\n    /**\\n     * @dev Returns the admin role that controls `role`. See {grantRole} and\\n     * {revokeRole}.\\n     *\\n     * To change a role's admin, use {_setRoleAdmin}.\\n     */\\n    function getRoleAdmin(bytes32 role) public view virtual returns (bytes32) {\\n        return _roles[role].adminRole;\\n    }\\n\\n    /**\\n     * @dev Grants `role` to `account`.\\n     *\\n     * If `account` had not been already granted `role`, emits a {RoleGranted}\\n     * event.\\n     *\\n     * Requirements:\\n     *\\n     * - the caller must have ``role``'s admin role.\\n     *\\n     * May emit a {RoleGranted} event.\\n     */\\n    function grantRole(bytes32 role, address account) public virtual onlyRole(getRoleAdmin(role)) {\\n        _grantRole(role, account);\\n    }\\n\\n    /**\\n     * @dev Revokes `role` from `account`.\\n     *\\n     * If `account` had been granted `role`, emits a {RoleRevoked} event.\\n     *\\n     * Requirements:\\n     *\\n     * - the caller must have ``role``'s admin role.\\n     *\\n     * May emit a {RoleRevoked} event.\\n     */\\n    function revokeRole(bytes32 role, address account) public virtual onlyRole(getRoleAdmin(role)) {\\n        _revokeRole(role, account);\\n    }\\n\\n    /**\\n     * @dev Revokes `role` from the calling account.\\n     *\\n     * Roles are often managed via {grantRole} and {revokeRole}: this function's\\n     * purpose is to provide a mechanism for accounts to lose their privileges\\n     * if they are compromised (such as when a trusted device is misplaced).\\n     *\\n     * If the calling account had been revoked `role`, emits a {RoleRevoked}\\n     * event.\\n     *\\n     * Requirements:\\n     *\\n     * - the caller must be `callerConfirmation`.\\n     *\\n     * May emit a {RoleRevoked} event.\\n     */\\n    function renounceRole(bytes32 role, address callerConfirmation) public virtual {\\n        if (callerConfirmation != _msgSender()) {\\n            revert AccessControlBadConfirmation();\\n        }\\n\\n        _revokeRole(role, callerConfirmation);\\n    }\\n\\n    /**\\n     * @dev Sets `adminRole` as ``role``'s admin role.\\n     *\\n     * Emits a {RoleAdminChanged} event.\\n     */\\n    function _setRoleAdmin(bytes32 role, bytes32 adminRole) internal virtual {\\n        bytes32 previousAdminRole = getRoleAdmin(role);\\n        _roles[role].adminRole = adminRole;\\n        emit RoleAdminChanged(role, previousAdminRole, adminRole);\\n    }\\n\\n    /**\\n     * @dev Attempts to grant `role` to `account` and returns a boolean indicating if `role` was granted.\\n     *\\n     * Internal function without access restriction.\\n     *\\n     * May emit a {RoleGranted} event.\\n     */\\n    function _grantRole(bytes32 role, address account) internal virtual returns (bool) {\\n        if (!hasRole(role, account)) {\\n            _roles[role].hasRole[account] = true;\\n            emit RoleGranted(role, account, _msgSender());\\n            return true;\\n        } else {\\n            return false;\\n        }\\n    }\\n\\n    /**\\n     * @dev Attempts to revoke `role` from `account` and returns a boolean indicating if `role` was revoked.\\n     *\\n     * Internal function without access restriction.\\n     *\\n     * May emit a {RoleRevoked} event.\\n     */\\n    function _revokeRole(bytes32 role, address account) internal virtual returns (bool) {\\n        if (hasRole(role, account)) {\\n            _roles[role].hasRole[account] = false;\\n            emit RoleRevoked(role, account, _msgSender());\\n            return true;\\n        } else {\\n            return false;\\n        }\\n    }\\n}\\n\",\"keccak256\":\"0xc1bebdee8943bd5e9ef1e0f2e63296aa1dd4171a66b9e74d0286220e891e1458\",\"license\":\"MIT\"},\"@openzeppelin/contracts/access/IAccessControl.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n// OpenZeppelin Contracts (last updated v5.3.0) (access/IAccessControl.sol)\\n\\npragma solidity ^0.8.20;\\n\\n/**\\n * @dev External interface of AccessControl declared to support ERC-165 detection.\\n */\\ninterface IAccessControl {\\n    /**\\n     * @dev The `account` is missing a role.\\n     */\\n    error AccessControlUnauthorizedAccount(address account, bytes32 neededRole);\\n\\n    /**\\n     * @dev The caller of a function is not the expected one.\\n     *\\n     * NOTE: Don't confuse with {AccessControlUnauthorizedAccount}.\\n     */\\n    error AccessControlBadConfirmation();\\n\\n    /**\\n     * @dev Emitted when `newAdminRole` is set as ``role``'s admin role, replacing `previousAdminRole`\\n     *\\n     * `DEFAULT_ADMIN_ROLE` is the starting admin for all roles, despite\\n     * {RoleAdminChanged} not being emitted to signal this.\\n     */\\n    event RoleAdminChanged(bytes32 indexed role, bytes32 indexed previousAdminRole, bytes32 indexed newAdminRole);\\n\\n    /**\\n     * @dev Emitted when `account` is granted `role`.\\n     *\\n     * `sender` is the account that originated the contract call. This account bears the admin role (for the granted role).\\n     * Expected in cases where the role was granted using the internal {AccessControl-_grantRole}.\\n     */\\n    event RoleGranted(bytes32 indexed role, address indexed account, address indexed sender);\\n\\n    /**\\n     * @dev Emitted when `account` is revoked `role`.\\n     *\\n     * `sender` is the account that originated the contract call:\\n     *   - if using `revokeRole`, it is the admin role bearer\\n     *   - if using `renounceRole`, it is the role bearer (i.e. `account`)\\n     */\\n    event RoleRevoked(bytes32 indexed role, address indexed account, address indexed sender);\\n\\n    /**\\n     * @dev Returns `true` if `account` has been granted `role`.\\n     */\\n    function hasRole(bytes32 role, address account) external view returns (bool);\\n\\n    /**\\n     * @dev Returns the admin role that controls `role`. See {grantRole} and\\n     * {revokeRole}.\\n     *\\n     * To change a role's admin, use {AccessControl-_setRoleAdmin}.\\n     */\\n    function getRoleAdmin(bytes32 role) external view returns (bytes32);\\n\\n    /**\\n     * @dev Grants `role` to `account`.\\n     *\\n     * If `account` had not been already granted `role`, emits a {RoleGranted}\\n     * event.\\n     *\\n     * Requirements:\\n     *\\n     * - the caller must have ``role``'s admin role.\\n     */\\n    function grantRole(bytes32 role, address account) external;\\n\\n    /**\\n     * @dev Revokes `role` from `account`.\\n     *\\n     * If `account` had been granted `role`, emits a {RoleRevoked} event.\\n     *\\n     * Requirements:\\n     *\\n     * - the caller must have ``role``'s admin role.\\n     */\\n    function revokeRole(bytes32 role, address account) external;\\n\\n    /**\\n     * @dev Revokes `role` from the calling account.\\n     *\\n     * Roles are often managed via {grantRole} and {revokeRole}: this function's\\n     * purpose is to provide a mechanism for accounts to lose their privileges\\n     * if they are compromised (such as when a trusted device is misplaced).\\n     *\\n     * If the calling account had been granted `role`, emits a {RoleRevoked}\\n     * event.\\n     *\\n     * Requirements:\\n     *\\n     * - the caller must be `callerConfirmation`.\\n     */\\n    function renounceRole(bytes32 role, address callerConfirmation) external;\\n}\\n\",\"keccak256\":\"0x4d9a2b261b56a1e4a37bb038151dec98b952fed16de2bdfdda27e38e2b12b530\",\"license\":\"MIT\"},\"@openzeppelin/contracts/utils/Context.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n// OpenZeppelin Contracts (last updated v5.0.1) (utils/Context.sol)\\n\\npragma solidity ^0.8.20;\\n\\n/**\\n * @dev Provides information about the current execution context, including the\\n * sender of the transaction and its data. While these are generally available\\n * via msg.sender and msg.data, they should not be accessed in such a direct\\n * manner, since when dealing with meta-transactions the account sending and\\n * paying for execution may not be the actual sender (as far as an application\\n * is concerned).\\n *\\n * This contract is only required for intermediate, library-like contracts.\\n */\\nabstract contract Context {\\n    function _msgSender() internal view virtual returns (address) {\\n        return msg.sender;\\n    }\\n\\n    function _msgData() internal view virtual returns (bytes calldata) {\\n        return msg.data;\\n    }\\n\\n    function _contextSuffixLength() internal view virtual returns (uint256) {\\n        return 0;\\n    }\\n}\\n\",\"keccak256\":\"0x493033a8d1b176a037b2cc6a04dad01a5c157722049bbecf632ca876224dd4b2\",\"license\":\"MIT\"},\"@openzeppelin/contracts/utils/Pausable.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n// OpenZeppelin Contracts (last updated v5.3.0) (utils/Pausable.sol)\\n\\npragma solidity ^0.8.20;\\n\\nimport {Context} from \\\"../utils/Context.sol\\\";\\n\\n/**\\n * @dev Contract module which allows children to implement an emergency stop\\n * mechanism that can be triggered by an authorized account.\\n *\\n * This module is used through inheritance. It will make available the\\n * modifiers `whenNotPaused` and `whenPaused`, which can be applied to\\n * the functions of your contract. Note that they will not be pausable by\\n * simply including this module, only once the modifiers are put in place.\\n */\\nabstract contract Pausable is Context {\\n    bool private _paused;\\n\\n    /**\\n     * @dev Emitted when the pause is triggered by `account`.\\n     */\\n    event Paused(address account);\\n\\n    /**\\n     * @dev Emitted when the pause is lifted by `account`.\\n     */\\n    event Unpaused(address account);\\n\\n    /**\\n     * @dev The operation failed because the contract is paused.\\n     */\\n    error EnforcedPause();\\n\\n    /**\\n     * @dev The operation failed because the contract is not paused.\\n     */\\n    error ExpectedPause();\\n\\n    /**\\n     * @dev Modifier to make a function callable only when the contract is not paused.\\n     *\\n     * Requirements:\\n     *\\n     * - The contract must not be paused.\\n     */\\n    modifier whenNotPaused() {\\n        _requireNotPaused();\\n        _;\\n    }\\n\\n    /**\\n     * @dev Modifier to make a function callable only when the contract is paused.\\n     *\\n     * Requirements:\\n     *\\n     * - The contract must be paused.\\n     */\\n    modifier whenPaused() {\\n        _requirePaused();\\n        _;\\n    }\\n\\n    /**\\n     * @dev Returns true if the contract is paused, and false otherwise.\\n     */\\n    function paused() public view virtual returns (bool) {\\n        return _paused;\\n    }\\n\\n    /**\\n     * @dev Throws if the contract is paused.\\n     */\\n    function _requireNotPaused() internal view virtual {\\n        if (paused()) {\\n            revert EnforcedPause();\\n        }\\n    }\\n\\n    /**\\n     * @dev Throws if the contract is not paused.\\n     */\\n    function _requirePaused() internal view virtual {\\n        if (!paused()) {\\n            revert ExpectedPause();\\n        }\\n    }\\n\\n    /**\\n     * @dev Triggers stopped state.\\n     *\\n     * Requirements:\\n     *\\n     * - The contract must not be paused.\\n     */\\n    function _pause() internal virtual whenNotPaused {\\n        _paused = true;\\n        emit Paused(_msgSender());\\n    }\\n\\n    /**\\n     * @dev Returns to normal state.\\n     *\\n     * Requirements:\\n     *\\n     * - The contract must be paused.\\n     */\\n    function _unpause() internal virtual whenPaused {\\n        _paused = false;\\n        emit Unpaused(_msgSender());\\n    }\\n}\\n\",\"keccak256\":\"0xdb484371dfbb848cb6f5d70464e9ac9b2900e4164ead76bbce4fef0b44bcc68f\",\"license\":\"MIT\"},\"@openzeppelin/contracts/utils/ReentrancyGuard.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n// OpenZeppelin Contracts (last updated v5.1.0) (utils/ReentrancyGuard.sol)\\n\\npragma solidity ^0.8.20;\\n\\n/**\\n * @dev Contract module that helps prevent reentrant calls to a function.\\n *\\n * Inheriting from `ReentrancyGuard` will make the {nonReentrant} modifier\\n * available, which can be applied to functions to make sure there are no nested\\n * (reentrant) calls to them.\\n *\\n * Note that because there is a single `nonReentrant` guard, functions marked as\\n * `nonReentrant` may not call one another. This can be worked around by making\\n * those functions `private`, and then adding `external` `nonReentrant` entry\\n * points to them.\\n *\\n * TIP: If EIP-1153 (transient storage) is available on the chain you're deploying at,\\n * consider using {ReentrancyGuardTransient} instead.\\n *\\n * TIP: If you would like to learn more about reentrancy and alternative ways\\n * to protect against it, check out our blog post\\n * https://blog.openzeppelin.com/reentrancy-after-istanbul/[Reentrancy After Istanbul].\\n */\\nabstract contract ReentrancyGuard {\\n    // Booleans are more expensive than uint256 or any type that takes up a full\\n    // word because each write operation emits an extra SLOAD to first read the\\n    // slot's contents, replace the bits taken up by the boolean, and then write\\n    // back. This is the compiler's defense against contract upgrades and\\n    // pointer aliasing, and it cannot be disabled.\\n\\n    // The values being non-zero value makes deployment a bit more expensive,\\n    // but in exchange the refund on every call to nonReentrant will be lower in\\n    // amount. Since refunds are capped to a percentage of the total\\n    // transaction's gas, it is best to keep them low in cases like this one, to\\n    // increase the likelihood of the full refund coming into effect.\\n    uint256 private constant NOT_ENTERED = 1;\\n    uint256 private constant ENTERED = 2;\\n\\n    uint256 private _status;\\n\\n    /**\\n     * @dev Unauthorized reentrant call.\\n     */\\n    error ReentrancyGuardReentrantCall();\\n\\n    constructor() {\\n        _status = NOT_ENTERED;\\n    }\\n\\n    /**\\n     * @dev Prevents a contract from calling itself, directly or indirectly.\\n     * Calling a `nonReentrant` function from another `nonReentrant`\\n     * function is not supported. It is possible to prevent this from happening\\n     * by making the `nonReentrant` function external, and making it call a\\n     * `private` function that does the actual work.\\n     */\\n    modifier nonReentrant() {\\n        _nonReentrantBefore();\\n        _;\\n        _nonReentrantAfter();\\n    }\\n\\n    function _nonReentrantBefore() private {\\n        // On the first call to nonReentrant, _status will be NOT_ENTERED\\n        if (_status == ENTERED) {\\n            revert ReentrancyGuardReentrantCall();\\n        }\\n\\n        // Any calls to nonReentrant after this point will fail\\n        _status = ENTERED;\\n    }\\n\\n    function _nonReentrantAfter() private {\\n        // By storing the original value once again, a refund is triggered (see\\n        // https://eips.ethereum.org/EIPS/eip-2200)\\n        _status = NOT_ENTERED;\\n    }\\n\\n    /**\\n     * @dev Returns true if the reentrancy guard is currently set to \\\"entered\\\", which indicates there is a\\n     * `nonReentrant` function in the call stack.\\n     */\\n    function _reentrancyGuardEntered() internal view returns (bool) {\\n        return _status == ENTERED;\\n    }\\n}\\n\",\"keccak256\":\"0x11a5a79827df29e915a12740caf62fe21ebe27c08c9ae3e09abe9ee3ba3866d3\",\"license\":\"MIT\"},\"@openzeppelin/contracts/utils/introspection/ERC165.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n// OpenZeppelin Contracts (last updated v5.1.0) (utils/introspection/ERC165.sol)\\n\\npragma solidity ^0.8.20;\\n\\nimport {IERC165} from \\\"./IERC165.sol\\\";\\n\\n/**\\n * @dev Implementation of the {IERC165} interface.\\n *\\n * Contracts that want to implement ERC-165 should inherit from this contract and override {supportsInterface} to check\\n * for the additional interface id that will be supported. For example:\\n *\\n * ```solidity\\n * function supportsInterface(bytes4 interfaceId) public view virtual override returns (bool) {\\n *     return interfaceId == type(MyInterface).interfaceId || super.supportsInterface(interfaceId);\\n * }\\n * ```\\n */\\nabstract contract ERC165 is IERC165 {\\n    /**\\n     * @dev See {IERC165-supportsInterface}.\\n     */\\n    function supportsInterface(bytes4 interfaceId) public view virtual returns (bool) {\\n        return interfaceId == type(IERC165).interfaceId;\\n    }\\n}\\n\",\"keccak256\":\"0xddce8e17e3d3f9ed818b4f4c4478a8262aab8b11ed322f1bf5ed705bb4bd97fa\",\"license\":\"MIT\"},\"@openzeppelin/contracts/utils/introspection/IERC165.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n// OpenZeppelin Contracts (last updated v5.1.0) (utils/introspection/IERC165.sol)\\n\\npragma solidity ^0.8.20;\\n\\n/**\\n * @dev Interface of the ERC-165 standard, as defined in the\\n * https://eips.ethereum.org/EIPS/eip-165[ERC].\\n *\\n * Implementers can declare support of contract interfaces, which can then be\\n * queried by others ({ERC165Checker}).\\n *\\n * For an implementation, see {ERC165}.\\n */\\ninterface IERC165 {\\n    /**\\n     * @dev Returns true if this contract implements the interface defined by\\n     * `interfaceId`. See the corresponding\\n     * https://eips.ethereum.org/EIPS/eip-165#how-interfaces-are-identified[ERC section]\\n     * to learn more about how these ids are created.\\n     *\\n     * This function call must use less than 30 000 gas.\\n     */\\n    function supportsInterface(bytes4 interfaceId) external view returns (bool);\\n}\\n\",\"keccak256\":\"0x79796192ec90263f21b464d5bc90b777a525971d3de8232be80d9c4f9fb353b8\",\"license\":\"MIT\"},\"contracts/MooveCustomization.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\r\\npragma solidity ^0.8.21;\\r\\n\\r\\nimport \\\"@openzeppelin/contracts/access/AccessControl.sol\\\";\\r\\nimport \\\"@openzeppelin/contracts/utils/ReentrancyGuard.sol\\\";\\r\\nimport \\\"@openzeppelin/contracts/utils/Pausable.sol\\\";\\r\\nimport \\\"./interfaces/IMooveCustomization.sol\\\";\\r\\n\\r\\n// ============= INTERFACES =============\\r\\n\\r\\ninterface IMooveNFT {\\r\\n    function ownerOf(uint256 tokenId) external view returns (address);\\r\\n\\r\\n    function updateTokenMetadata(uint256 tokenId) external;\\r\\n}\\r\\n\\r\\n/**\\r\\n * @title MooveCustomization\\r\\n * @dev Implementation contract for virtual vehicle NFT customizations\\r\\n * @notice All customizations are purely virtual and affect only NFT metadata and visual representation\\r\\n */\\r\\ncontract MooveCustomization is IMooveCustomization, AccessControl, ReentrancyGuard, Pausable {\\r\\n    // ============= CONSTANTS =============\\r\\n\\r\\n    bytes32 public constant CUSTOMIZATION_ADMIN_ROLE =\\r\\n        keccak256(\\\"CUSTOMIZATION_ADMIN_ROLE\\\");\\r\\n    bytes32 public constant PRICE_MANAGER_ROLE =\\r\\n        keccak256(\\\"PRICE_MANAGER_ROLE\\\");\\r\\n\\r\\n    uint256 public constant MAX_PERFORMANCE_BONUS = 100;\\r\\n    uint256 public constant MAX_CUSTOMIZATIONS_PER_VEHICLE = 50;\\r\\n\\r\\n    // ============= STATE VARIABLES =============\\r\\n\\r\\n    /// @dev Reference to the MooveNFT contract\\r\\n    IMooveNFT public immutable mooveNFT;\\r\\n\\r\\n    /// @dev Counter for customization IDs\\r\\n    uint256 private _customizationIdCounter;\\r\\n\\r\\n    /// @dev Mapping from customization ID to Customization struct\\r\\n    mapping(uint256 => Customization) private _customizations;\\r\\n\\r\\n    /// @dev Mapping from token ID to array of applied customization IDs\\r\\n    mapping(uint256 => uint256[]) private _vehicleCustomizations;\\r\\n\\r\\n    /// @dev Mapping from token ID to customization ID to check if applied\\r\\n    mapping(uint256 => mapping(uint256 => bool))\\r\\n        private _isCustomizationApplied;\\r\\n\\r\\n    /// @dev Mapping from token ID to performance upgrades\\r\\n    mapping(uint256 => PerformanceUpgrade) private _vehiclePerformance;\\r\\n\\r\\n    /// @dev Mapping from token ID to aesthetic customizations\\r\\n    mapping(uint256 => AestheticCustomization) private _vehicleAesthetics;\\r\\n\\r\\n    /// @dev Arrays to track customizations by type for efficient querying\\r\\n    mapping(CustomizationType => uint256[]) private _customizationsByType;\\r\\n\\r\\n    /// @dev Mapping to track active customizations\\r\\n    mapping(uint256 => bool) private _activeCustomizations;\\r\\n\\r\\n    // ============= MODIFIERS =============\\r\\n\\r\\n    /**\\r\\n     * @dev Modifier to check if the caller owns the vehicle token\\r\\n     */\\r\\n    modifier onlyVehicleOwner(uint256 tokenId) {\\r\\n        require(mooveNFT.ownerOf(tokenId) == msg.sender, \\\"Not vehicle owner\\\");\\r\\n        _;\\r\\n    }\\r\\n\\r\\n    /**\\r\\n     * @dev Modifier to check if customization exists and is active\\r\\n     */\\r\\n    modifier customizationExists(uint256 customizationId) {\\r\\n        require(\\r\\n            _customizations[customizationId].id != 0,\\r\\n            \\\"Customization does not exist\\\"\\r\\n        );\\r\\n        require(\\r\\n            _activeCustomizations[customizationId],\\r\\n            \\\"Customization not active\\\"\\r\\n        );\\r\\n        _;\\r\\n    }\\r\\n\\r\\n    /**\\r\\n     * @dev Modifier to check if vehicle exists\\r\\n     */\\r\\n    modifier vehicleExists(uint256 tokenId) {\\r\\n        require(\\r\\n            mooveNFT.ownerOf(tokenId) != address(0),\\r\\n            \\\"Vehicle does not exist\\\"\\r\\n        );\\r\\n        _;\\r\\n    }\\r\\n\\r\\n    // ============= CONSTRUCTOR =============\\r\\n\\r\\n    /**\\r\\n     * @dev Constructor sets the MooveNFT contract address and initial roles\\r\\n     * @param _mooveNFT Address of the MooveNFT contract\\r\\n     * @param _admin Address to be granted admin roles\\r\\n     */\\r\\n    constructor(address _mooveNFT, address _admin) {\\r\\n        require(_mooveNFT != address(0), \\\"Invalid MooveNFT address\\\");\\r\\n        require(_admin != address(0), \\\"Invalid admin address\\\");\\r\\n\\r\\n        // Initialize immutable variable\\r\\n        mooveNFT = IMooveNFT(_mooveNFT);\\r\\n\\r\\n        // Set up roles\\r\\n        _grantRole(DEFAULT_ADMIN_ROLE, _admin);\\r\\n        _grantRole(CUSTOMIZATION_ADMIN_ROLE, _admin);\\r\\n        _grantRole(PRICE_MANAGER_ROLE, _admin);\\r\\n\\r\\n        _customizationIdCounter = 1; // Start from 1, 0 is reserved for \\\"not exists\\\"\\r\\n    }\\r\\n\\r\\n    // ============= CUSTOMIZATION MANAGEMENT =============\\r\\n\\r\\n    /**\\r\\n     * @dev Create a new customization option\\r\\n     */\\r\\n    function createCustomization(\\r\\n        string calldata name, // Optimized: changed from memory to calldata\\r\\n        string calldata description, // Optimized: changed from memory to calldata\\r\\n        CustomizationType custType,\\r\\n        uint256 price,\\r\\n        string calldata imageURI, // Optimized: changed from memory to calldata\\r\\n        uint256 maxSupply\\r\\n    )\\r\\n        external\\r\\n        override\\r\\n        onlyRole(CUSTOMIZATION_ADMIN_ROLE)\\r\\n        returns (uint256 customizationId)\\r\\n    {\\r\\n        require(bytes(name).length > 0, \\\"Name cannot be empty\\\");\\r\\n        require(bytes(description).length > 0, \\\"Description cannot be empty\\\");\\r\\n        require(bytes(imageURI).length > 0, \\\"Image URI cannot be empty\\\");\\r\\n\\r\\n        customizationId = _customizationIdCounter++;\\r\\n\\r\\n        _customizations[customizationId] = Customization({\\r\\n            id: customizationId,\\r\\n            name: name,\\r\\n            description: description,\\r\\n            custType: custType,\\r\\n            price: price,\\r\\n            imageURI: imageURI,\\r\\n            isActive: true,\\r\\n            maxSupply: uint32(maxSupply), // Optimized: packed\\r\\n            currentSupply: 0\\r\\n        });\\r\\n\\r\\n        _customizationsByType[custType].push(customizationId);\\r\\n        _activeCustomizations[customizationId] = true;\\r\\n\\r\\n        emit CustomizationCreated(customizationId, name, custType, price);\\r\\n    }\\r\\n\\r\\n    /**\\r\\n     * @dev Apply customization to NFT\\r\\n     * @param tokenId Token ID to customize\\r\\n     * @param customizationId Customization ID to apply\\r\\n     */\\r\\n    function applyCustomization(\\r\\n        uint256 tokenId,\\r\\n        uint256 customizationId\\r\\n    ) external payable override nonReentrant {\\r\\n        require(\\r\\n            mooveNFT.ownerOf(tokenId) == msg.sender,\\r\\n            \\\"Not token owner\\\"\\r\\n        );\\r\\n        require(\\r\\n            _customizations[customizationId].id != 0,\\r\\n            \\\"Customization does not exist\\\"\\r\\n        );\\r\\n\\r\\n        Customization storage customization = _customizations[customizationId];\\r\\n        require(\\r\\n            customization.isActive,\\r\\n            \\\"Customization not active\\\"\\r\\n        );\\r\\n        require(\\r\\n            msg.value >= customization.price,\\r\\n            \\\"Insufficient payment\\\"\\r\\n        );\\r\\n\\r\\n        // Update state first to prevent reentrancy\\r\\n        _vehicleCustomizations[tokenId].push(customizationId);\\r\\n        _isCustomizationApplied[tokenId][customizationId] = true;\\r\\n        unchecked {\\r\\n            customization.currentSupply++; // Optimized: unchecked increment\\r\\n        }\\r\\n\\r\\n        // Handle specific customization types\\r\\n        if (customization.custType == CustomizationType.PERFORMANCE) {\\r\\n            _applyPerformanceBonus(tokenId, customizationId);\\r\\n        } else if (customization.custType == CustomizationType.AESTHETIC) {\\r\\n            _applyAestheticChange(tokenId, customizationId);\\r\\n        }\\r\\n\\r\\n        // Refund excess payment\\r\\n        if (msg.value > customization.price) {\\r\\n            (bool refundSuccess, ) = payable(msg.sender).call{value: msg.value - customization.price}(\\\"\\\");\\r\\n            require(refundSuccess, \\\"Refund failed\\\");\\r\\n        }\\r\\n\\r\\n        emit CustomizationApplied(\\r\\n            tokenId,\\r\\n            customizationId,\\r\\n            msg.sender,\\r\\n            customization.price\\r\\n        );\\r\\n    }\\r\\n\\r\\n    /**\\r\\n     * @dev Remove a customization from a vehicle NFT\\r\\n     */\\r\\n    function removeCustomization(\\r\\n        uint256 tokenId,\\r\\n        uint256 customizationId\\r\\n    ) external override onlyVehicleOwner(tokenId) returns (bool success) {\\r\\n        require(\\r\\n            _isCustomizationApplied[tokenId][customizationId],\\r\\n            \\\"Customization not applied\\\"\\r\\n        );\\r\\n\\r\\n        // Remove from applied customizations\\r\\n        _isCustomizationApplied[tokenId][customizationId] = false;\\r\\n\\r\\n        // Remove from vehicle customizations array\\r\\n        uint256[] storage vehicleCustoms = _vehicleCustomizations[tokenId];\\r\\n        uint256 length = vehicleCustoms.length;\\r\\n        for (uint256 i = 0; i < length;) { // Optimized: use unchecked increment\\r\\n            if (vehicleCustoms[i] == customizationId) {\\r\\n                vehicleCustoms[i] = vehicleCustoms[length - 1];\\r\\n                vehicleCustoms.pop();\\r\\n                break;\\r\\n            }\\r\\n            unchecked { i++; } // Optimized: unchecked increment\\r\\n        }\\r\\n\\r\\n        // Decrease supply\\r\\n        _customizations[customizationId].currentSupply--;\\r\\n\\r\\n        // Handle specific customization types\\r\\n        CustomizationType custType = _customizations[customizationId].custType;\\r\\n        if (custType == CustomizationType.PERFORMANCE) {\\r\\n            _removePerformanceBonus(tokenId, customizationId);\\r\\n        } else if (custType == CustomizationType.AESTHETIC) {\\r\\n            _removeAestheticChange(tokenId, customizationId);\\r\\n        }\\r\\n\\r\\n        emit CustomizationRemoved(tokenId, customizationId, msg.sender);\\r\\n\\r\\n        return true;\\r\\n    }\\r\\n\\r\\n    /**\\r\\n     * @dev Apply performance upgrade to a vehicle NFT\\r\\n     */\\r\\n    function applyPerformanceUpgrade(\\r\\n        uint256 tokenId,\\r\\n        PerformanceUpgrade calldata upgrade // Optimized: changed from memory to calldata\\r\\n    )\\r\\n        external\\r\\n        override\\r\\n        payable\\r\\n        onlyVehicleOwner(tokenId)\\r\\n        whenNotPaused\\r\\n        returns (bool success)\\r\\n    {\\r\\n        require(\\r\\n            _isValidPerformanceUpgrade(upgrade),\\r\\n            \\\"Invalid performance upgrade\\\"\\r\\n        );\\r\\n\\r\\n        // Calculate cost based on bonus amounts\\r\\n        uint256 cost = _calculatePerformanceCost(upgrade);\\r\\n        require(msg.value >= cost, \\\"Insufficient payment\\\");\\r\\n\\r\\n        // Apply the upgrade\\r\\n        PerformanceUpgrade storage current = _vehiclePerformance[tokenId];\\r\\n        current.speedBonus = _addBonusCapped(\\r\\n            current.speedBonus,\\r\\n            upgrade.speedBonus\\r\\n        );\\r\\n        current.accelerationBonus = _addBonusCapped(\\r\\n            current.accelerationBonus,\\r\\n            upgrade.accelerationBonus\\r\\n        );\\r\\n        current.handlingBonus = _addBonusCapped(\\r\\n            current.handlingBonus,\\r\\n            upgrade.handlingBonus\\r\\n        );\\r\\n        current.durabilityBonus = _addBonusCapped(\\r\\n            current.durabilityBonus,\\r\\n            upgrade.durabilityBonus\\r\\n        );\\r\\n\\r\\n        // Refund excess payment\\r\\n        if (msg.value > cost) {\\r\\n            payable(msg.sender).transfer(msg.value - cost);\\r\\n        }\\r\\n\\r\\n        return true;\\r\\n    }\\r\\n\\r\\n    /**\\r\\n     * @dev Apply aesthetic customization to a vehicle NFT\\r\\n     */\\r\\n    function applyAestheticCustomization(\\r\\n        uint256 tokenId,\\r\\n        AestheticCustomization calldata aesthetic // Optimized: changed from memory to calldata\\r\\n    )\\r\\n        external\\r\\n        override\\r\\n        payable\\r\\n        onlyVehicleOwner(tokenId)\\r\\n        whenNotPaused\\r\\n        returns (bool success)\\r\\n    {\\r\\n        require(\\r\\n            _isValidAestheticCustomization(aesthetic),\\r\\n            \\\"Invalid aesthetic customization\\\"\\r\\n        );\\r\\n\\r\\n        // Calculate cost\\r\\n        uint256 cost = _calculateAestheticCost(aesthetic);\\r\\n        require(msg.value >= cost, \\\"Insufficient payment\\\");\\r\\n\\r\\n        // Apply the aesthetic changes\\r\\n        _vehicleAesthetics[tokenId] = aesthetic;\\r\\n\\r\\n        // Refund excess payment\\r\\n        if (msg.value > cost) {\\r\\n            payable(msg.sender).transfer(msg.value - cost);\\r\\n        }\\r\\n\\r\\n        return true;\\r\\n    }\\r\\n\\r\\n    // ============= QUERY FUNCTIONS =============\\r\\n\\r\\n    /**\\r\\n     * @dev Get customization details by ID\\r\\n     */\\r\\n    function getCustomization(\\r\\n        uint256 customizationId\\r\\n    ) external view override returns (Customization memory customization) {\\r\\n        require(\\r\\n            _customizations[customizationId].id != 0,\\r\\n            \\\"Customization does not exist\\\"\\r\\n        );\\r\\n        return _customizations[customizationId];\\r\\n    }\\r\\n\\r\\n    /**\\r\\n     * @dev Get all active customizations\\r\\n     */\\r\\n    function getActiveCustomizations()\\r\\n        external\\r\\n        view\\r\\n        override\\r\\n        returns (Customization[] memory customizations)\\r\\n    {\\r\\n        // Count active customizations\\r\\n        uint256 activeCount = 0;\\r\\n        for (uint256 i = 1; i < _customizationIdCounter; i++) {\\r\\n            if (_activeCustomizations[i]) {\\r\\n                activeCount++;\\r\\n            }\\r\\n        }\\r\\n\\r\\n        // Create array and populate\\r\\n        customizations = new Customization[](activeCount);\\r\\n        uint256 index = 0;\\r\\n        for (uint256 i = 1; i < _customizationIdCounter; i++) {\\r\\n            if (_activeCustomizations[i]) {\\r\\n                customizations[index] = _customizations[i];\\r\\n                index++;\\r\\n            }\\r\\n        }\\r\\n    }\\r\\n\\r\\n    /**\\r\\n     * @dev Get customizations by type\\r\\n     */\\r\\n    function getCustomizationsByType(\\r\\n        CustomizationType custType\\r\\n    ) external view override returns (Customization[] memory customizations) {\\r\\n        uint256[] storage ids = _customizationsByType[custType];\\r\\n        uint256 activeCount = 0;\\r\\n\\r\\n        // Count active customizations of this type\\r\\n        for (uint256 i = 0; i < ids.length; i++) {\\r\\n            if (_activeCustomizations[ids[i]]) {\\r\\n                activeCount++;\\r\\n            }\\r\\n        }\\r\\n\\r\\n        // Create array and populate\\r\\n        customizations = new Customization[](activeCount);\\r\\n        uint256 index = 0;\\r\\n        for (uint256 i = 0; i < ids.length; i++) {\\r\\n            if (_activeCustomizations[ids[i]]) {\\r\\n                customizations[index] = _customizations[ids[i]];\\r\\n                index++;\\r\\n            }\\r\\n        }\\r\\n    }\\r\\n\\r\\n    /**\\r\\n     * @dev Get all customizations applied to a vehicle\\r\\n     */\\r\\n    function getVehicleCustomizations(\\r\\n        uint256 tokenId\\r\\n    )\\r\\n        external\\r\\n        view\\r\\n        override\\r\\n        vehicleExists(tokenId)\\r\\n        returns (uint256[] memory customizationIds)\\r\\n    {\\r\\n        return _vehicleCustomizations[tokenId];\\r\\n    }\\r\\n\\r\\n    /**\\r\\n     * @dev Check if a customization is applied to a vehicle\\r\\n     */\\r\\n    function isCustomizationApplied(\\r\\n        uint256 tokenId,\\r\\n        uint256 customizationId\\r\\n    ) external view override returns (bool isApplied) {\\r\\n        return _isCustomizationApplied[tokenId][customizationId];\\r\\n    }\\r\\n\\r\\n    /**\\r\\n     * @dev Calculate total cost for multiple customizations\\r\\n     */\\r\\n    function calculateTotalCost(\\r\\n        uint256[] memory customizationIds\\r\\n    ) external view override returns (uint256 totalCost) {\\r\\n        for (uint256 i = 0; i < customizationIds.length; i++) {\\r\\n            require(\\r\\n                _customizations[customizationIds[i]].id != 0,\\r\\n                \\\"Invalid customization ID\\\"\\r\\n            );\\r\\n            totalCost += _customizations[customizationIds[i]].price;\\r\\n        }\\r\\n    }\\r\\n\\r\\n    /**\\r\\n     * @dev Get vehicle performance stats\\r\\n     */\\r\\n    function getVehiclePerformance(\\r\\n        uint256 tokenId\\r\\n    )\\r\\n        external\\r\\n        view\\r\\n        override\\r\\n        vehicleExists(tokenId)\\r\\n        returns (PerformanceUpgrade memory upgrade)\\r\\n    {\\r\\n        return _vehiclePerformance[tokenId];\\r\\n    }\\r\\n\\r\\n    /**\\r\\n     * @dev Get vehicle aesthetic customizations\\r\\n     */\\r\\n    function getVehicleAesthetics(\\r\\n        uint256 tokenId\\r\\n    )\\r\\n        external\\r\\n        view\\r\\n        override\\r\\n        vehicleExists(tokenId)\\r\\n        returns (AestheticCustomization memory aesthetic)\\r\\n    {\\r\\n        return _vehicleAesthetics[tokenId];\\r\\n    }\\r\\n\\r\\n    // ============= ADMIN FUNCTIONS =============\\r\\n\\r\\n    /**\\r\\n     * @dev Update customization price\\r\\n     */\\r\\n    function updateCustomizationPrice(\\r\\n        uint256 customizationId,\\r\\n        uint256 newPrice\\r\\n    ) external override onlyRole(PRICE_MANAGER_ROLE) {\\r\\n        require(\\r\\n            _customizations[customizationId].id != 0,\\r\\n            \\\"Customization does not exist\\\"\\r\\n        );\\r\\n\\r\\n        uint256 oldPrice = _customizations[customizationId].price;\\r\\n        _customizations[customizationId].price = newPrice;\\r\\n\\r\\n        emit CustomizationPriceUpdated(customizationId, oldPrice, newPrice);\\r\\n    }\\r\\n\\r\\n    /**\\r\\n     * @dev Set customization active status\\r\\n     */\\r\\n    function setCustomizationActive(\\r\\n        uint256 customizationId,\\r\\n        bool isActive\\r\\n    ) external override onlyRole(CUSTOMIZATION_ADMIN_ROLE) {\\r\\n        require(\\r\\n            _customizations[customizationId].id != 0,\\r\\n            \\\"Customization does not exist\\\"\\r\\n        );\\r\\n\\r\\n        _customizations[customizationId].isActive = isActive;\\r\\n        _activeCustomizations[customizationId] = isActive;\\r\\n    }\\r\\n\\r\\n    /**\\r\\n     * @dev Update customization image URI\\r\\n     */\\r\\n    function updateCustomizationImage(\\r\\n        uint256 customizationId,\\r\\n        string calldata newImageURI // Optimized: changed from memory to calldata\\r\\n    ) external override onlyRole(CUSTOMIZATION_ADMIN_ROLE) {\\r\\n        require(\\r\\n            _customizations[customizationId].id != 0,\\r\\n            \\\"Customization does not exist\\\"\\r\\n        );\\r\\n        require(bytes(newImageURI).length > 0, \\\"Image URI cannot be empty\\\");\\r\\n\\r\\n        _customizations[customizationId].imageURI = newImageURI;\\r\\n    }\\r\\n\\r\\n    /**\\r\\n     * @dev Withdraw contract balance\\r\\n     */\\r\\n    function withdraw(\\r\\n        address payable to,\\r\\n        uint256 amount\\r\\n    ) external override onlyRole(DEFAULT_ADMIN_ROLE) {\\r\\n        require(to != address(0), \\\"Invalid recipient address\\\");\\r\\n        require(to != address(this), \\\"Cannot withdraw to self\\\");\\r\\n        require(to.code.length == 0, \\\"Cannot withdraw to contract\\\");\\r\\n        require(amount > 0, \\\"Amount must be greater than 0\\\");\\r\\n        require(\\r\\n            amount <= address(this).balance,\\r\\n            \\\"Insufficient contract balance\\\"\\r\\n        );\\r\\n\\r\\n        // Use call instead of transfer for better gas efficiency and to prevent reentrancy\\r\\n        (bool success, ) = to.call{value: amount}(\\\"\\\");\\r\\n        require(success, \\\"Transfer failed\\\");\\r\\n    }\\r\\n\\r\\n    /**\\r\\n     * @dev Emergency pause function\\r\\n     */\\r\\n    function pause() external override onlyRole(DEFAULT_ADMIN_ROLE) {\\r\\n        _pause();\\r\\n    }\\r\\n\\r\\n    /**\\r\\n     * @dev Unpause function\\r\\n     */\\r\\n    function unpause() external override onlyRole(DEFAULT_ADMIN_ROLE) {\\r\\n        _unpause();\\r\\n    }\\r\\n\\r\\n    // ============= INTERNAL FUNCTIONS =============\\r\\n\\r\\n    /**\\r\\n     * @dev Apply virtual performance bonus from a specific customization\\r\\n     */\\r\\n    function _applyPerformanceBonus(\\r\\n        uint256 tokenId,\\r\\n        uint256 /* customizationId */\\r\\n    ) internal {\\r\\n        PerformanceUpgrade storage performance = _vehiclePerformance[tokenId];\\r\\n\\r\\n        // Each performance customization gives +5 to virtual stats\\r\\n        performance.speedBonus = _addBonusCapped(performance.speedBonus, 5);\\r\\n        performance.accelerationBonus = _addBonusCapped(\\r\\n            performance.accelerationBonus,\\r\\n            5\\r\\n        );\\r\\n        performance.handlingBonus = _addBonusCapped(\\r\\n            performance.handlingBonus,\\r\\n            5\\r\\n        );\\r\\n        performance.durabilityBonus = _addBonusCapped(\\r\\n            performance.durabilityBonus,\\r\\n            5\\r\\n        );\\r\\n\\r\\n        _updateNFTMetadata(tokenId);\\r\\n    }\\r\\n\\r\\n    /**\\r\\n     * @dev Remove performance bonus from a specific customization\\r\\n     */\\r\\n    function _removePerformanceBonus(\\r\\n        uint256 tokenId,\\r\\n        uint256 /* customizationId */\\r\\n    ) internal {\\r\\n        PerformanceUpgrade storage performance = _vehiclePerformance[tokenId];\\r\\n\\r\\n        performance.speedBonus = performance.speedBonus >= 5\\r\\n            ? performance.speedBonus - 5\\r\\n            : 0;\\r\\n        performance.accelerationBonus = performance.accelerationBonus >= 5\\r\\n            ? performance.accelerationBonus - 5\\r\\n            : 0;\\r\\n        performance.handlingBonus = performance.handlingBonus >= 5\\r\\n            ? performance.handlingBonus - 5\\r\\n            : 0;\\r\\n        performance.durabilityBonus = performance.durabilityBonus >= 5\\r\\n            ? performance.durabilityBonus - 5\\r\\n            : 0;\\r\\n    }\\r\\n\\r\\n    /**\\r\\n     * @dev Apply virtual aesthetic changes\\r\\n     */\\r\\n    function _applyAestheticChange(\\r\\n        uint256 tokenId,\\r\\n        uint256 /* customizationId */\\r\\n    ) internal {\\r\\n        _updateNFTMetadata(tokenId);\\r\\n    }\\r\\n\\r\\n    /**\\r\\n     * @dev Remove virtual aesthetic changes\\r\\n     */\\r\\n    function _removeAestheticChange(\\r\\n        uint256 tokenId,\\r\\n        uint256 /* customizationId */\\r\\n    ) internal {\\r\\n        _updateNFTMetadata(tokenId);\\r\\n    }\\r\\n\\r\\n    /**\\r\\n     * @dev Update NFT metadata to reflect applied customizations\\r\\n     */\\r\\n    function _updateNFTMetadata(uint256 tokenId) internal {\\r\\n        try mooveNFT.updateTokenMetadata(tokenId) {\\r\\n            // Metadata updated successfully\\r\\n        } catch {\\r\\n            // Handle update failure gracefully\\r\\n        }\\r\\n    }\\r\\n\\r\\n    /**\\r\\n     * @dev Add bonus with cap at MAX_PERFORMANCE_BONUS\\r\\n     */\\r\\n    function _addBonusCapped(\\r\\n        uint8 current,\\r\\n        uint8 addition\\r\\n    ) internal pure returns (uint8) {\\r\\n        uint256 sum = uint256(current) + uint256(addition);\\r\\n        return\\r\\n            sum > MAX_PERFORMANCE_BONUS\\r\\n                ? uint8(MAX_PERFORMANCE_BONUS)\\r\\n                : uint8(sum);\\r\\n    }\\r\\n\\r\\n    /**\\r\\n     * @dev Validate performance upgrade parameters\\r\\n     */\\r\\n    function _isValidPerformanceUpgrade(\\r\\n        PerformanceUpgrade memory upgrade\\r\\n    ) internal pure returns (bool) {\\r\\n        return\\r\\n            upgrade.speedBonus <= MAX_PERFORMANCE_BONUS &&\\r\\n            upgrade.accelerationBonus <= MAX_PERFORMANCE_BONUS &&\\r\\n            upgrade.handlingBonus <= MAX_PERFORMANCE_BONUS &&\\r\\n            upgrade.durabilityBonus <= MAX_PERFORMANCE_BONUS;\\r\\n    }\\r\\n\\r\\n    /**\\r\\n     * @dev Validate aesthetic customization parameters\\r\\n     */\\r\\n    function _isValidAestheticCustomization(\\r\\n        AestheticCustomization memory aesthetic\\r\\n    ) internal pure returns (bool) {\\r\\n        return\\r\\n            bytes(aesthetic.colorCode).length > 0 ||\\r\\n            aesthetic.skinId > 0 ||\\r\\n            aesthetic.decalIds.length > 0 ||\\r\\n            bytes(aesthetic.customURI).length > 0;\\r\\n    }\\r\\n\\r\\n    /**\\r\\n     * @dev Calculate cost for performance upgrade\\r\\n     */\\r\\n    function _calculatePerformanceCost(\\r\\n        PerformanceUpgrade memory upgrade\\r\\n    ) internal pure returns (uint256) {\\r\\n        uint256 totalBonus = uint256(upgrade.speedBonus) +\\r\\n            uint256(upgrade.accelerationBonus) +\\r\\n            uint256(upgrade.handlingBonus) +\\r\\n            uint256(upgrade.durabilityBonus);\\r\\n        return totalBonus * 0.001 ether;\\r\\n    }\\r\\n\\r\\n    /**\\r\\n     * @dev Calculate cost for aesthetic customization\\r\\n     */\\r\\n    function _calculateAestheticCost(\\r\\n        AestheticCustomization memory aesthetic\\r\\n    ) internal pure returns (uint256) {\\r\\n        uint256 cost = 0;\\r\\n\\r\\n        if (bytes(aesthetic.colorCode).length > 0) cost += 0.01 ether;\\r\\n        if (aesthetic.skinId > 0) cost += 0.02 ether;\\r\\n        if (aesthetic.decalIds.length > 0)\\r\\n            cost += aesthetic.decalIds.length * 0.005 ether;\\r\\n        if (bytes(aesthetic.customURI).length > 0) cost += 0.05 ether;\\r\\n\\r\\n        return cost;\\r\\n    }\\r\\n\\r\\n    /**\\r\\n     * @dev Receive function to accept ETH payments\\r\\n     */\\r\\n    receive() external payable {\\r\\n        // Contract can receive ETH\\r\\n    }\\r\\n} \",\"keccak256\":\"0xf9cdfce18a1750a451743873234a63f3cd32936c4de741b177b0e442541f743d\",\"license\":\"MIT\"},\"contracts/interfaces/IMooveCustomization.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\r\\npragma solidity ^0.8.21;\\r\\n\\r\\n// ============= ENUMS & STRUCTS =============\\r\\n\\r\\nenum CustomizationType {\\r\\n    AESTHETIC,\\r\\n    PERFORMANCE,\\r\\n    SPECIAL,\\r\\n    LIMITED_EDITION\\r\\n}\\r\\n\\r\\nstruct Customization {\\r\\n    uint256 id;\\r\\n    string name;\\r\\n    string description;\\r\\n    CustomizationType custType;\\r\\n    uint256 price;\\r\\n    string imageURI;\\r\\n    bool isActive;\\r\\n    uint32 maxSupply; // Optimized: reduced from uint256\\r\\n    uint32 currentSupply; // Optimized: reduced from uint256\\r\\n}\\r\\n\\r\\nstruct PerformanceUpgrade {\\r\\n    uint8 speedBonus;\\r\\n    uint8 accelerationBonus;\\r\\n    uint8 handlingBonus;\\r\\n    uint8 durabilityBonus;\\r\\n}\\r\\n\\r\\nstruct AestheticCustomization {\\r\\n    string colorCode;\\r\\n    uint256 skinId;\\r\\n    uint256[] decalIds;\\r\\n    string customURI;\\r\\n}\\r\\n\\r\\n/**\\r\\n * @title IMooveCustomization\\r\\n * @dev Interface for virtual vehicle NFT customizations\\r\\n * @notice All customizations are purely virtual and affect only NFT metadata and visual representation\\r\\n */\\r\\ninterface IMooveCustomization {\\r\\n    // ============= EVENTS =============\\r\\n\\r\\n    event CustomizationCreated(\\r\\n        uint256 indexed customizationId,\\r\\n        string name,\\r\\n        CustomizationType custType,\\r\\n        uint256 price\\r\\n    );\\r\\n\\r\\n    event CustomizationApplied(\\r\\n        uint256 indexed tokenId,\\r\\n        uint256 indexed customizationId,\\r\\n        address indexed owner,\\r\\n        uint256 price\\r\\n    );\\r\\n\\r\\n    event CustomizationRemoved(\\r\\n        uint256 indexed tokenId,\\r\\n        uint256 indexed customizationId,\\r\\n        address indexed owner\\r\\n    );\\r\\n\\r\\n    event CustomizationPriceUpdated(\\r\\n        uint256 indexed customizationId,\\r\\n        uint256 oldPrice,\\r\\n        uint256 newPrice\\r\\n    );\\r\\n\\r\\n    // ============= CUSTOMIZATION MANAGEMENT =============\\r\\n\\r\\n    /**\\r\\n     * @dev Create a new customization option\\r\\n     * @param name Name of the customization\\r\\n     * @param description Description of the customization\\r\\n     * @param custType Type of customization\\r\\n     * @param price Price in ETH\\r\\n     * @param imageURI URI for the customization image\\r\\n     * @param maxSupply Maximum supply of this customization\\r\\n     * @return customizationId The ID of the newly created customization\\r\\n     */\\r\\n    function createCustomization(\\r\\n        string calldata name, // Optimized: changed from memory to calldata\\r\\n        string calldata description, // Optimized: changed from memory to calldata\\r\\n        CustomizationType custType,\\r\\n        uint256 price,\\r\\n        string calldata imageURI, // Optimized: changed from memory to calldata\\r\\n        uint256 maxSupply\\r\\n    ) external returns (uint256 customizationId);\\r\\n\\r\\n    /**\\r\\n     * @dev Apply customization to NFT\\r\\n     * @param tokenId Token ID to customize\\r\\n     * @param customizationId Customization ID to apply\\r\\n     */\\r\\n    function applyCustomization(\\r\\n        uint256 tokenId,\\r\\n        uint256 customizationId\\r\\n    ) external payable;\\r\\n\\r\\n    /**\\r\\n     * @dev Remove a customization from a vehicle NFT\\r\\n     * @param tokenId Token ID of the vehicle\\r\\n     * @param customizationId Customization ID to remove\\r\\n     * @return success Whether the removal was successful\\r\\n     */\\r\\n    function removeCustomization(\\r\\n        uint256 tokenId,\\r\\n        uint256 customizationId\\r\\n    ) external returns (bool success);\\r\\n\\r\\n    /**\\r\\n     * @dev Apply performance upgrade to a vehicle NFT\\r\\n     * @param tokenId Token ID of the vehicle\\r\\n     * @param upgrade Performance upgrade to apply\\r\\n     * @return success Whether the upgrade was successful\\r\\n     */\\r\\n    function applyPerformanceUpgrade(\\r\\n        uint256 tokenId,\\r\\n        PerformanceUpgrade calldata upgrade // Optimized: changed from memory to calldata\\r\\n    ) external payable returns (bool success);\\r\\n\\r\\n    /**\\r\\n     * @dev Apply aesthetic customization to a vehicle NFT\\r\\n     * @param tokenId Token ID of the vehicle\\r\\n     * @param aesthetic Aesthetic customization to apply\\r\\n     * @return success Whether the customization was successful\\r\\n     */\\r\\n    function applyAestheticCustomization(\\r\\n        uint256 tokenId,\\r\\n        AestheticCustomization calldata aesthetic // Optimized: changed from memory to calldata\\r\\n    ) external payable returns (bool success);\\r\\n\\r\\n    // ============= QUERY FUNCTIONS =============\\r\\n\\r\\n    /**\\r\\n     * @dev Get customization details by ID\\r\\n     * @param customizationId ID of the customization\\r\\n     * @return customization Customization details\\r\\n     */\\r\\n    function getCustomization(\\r\\n        uint256 customizationId\\r\\n    ) external view returns (Customization memory customization);\\r\\n\\r\\n    /**\\r\\n     * @dev Get all active customizations\\r\\n     * @return customizations Array of active customizations\\r\\n     */\\r\\n    function getActiveCustomizations()\\r\\n        external\\r\\n        view\\r\\n        returns (Customization[] memory customizations);\\r\\n\\r\\n    /**\\r\\n     * @dev Get customizations by type\\r\\n     * @param custType Type of customization to filter by\\r\\n     * @return customizations Array of customizations of the specified type\\r\\n     */\\r\\n    function getCustomizationsByType(\\r\\n        CustomizationType custType\\r\\n    ) external view returns (Customization[] memory customizations);\\r\\n\\r\\n    /**\\r\\n     * @dev Get all customizations applied to a vehicle\\r\\n     * @param tokenId Token ID of the vehicle\\r\\n     * @return customizationIds Array of applied customization IDs\\r\\n     */\\r\\n    function getVehicleCustomizations(\\r\\n        uint256 tokenId\\r\\n    ) external view returns (uint256[] memory customizationIds);\\r\\n\\r\\n    /**\\r\\n     * @dev Check if a customization is applied to a vehicle\\r\\n     * @param tokenId Token ID of the vehicle\\r\\n     * @param customizationId Customization ID to check\\r\\n     * @return isApplied Whether the customization is applied\\r\\n     */\\r\\n    function isCustomizationApplied(\\r\\n        uint256 tokenId,\\r\\n        uint256 customizationId\\r\\n    ) external view returns (bool isApplied);\\r\\n\\r\\n    /**\\r\\n     * @dev Calculate total cost for multiple customizations\\r\\n     * @param customizationIds Array of customization IDs\\r\\n     * @return totalCost Total cost in ETH\\r\\n     */\\r\\n    function calculateTotalCost(\\r\\n        uint256[] memory customizationIds\\r\\n    ) external view returns (uint256 totalCost);\\r\\n\\r\\n    /**\\r\\n     * @dev Get vehicle performance stats\\r\\n     * @param tokenId Token ID of the vehicle\\r\\n     * @return upgrade Current performance upgrade stats\\r\\n     */\\r\\n    function getVehiclePerformance(\\r\\n        uint256 tokenId\\r\\n    ) external view returns (PerformanceUpgrade memory upgrade);\\r\\n\\r\\n    /**\\r\\n     * @dev Get vehicle aesthetic customizations\\r\\n     * @param tokenId Token ID of the vehicle\\r\\n     * @return aesthetic Current aesthetic customization\\r\\n     */\\r\\n    function getVehicleAesthetics(\\r\\n        uint256 tokenId\\r\\n    ) external view returns (AestheticCustomization memory aesthetic);\\r\\n\\r\\n    // ============= ADMIN FUNCTIONS =============\\r\\n\\r\\n    /**\\r\\n     * @dev Update customization price\\r\\n     * @param customizationId ID of the customization\\r\\n     * @param newPrice New price in ETH\\r\\n     */\\r\\n    function updateCustomizationPrice(\\r\\n        uint256 customizationId,\\r\\n        uint256 newPrice\\r\\n    ) external;\\r\\n\\r\\n    /**\\r\\n     * @dev Set customization active status\\r\\n     * @param customizationId ID of the customization\\r\\n     * @param isActive Whether the customization should be active\\r\\n     */\\r\\n    function setCustomizationActive(\\r\\n        uint256 customizationId,\\r\\n        bool isActive\\r\\n    ) external;\\r\\n\\r\\n    /**\\r\\n     * @dev Update customization image URI\\r\\n     * @param customizationId ID of the customization\\r\\n     * @param newImageURI New image URI\\r\\n     */\\r\\n    function updateCustomizationImage(\\r\\n        uint256 customizationId,\\r\\n        string calldata newImageURI // Optimized: changed from memory to calldata\\r\\n    ) external;\\r\\n\\r\\n    /**\\r\\n     * @dev Withdraw contract balance\\r\\n     * @param to Recipient address\\r\\n     * @param amount Amount to withdraw\\r\\n     */\\r\\n    function withdraw(\\r\\n        address payable to,\\r\\n        uint256 amount\\r\\n    ) external;\\r\\n\\r\\n    /**\\r\\n     * @dev Emergency pause function\\r\\n     */\\r\\n    function pause() external;\\r\\n\\r\\n    /**\\r\\n     * @dev Unpause function\\r\\n     */\\r\\n    function unpause() external;\\r\\n}\\r\\n\",\"keccak256\":\"0x052dd0d4e284ffbf95448a287bf2608a1f64ab3157184251025fd1d46c4db3b2\",\"license\":\"MIT\"}},\"version\":1}",
+  "bytecode": "0x60a0346200018057601f6200352f38819003918201601f19168301916001600160401b038311848410176200018557808492604094855283398101031262000180576200005a602062000052836200019b565b92016200019b565b600180556001600160a01b039182169182156200013b57811615620000f6576200009f916080526200008c81620001b0565b50620000988162000230565b50620002d2565b50600160035560405161319f90816200037082396080518181816101c1015281816107bb01528181610c7301528181610d930152818161116801528181611aab0152818161217e0152818161227101526130be0152f35b60405162461bcd60e51b815260206004820152601560248201527f496e76616c69642061646d696e206164647265737300000000000000000000006044820152606490fd5b60405162461bcd60e51b815260206004820152601860248201527f496e76616c6964204d6f6f76654e4654206164647265737300000000000000006044820152606490fd5b600080fd5b634e487b7160e01b600052604160045260246000fd5b51906001600160a01b03821682036200018057565b6001600160a01b031660008181527fad3228b676f7d3cd4284a5443f17f1962b36e491b30a40b2405849e597ba5fb5602052604081205490919060ff166200022c57818052816020526040822081835260205260408220600160ff1982541617905533916000805160206200350f8339815191528180a4600190565b5090565b6001600160a01b031660008181527f13485b5810a34024a52fcc7d5d30dd55193e08e47cef3d4eeb93c8a439e1833760205260408120549091907f368a0a902ce0a8be883cdf3d5cbaaae7bbbf3f9f0aa7ad2c137c77c3a72ca6b69060ff16620002cd57808352826020526040832082845260205260408320600160ff198254161790556000805160206200350f833981519152339380a4600190565b505090565b6001600160a01b031660008181527f9d3d98451b345b45ff50af9e3af5ef3d429772e3b256eac22f1b87f9143d4f3e60205260408120549091907f3515f38d031dcbca5f1dac4c5afc1efca2020e42efdd9c5806ae7e963d18435a9060ff16620002cd57808352826020526040832082845260205260408320600160ff198254161790556000805160206200350f833981519152339380a460019056fe608080604052600436101561001d575b50361561001b57600080fd5b005b60003560e01c90816301ffc9a71461260b575080630eb38075146124df578063109dc4f01461222f57806321c86b9114612145578063248a9ca3146121165780632f2ff15d146120e5578063307381d014611b1557806331aab75914611ada57806333fda52114611a9557806334d3aaaf1461198b57806336568abe146119525780633c8fc03c146119365780633f4ba83a146118cc578063417c5754146117e75780635c975abb146117c45780636faf3c0a146116e257806383131aa01461165d5780638456cb59146116035780638cd2ca0f1461110b57806391d14854146110cb5780639a6007c714610f1e578063a217fddf14610f02578063a29d671714610ec7578063ae231edc14610d36578063b9d3844e14610c1a578063bb887ddd14610bfe578063d547741f14610bcd578063e20f0b5a14610aef578063e556fe7d14610ab7578063eaf200da1461077a578063f3fef3a3146105835763f4ad3dd51461018a573861000f565b3461057e57610198366127f2565b6040516331a9108f60e11b815260048101839052602092602492916001600160a01b03858286817f000000000000000000000000000000000000000000000000000000000000000085165afa9081156105725761020092600092610543575b50163314612d2a565b8060005260068452604060002082600052845260ff928360406000205416156105005781600052600685526040600020836000528552604060002060ff1990818154169055826000526005865260406000209485549560005b87811061043b575b50509091929380955060005260048652600660406000200163ffffffff815460281c16801561042657815468ffffffff0000000000191660001990910160281b68ffffffff000000000016179055846000526004865280600360406000200154169260048410156104125750600183036103fe576103a192508360005260078652806040600020928354908280831660058110156000146103f657610305906130a9565b1691161780845560081c1660058110156000146103eb5761032861033e916130a9565b835461ff00191660089190911b61ff0016178355565b815460101c8116600581106103e057610359610371916130a9565b835462ff0000191660109190911b62ff000016178355565b815460181c16600581106103d257610388906130a9565b63ff00000082549160181b169063ff0000001916179055565b6040519133917f8d44b5c72ff5f13f911acf7355ac1984f6f3274f44df88b967666f518a3a221c600080a460018152f35b50805463ff00000019169055565b506103716000610359565b5061033e6000610328565b506000610305565b50506103a15761040d816130bc565b6103a1565b634e487b7160e01b60009081526021600452fd5b84634e487b7160e01b60005260116004526000fd5b866104468284612bee565b919054600392831b1c1461045d5750600101610259565b92939495969790600019918281019081116104eb57906104906104836104a99386612bee565b905490871b1c9185612bee565b90919082549060031b91821b91600019901b1916179055565b815480156104d6578101926104be8484612bee565b81939154921b1b191690555590849392913880610261565b86634e487b7160e01b60005260316004526000fd5b87634e487b7160e01b60005260116004526000fd5b8460196064926040519262461bcd60e51b845260048401528201527f437573746f6d697a6174696f6e206e6f74206170706c696564000000000000006044820152fd5b610564919250873d891161056b575b61055c818361283f565b810190612c3f565b90386101f7565b503d610552565b6040513d6000823e3d90fd5b600080fd5b3461057e57604036600319011261057e576004356001600160a01b0381169081900361057e576024908135906105b7612931565b8015610736573081146106f257803b6106ae57811561066a5747821161062657600080809381935af16105e8612cfa565b50156105f057005b606490600f6040519162461bcd60e51b8352602060048401528201526e151c985b9cd9995c8819985a5b1959608a1b6044820152fd5b60405162461bcd60e51b815260206004820152601d818501527f496e73756666696369656e7420636f6e74726163742062616c616e63650000006044820152606490fd5b60405162461bcd60e51b815260206004820152601d818501527f416d6f756e74206d7573742062652067726561746572207468616e20300000006044820152606490fd5b60405162461bcd60e51b815260206004820152601b818501527f43616e6e6f7420776974686472617720746f20636f6e747261637400000000006044820152606490fd5b60405162461bcd60e51b8152602060048201526017818501527f43616e6e6f7420776974686472617720746f2073656c660000000000000000006044820152606490fd5b60405162461bcd60e51b8152602060048201526019818501527f496e76616c696420726563697069656e742061646472657373000000000000006044820152606490fd5b610783366127f2565b906001916002835414610aa557600283556040516331a9108f60e11b815260048101839052602092906001600160a01b0384826024817f000000000000000000000000000000000000000000000000000000000000000085165afa91821561057257600092610a86575b5033911603610a4f57816000526004835261080e6040600020541515612c5e565b816000526004835260406000206006810160ff908181541615610a0a5781600360048501946108408654341015612caa565b8660005260058952610856886040600020612c1c565b600087815260068a5260408082208a83528b529020805460ff199081168c17909155845468ffffffff0000000000198116602891821c63ffffffff168d0190911b68ffffffff0000000000161790945501541660048110156109f4578088036109df575061038861094092856000526007885261090b6108f582604060002095865490826108e5818416613128565b1691161780875560081c16613128565b845461ff00191660089190911b61ff0016178455565b61093561091d82855460101c16613128565b845462ff0000191660109190911b62ff000016178455565b825460181c16613128565b610949826130bc565b8054803411610984575b505460405190815233937f2a5d856c429a87043a9cf7e950169054f0f3c7ae72a9996d0be37b185309509e91a48055005b60008080610993819434612ced565b335af161099e612cfa565b50156109aa5785610953565b60405162461bcd60e51b815260048101859052600d60248201526c1499599d5b990819985a5b1959609a1b6044820152606490fd5b915050610949576109ef826130bc565b610949565b634e487b7160e01b600052602160045260246000fd5b60405162461bcd60e51b815260048101879052601860248201527f437573746f6d697a6174696f6e206e6f742061637469766500000000000000006044820152606490fd5b60405162461bcd60e51b815260048101849052600f60248201526e2737ba103a37b5b2b71037bbb732b960891b6044820152606490fd5b610a9e919250853d871161056b5761055c818361283f565b90866107ed565b604051633ee5aeb560e01b8152600490fd5b3461057e57610ac5366127f2565b906000526006602052604060002090600052602052602060ff604060002054166040519015158152f35b3461057e5760208060031936011261057e576004356001600160401b03811161057e57610b20903690600401612877565b6000805b8251821015610bc357610b378284612ff4565b516000526004845260406000205415610b7e57610b72610b7891610b5b8486612ff4565b51600052600486526004604060002001549061309c565b91612ad0565b90610b24565b60405162461bcd60e51b815260048101859052601860248201527f496e76616c696420637573746f6d697a6174696f6e20494400000000000000006044820152606490fd5b8390604051908152f35b3461057e5761001b610bde3661268b565b90806000526000602052610bf960016040600020015461296b565b612a0f565b3461057e57600036600319011261057e57602060405160648152f35b3461057e5760208060031936011261057e576004359060006060604051610c4081612824565b8281528284820152826040820152015260018060a01b03916040516331a9108f60e11b81528160048201528281602481877f0000000000000000000000000000000000000000000000000000000000000000165afa93841561057257608094610cb492600091610d19575b50161515613008565b60005260078152604060002060405190610ccd82612824565b5460ff80928183169485825282818301818660081c1681528160606040860195828960101c168752019660181c1686526040519788525116908601525116604084015251166060820152f35b610d309150853d871161056b5761055c818361283f565b86610cab565b3461057e5760208060031936011261057e5760405190600435610d5883612824565b6060808452600083850152604080850182905293810181905292516331a9108f60e11b8152600481018290526001600160a01b0383826024817f000000000000000000000000000000000000000000000000000000000000000085165afa801561057257610dd992600091610eaa575b50610e4c9594939291161515613008565b6000526008815260406000209160405192610df384612824565b610dfc81612f02565b84526001928382015493818601948552610e2b6003610e1d6002860161304d565b946040890195865201612f02565b92848701938452604051978897848952516080858a015260a08901906126b1565b955160408801525194601f199485888303019088015282808751928381520196019260005b828110610e94578880610e908a8a8a51908483030160808501526126b1565b0390f35b8451885289985096810196938101938301610e71565b610ec19150853d871161056b5761055c818361283f565b86610dc8565b3461057e57600036600319011261057e5760206040517f368a0a902ce0a8be883cdf3d5cbaaae7bbbf3f9f0aa7ad2c137c77c3a72ca6b68152f35b3461057e57600036600319011261057e57602060405160008152f35b3461057e5760208060031936011261057e57600435600481101561057e57610f4590612bd5565b906000808354915b8281106110825750610f5e90612fa4565b9160009060005b838110610f7a5760405180610e908782612790565b610f848187612bee565b9054600391821b1c600052600a835260ff8060406000205416610fb2575b5050610fad90612ad0565b610f65565b9361107a918395610fc6610fad958b612bee565b905490831b1c600052600486526006604060002061101d8360405195610feb87612808565b83548752610ffb60018501612f02565b8b88015261100b60028501612f02565b60408801528301541660608601612b31565b6004810154608085015261103360058201612f02565b60a08501520154908116151560c083015263ffffffff90818160081c1660e084015260281c166101008201526110698289612ff4565b526110748188612ff4565b50612ad0565b929087610fa2565b61108c8186612bee565b90549060031b1c600052600a845260ff604060002054166110b6575b6110b190612ad0565b610f4d565b906110c36110b191612ad0565b9190506110a8565b3461057e576110d93661268b565b90600052600060205260406000209060018060a01b0316600052602052602060ff604060002054166040519015158152f35b60031960403682011261057e576001600160401b0390600435602480359084821161057e57816004019460808336039586011261057e576040516331a9108f60e11b815260048101859052602096906001600160a01b03888286817f000000000000000000000000000000000000000000000000000000000000000085165afa908115610572576111a6926000926115e45750163314612d2a565b6111ae612dcb565b6111b83682612e07565b80515115908115916115d7575b81156115c8575b81156115b9575b5015611575576111e33682612e07565b94600095805151611566575b8881015161154e575b6040810151518015801561150c575b505060600151516114df575b61121f86341015612caa565b6000526008875260406000206112358280612e88565b908482116114ca576112518261124b8554612b3d565b85612b8e565b600090601f831160011461146357611282929160009183611458575b50508160011b916000199060031b1c19161790565b81555b600196848601358883015560028201906044870135906022190181121561057e5786019060048201359185831161057e5786018260051b3603811361057e57600160401b8311611443578154838355808410611426575b5090600052896000208960005b84811061141457505050505090606460036113079301950190612e88565b9290918311611400575061131f8261124b8554612b3d565b600090601f831160011461139c5761134f9291600091836113915750508160011b916000199060031b1c19161790565b90555b803411611363575b50604051908152f35b60008080611372819434612ced565b818115611388575b3390f115610572578261135a565b506108fc61137a565b01359050878061126d565b90859291601f1983169185600052886000209260005b8a8282106113ea57505084116113d0575b505050811b019055611352565b0135600019600384901b60f8161c191690558680806113c3565b8385013586558a979095019492830192016113b2565b634e487b7160e01b60009081526041600452fd5b8c843594019381840155018a906112e9565b61143d9083600052848d6000209182019101612b77565b8b6112dc565b86634e487b7160e01b60005260416004526000fd5b013590508b8061126d565b601f19831691846000528b6000209260005b8d8282106114b457505090846001959493921061149a575b505050811b018155611285565b0135600019600384901b60f8161c191690558a808061148d565b6001849682939587013581550195019201611475565b85634e487b7160e01b60005260416004526000fd5b9466b1a2bc2ec5000081018091116114f75794611213565b83634e487b7160e01b60005260116004526000fd5b6611c37937e0800098919298808402938404141715611539576060916115319161309c565b96908a611207565b85634e487b7160e01b60005260116004526000fd5b9566470de4df820000810180911161042657956111f8565b662386f26fc1000096506111ef565b60405162461bcd60e51b815260048101889052601f818501527f496e76616c69642061657374686574696320637573746f6d697a6174696f6e006044820152606490fd5b606091500151511515886111d3565b604081015151151591506111cc565b88810151151591506111c5565b6115fc9192508a3d8c1161056b5761055c818361283f565b908a6101f7565b3461057e57600036600319011261057e5761161c612931565b611624612dcb565b600160ff1960025416176002557f62e78cea01bee320cd4e420270b5ea74000d11b0c9f74754ebdbfc544b05a2586020604051338152a1005b3461057e57604036600319011261057e57600435602435801515810361057e5761001b916116896128d5565b8060005260046020526116a26040600020541515612c5e565b60005260046020526116c78160066040600020019060ff801983541691151516179055565b600a60205260406000209060ff801983541691151516179055565b3461057e5760208060031936011261057e576004356116ff612eba565b5080600052600482526117186040600020541515612c5e565b6000526004815260406000209060066040519261173484612808565b8054845261174460018201612f02565b8385015261175460028201612f02565b604085015261176d60ff60038301541660608601612b31565b6004810154608085015261178360058201612f02565b60a0850152015460ff8116151560c084015263ffffffff90818160081c1660e085015260281c16610100830152610e906040519282849384528301906126fe565b3461057e57600036600319011261057e57602060ff600254166040519015158152f35b3461057e576117f5366127f2565b3360009081527f9d3d98451b345b45ff50af9e3af5ef3d429772e3b256eac22f1b87f9143d4f3e60205260409020547f3515f38d031dcbca5f1dac4c5afc1efca2020e42efdd9c5806ae7e963d18435a9060ff16156118ae575060407f0b8176be666e19af8f6b1116a7dec911b195957b0db55d66fb8ecced7fd9484d9183600052600460205261188b82600020541515612c5e565b8360005260046020526004826000200190808254925582519182526020820152a2005b6044906040519063e2517d3f60e01b82523360048301526024820152fd5b3461057e57600036600319011261057e576118e5612931565b60025460ff8116156119245760ff19166002557f5db9ee0a495bf2e6ff9c91a7834c1ba4fdd244a5e8aa4e537bd38aeae4b073aa6020604051338152a1005b604051638dfc202b60e01b8152600490fd5b3461057e57600036600319011261057e57602060405160328152f35b3461057e576119603661268b565b336001600160a01b038216036119795761001b91612a0f565b60405163334bd91960e11b8152600490fd5b3461057e57600036600319011261057e5760038054600060015b828110611a5b57506119b690612fa4565b91600060015b8381106119d15760405180610e908782612790565b806000526020600a815260ff80604060002054166119fa575b50506119f590612ad0565b6119bc565b92816119f593946004611a5394526006604060002060405193611a1c85612808565b81548552611a2c60018301612f02565b90850152611a3c60028201612f02565b604085015261101d838a8301541660608601612b31565b9190866119ea565b80600052600a60205260ff60406000205416611a80575b611a7b90612ad0565b6119a5565b90611a8d611a7b91612ad0565b919050611a72565b3461057e57600036600319011261057e576040517f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03168152602090f35b3461057e57600036600319011261057e5760206040517f3515f38d031dcbca5f1dac4c5afc1efca2020e42efdd9c5806ae7e963d18435a8152f35b3461057e5760c036600319011261057e576004356001600160401b03811161057e57611b4590369060040161265e565b6024356001600160401b03811161057e57611b6490369060040161265e565b90916004604435101561057e576084356001600160401b03811161057e57611b9090369060040161265e565b90611b996128d5565b82156120a95783156120645781611bb4611c11931515612a84565b611bee60035496611bc488612ad0565b60035560405196611bd488612808565b888852611be236888c612afa565b60208901523691612afa565b6040860152611c0260443560608701612b31565b60643560808601523691612afa565b60a0830152600160c083015263ffffffff60a4351660e083015260006101008301528260005260046020526040600020938251855560208301518051906001600160401b038211611f5f57611c7682611c6d60018a0154612b3d565b60018a01612b8e565b602090601f8311600114611ff257611ca6929160009183611f755750508160011b916000199060031b1c19161790565b60018601555b60408301518051906001600160401b038211611f5f57611cdc82611cd360028a0154612b3d565b60028a01612b8e565b602090601f8311600114611f8057611d0c929160009183611f755750508160011b916000199060031b1c19161790565b60028601555b60038501606084015160048110156109f45760ff801983541691161790556080830151600486015560a0830151928351956001600160401b038711611f5f57868695611d70602099611d676005860154612b3d565b60058601612b8e565b8890601f8311600114611eb45761010060067fd2b94acb95985643ac1f7c726dd620f604f2cc7a280015d015d521c05dea1606989795611dd486611e359760809a9763ffffffff97600092611ea95750508160011b916000199060031b1c19161790565b60058201555b0192611df860c08201511515859060ff801983541691151516179055565b60e08101518454929091015168ffffffffffffffff001990921660089190911b64ffffffff001617911660281b68ffffffff000000000016179055565b611e4985611e44604435612bd5565b612c1c565b84600052600a87526040600020600160ff198254161790558260405193849260608452816060850152848401376000838284010152611e8c8883016044356126f1565b6064356040830152601f01601f19168101030190a2604051908152f35b01519050388061126d565b6005849392989796959401600052896000209060005b601f1984168110611f4557506006611e359460018563ffffffff957fd2b94acb95985643ac1f7c726dd620f604f2cc7a280015d015d521c05dea16069c9d6101009660809c9b99601f19811610611f2c575b505050811b016005820155611dda565b015160001960f88460031b161c191690558f8080611f1c565b818a01518355988b01988a98506001909201918b01611eca565b634e487b7160e01b600052604160045260246000fd5b01519050888061126d565b9190600288016000526020600020906000935b601f1984168510611fd7576001945083601f19811610611fbe575b505050811b016002860155611d12565b015160001960f88460031b161c19169055878080611fae565b81810151835560209485019460019093019290910190611f93565b9190600188016000526020600020906000935b601f1984168510612049576001945083601f19811610612030575b505050811b016001860155611cac565b015160001960f88460031b161c19169055878080612020565b81810151835560209485019460019093019290910190612005565b60405162461bcd60e51b815260206004820152601b60248201527f4465736372697074696f6e2063616e6e6f7420626520656d70747900000000006044820152606490fd5b60405162461bcd60e51b81526020600482015260146024820152734e616d652063616e6e6f7420626520656d70747960601b6044820152606490fd5b3461057e5761001b6120f63661268b565b9080600052600060205261211160016040600020015461296b565b612991565b3461057e57602036600319011261057e5760043560005260006020526020600160406000200154604051908152f35b3461057e5760208060031936011261057e576040516331a9108f60e11b815260048035908201819052906001600160a01b0383826024817f000000000000000000000000000000000000000000000000000000000000000085165afa8015610572576121bb926000916122125750161515613008565b600052600581526121cf604060002061304d565b906040519181839283018184528251809152816040850193019160005b8281106121fb57505050500390f35b8351855286955093810193928101926001016121ec565b6122299150853d871161056b5761055c818361283f565b85610cab565b60a036600319011261057e57600435608036602319011261057e576040516331a9108f60e11b815260048101829052602091906001600160a01b0383826024817f000000000000000000000000000000000000000000000000000000000000000085165afa908115610572576122af926000926124c05750163314612d2a565b6122b7612dcb565b6122c036612d6a565b606460ff9181838181845116111592836124af575b8361249d575b8361248c575b5050501561244a576123256122f536612d6a565b83606061231b61230e83855116848b870151169061309c565b836040860151169061309c565b920151169061309c565b9266038d7ea4c68000938481029481860414901517156124345761234b84341015612caa565b600052600784526040600020908154602435848116810361057e57612373859182841661314b565b169060ff19161780835560443590848216820361057e5761239c91856103289260081c1661314b565b82825460101c16903590838216820361057e576123d4916123bc9161314b565b825462ff0000191660109190911b62ff000016178255565b81815460181c16608435928316830361057e576123f4926103889161314b565b803411612406575b5060405160018152f35b60008080612415819434612ced565b81811561242b575b3390f11561057257816123fc565b506108fc61241d565b634e487b7160e01b600052601160045260246000fd5b60405162461bcd60e51b815260048101859052601b60248201527f496e76616c696420706572666f726d616e6365207570677261646500000000006044820152fd5b6060015116111590508183876122e1565b925081816040850151161115926122db565b9250818188850151161115926122d5565b6124d8919250853d871161056b5761055c818361283f565b90856101f7565b3461057e57604036600319011261057e576004356001600160401b0360243581811161057e5761251390369060040161265e565b9061251c6128d5565b83600052602093600485526125376040600020541515612c5e565b612542831515612a84565b600052600484526005604060002001928211611f5f576125668261124b8554612b3d565b600093601f83116001146125a757506125989293829160009261259c5750508160011b916000199060031b1c19161790565b9055005b01359050848061126d565b90601f198316948460005282600020926000905b8782106125f35750508360019596106125d9575b505050811b019055005b0135600019600384901b60f8161c191690558380806125cf565b806001849682949587013581550195019201906125bb565b3461057e57602036600319011261057e576004359063ffffffff60e01b821680920361057e57602091637965db0b60e01b811490811561264d575b5015158152f35b6301ffc9a760e01b14905083612646565b9181601f8401121561057e578235916001600160401b03831161057e576020838186019501011161057e57565b604090600319011261057e57600435906024356001600160a01b038116810361057e5790565b919082519283825260005b8481106126dd575050826000602080949584010152601f8019910116010190565b6020818301810151848301820152016126bc565b9060048210156109f45752565b90612763612735612723610120855185526020860151908060208701528501906126b1565b604085015184820360408601526126b1565b612747606085015160608501906126f1565b6080840151608084015260a084015183820360a08501526126b1565b9160c0810151151560c083015260e081015163ffffffff80911660e0840152610100809201511691015290565b602080820190808352835180925260408301928160408460051b8301019501936000915b8483106127c45750505050505090565b90919293949584806127e2600193603f198682030187528a516126fe565b98019301930191949392906127b4565b604090600319011261057e576004359060243590565b61012081019081106001600160401b03821117611f5f57604052565b608081019081106001600160401b03821117611f5f57604052565b90601f801991011681019081106001600160401b03821117611f5f57604052565b6001600160401b038111611f5f5760051b60200190565b9080601f8301121561057e57602090823561289181612860565b9361289f604051958661283f565b818552838086019260051b82010192831161057e578301905b8282106128c6575050505090565b813581529083019083016128b8565b3360009081527f13485b5810a34024a52fcc7d5d30dd55193e08e47cef3d4eeb93c8a439e1833760205260409020547f368a0a902ce0a8be883cdf3d5cbaaae7bbbf3f9f0aa7ad2c137c77c3a72ca6b69060ff16156118ae5750565b3360009081527fad3228b676f7d3cd4284a5443f17f1962b36e491b30a40b2405849e597ba5fb5602052604081205460ff16156118ae5750565b80600052600060205260406000203360005260205260ff60406000205416156118ae5750565b9060009180835282602052604083209160018060a01b03169182845260205260ff60408420541615600014612a0a57808352826020526040832082845260205260408320600160ff198254161790557f2f8788117e7eff1d82e926ec794901d17c78024a50270940304540a733656f0d339380a4600190565b505090565b9060009180835282602052604083209160018060a01b03169182845260205260ff604084205416600014612a0a5780835282602052604083208284526020526040832060ff1981541690557ff6391f5c32d9c69d2a47ea670b442974b53935d1edc7fd64eb21e047a839171b339380a4600190565b15612a8b57565b60405162461bcd60e51b815260206004820152601960248201527f496d616765205552492063616e6e6f7420626520656d707479000000000000006044820152606490fd5b60001981146124345760010190565b6001600160401b038111611f5f57601f01601f191660200190565b929192612b0682612adf565b91612b14604051938461283f565b82948184528183011161057e578281602093846000960137010152565b60048210156109f45752565b90600182811c92168015612b6d575b6020831014612b5757565b634e487b7160e01b600052602260045260246000fd5b91607f1691612b4c565b818110612b82575050565b60008155600101612b77565b9190601f8111612b9d57505050565b612bc9926000526020600020906020601f840160051c83019310612bcb575b601f0160051c0190612b77565b565b9091508190612bbc565b60048110156109f4576000526009602052604060002090565b8054821015612c065760005260206000200190600090565b634e487b7160e01b600052603260045260246000fd5b90815491600160401b831015611f5f5782610490916001612bc995018155612bee565b9081602091031261057e57516001600160a01b038116810361057e5790565b15612c6557565b60405162461bcd60e51b815260206004820152601c60248201527f437573746f6d697a6174696f6e20646f6573206e6f74206578697374000000006044820152606490fd5b15612cb157565b60405162461bcd60e51b8152602060048201526014602482015273125b9cdd59999a58da595b9d081c185e5b595b9d60621b6044820152606490fd5b9190820391821161243457565b3d15612d25573d90612d0b82612adf565b91612d19604051938461283f565b82523d6000602084013e565b606090565b15612d3157565b60405162461bcd60e51b81526020600482015260116024820152702737ba103b32b434b1b6329037bbb732b960791b6044820152606490fd5b608090602319011261057e5760405190612d8382612824565b8160243560ff8116810361057e57815260443560ff8116810361057e57602082015260643560ff8116810361057e5760408201526084359060ff8216820361057e5760600152565b60ff60025416612dd757565b60405163d93c066560e01b8152600490fd5b9080601f8301121561057e57816020612e0493359101612afa565b90565b919060808382031261057e5760405190612e2082612824565b81938035916001600160401b039283811161057e5781612e41918401612de9565b845260208201356020850152604082013583811161057e5781612e65918401612877565b6040850152606082013592831161057e57606092612e839201612de9565b910152565b903590601e198136030182121561057e57018035906001600160401b03821161057e5760200191813603831361057e57565b60405190612ec782612808565b816101006000918281526060602082015260606040820152826060820152826080820152606060a08201528260c08201528260e08201520152565b90604051918260008254612f1581612b3d565b908184526020946001918281169081600014612f825750600114612f43575b505050612bc99250038361283f565b600090815285812095935091905b818310612f6a575050612bc99350820101388080612f34565b85548884018501529485019487945091830191612f51565b92505050612bc994925060ff191682840152151560051b820101388080612f34565b90612fae82612860565b612fbb604051918261283f565b8281528092612fcc601f1991612860565b019060005b828110612fdd57505050565b602090612fe8612eba565b82828501015201612fd1565b8051821015612c065760209160051b010190565b1561300f57565b60405162461bcd60e51b815260206004820152601660248201527515995a1a58db1948191bd95cc81b9bdd08195e1a5cdd60521b6044820152606490fd5b9060405191828154918282526020928383019160005283600020936000905b82821061308257505050612bc99250038361283f565b85548452600195860195889550938101939091019061306c565b9190820180921161243457565b60ff6004199116019060ff821161243457565b7f00000000000000000000000000000000000000000000000000000000000000006001600160a01b031690813b1561057e576000916024839260405194859384926304d51d1960e51b845260048401525af16131155750565b6001600160401b038111611f5f57604052565b60ff16600581018091116124345760648111156131455750606490565b60ff1690565b60ff8061315a9316911661309c565b6064811115613145575060649056fea2646970667358221220cc8e8edf6f6d52c97353dde8d762980d11317dfe44f7b452ee6f5cf2b2e4989d64736f6c634300081500332f8788117e7eff1d82e926ec794901d17c78024a50270940304540a733656f0d",
+  "deployedBytecode": "0x608080604052600436101561001d575b50361561001b57600080fd5b005b60003560e01c90816301ffc9a71461260b575080630eb38075146124df578063109dc4f01461222f57806321c86b9114612145578063248a9ca3146121165780632f2ff15d146120e5578063307381d014611b1557806331aab75914611ada57806333fda52114611a9557806334d3aaaf1461198b57806336568abe146119525780633c8fc03c146119365780633f4ba83a146118cc578063417c5754146117e75780635c975abb146117c45780636faf3c0a146116e257806383131aa01461165d5780638456cb59146116035780638cd2ca0f1461110b57806391d14854146110cb5780639a6007c714610f1e578063a217fddf14610f02578063a29d671714610ec7578063ae231edc14610d36578063b9d3844e14610c1a578063bb887ddd14610bfe578063d547741f14610bcd578063e20f0b5a14610aef578063e556fe7d14610ab7578063eaf200da1461077a578063f3fef3a3146105835763f4ad3dd51461018a573861000f565b3461057e57610198366127f2565b6040516331a9108f60e11b815260048101839052602092602492916001600160a01b03858286817f000000000000000000000000000000000000000000000000000000000000000085165afa9081156105725761020092600092610543575b50163314612d2a565b8060005260068452604060002082600052845260ff928360406000205416156105005781600052600685526040600020836000528552604060002060ff1990818154169055826000526005865260406000209485549560005b87811061043b575b50509091929380955060005260048652600660406000200163ffffffff815460281c16801561042657815468ffffffff0000000000191660001990910160281b68ffffffff000000000016179055846000526004865280600360406000200154169260048410156104125750600183036103fe576103a192508360005260078652806040600020928354908280831660058110156000146103f657610305906130a9565b1691161780845560081c1660058110156000146103eb5761032861033e916130a9565b835461ff00191660089190911b61ff0016178355565b815460101c8116600581106103e057610359610371916130a9565b835462ff0000191660109190911b62ff000016178355565b815460181c16600581106103d257610388906130a9565b63ff00000082549160181b169063ff0000001916179055565b6040519133917f8d44b5c72ff5f13f911acf7355ac1984f6f3274f44df88b967666f518a3a221c600080a460018152f35b50805463ff00000019169055565b506103716000610359565b5061033e6000610328565b506000610305565b50506103a15761040d816130bc565b6103a1565b634e487b7160e01b60009081526021600452fd5b84634e487b7160e01b60005260116004526000fd5b866104468284612bee565b919054600392831b1c1461045d5750600101610259565b92939495969790600019918281019081116104eb57906104906104836104a99386612bee565b905490871b1c9185612bee565b90919082549060031b91821b91600019901b1916179055565b815480156104d6578101926104be8484612bee565b81939154921b1b191690555590849392913880610261565b86634e487b7160e01b60005260316004526000fd5b87634e487b7160e01b60005260116004526000fd5b8460196064926040519262461bcd60e51b845260048401528201527f437573746f6d697a6174696f6e206e6f74206170706c696564000000000000006044820152fd5b610564919250873d891161056b575b61055c818361283f565b810190612c3f565b90386101f7565b503d610552565b6040513d6000823e3d90fd5b600080fd5b3461057e57604036600319011261057e576004356001600160a01b0381169081900361057e576024908135906105b7612931565b8015610736573081146106f257803b6106ae57811561066a5747821161062657600080809381935af16105e8612cfa565b50156105f057005b606490600f6040519162461bcd60e51b8352602060048401528201526e151c985b9cd9995c8819985a5b1959608a1b6044820152fd5b60405162461bcd60e51b815260206004820152601d818501527f496e73756666696369656e7420636f6e74726163742062616c616e63650000006044820152606490fd5b60405162461bcd60e51b815260206004820152601d818501527f416d6f756e74206d7573742062652067726561746572207468616e20300000006044820152606490fd5b60405162461bcd60e51b815260206004820152601b818501527f43616e6e6f7420776974686472617720746f20636f6e747261637400000000006044820152606490fd5b60405162461bcd60e51b8152602060048201526017818501527f43616e6e6f7420776974686472617720746f2073656c660000000000000000006044820152606490fd5b60405162461bcd60e51b8152602060048201526019818501527f496e76616c696420726563697069656e742061646472657373000000000000006044820152606490fd5b610783366127f2565b906001916002835414610aa557600283556040516331a9108f60e11b815260048101839052602092906001600160a01b0384826024817f000000000000000000000000000000000000000000000000000000000000000085165afa91821561057257600092610a86575b5033911603610a4f57816000526004835261080e6040600020541515612c5e565b816000526004835260406000206006810160ff908181541615610a0a5781600360048501946108408654341015612caa565b8660005260058952610856886040600020612c1c565b600087815260068a5260408082208a83528b529020805460ff199081168c17909155845468ffffffff0000000000198116602891821c63ffffffff168d0190911b68ffffffff0000000000161790945501541660048110156109f4578088036109df575061038861094092856000526007885261090b6108f582604060002095865490826108e5818416613128565b1691161780875560081c16613128565b845461ff00191660089190911b61ff0016178455565b61093561091d82855460101c16613128565b845462ff0000191660109190911b62ff000016178455565b825460181c16613128565b610949826130bc565b8054803411610984575b505460405190815233937f2a5d856c429a87043a9cf7e950169054f0f3c7ae72a9996d0be37b185309509e91a48055005b60008080610993819434612ced565b335af161099e612cfa565b50156109aa5785610953565b60405162461bcd60e51b815260048101859052600d60248201526c1499599d5b990819985a5b1959609a1b6044820152606490fd5b915050610949576109ef826130bc565b610949565b634e487b7160e01b600052602160045260246000fd5b60405162461bcd60e51b815260048101879052601860248201527f437573746f6d697a6174696f6e206e6f742061637469766500000000000000006044820152606490fd5b60405162461bcd60e51b815260048101849052600f60248201526e2737ba103a37b5b2b71037bbb732b960891b6044820152606490fd5b610a9e919250853d871161056b5761055c818361283f565b90866107ed565b604051633ee5aeb560e01b8152600490fd5b3461057e57610ac5366127f2565b906000526006602052604060002090600052602052602060ff604060002054166040519015158152f35b3461057e5760208060031936011261057e576004356001600160401b03811161057e57610b20903690600401612877565b6000805b8251821015610bc357610b378284612ff4565b516000526004845260406000205415610b7e57610b72610b7891610b5b8486612ff4565b51600052600486526004604060002001549061309c565b91612ad0565b90610b24565b60405162461bcd60e51b815260048101859052601860248201527f496e76616c696420637573746f6d697a6174696f6e20494400000000000000006044820152606490fd5b8390604051908152f35b3461057e5761001b610bde3661268b565b90806000526000602052610bf960016040600020015461296b565b612a0f565b3461057e57600036600319011261057e57602060405160648152f35b3461057e5760208060031936011261057e576004359060006060604051610c4081612824565b8281528284820152826040820152015260018060a01b03916040516331a9108f60e11b81528160048201528281602481877f0000000000000000000000000000000000000000000000000000000000000000165afa93841561057257608094610cb492600091610d19575b50161515613008565b60005260078152604060002060405190610ccd82612824565b5460ff80928183169485825282818301818660081c1681528160606040860195828960101c168752019660181c1686526040519788525116908601525116604084015251166060820152f35b610d309150853d871161056b5761055c818361283f565b86610cab565b3461057e5760208060031936011261057e5760405190600435610d5883612824565b6060808452600083850152604080850182905293810181905292516331a9108f60e11b8152600481018290526001600160a01b0383826024817f000000000000000000000000000000000000000000000000000000000000000085165afa801561057257610dd992600091610eaa575b50610e4c9594939291161515613008565b6000526008815260406000209160405192610df384612824565b610dfc81612f02565b84526001928382015493818601948552610e2b6003610e1d6002860161304d565b946040890195865201612f02565b92848701938452604051978897848952516080858a015260a08901906126b1565b955160408801525194601f199485888303019088015282808751928381520196019260005b828110610e94578880610e908a8a8a51908483030160808501526126b1565b0390f35b8451885289985096810196938101938301610e71565b610ec19150853d871161056b5761055c818361283f565b86610dc8565b3461057e57600036600319011261057e5760206040517f368a0a902ce0a8be883cdf3d5cbaaae7bbbf3f9f0aa7ad2c137c77c3a72ca6b68152f35b3461057e57600036600319011261057e57602060405160008152f35b3461057e5760208060031936011261057e57600435600481101561057e57610f4590612bd5565b906000808354915b8281106110825750610f5e90612fa4565b9160009060005b838110610f7a5760405180610e908782612790565b610f848187612bee565b9054600391821b1c600052600a835260ff8060406000205416610fb2575b5050610fad90612ad0565b610f65565b9361107a918395610fc6610fad958b612bee565b905490831b1c600052600486526006604060002061101d8360405195610feb87612808565b83548752610ffb60018501612f02565b8b88015261100b60028501612f02565b60408801528301541660608601612b31565b6004810154608085015261103360058201612f02565b60a08501520154908116151560c083015263ffffffff90818160081c1660e084015260281c166101008201526110698289612ff4565b526110748188612ff4565b50612ad0565b929087610fa2565b61108c8186612bee565b90549060031b1c600052600a845260ff604060002054166110b6575b6110b190612ad0565b610f4d565b906110c36110b191612ad0565b9190506110a8565b3461057e576110d93661268b565b90600052600060205260406000209060018060a01b0316600052602052602060ff604060002054166040519015158152f35b60031960403682011261057e576001600160401b0390600435602480359084821161057e57816004019460808336039586011261057e576040516331a9108f60e11b815260048101859052602096906001600160a01b03888286817f000000000000000000000000000000000000000000000000000000000000000085165afa908115610572576111a6926000926115e45750163314612d2a565b6111ae612dcb565b6111b83682612e07565b80515115908115916115d7575b81156115c8575b81156115b9575b5015611575576111e33682612e07565b94600095805151611566575b8881015161154e575b6040810151518015801561150c575b505060600151516114df575b61121f86341015612caa565b6000526008875260406000206112358280612e88565b908482116114ca576112518261124b8554612b3d565b85612b8e565b600090601f831160011461146357611282929160009183611458575b50508160011b916000199060031b1c19161790565b81555b600196848601358883015560028201906044870135906022190181121561057e5786019060048201359185831161057e5786018260051b3603811361057e57600160401b8311611443578154838355808410611426575b5090600052896000208960005b84811061141457505050505090606460036113079301950190612e88565b9290918311611400575061131f8261124b8554612b3d565b600090601f831160011461139c5761134f9291600091836113915750508160011b916000199060031b1c19161790565b90555b803411611363575b50604051908152f35b60008080611372819434612ced565b818115611388575b3390f115610572578261135a565b506108fc61137a565b01359050878061126d565b90859291601f1983169185600052886000209260005b8a8282106113ea57505084116113d0575b505050811b019055611352565b0135600019600384901b60f8161c191690558680806113c3565b8385013586558a979095019492830192016113b2565b634e487b7160e01b60009081526041600452fd5b8c843594019381840155018a906112e9565b61143d9083600052848d6000209182019101612b77565b8b6112dc565b86634e487b7160e01b60005260416004526000fd5b013590508b8061126d565b601f19831691846000528b6000209260005b8d8282106114b457505090846001959493921061149a575b505050811b018155611285565b0135600019600384901b60f8161c191690558a808061148d565b6001849682939587013581550195019201611475565b85634e487b7160e01b60005260416004526000fd5b9466b1a2bc2ec5000081018091116114f75794611213565b83634e487b7160e01b60005260116004526000fd5b6611c37937e0800098919298808402938404141715611539576060916115319161309c565b96908a611207565b85634e487b7160e01b60005260116004526000fd5b9566470de4df820000810180911161042657956111f8565b662386f26fc1000096506111ef565b60405162461bcd60e51b815260048101889052601f818501527f496e76616c69642061657374686574696320637573746f6d697a6174696f6e006044820152606490fd5b606091500151511515886111d3565b604081015151151591506111cc565b88810151151591506111c5565b6115fc9192508a3d8c1161056b5761055c818361283f565b908a6101f7565b3461057e57600036600319011261057e5761161c612931565b611624612dcb565b600160ff1960025416176002557f62e78cea01bee320cd4e420270b5ea74000d11b0c9f74754ebdbfc544b05a2586020604051338152a1005b3461057e57604036600319011261057e57600435602435801515810361057e5761001b916116896128d5565b8060005260046020526116a26040600020541515612c5e565b60005260046020526116c78160066040600020019060ff801983541691151516179055565b600a60205260406000209060ff801983541691151516179055565b3461057e5760208060031936011261057e576004356116ff612eba565b5080600052600482526117186040600020541515612c5e565b6000526004815260406000209060066040519261173484612808565b8054845261174460018201612f02565b8385015261175460028201612f02565b604085015261176d60ff60038301541660608601612b31565b6004810154608085015261178360058201612f02565b60a0850152015460ff8116151560c084015263ffffffff90818160081c1660e085015260281c16610100830152610e906040519282849384528301906126fe565b3461057e57600036600319011261057e57602060ff600254166040519015158152f35b3461057e576117f5366127f2565b3360009081527f9d3d98451b345b45ff50af9e3af5ef3d429772e3b256eac22f1b87f9143d4f3e60205260409020547f3515f38d031dcbca5f1dac4c5afc1efca2020e42efdd9c5806ae7e963d18435a9060ff16156118ae575060407f0b8176be666e19af8f6b1116a7dec911b195957b0db55d66fb8ecced7fd9484d9183600052600460205261188b82600020541515612c5e565b8360005260046020526004826000200190808254925582519182526020820152a2005b6044906040519063e2517d3f60e01b82523360048301526024820152fd5b3461057e57600036600319011261057e576118e5612931565b60025460ff8116156119245760ff19166002557f5db9ee0a495bf2e6ff9c91a7834c1ba4fdd244a5e8aa4e537bd38aeae4b073aa6020604051338152a1005b604051638dfc202b60e01b8152600490fd5b3461057e57600036600319011261057e57602060405160328152f35b3461057e576119603661268b565b336001600160a01b038216036119795761001b91612a0f565b60405163334bd91960e11b8152600490fd5b3461057e57600036600319011261057e5760038054600060015b828110611a5b57506119b690612fa4565b91600060015b8381106119d15760405180610e908782612790565b806000526020600a815260ff80604060002054166119fa575b50506119f590612ad0565b6119bc565b92816119f593946004611a5394526006604060002060405193611a1c85612808565b81548552611a2c60018301612f02565b90850152611a3c60028201612f02565b604085015261101d838a8301541660608601612b31565b9190866119ea565b80600052600a60205260ff60406000205416611a80575b611a7b90612ad0565b6119a5565b90611a8d611a7b91612ad0565b919050611a72565b3461057e57600036600319011261057e576040517f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03168152602090f35b3461057e57600036600319011261057e5760206040517f3515f38d031dcbca5f1dac4c5afc1efca2020e42efdd9c5806ae7e963d18435a8152f35b3461057e5760c036600319011261057e576004356001600160401b03811161057e57611b4590369060040161265e565b6024356001600160401b03811161057e57611b6490369060040161265e565b90916004604435101561057e576084356001600160401b03811161057e57611b9090369060040161265e565b90611b996128d5565b82156120a95783156120645781611bb4611c11931515612a84565b611bee60035496611bc488612ad0565b60035560405196611bd488612808565b888852611be236888c612afa565b60208901523691612afa565b6040860152611c0260443560608701612b31565b60643560808601523691612afa565b60a0830152600160c083015263ffffffff60a4351660e083015260006101008301528260005260046020526040600020938251855560208301518051906001600160401b038211611f5f57611c7682611c6d60018a0154612b3d565b60018a01612b8e565b602090601f8311600114611ff257611ca6929160009183611f755750508160011b916000199060031b1c19161790565b60018601555b60408301518051906001600160401b038211611f5f57611cdc82611cd360028a0154612b3d565b60028a01612b8e565b602090601f8311600114611f8057611d0c929160009183611f755750508160011b916000199060031b1c19161790565b60028601555b60038501606084015160048110156109f45760ff801983541691161790556080830151600486015560a0830151928351956001600160401b038711611f5f57868695611d70602099611d676005860154612b3d565b60058601612b8e565b8890601f8311600114611eb45761010060067fd2b94acb95985643ac1f7c726dd620f604f2cc7a280015d015d521c05dea1606989795611dd486611e359760809a9763ffffffff97600092611ea95750508160011b916000199060031b1c19161790565b60058201555b0192611df860c08201511515859060ff801983541691151516179055565b60e08101518454929091015168ffffffffffffffff001990921660089190911b64ffffffff001617911660281b68ffffffff000000000016179055565b611e4985611e44604435612bd5565b612c1c565b84600052600a87526040600020600160ff198254161790558260405193849260608452816060850152848401376000838284010152611e8c8883016044356126f1565b6064356040830152601f01601f19168101030190a2604051908152f35b01519050388061126d565b6005849392989796959401600052896000209060005b601f1984168110611f4557506006611e359460018563ffffffff957fd2b94acb95985643ac1f7c726dd620f604f2cc7a280015d015d521c05dea16069c9d6101009660809c9b99601f19811610611f2c575b505050811b016005820155611dda565b015160001960f88460031b161c191690558f8080611f1c565b818a01518355988b01988a98506001909201918b01611eca565b634e487b7160e01b600052604160045260246000fd5b01519050888061126d565b9190600288016000526020600020906000935b601f1984168510611fd7576001945083601f19811610611fbe575b505050811b016002860155611d12565b015160001960f88460031b161c19169055878080611fae565b81810151835560209485019460019093019290910190611f93565b9190600188016000526020600020906000935b601f1984168510612049576001945083601f19811610612030575b505050811b016001860155611cac565b015160001960f88460031b161c19169055878080612020565b81810151835560209485019460019093019290910190612005565b60405162461bcd60e51b815260206004820152601b60248201527f4465736372697074696f6e2063616e6e6f7420626520656d70747900000000006044820152606490fd5b60405162461bcd60e51b81526020600482015260146024820152734e616d652063616e6e6f7420626520656d70747960601b6044820152606490fd5b3461057e5761001b6120f63661268b565b9080600052600060205261211160016040600020015461296b565b612991565b3461057e57602036600319011261057e5760043560005260006020526020600160406000200154604051908152f35b3461057e5760208060031936011261057e576040516331a9108f60e11b815260048035908201819052906001600160a01b0383826024817f000000000000000000000000000000000000000000000000000000000000000085165afa8015610572576121bb926000916122125750161515613008565b600052600581526121cf604060002061304d565b906040519181839283018184528251809152816040850193019160005b8281106121fb57505050500390f35b8351855286955093810193928101926001016121ec565b6122299150853d871161056b5761055c818361283f565b85610cab565b60a036600319011261057e57600435608036602319011261057e576040516331a9108f60e11b815260048101829052602091906001600160a01b0383826024817f000000000000000000000000000000000000000000000000000000000000000085165afa908115610572576122af926000926124c05750163314612d2a565b6122b7612dcb565b6122c036612d6a565b606460ff9181838181845116111592836124af575b8361249d575b8361248c575b5050501561244a576123256122f536612d6a565b83606061231b61230e83855116848b870151169061309c565b836040860151169061309c565b920151169061309c565b9266038d7ea4c68000938481029481860414901517156124345761234b84341015612caa565b600052600784526040600020908154602435848116810361057e57612373859182841661314b565b169060ff19161780835560443590848216820361057e5761239c91856103289260081c1661314b565b82825460101c16903590838216820361057e576123d4916123bc9161314b565b825462ff0000191660109190911b62ff000016178255565b81815460181c16608435928316830361057e576123f4926103889161314b565b803411612406575b5060405160018152f35b60008080612415819434612ced565b81811561242b575b3390f11561057257816123fc565b506108fc61241d565b634e487b7160e01b600052601160045260246000fd5b60405162461bcd60e51b815260048101859052601b60248201527f496e76616c696420706572666f726d616e6365207570677261646500000000006044820152fd5b6060015116111590508183876122e1565b925081816040850151161115926122db565b9250818188850151161115926122d5565b6124d8919250853d871161056b5761055c818361283f565b90856101f7565b3461057e57604036600319011261057e576004356001600160401b0360243581811161057e5761251390369060040161265e565b9061251c6128d5565b83600052602093600485526125376040600020541515612c5e565b612542831515612a84565b600052600484526005604060002001928211611f5f576125668261124b8554612b3d565b600093601f83116001146125a757506125989293829160009261259c5750508160011b916000199060031b1c19161790565b9055005b01359050848061126d565b90601f198316948460005282600020926000905b8782106125f35750508360019596106125d9575b505050811b019055005b0135600019600384901b60f8161c191690558380806125cf565b806001849682949587013581550195019201906125bb565b3461057e57602036600319011261057e576004359063ffffffff60e01b821680920361057e57602091637965db0b60e01b811490811561264d575b5015158152f35b6301ffc9a760e01b14905083612646565b9181601f8401121561057e578235916001600160401b03831161057e576020838186019501011161057e57565b604090600319011261057e57600435906024356001600160a01b038116810361057e5790565b919082519283825260005b8481106126dd575050826000602080949584010152601f8019910116010190565b6020818301810151848301820152016126bc565b9060048210156109f45752565b90612763612735612723610120855185526020860151908060208701528501906126b1565b604085015184820360408601526126b1565b612747606085015160608501906126f1565b6080840151608084015260a084015183820360a08501526126b1565b9160c0810151151560c083015260e081015163ffffffff80911660e0840152610100809201511691015290565b602080820190808352835180925260408301928160408460051b8301019501936000915b8483106127c45750505050505090565b90919293949584806127e2600193603f198682030187528a516126fe565b98019301930191949392906127b4565b604090600319011261057e576004359060243590565b61012081019081106001600160401b03821117611f5f57604052565b608081019081106001600160401b03821117611f5f57604052565b90601f801991011681019081106001600160401b03821117611f5f57604052565b6001600160401b038111611f5f5760051b60200190565b9080601f8301121561057e57602090823561289181612860565b9361289f604051958661283f565b818552838086019260051b82010192831161057e578301905b8282106128c6575050505090565b813581529083019083016128b8565b3360009081527f13485b5810a34024a52fcc7d5d30dd55193e08e47cef3d4eeb93c8a439e1833760205260409020547f368a0a902ce0a8be883cdf3d5cbaaae7bbbf3f9f0aa7ad2c137c77c3a72ca6b69060ff16156118ae5750565b3360009081527fad3228b676f7d3cd4284a5443f17f1962b36e491b30a40b2405849e597ba5fb5602052604081205460ff16156118ae5750565b80600052600060205260406000203360005260205260ff60406000205416156118ae5750565b9060009180835282602052604083209160018060a01b03169182845260205260ff60408420541615600014612a0a57808352826020526040832082845260205260408320600160ff198254161790557f2f8788117e7eff1d82e926ec794901d17c78024a50270940304540a733656f0d339380a4600190565b505090565b9060009180835282602052604083209160018060a01b03169182845260205260ff604084205416600014612a0a5780835282602052604083208284526020526040832060ff1981541690557ff6391f5c32d9c69d2a47ea670b442974b53935d1edc7fd64eb21e047a839171b339380a4600190565b15612a8b57565b60405162461bcd60e51b815260206004820152601960248201527f496d616765205552492063616e6e6f7420626520656d707479000000000000006044820152606490fd5b60001981146124345760010190565b6001600160401b038111611f5f57601f01601f191660200190565b929192612b0682612adf565b91612b14604051938461283f565b82948184528183011161057e578281602093846000960137010152565b60048210156109f45752565b90600182811c92168015612b6d575b6020831014612b5757565b634e487b7160e01b600052602260045260246000fd5b91607f1691612b4c565b818110612b82575050565b60008155600101612b77565b9190601f8111612b9d57505050565b612bc9926000526020600020906020601f840160051c83019310612bcb575b601f0160051c0190612b77565b565b9091508190612bbc565b60048110156109f4576000526009602052604060002090565b8054821015612c065760005260206000200190600090565b634e487b7160e01b600052603260045260246000fd5b90815491600160401b831015611f5f5782610490916001612bc995018155612bee565b9081602091031261057e57516001600160a01b038116810361057e5790565b15612c6557565b60405162461bcd60e51b815260206004820152601c60248201527f437573746f6d697a6174696f6e20646f6573206e6f74206578697374000000006044820152606490fd5b15612cb157565b60405162461bcd60e51b8152602060048201526014602482015273125b9cdd59999a58da595b9d081c185e5b595b9d60621b6044820152606490fd5b9190820391821161243457565b3d15612d25573d90612d0b82612adf565b91612d19604051938461283f565b82523d6000602084013e565b606090565b15612d3157565b60405162461bcd60e51b81526020600482015260116024820152702737ba103b32b434b1b6329037bbb732b960791b6044820152606490fd5b608090602319011261057e5760405190612d8382612824565b8160243560ff8116810361057e57815260443560ff8116810361057e57602082015260643560ff8116810361057e5760408201526084359060ff8216820361057e5760600152565b60ff60025416612dd757565b60405163d93c066560e01b8152600490fd5b9080601f8301121561057e57816020612e0493359101612afa565b90565b919060808382031261057e5760405190612e2082612824565b81938035916001600160401b039283811161057e5781612e41918401612de9565b845260208201356020850152604082013583811161057e5781612e65918401612877565b6040850152606082013592831161057e57606092612e839201612de9565b910152565b903590601e198136030182121561057e57018035906001600160401b03821161057e5760200191813603831361057e57565b60405190612ec782612808565b816101006000918281526060602082015260606040820152826060820152826080820152606060a08201528260c08201528260e08201520152565b90604051918260008254612f1581612b3d565b908184526020946001918281169081600014612f825750600114612f43575b505050612bc99250038361283f565b600090815285812095935091905b818310612f6a575050612bc99350820101388080612f34565b85548884018501529485019487945091830191612f51565b92505050612bc994925060ff191682840152151560051b820101388080612f34565b90612fae82612860565b612fbb604051918261283f565b8281528092612fcc601f1991612860565b019060005b828110612fdd57505050565b602090612fe8612eba565b82828501015201612fd1565b8051821015612c065760209160051b010190565b1561300f57565b60405162461bcd60e51b815260206004820152601660248201527515995a1a58db1948191bd95cc81b9bdd08195e1a5cdd60521b6044820152606490fd5b9060405191828154918282526020928383019160005283600020936000905b82821061308257505050612bc99250038361283f565b85548452600195860195889550938101939091019061306c565b9190820180921161243457565b60ff6004199116019060ff821161243457565b7f00000000000000000000000000000000000000000000000000000000000000006001600160a01b031690813b1561057e576000916024839260405194859384926304d51d1960e51b845260048401525af16131155750565b6001600160401b038111611f5f57604052565b60ff16600581018091116124345760648111156131455750606490565b60ff1690565b60ff8061315a9316911661309c565b6064811115613145575060649056fea2646970667358221220cc8e8edf6f6d52c97353dde8d762980d11317dfe44f7b452ee6f5cf2b2e4989d64736f6c63430008150033",
+  "devdoc": {
+    "details": "Implementation contract for virtual vehicle NFT customizations",
+    "errors": {
+      "AccessControlBadConfirmation()": [
+        {
+          "details": "The caller of a function is not the expected one. NOTE: Don't confuse with {AccessControlUnauthorizedAccount}."
+        }
+      ],
+      "AccessControlUnauthorizedAccount(address,bytes32)": [
+        {
+          "details": "The `account` is missing a role."
+        }
+      ],
+      "EnforcedPause()": [
+        {
+          "details": "The operation failed because the contract is paused."
+        }
+      ],
+      "ExpectedPause()": [
+        {
+          "details": "The operation failed because the contract is not paused."
+        }
+      ],
+      "ReentrancyGuardReentrantCall()": [
+        {
+          "details": "Unauthorized reentrant call."
+        }
+      ]
+    },
+    "events": {
+      "Paused(address)": {
+        "details": "Emitted when the pause is triggered by `account`."
+      },
+      "RoleAdminChanged(bytes32,bytes32,bytes32)": {
+        "details": "Emitted when `newAdminRole` is set as ``role``'s admin role, replacing `previousAdminRole` `DEFAULT_ADMIN_ROLE` is the starting admin for all roles, despite {RoleAdminChanged} not being emitted to signal this."
+      },
+      "RoleGranted(bytes32,address,address)": {
+        "details": "Emitted when `account` is granted `role`. `sender` is the account that originated the contract call. This account bears the admin role (for the granted role). Expected in cases where the role was granted using the internal {AccessControl-_grantRole}."
+      },
+      "RoleRevoked(bytes32,address,address)": {
+        "details": "Emitted when `account` is revoked `role`. `sender` is the account that originated the contract call:   - if using `revokeRole`, it is the admin role bearer   - if using `renounceRole`, it is the role bearer (i.e. `account`)"
+      },
+      "Unpaused(address)": {
+        "details": "Emitted when the pause is lifted by `account`."
+      }
+    },
+    "kind": "dev",
+    "methods": {
+      "applyAestheticCustomization(uint256,(string,uint256,uint256[],string))": {
+        "details": "Apply aesthetic customization to a vehicle NFT"
+      },
+      "applyCustomization(uint256,uint256)": {
+        "details": "Apply customization to NFT",
+        "params": {
+          "customizationId": "Customization ID to apply",
+          "tokenId": "Token ID to customize"
+        }
+      },
+      "applyPerformanceUpgrade(uint256,(uint8,uint8,uint8,uint8))": {
+        "details": "Apply performance upgrade to a vehicle NFT"
+      },
+      "calculateTotalCost(uint256[])": {
+        "details": "Calculate total cost for multiple customizations"
+      },
+      "constructor": {
+        "details": "Constructor sets the MooveNFT contract address and initial roles",
+        "params": {
+          "_admin": "Address to be granted admin roles",
+          "_mooveNFT": "Address of the MooveNFT contract"
+        }
+      },
+      "createCustomization(string,string,uint8,uint256,string,uint256)": {
+        "details": "Create a new customization option"
+      },
+      "getActiveCustomizations()": {
+        "details": "Get all active customizations"
+      },
+      "getCustomization(uint256)": {
+        "details": "Get customization details by ID"
+      },
+      "getCustomizationsByType(uint8)": {
+        "details": "Get customizations by type"
+      },
+      "getRoleAdmin(bytes32)": {
+        "details": "Returns the admin role that controls `role`. See {grantRole} and {revokeRole}. To change a role's admin, use {_setRoleAdmin}."
+      },
+      "getVehicleAesthetics(uint256)": {
+        "details": "Get vehicle aesthetic customizations"
+      },
+      "getVehicleCustomizations(uint256)": {
+        "details": "Get all customizations applied to a vehicle"
+      },
+      "getVehiclePerformance(uint256)": {
+        "details": "Get vehicle performance stats"
+      },
+      "grantRole(bytes32,address)": {
+        "details": "Grants `role` to `account`. If `account` had not been already granted `role`, emits a {RoleGranted} event. Requirements: - the caller must have ``role``'s admin role. May emit a {RoleGranted} event."
+      },
+      "hasRole(bytes32,address)": {
+        "details": "Returns `true` if `account` has been granted `role`."
+      },
+      "isCustomizationApplied(uint256,uint256)": {
+        "details": "Check if a customization is applied to a vehicle"
+      },
+      "pause()": {
+        "details": "Emergency pause function"
+      },
+      "paused()": {
+        "details": "Returns true if the contract is paused, and false otherwise."
+      },
+      "removeCustomization(uint256,uint256)": {
+        "details": "Remove a customization from a vehicle NFT"
+      },
+      "renounceRole(bytes32,address)": {
+        "details": "Revokes `role` from the calling account. Roles are often managed via {grantRole} and {revokeRole}: this function's purpose is to provide a mechanism for accounts to lose their privileges if they are compromised (such as when a trusted device is misplaced). If the calling account had been revoked `role`, emits a {RoleRevoked} event. Requirements: - the caller must be `callerConfirmation`. May emit a {RoleRevoked} event."
+      },
+      "revokeRole(bytes32,address)": {
+        "details": "Revokes `role` from `account`. If `account` had been granted `role`, emits a {RoleRevoked} event. Requirements: - the caller must have ``role``'s admin role. May emit a {RoleRevoked} event."
+      },
+      "setCustomizationActive(uint256,bool)": {
+        "details": "Set customization active status"
+      },
+      "supportsInterface(bytes4)": {
+        "details": "See {IERC165-supportsInterface}."
+      },
+      "unpause()": {
+        "details": "Unpause function"
+      },
+      "updateCustomizationImage(uint256,string)": {
+        "details": "Update customization image URI"
+      },
+      "updateCustomizationPrice(uint256,uint256)": {
+        "details": "Update customization price"
+      },
+      "withdraw(address,uint256)": {
+        "details": "Withdraw contract balance"
+      }
+    },
+    "stateVariables": {
+      "_activeCustomizations": {
+        "details": "Mapping to track active customizations"
+      },
+      "_customizationIdCounter": {
+        "details": "Counter for customization IDs"
+      },
+      "_customizations": {
+        "details": "Mapping from customization ID to Customization struct"
+      },
+      "_customizationsByType": {
+        "details": "Arrays to track customizations by type for efficient querying"
+      },
+      "_isCustomizationApplied": {
+        "details": "Mapping from token ID to customization ID to check if applied"
+      },
+      "_vehicleAesthetics": {
+        "details": "Mapping from token ID to aesthetic customizations"
+      },
+      "_vehicleCustomizations": {
+        "details": "Mapping from token ID to array of applied customization IDs"
+      },
+      "_vehiclePerformance": {
+        "details": "Mapping from token ID to performance upgrades"
+      },
+      "mooveNFT": {
+        "details": "Reference to the MooveNFT contract"
+      }
+    },
+    "title": "MooveCustomization",
+    "version": 1
+  },
+  "userdoc": {
+    "kind": "user",
+    "methods": {},
+    "notice": "All customizations are purely virtual and affect only NFT metadata and visual representation",
+    "version": 1
+  },
+  "storageLayout": {
+    "storage": [
+      {
+        "astId": 26,
+        "contract": "contracts/MooveCustomization.sol:MooveCustomization",
+        "label": "_roles",
+        "offset": 0,
+        "slot": "0",
+        "type": "t_mapping(t_bytes32,t_struct(RoleData)21_storage)"
+      },
+      {
+        "astId": 2387,
+        "contract": "contracts/MooveCustomization.sol:MooveCustomization",
+        "label": "_status",
+        "offset": 0,
+        "slot": "1",
+        "type": "t_uint256"
+      },
+      {
+        "astId": 2277,
+        "contract": "contracts/MooveCustomization.sol:MooveCustomization",
+        "label": "_paused",
+        "offset": 0,
+        "slot": "2",
+        "type": "t_bool"
+      },
+      {
+        "astId": 11567,
+        "contract": "contracts/MooveCustomization.sol:MooveCustomization",
+        "label": "_customizationIdCounter",
+        "offset": 0,
+        "slot": "3",
+        "type": "t_uint256"
+      },
+      {
+        "astId": 11573,
+        "contract": "contracts/MooveCustomization.sol:MooveCustomization",
+        "label": "_customizations",
+        "offset": 0,
+        "slot": "4",
+        "type": "t_mapping(t_uint256,t_struct(Customization)16668_storage)"
+      },
+      {
+        "astId": 11579,
+        "contract": "contracts/MooveCustomization.sol:MooveCustomization",
+        "label": "_vehicleCustomizations",
+        "offset": 0,
+        "slot": "5",
+        "type": "t_mapping(t_uint256,t_array(t_uint256)dyn_storage)"
+      },
+      {
+        "astId": 11586,
+        "contract": "contracts/MooveCustomization.sol:MooveCustomization",
+        "label": "_isCustomizationApplied",
+        "offset": 0,
+        "slot": "6",
+        "type": "t_mapping(t_uint256,t_mapping(t_uint256,t_bool))"
+      },
+      {
+        "astId": 11592,
+        "contract": "contracts/MooveCustomization.sol:MooveCustomization",
+        "label": "_vehiclePerformance",
+        "offset": 0,
+        "slot": "7",
+        "type": "t_mapping(t_uint256,t_struct(PerformanceUpgrade)16677_storage)"
+      },
+      {
+        "astId": 11598,
+        "contract": "contracts/MooveCustomization.sol:MooveCustomization",
+        "label": "_vehicleAesthetics",
+        "offset": 0,
+        "slot": "8",
+        "type": "t_mapping(t_uint256,t_struct(AestheticCustomization)16687_storage)"
+      },
+      {
+        "astId": 11605,
+        "contract": "contracts/MooveCustomization.sol:MooveCustomization",
+        "label": "_customizationsByType",
+        "offset": 0,
+        "slot": "9",
+        "type": "t_mapping(t_enum(CustomizationType)16648,t_array(t_uint256)dyn_storage)"
+      },
+      {
+        "astId": 11610,
+        "contract": "contracts/MooveCustomization.sol:MooveCustomization",
+        "label": "_activeCustomizations",
+        "offset": 0,
+        "slot": "10",
+        "type": "t_mapping(t_uint256,t_bool)"
+      }
+    ],
+    "types": {
+      "t_address": {
+        "encoding": "inplace",
+        "label": "address",
+        "numberOfBytes": "20"
+      },
+      "t_array(t_uint256)dyn_storage": {
+        "base": "t_uint256",
+        "encoding": "dynamic_array",
+        "label": "uint256[]",
+        "numberOfBytes": "32"
+      },
+      "t_bool": {
+        "encoding": "inplace",
+        "label": "bool",
+        "numberOfBytes": "1"
+      },
+      "t_bytes32": {
+        "encoding": "inplace",
+        "label": "bytes32",
+        "numberOfBytes": "32"
+      },
+      "t_enum(CustomizationType)16648": {
+        "encoding": "inplace",
+        "label": "enum CustomizationType",
+        "numberOfBytes": "1"
+      },
+      "t_mapping(t_address,t_bool)": {
+        "encoding": "mapping",
+        "key": "t_address",
+        "label": "mapping(address => bool)",
+        "numberOfBytes": "32",
+        "value": "t_bool"
+      },
+      "t_mapping(t_bytes32,t_struct(RoleData)21_storage)": {
+        "encoding": "mapping",
+        "key": "t_bytes32",
+        "label": "mapping(bytes32 => struct AccessControl.RoleData)",
+        "numberOfBytes": "32",
+        "value": "t_struct(RoleData)21_storage"
+      },
+      "t_mapping(t_enum(CustomizationType)16648,t_array(t_uint256)dyn_storage)": {
+        "encoding": "mapping",
+        "key": "t_enum(CustomizationType)16648",
+        "label": "mapping(enum CustomizationType => uint256[])",
+        "numberOfBytes": "32",
+        "value": "t_array(t_uint256)dyn_storage"
+      },
+      "t_mapping(t_uint256,t_array(t_uint256)dyn_storage)": {
+        "encoding": "mapping",
+        "key": "t_uint256",
+        "label": "mapping(uint256 => uint256[])",
+        "numberOfBytes": "32",
+        "value": "t_array(t_uint256)dyn_storage"
+      },
+      "t_mapping(t_uint256,t_bool)": {
+        "encoding": "mapping",
+        "key": "t_uint256",
+        "label": "mapping(uint256 => bool)",
+        "numberOfBytes": "32",
+        "value": "t_bool"
+      },
+      "t_mapping(t_uint256,t_mapping(t_uint256,t_bool))": {
+        "encoding": "mapping",
+        "key": "t_uint256",
+        "label": "mapping(uint256 => mapping(uint256 => bool))",
+        "numberOfBytes": "32",
+        "value": "t_mapping(t_uint256,t_bool)"
+      },
+      "t_mapping(t_uint256,t_struct(AestheticCustomization)16687_storage)": {
+        "encoding": "mapping",
+        "key": "t_uint256",
+        "label": "mapping(uint256 => struct AestheticCustomization)",
+        "numberOfBytes": "32",
+        "value": "t_struct(AestheticCustomization)16687_storage"
+      },
+      "t_mapping(t_uint256,t_struct(Customization)16668_storage)": {
+        "encoding": "mapping",
+        "key": "t_uint256",
+        "label": "mapping(uint256 => struct Customization)",
+        "numberOfBytes": "32",
+        "value": "t_struct(Customization)16668_storage"
+      },
+      "t_mapping(t_uint256,t_struct(PerformanceUpgrade)16677_storage)": {
+        "encoding": "mapping",
+        "key": "t_uint256",
+        "label": "mapping(uint256 => struct PerformanceUpgrade)",
+        "numberOfBytes": "32",
+        "value": "t_struct(PerformanceUpgrade)16677_storage"
+      },
+      "t_string_storage": {
+        "encoding": "bytes",
+        "label": "string",
+        "numberOfBytes": "32"
+      },
+      "t_struct(AestheticCustomization)16687_storage": {
+        "encoding": "inplace",
+        "label": "struct AestheticCustomization",
+        "members": [
+          {
+            "astId": 16679,
+            "contract": "contracts/MooveCustomization.sol:MooveCustomization",
+            "label": "colorCode",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_string_storage"
+          },
+          {
+            "astId": 16681,
+            "contract": "contracts/MooveCustomization.sol:MooveCustomization",
+            "label": "skinId",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_uint256"
+          },
+          {
+            "astId": 16684,
+            "contract": "contracts/MooveCustomization.sol:MooveCustomization",
+            "label": "decalIds",
+            "offset": 0,
+            "slot": "2",
+            "type": "t_array(t_uint256)dyn_storage"
+          },
+          {
+            "astId": 16686,
+            "contract": "contracts/MooveCustomization.sol:MooveCustomization",
+            "label": "customURI",
+            "offset": 0,
+            "slot": "3",
+            "type": "t_string_storage"
+          }
+        ],
+        "numberOfBytes": "128"
+      },
+      "t_struct(Customization)16668_storage": {
+        "encoding": "inplace",
+        "label": "struct Customization",
+        "members": [
+          {
+            "astId": 16650,
+            "contract": "contracts/MooveCustomization.sol:MooveCustomization",
+            "label": "id",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_uint256"
+          },
+          {
+            "astId": 16652,
+            "contract": "contracts/MooveCustomization.sol:MooveCustomization",
+            "label": "name",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_string_storage"
+          },
+          {
+            "astId": 16654,
+            "contract": "contracts/MooveCustomization.sol:MooveCustomization",
+            "label": "description",
+            "offset": 0,
+            "slot": "2",
+            "type": "t_string_storage"
+          },
+          {
+            "astId": 16657,
+            "contract": "contracts/MooveCustomization.sol:MooveCustomization",
+            "label": "custType",
+            "offset": 0,
+            "slot": "3",
+            "type": "t_enum(CustomizationType)16648"
+          },
+          {
+            "astId": 16659,
+            "contract": "contracts/MooveCustomization.sol:MooveCustomization",
+            "label": "price",
+            "offset": 0,
+            "slot": "4",
+            "type": "t_uint256"
+          },
+          {
+            "astId": 16661,
+            "contract": "contracts/MooveCustomization.sol:MooveCustomization",
+            "label": "imageURI",
+            "offset": 0,
+            "slot": "5",
+            "type": "t_string_storage"
+          },
+          {
+            "astId": 16663,
+            "contract": "contracts/MooveCustomization.sol:MooveCustomization",
+            "label": "isActive",
+            "offset": 0,
+            "slot": "6",
+            "type": "t_bool"
+          },
+          {
+            "astId": 16665,
+            "contract": "contracts/MooveCustomization.sol:MooveCustomization",
+            "label": "maxSupply",
+            "offset": 1,
+            "slot": "6",
+            "type": "t_uint32"
+          },
+          {
+            "astId": 16667,
+            "contract": "contracts/MooveCustomization.sol:MooveCustomization",
+            "label": "currentSupply",
+            "offset": 5,
+            "slot": "6",
+            "type": "t_uint32"
+          }
+        ],
+        "numberOfBytes": "224"
+      },
+      "t_struct(PerformanceUpgrade)16677_storage": {
+        "encoding": "inplace",
+        "label": "struct PerformanceUpgrade",
+        "members": [
+          {
+            "astId": 16670,
+            "contract": "contracts/MooveCustomization.sol:MooveCustomization",
+            "label": "speedBonus",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_uint8"
+          },
+          {
+            "astId": 16672,
+            "contract": "contracts/MooveCustomization.sol:MooveCustomization",
+            "label": "accelerationBonus",
+            "offset": 1,
+            "slot": "0",
+            "type": "t_uint8"
+          },
+          {
+            "astId": 16674,
+            "contract": "contracts/MooveCustomization.sol:MooveCustomization",
+            "label": "handlingBonus",
+            "offset": 2,
+            "slot": "0",
+            "type": "t_uint8"
+          },
+          {
+            "astId": 16676,
+            "contract": "contracts/MooveCustomization.sol:MooveCustomization",
+            "label": "durabilityBonus",
+            "offset": 3,
+            "slot": "0",
+            "type": "t_uint8"
+          }
+        ],
+        "numberOfBytes": "32"
+      },
+      "t_struct(RoleData)21_storage": {
+        "encoding": "inplace",
+        "label": "struct AccessControl.RoleData",
+        "members": [
+          {
+            "astId": 18,
+            "contract": "contracts/MooveCustomization.sol:MooveCustomization",
+            "label": "hasRole",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_mapping(t_address,t_bool)"
+          },
+          {
+            "astId": 20,
+            "contract": "contracts/MooveCustomization.sol:MooveCustomization",
+            "label": "adminRole",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_bytes32"
+          }
+        ],
+        "numberOfBytes": "64"
+      },
+      "t_uint256": {
+        "encoding": "inplace",
+        "label": "uint256",
+        "numberOfBytes": "32"
+      },
+      "t_uint32": {
+        "encoding": "inplace",
+        "label": "uint32",
+        "numberOfBytes": "4"
+      },
+      "t_uint8": {
+        "encoding": "inplace",
+        "label": "uint8",
+        "numberOfBytes": "1"
+      }
+    }
+  }
+}

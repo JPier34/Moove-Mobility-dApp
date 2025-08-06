@@ -36,8 +36,8 @@ const config: HardhatUserConfig = {
       accounts:
         process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
       chainId: 11155111,
-      gasPrice: 20000000000, // 20 gwei
-      gas: 60000000, // 60 million gas limit
+      gasPrice: 10000000000, // 10 gwei (further reduced)
+      gas: 25000000, // 25 million gas limit (further reduced)
     },
     localhost: {
       url: "http://127.0.0.1:8545",
