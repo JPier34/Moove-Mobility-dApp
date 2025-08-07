@@ -11,6 +11,9 @@ import type {
   NearbyVehicle,
 } from "@/utils/vehicleGeoLocation";
 
+import TypewriterText from "./TypewriterText";
+import { usePreloadCityImages } from "@/hooks/useIPFSImage";
+
 // ============= TYPES =============
 interface VehicleOption {
   type: VehicleType;
@@ -379,15 +382,8 @@ function LocationStatusBanner({
     >
       <span className="text-2xl mr-3">🌍</span>
       <div className="text-left">
-        <div>Available in {EUROPEAN_CITIES.length} European cities</div>
-        <div className="text-sm opacity-75">
-          <button
-            onClick={onRequestLocation}
-            className="underline hover:no-underline"
-          >
-            Set your location to get started
-          </button>
-        </div>
+        <div>Now Available in {EUROPEAN_CITIES.length} European cities</div>
+        <div className="text-sm opacity-75"></div>
       </div>
     </motion.div>
   );
@@ -1103,6 +1099,14 @@ export default function RentalHomepage() {
     },
   ] = useLocationWithModal();
 
+  // Preload city images for better performance
+  const { preloadAllCityImages, isPreloading } = usePreloadCityImages();
+
+  // Preload images when component mounts
+  useEffect(() => {
+    preloadAllCityImages();
+  }, [preloadAllCityImages]);
+
   const handleRentVehicle = (vehicle: VehicleOption) => {
     if (locationState.canRent) {
       // Redirect to marketplace with vehicle pre-selected and city info
@@ -1126,54 +1130,96 @@ export default function RentalHomepage() {
         onManualCitySelect={handleManualCitySelect}
       />
 
-      {/* Hero Section with Dynamic Location Status */}
-      <section className="py-20 bg-gradient-to-br from-blue-600 via-purple-600 to-green-600 text-white relative overflow-hidden">
-        <div className="absolute inset-0">
-          <motion.div
-            className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full bg-white/10 blur-3xl"
-            animate={{
-              x: [0, 100, 0],
-              y: [0, -50, 0],
-              scale: [1, 1.2, 1],
-            }}
-            transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
-          />
-        </div>
+      {/* Hero Section with Dynamic City Background */}
+      <section
+        className="relative h-screen flex items-center text-white overflow-hidden"
+        style={{
+          backgroundImage:
+            locationState.currentCity?.id === "sanbenedetto"
+              ? 'url("https://xsdctknbxfzpxukj.public.blob.vercel-storage.com/san-benedetto-del-tronto-hero.jpg")'
+              : locationState.currentCity?.id === "rome"
+              ? 'url("https://xsdctknbxfzpxukj.public.blob.vercel-storage.com/rome-hero.jpg")'
+              : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat",
+        }}
+      >
+        {/* Gradient Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/20 to-transparent" />
 
-        <div className="max-w-7xl mx-auto px-6 text-center relative z-10">
-          <motion.h1
-            className="text-5xl md:text-7xl font-bold mb-8"
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-          >
-            Welcome to{" "}
-            <span className="bg-gradient-to-r from-green-400 to-blue-400 bg-clip-text text-transparent">
-              Moove
-            </span>
-          </motion.h1>
+        {/* Content Container */}
+        <div className="relative z-10 max-w-7xl mx-auto px-6 w-full">
+          <div className="flex items-center min-h-[80vh]">
+            {/* Text Content - Centered */}
+            <motion.div
+              className="space-y-8 max-w-2xl"
+              initial={{ opacity: 0, y: 50 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8 }}
+            >
+              {/* City Icon and Name */}
+              {locationState.currentCity && (
+                <motion.div
+                  className="flex items-center space-x-3 mb-6"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.8, delay: 0.3 }}
+                >
+                  <span className="text-4xl">
+                    {locationState.currentCity.emoji ||
+                      locationState.currentCity.heroImage?.icon}
+                  </span>
+                  <span className="text-2xl font-medium opacity-90">
+                    {locationState.currentCity.name}
+                  </span>
+                </motion.div>
+              )}
 
-          <motion.p
-            className="text-2xl mb-12 max-w-4xl mx-auto leading-relaxed"
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.2 }}
-          >
-            The future of urban mobility is here. Rent electric vehicles with
-            blockchain-powered NFT passes.
-          </motion.p>
+              {/* Main Title with Typewriter Effect */}
+              <div className="space-y-4">
+                <TypewriterText
+                  text="Welcome to"
+                  className="text-4xl md:text-6xl font-bold"
+                  speed={150}
+                  delay={0.5}
+                />
+                <motion.div
+                  className="text-5xl md:text-7xl font-bold"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.8, delay: 1.5 }}
+                >
+                  <span className="bg-gradient-to-r from-green-400 to-blue-400 bg-clip-text text-transparent">
+                    Moove
+                  </span>
+                </motion.div>
+              </div>
 
-          <motion.div
-            className="mb-12"
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.4 }}
-          >
-            <LocationStatusBanner
-              locationState={locationState}
-              onRequestLocation={requestLocationAgain}
-            />
-          </motion.div>
+              {/* Description */}
+              <motion.p
+                className="text-xl md:text-2xl leading-relaxed opacity-90 max-w-lg"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, delay: 0.7 }}
+              >
+                The future of urban mobility is here. Rent electric vehicles
+                with blockchain-powered NFT passes.
+              </motion.p>
+
+              {/* Location Status Banner */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, delay: 0.9 }}
+              >
+                <LocationStatusBanner
+                  locationState={locationState}
+                  onRequestLocation={requestLocationAgain}
+                />
+              </motion.div>
+            </motion.div>
+          </div>
         </div>
       </section>
 

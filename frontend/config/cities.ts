@@ -20,6 +20,12 @@ export interface CityConfig {
     scooter: number;
     monopattino: number;
   };
+  // Hero section image configuration
+  heroImage?: {
+    ipfsHash: string;
+    icon: string;
+    altText: string;
+  };
 }
 
 export type VehicleType = "bike" | "scooter" | "monopattino";
@@ -44,8 +50,14 @@ export const EUROPEAN_CITIES: CityConfig[] = [
     coordinates: { lat: 41.9028, lng: 12.4964 },
     bounds: { north: 41.95, south: 41.85, east: 12.55, west: 12.44 },
     timezone: "Europe/Rome",
+    emoji: "🏛️",
     allowedVehicles: ["bike", "scooter", "monopattino"],
     vehicleLimit: { bike: 200, scooter: 120, monopattino: 100 },
+    heroImage: {
+      ipfsHash: "bafkreigwgxcrnygcj2s6eu7yikt2wtrby5dy4tj7c4f6gs3fu3wxtkhv4e",
+      icon: "🏛️",
+      altText: "Roma skyline con Colosseo e monumenti storici",
+    },
   },
 
   {
@@ -57,6 +69,23 @@ export const EUROPEAN_CITIES: CityConfig[] = [
     timezone: "Europe/Rome",
     allowedVehicles: ["bike", "scooter", "monopattino"],
     vehicleLimit: { bike: 80, scooter: 60, monopattino: 50 },
+  },
+
+  {
+    id: "sanbenedetto",
+    name: "San Benedetto del Tronto",
+    country: "Italy",
+    coordinates: { lat: 42.9448, lng: 13.8833 },
+    bounds: { north: 43.0, south: 42.89, east: 13.95, west: 13.82 },
+    timezone: "Europe/Rome",
+    emoji: "🏖️",
+    allowedVehicles: ["bike", "scooter", "monopattino"],
+    vehicleLimit: { bike: 60, scooter: 40, monopattino: 30 },
+    heroImage: {
+      ipfsHash: "bafkreida5qw3breb2a6k4xkw3tg7a5nuoktqmnzi64snutlm4gfn6n7mt4",
+      icon: "🏖️",
+      altText: "San Benedetto del Tronto vista mare e lungomare",
+    },
   },
 
   {

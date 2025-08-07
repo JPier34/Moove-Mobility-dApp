@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { LocationIndicator } from "@/components/layout/LocationIndicator";
+import LocationIndicator from "@/components/layout/LocationIndicator";
 import { useTheme } from "@/providers/ThemeProvider";
 import Link from "next/link";
 import { usePathname } from "next/navigation";

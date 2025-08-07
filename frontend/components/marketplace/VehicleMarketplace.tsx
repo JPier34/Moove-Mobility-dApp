@@ -323,28 +323,91 @@ export default function VehicleMarketplace() {
     refetchVehicles,
   } = useRentalPassContract();
 
-  // Convert contract data to UI format (ETH only)
+  // Convert contract data to UI format (ETH only) - FILTERED BY SELECTED CITY
   const vehicleOptions: VehiclePassDisplay[] = React.useMemo(() => {
-    return availableVehicles.map((vehicle) => {
-      const config = getVehicleConfig(vehicle.vehicleType);
-      const priceETH = formatPrice(vehicle.priceWei);
-      const typeString = vehicleTypeToString(vehicle.vehicleType);
+    // Filter vehicles based on selected city
+    const selectedCity = locationHook.currentCity;
 
-      return {
-        type: vehicle.vehicleType,
-        typeString,
-        name: config.name,
-        icon: config.icon,
-        description: config.description,
-        features: config.features,
-        gradient: config.gradient,
-        priceETH,
-        priceWei: vehicle.priceWei,
-        duration: 30,
-        availability: Number(vehicle.available),
-      };
-    });
-  }, [availableVehicles, formatPrice, vehicleTypeToString, getVehicleConfig]);
+    if (!selectedCity) {
+      console.log("📍 No city selected, showing all vehicles");
+      return availableVehicles.map((vehicle) => {
+        const config = getVehicleConfig(vehicle.vehicleType);
+        const priceETH = formatPrice(vehicle.priceWei);
+        const typeString = vehicleTypeToString(vehicle.vehicleType);
+
+        return {
+          type: vehicle.vehicleType,
+          typeString,
+          name: config.name,
+          icon: config.icon,
+          description: config.description,
+          features: config.features,
+          gradient: config.gradient,
+          priceETH,
+          priceWei: vehicle.priceWei,
+          duration: 30,
+          availability: Number(vehicle.available),
+        };
+      });
+    }
+
+    console.log(
+      `🏙️ Filtering vehicles for city: ${selectedCity.name} (${selectedCity.id})`
+    );
+    console.log(`🚗 City allowed vehicles:`, selectedCity.allowedVehicles);
+    console.log(`📊 City vehicle limits:`, selectedCity.vehicleLimit);
+
+    return availableVehicles
+      .filter((vehicle) => {
+        // Check if vehicle type is allowed in this city
+        const isAllowed = selectedCity.allowedVehicles.includes(
+          vehicleTypeToString(vehicle.vehicleType)
+        );
+        console.log(
+          `🚲 Vehicle ${vehicleTypeToString(vehicle.vehicleType)} allowed in ${
+            selectedCity.name
+          }: ${isAllowed}`
+        );
+        return isAllowed;
+      })
+      .map((vehicle) => {
+        const config = getVehicleConfig(vehicle.vehicleType);
+        const priceETH = formatPrice(vehicle.priceWei);
+        const typeString = vehicleTypeToString(vehicle.vehicleType);
+
+        // Get availability from city limits instead of global availability
+        const cityVehicleLimit =
+          selectedCity.vehicleLimit[
+            vehicleTypeToString(
+              vehicle.vehicleType
+            ) as keyof typeof selectedCity.vehicleLimit
+          ] || 0;
+        const availability = Math.min(
+          Number(vehicle.available),
+          cityVehicleLimit
+        );
+
+        return {
+          type: vehicle.vehicleType,
+          typeString,
+          name: config.name,
+          icon: config.icon,
+          description: config.description,
+          features: config.features,
+          gradient: config.gradient,
+          priceETH,
+          priceWei: vehicle.priceWei,
+          duration: 30,
+          availability: availability,
+        };
+      });
+  }, [
+    availableVehicles,
+    formatPrice,
+    vehicleTypeToString,
+    getVehicleConfig,
+    locationHook.currentCity,
+  ]);
 
   const handleSelectVehicle = (vehicleType: number) => {
     if (!isConnected || !locationHook.canRent) {
@@ -352,6 +415,7 @@ export default function VehicleMarketplace() {
     }
 
     const typeString = vehicleTypeToString(vehicleType);
+    // Use preferred city (manually selected or detected) for routing
     router.push(`/purchase/${typeString}?city=${locationHook.currentCity?.id}`);
   };
 
