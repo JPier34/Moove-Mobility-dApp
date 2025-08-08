@@ -1,6 +1,5 @@
 "use client";
 
-import { motion } from "framer-motion";
 import { getCityImageUrl, getCityImageConfig } from "@/utils/cityImages";
 import { CityConfig } from "@/config/cities";
 
@@ -33,11 +32,9 @@ export default function CityBackgroundImage({
       </div>
     );
   }
-
-  // Soluzione alternativa: componente semplice senza animazioni
   return (
     <div className={`relative ${className}`} style={{ zIndex: 1 }}>
-      {/* Background Image - Semplice e diretto */}
+      {/* Background Image */}
       <div className="absolute inset-0">
         <img
           src={imageUrl}
@@ -57,13 +54,8 @@ export default function CityBackgroundImage({
         />
       </div>
 
-      {/* Gradient Overlay - Molto trasparente */}
+      {/* Gradient Overlay - Trasparent */}
       <div className="absolute inset-0 bg-gradient-to-r from-black/40 via-black/10 to-transparent" />
-
-      {/* City Icon Overlay */}
-      <div className="absolute top-8 right-8 text-6xl md:text-8xl opacity-20">
-        {city?.heroImage?.icon || "🏙️"}
-      </div>
     </div>
   );
 }

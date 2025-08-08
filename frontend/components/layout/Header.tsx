@@ -20,13 +20,13 @@ export default function Header() {
 
   return (
     <>
-      <header className="bg-white dark:bg-gray-900 shadow-sm border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <header className="bg-white dark:bg-gray-900 shadow-sm border-b border-gray-200 dark:border-gray-700 flex justify-around">
+        <div className="max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Logo */}
             <div className="flex items-center">
               <Link href="/" className="flex items-center">
-                <div className="text-2xl font-bold text-moove-primary">
+                <div className="text-2xl font-bold overflow-hidden text-moove-primary">
                   m
                   <span className="inline-block w-6 h-6 border-2 border-current rounded-full mx-1"></span>
                   <span className="inline-block w-6 h-6 border-2 border-current rounded-full mr-1"></span>
