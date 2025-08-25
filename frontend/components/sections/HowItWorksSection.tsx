@@ -29,7 +29,7 @@ export default function HowItWorksSection() {
     },
     {
       step: "4",
-      title: "Unlock & Ride",
+      title: "Unlock & Ride!",
       description: "Use your code with any partner vehicle in your city",
       icon: "✨",
     },
@@ -38,7 +38,7 @@ export default function HowItWorksSection() {
   return (
     <motion.section
       ref={ref}
-      className="py-20 bg-white dark:bg-gray-900 relative overflow-hidden"
+      className="py-20 bg-white dark:bg-gray-900 relative min-h-screen overflow-hidden"
     >
       <div className="absolute inset-0 opacity-5">
         <svg
@@ -170,7 +170,7 @@ export default function HowItWorksSection() {
               ⚡
             </motion.span>
             <span className="text-lg font-semibold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">
-              Ready to start your sustainable journey?
+              Ready to start your journey?
             </span>
           </motion.div>
 
@@ -193,24 +193,9 @@ export default function HowItWorksSection() {
                 </span>
               </motion.button>
             </Link>
-
-            <Link href="/how-it-works">
-              <motion.button
-                whileHover={{ scale: 1.05, y: -2 }}
-                whileTap={{ scale: 0.95 }}
-                className="bg-white dark:bg-gray-800 border-2 border-green-500 text-green-600 dark:text-green-400 font-semibold py-4 px-8 rounded-full text-lg hover:bg-green-50 dark:hover:bg-gray-700 transition-all duration-300"
-              >
-                Learn More
-              </motion.button>
-            </Link>
           </div>
         </motion.div>
       </div>
     </motion.section>
   );
 }
-
-
-
-
-

@@ -4,7 +4,7 @@ import React, { useRef, useState, useEffect } from "react";
 import { motion, useInView } from "framer-motion";
 
 const STATS = [
-  { label: "European Cities", value: 20, suffix: "" },
+  { label: "European Cities", value: 20, suffix: "+" },
   { label: "Available Vehicles", value: 2500, suffix: "+" },
   { label: "Happy Users", value: 15000, suffix: "+" },
   { label: "CO₂ Saved (tons)", value: 450, suffix: "+" },
@@ -114,8 +114,3 @@ export default function StatsSection() {
     </motion.section>
   );
 }
-
-
-
-
-

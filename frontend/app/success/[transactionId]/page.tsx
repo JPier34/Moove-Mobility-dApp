@@ -410,7 +410,7 @@ export default function SuccessPage() {
 
   // Confetti effect on mount
   useEffect(() => {
-    // Here you could add a confetti library like react-confetti
+    // Confetti library like react-confetti?
   }, []);
 
   return (

@@ -30,7 +30,7 @@ export interface CityConfig {
 
 export type VehicleType = "bike" | "scooter" | "monopattino";
 
-// 20 European Cities Configuration
+// 20+ European Cities Configuration
 export const EUROPEAN_CITIES: CityConfig[] = [
   {
     id: "milan",
