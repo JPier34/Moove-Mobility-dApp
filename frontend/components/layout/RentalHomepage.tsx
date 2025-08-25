@@ -1,9 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
-import { EUROPEAN_CITIES, VehicleType } from "@/config/cities";
-import Link from "next/link";
-import { motion, useInView, AnimatePresence } from "framer-motion";
+import React, { useState, useEffect } from "react";
+import { EUROPEAN_CITIES } from "@/config/cities";
+import { motion } from "framer-motion";
 import { VehicleGeolocationSystem } from "@/utils/vehicleGeoLocation";
 import LocationPermissionModal from "@/components/modals/LocationPermissionModal";
 import type {
@@ -14,7 +13,6 @@ import { usePreloadCityImages } from "@/hooks/useIPFSImage";
 import StatsSection from "@/components/sections/StatsSection";
 import VehicleSection, {
   VehicleOption,
-  VEHICLE_OPTIONS,
 } from "@/components/sections/VehicleSection";
 import NFTMarketplaceSection from "@/components/sections/NFTMarketplaceSection";
 import HowItWorksSection from "@/components/sections/HowItWorksSection";
@@ -191,7 +189,6 @@ function useLocationWithModal(): [
 function HeroContent({
   locationState,
   requestLocationAgain,
-  onRentVehicle,
 }: {
   locationState: LocationState;
   requestLocationAgain: () => void;
@@ -242,63 +239,10 @@ function HeroContent({
         ))}
       </div>
 
-      {/* City Badge */}
-      {locationState.currentCity && (
-        <motion.div
-          className="inline-block relative z-20"
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.3 }}
-        >
-          <motion.div
-            className="bg-gradient-to-r from-green-400/20 to-blue-500/20 backdrop-blur-md px-6 py-4 rounded-2xl border border-white/20 shadow-lg"
-            animate={{
-              y: [0, -5, 0],
-              rotate: [0, 1, -1, 0],
-            }}
-            transition={{ duration: 6, repeat: Infinity }}
-            whileHover={{
-              scale: 1.05,
-              backgroundColor: "rgba(255,255,255,0.15)",
-            }}
-          >
-            <div className="flex items-center space-x-4">
-              <motion.span
-                className="text-3xl"
-                animate={{
-                  scale: [1, 1.2, 1],
-                  rotate: [0, 10, -10, 0],
-                }}
-                transition={{
-                  scale: { duration: 2, repeat: Infinity, ease: "easeInOut" },
-                  rotate: { duration: 4, repeat: Infinity },
-                }}
-              >
-                {locationState.currentCity.emoji || "🏙️"}
-              </motion.span>
-
-              <div>
-                <span className="text-lg font-semibold text-white">
-                  {locationState.currentCity.name}
-                </span>
-                <div className="flex items-center space-x-2 mt-1">
-                  <motion.div
-                    className="w-2 h-2 bg-green-400 rounded-full"
-                    animate={{ scale: [1, 1.5], opacity: [1, 0.5] }}
-                    transition={{ duration: 2, repeat: Infinity }}
-                  />
-                  <span className="text-sm opacity-80">Service Available</span>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
-
       {/* Title */}
       <div className="space-y-2 relative z-10">
         <motion.div
-          className="text-3xl md:text-5xl font-bold text-white/90"
+          className="text-3xl md:text-6xl font-bold text-white/90"
           initial={{ clipPath: "polygon(0 0, 0 0, 0 100%, 0% 100%)" }}
           animate={{ clipPath: "polygon(0 0, 100% 0, 100% 100%, 0 100%)" }}
           transition={{ duration: 1.5, delay: 0.5 }}
@@ -308,7 +252,7 @@ function HeroContent({
 
         <div className="relative">
           <motion.div
-            className="text-6xl md:text-8xl font-black leading-none text-white"
+            className="text-6xl md:text-9xl font-black leading-none text-white"
             initial={{ clipPath: "polygon(0 0, 0 0, 0 100%, 0% 100%)" }}
             animate={{ clipPath: "polygon(0 0, 100% 0, 100% 100%, 0 100%)" }}
             transition={{ duration: 1.5, delay: 0.7 }}
@@ -319,7 +263,7 @@ function HeroContent({
             mOO
           </motion.div>
           <motion.div
-            className="text-6xl md:text-8xl font-black leading-none bg-gradient-to-r from-green-400 via-blue-400 to-purple-500 bg-clip-text text-transparent ml-8 md:ml-12"
+            className="text-6xl md:text-9xl font-black leading-none bg-gradient-to-r from-green-400 via-blue-400 to-purple-500 bg-clip-text text-transparent ml-8 md:ml-12"
             initial={{
               clipPath: "polygon(100% 0, 100% 0, 100% 100%, 100% 100%)",
             }}
@@ -449,14 +393,6 @@ function HeroContent({
             locationState={locationState}
             onRequestLocation={requestLocationAgain}
           />
-
-          <motion.div
-            className="absolute -inset-2 bg-gradient-to-r from-green-400/20 to-blue-500/20 rounded-2xl opacity-0 group-hover:opacity-100 blur-sm transition-opacity duration-300 -z-10"
-            animate={{
-              rotate: [0, 2, -2, 0],
-            }}
-            transition={{ duration: 6, repeat: Infinity }}
-          />
         </div>
       </motion.div>
     </motion.div>
@@ -501,7 +437,7 @@ function LocationStatusBanner({
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="inline-flex items-center bg-green-500/10 backdrop-blur-sm border border-green-500/20 text-green-200 px-6 py-3 rounded-full text-lg font-medium"
+        className="inline-flex items-center bg-green-500/10 backdrop-blur-sm border border-green-500/20 text-green-200 px-6 py-4 mt-0 mb-6 rounded-full text-lg font-medium"
         whileHover={{ scale: 1.02 }}
         transition={{ type: "spring", stiffness: 300 }}
       >

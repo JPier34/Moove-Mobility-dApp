@@ -96,3 +96,8 @@ export default function NFTMarketplaceSection() {
     </motion.section>
   );
 }
+
+
+
+
+
