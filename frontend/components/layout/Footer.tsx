@@ -23,9 +23,17 @@ export default function Footer() {
   const currentYear = new Date().getFullYear();
 
   const socialLinks = [
-    { name: "LinkedIn", icon: LinkedInIcon, href: "#" },
-    { name: "Discord", icon: DiscordIcon, href: "#" },
-    { name: "GitHub", icon: GithubIcon, href: "#" },
+    {
+      name: "LinkedIn",
+      icon: LinkedInIcon,
+      href: "https://www.linkedin.com/in/jacopo-pierantozzi-46240b288",
+    },
+    {
+      name: "Discord",
+      icon: DiscordIcon,
+      href: "https://discord.com/users/1296743297661931520",
+    },
+    { name: "GitHub", icon: GithubIcon, href: "https://github.com/JPier34" },
   ];
 
   const platformLinks = [
@@ -48,7 +56,8 @@ export default function Footer() {
                 <span className="text-white font-bold text-sm">mOOve</span>
               </div>
               <h3 className="text-xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
-                Offered by J.Pier
+                Offered by{" "}
+                <span className="homepage-signature-text ">J.Pier</span>
               </h3>
             </div>
             <p className="text-gray-400 text-sm leading-relaxed mb-6">
