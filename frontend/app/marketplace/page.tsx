@@ -31,7 +31,6 @@ interface VehiclePassDisplay {
 function EnhancedLocationStatusHeader({
   locationState,
   onRefreshLocation,
-  onClearLocation,
 }: {
   locationState: ReturnType<typeof useLocationAndCity>;
   onRefreshLocation: () => void;
@@ -284,7 +283,7 @@ export default function EnhancedMarketplacePage() {
     }
 
     const typeString = vehicleTypeToString(vehicleType);
-    // Use preferred city (manually selected or detected) for routing
+    // Use preferred city (detected) for routing
     router.push(`/book/${typeString}?city=${locationHook.currentCity?.id}`);
   };
 
@@ -399,6 +398,8 @@ export default function EnhancedMarketplacePage() {
                       userHasPass={userHasPass(pass.type)}
                       isLoading={isLoading}
                       isLocationRequired={!locationHook.canRent}
+                      isPurchasing={false}
+                      onPurchasePass={() => {}}
                     />
                   </div>
                 ))}
@@ -627,12 +628,16 @@ function VehiclePassCard({
   userHasPass,
   isLoading,
   isLocationRequired,
+  isPurchasing,
+  onPurchasePass,
 }: {
   pass: VehiclePassDisplay;
   onSelect: () => void;
   userHasPass: boolean;
   isLoading: boolean;
   isLocationRequired: boolean;
+  isPurchasing?: boolean;
+  onPurchasePass?: () => void;
 }) {
   const isDisabled = isLoading || isLocationRequired;
 

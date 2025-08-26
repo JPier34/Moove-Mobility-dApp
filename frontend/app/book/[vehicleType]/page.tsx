@@ -29,6 +29,8 @@ const VEHICLE_CONFIG = {
     icon: "🚲",
     price: 25,
     priceETH: "0.025",
+    networkFee: "0.000050",
+    serviceFee: "0.0000050",
     gradient: "from-green-400 to-emerald-600",
     features: [
       "30 days unlimited rides",
@@ -42,6 +44,8 @@ const VEHICLE_CONFIG = {
     icon: "🛴",
     price: 35,
     priceETH: "0.035",
+    networkFee: "0.000035",
+    serviceFee: "0.0000035",
     gradient: "from-blue-400 to-indigo-600",
     features: [
       "30 days unlimited rides",
@@ -55,6 +59,8 @@ const VEHICLE_CONFIG = {
     icon: "🛵",
     price: 45,
     priceETH: "0.045",
+    networkFee: "0.000045",
+    serviceFee: "0.0000045",
     gradient: "from-purple-400 to-pink-600",
     features: [
       "30 days unlimited rides",
@@ -180,27 +186,34 @@ function VehicleDetails({
               <span className="text-gray-600 dark:text-gray-300">
                 Base Price:
               </span>
-              <span className="font-medium">€{config.price}</span>
+              <span className="font-medium">{config.priceETH}</span>
+              ETH
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600 dark:text-gray-300">
                 Network Fee:
               </span>
-              <span className="font-medium">€0.50</span>
+              <span className="font-medium">{config.networkFee}</span>
+              ETH
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600 dark:text-gray-300">
                 Service Fee:
               </span>
-              <span className="font-medium">€1.50</span>
+              <span className="font-medium">{config.serviceFee}</span>
+              ETH
             </div>
             <hr className="my-3 border-gray-200 dark:border-gray-600" />
             <div className="flex justify-between text-lg font-bold">
               <span>Total:</span>
               <div className="text-right">
-                <div>€{config.price + 2}</div>
-                <div className="text-sm text-gray-500 dark:text-gray-400">
-                  ≈ {config.priceETH} ETH
+                <div>
+                  {(
+                    parseFloat(config.priceETH) +
+                    parseFloat(config.networkFee) +
+                    parseFloat(config.serviceFee)
+                  ).toFixed(6)}
+                  <span> (≈ ETH{config.price})</span>
                 </div>
               </div>
             </div>
