@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { EUROPEAN_CITIES } from "@/config/cities";
+import { EUROPEAN_CITIES, getCityHeroImage } from "../../config/cities";
 import { motion } from "framer-motion";
 import { VehicleGeolocationSystem } from "@/utils/vehicleGeoLocation";
 import LocationPermissionModal from "@/components/modals/LocationPermissionModal";
@@ -78,10 +78,25 @@ function useLocationWithModal(): [
     locationMethod: "none",
   });
 
+  const [userExplicitlyDenied, setUserExplicitlyDenied] = useState(false);
+
+  const [isFirstLoad, setIsFirstLoad] = useState(true);
+
+  const [permissionAlreadyGranted, setPermissionAlreadyGranted] =
+    useState(false);
+
   useEffect(() => {
     const checkExistingPermission = async (): Promise<void> => {
+      if (userExplicitlyDenied) {
+        setLocationState((prev) => ({ ...prev, showLocationModal: false }));
+        return;
+      }
+
+      if (!isFirstLoad) {
+        return;
+      }
+
       try {
-        const geoSystem = new VehicleGeolocationSystem();
         let permission: "granted" | "denied" | "prompt" = "prompt";
 
         if (navigator.permissions) {
@@ -100,23 +115,27 @@ function useLocationWithModal(): [
         }
 
         if (permission === "granted") {
+          setPermissionAlreadyGranted(true);
           try {
+            const geoSystem = new VehicleGeolocationSystem();
             const location = await geoSystem.getCurrentLocation();
             handleLocationGranted(location);
-            setLocationState((prev) => ({ ...prev, showLocationModal: false }));
           } catch (error) {
             setLocationState((prev) => ({ ...prev, showLocationModal: true }));
           }
         } else {
           setLocationState((prev) => ({ ...prev, showLocationModal: true }));
         }
+
+        setIsFirstLoad(false);
       } catch (error) {
         setLocationState((prev) => ({ ...prev, showLocationModal: true }));
+        setIsFirstLoad(false);
       }
     };
 
     checkExistingPermission();
-  }, []);
+  }, [userExplicitlyDenied, isFirstLoad]);
 
   const handleLocationGranted = async (location: LocationCoordinates) => {
     setLocationState((prev) => ({
@@ -172,6 +191,7 @@ function useLocationWithModal(): [
       locationMethod: "none",
       error: "Location access denied",
     }));
+    setUserExplicitlyDenied(true);
   };
 
   const handleManualCitySelect = (cityId: string) => {
@@ -267,7 +287,7 @@ function HeroContent({
       {/* Title */}
       <div className="space-y-2 relative z-10 pt-20 md:pt-8">
         <motion.div
-          className="text-3xl md:text-6xl font-bold text-white/90"
+          className="text-2xl md:text-5xl font-semibold text-white/90"
           initial={{ clipPath: "polygon(0 0, 0 0, 0 100%, 0% 100%)" }}
           animate={{ clipPath: "polygon(0 0, 100% 0, 100% 100%, 0 100%)" }}
           transition={{ duration: 1.5, delay: 0.5 }}
@@ -312,29 +332,28 @@ function HeroContent({
 
       {/* Description */}
       <motion.p
-        className="text-lg md:text-xl leading-relaxed text-white/90 max-w-xl relative z-10"
+        className="text-lg md:text-3xl leading-relaxed text-white/90 max-w-xl relative z-10"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, delay: 1.3 }}
       >
-        The future of urban mobility is here. <br /> Rent electric vehicles with
-        <br />
+        The future of urban mobility is{" "}
         <motion.span
-          className="font-semibold bg-gradient-to-r from-green-400 to-white bg-clip-text text-transparent"
+          className="font-bold bg-gradient-to-r from-green-400 to-white bg-clip-text text-transparent"
           animate={{
             backgroundPosition: ["0%", "100%", "0%"],
           }}
           transition={{ duration: 3, repeat: Infinity }}
           style={{ backgroundSize: "200%" }}
         >
-          blockchain-powered NFT passes
+          here
         </motion.span>
         .
       </motion.p>
 
       {/* Features */}
       <motion.div
-        className="grid grid-cols-1 sm:grid-cols-3 gap-4 relative z-10 px-2 sm:px-0"
+        className="grid sm:grid-cols-3 gap-4 relative z-10 px-2 sm:px-0"
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, delay: 1.5 }}
@@ -555,7 +574,6 @@ export default function RentalHomepage() {
         isOpen={locationState.showLocationModal}
         onLocationGranted={handleLocationGranted}
         onLocationDenied={handleLocationDenied}
-        onManualCitySelect={handleManualCitySelect}
       />
 
       <section className="relative h-fit flex items-center text-white overflow-hidden">
@@ -583,12 +601,13 @@ export default function RentalHomepage() {
               <div
                 className="w-full h-full relative"
                 style={{
-                  backgroundImage:
-                    locationState.currentCity?.id === "sanbenedetto"
-                      ? 'url("https://xsdctknbxfzpxukj.public.blob.vercel-storage.com/san-benedetto-del-tronto-hero.jpg")'
-                      : locationState.currentCity?.id === "rome"
-                      ? 'url("https://xsdctknbxfzpxukj.public.blob.vercel-storage.com/rome-hero.jpg")'
-                      : "none",
+                  backgroundImage: locationState.currentCity?.id
+                    ? getCityHeroImage(locationState.currentCity.id)
+                      ? `url("${getCityHeroImage(
+                          locationState.currentCity.id
+                        )}")`
+                      : "none"
+                    : "none",
                   backgroundSize: "cover",
                   backgroundPosition: "center",
                   backgroundRepeat: "no-repeat",
@@ -643,7 +662,7 @@ export default function RentalHomepage() {
           className="relative max-w-7xl mr-auto px-4 sm:px-6 w-full min-h-screen"
           style={{ zIndex: 10 }}
         >
-          <div className="grid grid-cols-12 gap-8 items-center min-h-[70vh] md:min-h-[80vh]">
+          <div className="grid grid-cols-12 items-center min-h-[70vh] md:min-h-[80vh]">
             <div className="col-span-12 lg:col-span-8">
               <HeroContent
                 locationState={locationState}

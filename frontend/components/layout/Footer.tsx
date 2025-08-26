@@ -61,8 +61,7 @@ export default function Footer() {
               </h3>
             </div>
             <p className="text-gray-400 text-sm leading-relaxed mb-6">
-              The future of urban mobility is here. Rent electric vehicles with
-              blockchain-powered NFT passes.
+              The future of urban mobility is here.
             </p>
 
             {/* Social Links */}
@@ -114,7 +113,7 @@ export default function Footer() {
           <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
             {/* Copyright */}
             <p className="text-gray-400 text-sm">
-              © {currentYear} mOOve. Built for blockchain innovation.
+              © {currentYear} mOOve. Built for smart mobility.
             </p>
 
             {/* Tech Stack Badge */}

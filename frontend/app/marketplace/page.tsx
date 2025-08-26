@@ -9,7 +9,7 @@ import { useAccount } from "wagmi";
 import { useRentalPassContract } from "@/hooks/useRentalPassContract";
 import { VehicleType } from "@/types/nft";
 import { useLocationAndCity } from "@/hooks/useLocationAndCity";
-import { EUROPEAN_CITIES } from "@/config/cities";
+import { EUROPEAN_CITIES } from "../../config/cities";
 
 // ============= TYPES =============
 interface VehiclePassDisplay {
@@ -31,14 +31,10 @@ interface VehiclePassDisplay {
 function EnhancedLocationStatusHeader({
   locationState,
   onRefreshLocation,
-  onSetTestLocation,
   onClearLocation,
 }: {
   locationState: ReturnType<typeof useLocationAndCity>;
   onRefreshLocation: () => void;
-  onSetTestLocation: (
-    city: "rome" | "milan" | "paris" | "berlin" | "madrid"
-  ) => void;
   onClearLocation: () => void;
 }) {
   const {
@@ -82,7 +78,7 @@ function EnhancedLocationStatusHeader({
             </h3>
             <p className="text-yellow-700 dark:text-yellow-300 mb-4 text-sm">
               {error ||
-                "Your location is outside our service area. Please try a test location."}
+                "Your location is outside our service area. Please enable location access to continue."}
             </p>
 
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -94,17 +90,6 @@ function EnhancedLocationStatusHeader({
               >
                 🔄 Retry Location Access
               </motion.button>
-
-              {process.env.NODE_ENV === "development" && (
-                <motion.button
-                  onClick={() => onSetTestLocation("rome")}
-                  className="bg-blue-600 text-white py-2 px-6 rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  🧪 Use Test Location
-                </motion.button>
-              )}
             </div>
           </div>
         </motion.div>
@@ -122,11 +107,7 @@ function EnhancedLocationStatusHeader({
         <span className="text-2xl mr-3">📍</span>
         Service available in {currentCity.name}
         <span className="ml-3 bg-green-500/20 px-3 py-1 rounded-full text-sm">
-          {locationMethod === "manual"
-            ? "Manual"
-            : locationMethod === "gps"
-            ? "GPS"
-            : "None"}
+          {locationMethod === "gps" ? "GPS" : "None"}
         </span>
       </motion.div>
     );
@@ -172,16 +153,14 @@ function EnhancedLocationStatusHeader({
           </div>
         )}
 
-        {process.env.NODE_ENV === "development" && (
-          <motion.button
-            onClick={() => onSetTestLocation("rome")}
-            className="bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 transition-colors text-sm"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-          >
-            🧪 Use Rome for Testing
-          </motion.button>
-        )}
+        <motion.button
+          onClick={onRefreshLocation}
+          className="bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 transition-colors text-sm"
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+        >
+          📍 Enable Location Access
+        </motion.button>
       </div>
     </motion.div>
   );
@@ -357,7 +336,6 @@ export default function EnhancedMarketplacePage() {
           <EnhancedLocationStatusHeader
             locationState={locationHook}
             onRefreshLocation={locationHook.refreshLocation}
-            onSetTestLocation={locationHook.setTestLocation}
             onClearLocation={locationHook.clearLocation}
           />
 

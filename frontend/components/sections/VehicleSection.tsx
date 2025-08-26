@@ -3,7 +3,7 @@
 import React, { useRef } from "react";
 import { motion, useInView } from "framer-motion";
 import Link from "next/link";
-import { EUROPEAN_CITIES, VehicleType } from "@/config/cities";
+import { EUROPEAN_CITIES, VehicleType } from "../../config/cities";
 import type { NearbyVehicle } from "@/utils/vehicleGeoLocation";
 
 export interface VehicleOption {
