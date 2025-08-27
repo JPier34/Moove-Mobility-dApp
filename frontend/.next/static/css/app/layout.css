@@ -1322,9 +1322,6 @@ video {
 .bg-black\/50{
   background-color: rgb(0 0 0 / 0.5);
 }
-.bg-black\/70{
-  background-color: rgb(0 0 0 / 0.7);
-}
 .bg-blue-100{
   --tw-bg-opacity: 1;
   background-color: rgb(219 234 254 / var(--tw-bg-opacity, 1));
@@ -1528,6 +1525,9 @@ video {
 .bg-yellow-600{
   --tw-bg-opacity: 1;
   background-color: rgb(202 138 4 / var(--tw-bg-opacity, 1));
+}
+.bg-black\/70{
+  background-color: rgb(0 0 0 / 0.7);
 }
 .bg-opacity-50{
   --tw-bg-opacity: 0.5;
@@ -2031,6 +2031,9 @@ video {
 .font-semibold{
   font-weight: 600;
 }
+.font-normal{
+  font-weight: 400;
+}
 .uppercase{
   text-transform: uppercase;
 }
@@ -2241,14 +2244,14 @@ video {
 .opacity-5{
   opacity: 0.05;
 }
-.opacity-50{
-  opacity: 0.5;
-}
 .opacity-60{
   opacity: 0.6;
 }
 .opacity-75{
   opacity: 0.75;
+}
+.opacity-50{
+  opacity: 0.5;
 }
 .shadow-2xl{
   --tw-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter, useParams } from "next/navigation";
-import { useRentalPassContract } from "@/hooks/useRentalPassContract";
+import { CurrencyConverter } from "@/utils/currencyConverter";
 
 // ============= TYPES =============
 interface BookingDetails {
@@ -22,15 +22,23 @@ interface BookingStep {
   active: boolean;
 }
 
+interface PriceBreakdownProps {
+  config: {
+    priceETH: string;
+    networkFee: string;
+    serviceFee: string;
+  };
+}
+
 // ============= DATA =============
 const VEHICLE_CONFIG = {
   bike: {
     name: "E-Bike Pass",
     icon: "🚲",
-    price: 25,
-    priceETH: "0.025",
-    networkFee: "0.000050",
-    serviceFee: "0.0000050",
+    price: 18,
+    priceETH: "0.0075",
+    networkFee: "0.000021",
+    serviceFee: "0.0000004",
     gradient: "from-green-400 to-emerald-600",
     features: [
       "30 days unlimited rides",
@@ -42,10 +50,10 @@ const VEHICLE_CONFIG = {
   scooter: {
     name: "E-Scooter Pass",
     icon: "🛴",
-    price: 35,
-    priceETH: "0.035",
-    networkFee: "0.000035",
-    serviceFee: "0.0000035",
+    price: 28,
+    priceETH: "0.0117",
+    networkFee: "0.000021",
+    serviceFee: "0.0000006",
     gradient: "from-blue-400 to-indigo-600",
     features: [
       "30 days unlimited rides",
@@ -57,10 +65,10 @@ const VEHICLE_CONFIG = {
   monopattino: {
     name: "Monopattino Pass",
     icon: "🛵",
-    price: 45,
-    priceETH: "0.045",
-    networkFee: "0.000045",
-    serviceFee: "0.0000045",
+    price: 42,
+    priceETH: "0.0175",
+    networkFee: "0.000021",
+    serviceFee: "0.0000008",
     gradient: "from-purple-400 to-pink-600",
     features: [
       "30 days unlimited rides",
@@ -177,59 +185,22 @@ function VehicleDetails({
           </div>
         </div>
 
-        <div className="bg-gray-50 dark:bg-gray-700 rounded-2xl p-6">
-          <h4 className="font-semibold text-gray-900 dark:text-white mb-4">
-            Price Breakdown:
-          </h4>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-600 dark:text-gray-300">
-                Base Price:
-              </span>
-              <span className="font-medium">{config.priceETH}</span>
-              ETH
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600 dark:text-gray-300">
-                Network Fee:
-              </span>
-              <span className="font-medium">{config.networkFee}</span>
-              ETH
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600 dark:text-gray-300">
-                Service Fee:
-              </span>
-              <span className="font-medium">{config.serviceFee}</span>
-              ETH
-            </div>
-            <hr className="my-3 border-gray-200 dark:border-gray-600" />
-            <div className="flex justify-between text-lg font-bold">
-              <span>Total:</span>
-              <div className="text-right">
-                <div>
-                  {(
-                    parseFloat(config.priceETH) +
-                    parseFloat(config.networkFee) +
-                    parseFloat(config.serviceFee)
-                  ).toFixed(6)}
-                  <span> (≈ ETH{config.price})</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <PriceBreakdown config={config} />
       </div>
     </motion.div>
   );
 }
 
+// ============= Payment Phase =============
+
 function PaymentSection({
   onPurchase,
   isLoading,
+  totalETH,
 }: {
   onPurchase: () => void;
   isLoading: boolean;
+  totalETH: string;
 }) {
   const [paymentMethod, setPaymentMethod] = useState<"crypto" | "card">(
     "crypto"
@@ -246,7 +217,7 @@ function PaymentSection({
         Pay with your crypto!
       </h3>
 
-      {/* Payment Method Selection */}
+      {/* Payment Method */}
       <div className="grid grid-cols-1 gap-4 mb-8">
         <motion.button
           onClick={() => setPaymentMethod("crypto")}
@@ -342,12 +313,85 @@ function PaymentSection({
             Processing Transaction...
           </div>
         ) : (
-          `Purchase NFT Pass - €${paymentMethod === "crypto" ? "25" : "27"}`
+          `Purchase NFT Pass - ${totalETH} ETH`
         )}
       </motion.button>
     </motion.div>
   );
 }
+
+const PriceBreakdown: React.FC<PriceBreakdownProps> = ({ config }) => {
+  const [eurTotal, setEurTotal] = useState<number | null>(null);
+  const [isConverting, setIsConverting] = useState(false);
+
+  // Calculate total ETH
+  const totalETH = (
+    parseFloat(config.priceETH) +
+    parseFloat(config.networkFee) +
+    parseFloat(config.serviceFee)
+  ).toFixed(6);
+
+  // Convert to EUR when component mounts or totalETH changes
+  useEffect(() => {
+    const convertToEur = async () => {
+      setIsConverting(true);
+      try {
+        const eurAmount = await CurrencyConverter.convertEthToEur(
+          parseFloat(totalETH)
+        );
+        setEurTotal(eurAmount);
+      } catch (error) {
+        console.error("EUR conversion failed:", error);
+        setEurTotal(null);
+      } finally {
+        setIsConverting(false);
+      }
+    };
+
+    convertToEur();
+  }, [totalETH]);
+
+  return (
+    <div className="bg-gray-50 dark:bg-gray-700 rounded-2xl p-6">
+      <h4 className="font-semibold text-gray-900 dark:text-white mb-4">
+        Price Breakdown (ETH):
+      </h4>
+      <div className="space-y-2 text-sm">
+        <div className="flex justify-between">
+          <span className="text-gray-600 dark:text-gray-300">Base Price:</span>
+          <span className="font-medium">{config.priceETH}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-600 dark:text-gray-300">Network Fee:</span>
+          <span className="font-medium">{config.networkFee}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-600 dark:text-gray-300">Service Fee:</span>
+          <span className="font-medium">{config.serviceFee}</span>
+        </div>
+        <hr className="my-3 border-gray-200 dark:border-gray-600" />
+        <div className="flex justify-between text-lg font-bold">
+          <span>Total:</span>
+          <div className="text-right font-bold">
+            <div>
+              {totalETH} <span>ETH</span>
+            </div>
+            {/* EUR conversion */}
+            <div className="text-sm font-normal text-gray-500 dark:text-gray-400 mt-1">
+              {isConverting ? (
+                <span className="animate-pulse">Converting...</span>
+              ) : eurTotal ? (
+                `≈ €${eurTotal.toFixed(2)}`
+              ) : (
+                <span className="text-gray-400">EUR unavailable</span>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // ============= MAIN COMPONENT =============
 export default function BookingPage() {
@@ -410,7 +454,15 @@ export default function BookingPage() {
 
         <VehicleDetails config={config} vehicleType={vehicleType} />
 
-        <PaymentSection onPurchase={handlePurchase} isLoading={isLoading} />
+        <PaymentSection
+          onPurchase={handlePurchase}
+          isLoading={isLoading}
+          totalETH={(
+            parseFloat(config.priceETH) +
+            parseFloat(config.networkFee) +
+            parseFloat(config.serviceFee)
+          ).toFixed(6)}
+        />
       </div>
     </div>
   );

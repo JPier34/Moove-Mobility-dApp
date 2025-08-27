@@ -11,7 +11,7 @@ interface NFTModalProps {
   onClose: () => void;
 }
 
-// Mapping per le emoji delle categorie
+// Mapping emoji
 const categoryEmojis = {
   scooter: "🛴",
   bike: "🚲",
@@ -26,7 +26,7 @@ export default function NFTModal({ nft, isOpen, onClose }: NFTModalProps) {
     "details" | "history" | "attributes"
   >("details");
 
-  // Chiudi modal con ESC
+  // Close modal with ESC
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -51,10 +51,10 @@ export default function NFTModal({ nft, isOpen, onClose }: NFTModalProps) {
 
     setIsPurchasing(true);
     try {
-      // TODO: Implementare logica di acquisto con smart contract
+      // TODO: Implementing purchase logic with smart contract
       console.log("Purchasing NFT:", nft.id);
 
-      // Simulazione acquisto
+      // Simulating purchase
       await new Promise((resolve) => setTimeout(resolve, 2000));
 
       alert("Acquisto completato con successo!");
@@ -72,7 +72,7 @@ export default function NFTModal({ nft, isOpen, onClose }: NFTModalProps) {
       alert("Connetti il wallet per fare un'offerta");
       return;
     }
-    // TODO: Implementare logica per fare offerte
+    // TODO: Implementing offer logic
     console.log("Making offer for NFT:", nft.id);
     alert("Funzionalità in arrivo!");
   };
@@ -95,7 +95,7 @@ export default function NFTModal({ nft, isOpen, onClose }: NFTModalProps) {
           className="relative bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Header del modal */}
+          {/* Header modal */}
           <div className="flex items-center justify-between p-6 border-b border-gray-200">
             <h2 className="text-2xl font-bold text-gray-900">{nft.name}</h2>
             <button
@@ -118,11 +118,11 @@ export default function NFTModal({ nft, isOpen, onClose }: NFTModalProps) {
             </button>
           </div>
 
-          {/* Contenuto principale */}
+          {/* Main content */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-6 max-h-[calc(90vh-200px)] overflow-y-auto">
-            {/* Colonna sinistra - Immagine e gallery */}
+            {/* Left column - Image and gallery */}
             <div className="space-y-4">
-              {/* Immagine principale */}
+              {/* Main image */}
               <div className="aspect-square bg-gradient-to-br from-moove-50 to-moove-100 rounded-xl p-8">
                 <div className="w-full h-full bg-gradient-to-br from-moove-primary to-moove-secondary rounded-xl flex items-center justify-center text-8xl text-white">
                   {categoryEmojis[
@@ -131,7 +131,7 @@ export default function NFTModal({ nft, isOpen, onClose }: NFTModalProps) {
                 </div>
               </div>
 
-              {/* Thumbnail gallery (placeholder) */}
+              {/* Thumbnail gallery */}
               <div className="grid grid-cols-4 gap-2">
                 {[...Array(4)].map((_, i) => (
                   <div
@@ -148,9 +148,9 @@ export default function NFTModal({ nft, isOpen, onClose }: NFTModalProps) {
               </div>
             </div>
 
-            {/* Colonna destra - Dettagli e azioni */}
+            {/* Right column - Details and actions */}
             <div className="space-y-6">
-              {/* Info di base */}
+              {/* Base info */}
               <div>
                 <div className="flex items-center space-x-2 mb-2">
                   <span className="px-2 py-1 bg-moove-100 text-moove-700 rounded-full text-sm font-medium">
@@ -178,7 +178,7 @@ export default function NFTModal({ nft, isOpen, onClose }: NFTModalProps) {
                 </p>
               </div>
 
-              {/* Proprietario */}
+              {/* Owner */}
               <div className="bg-gray-50 rounded-lg p-4">
                 <div className="text-sm text-gray-500 mb-1">Proprietario</div>
                 <div className="flex items-center space-x-2">
@@ -194,7 +194,7 @@ export default function NFTModal({ nft, isOpen, onClose }: NFTModalProps) {
                 </div>
               </div>
 
-              {/* Prezzo */}
+              {/* Price */}
               <div className="bg-gradient-to-r from-moove-50 to-moove-100 rounded-lg p-4">
                 <div className="text-sm text-gray-600 mb-1">
                   Prezzo corrente
@@ -210,7 +210,7 @@ export default function NFTModal({ nft, isOpen, onClose }: NFTModalProps) {
                 </div>
               </div>
 
-              {/* Tabs per dettagli */}
+              {/* Tabs for details */}
               <div>
                 <div className="flex border-b border-gray-200 mb-4">
                   {[
@@ -232,7 +232,7 @@ export default function NFTModal({ nft, isOpen, onClose }: NFTModalProps) {
                   ))}
                 </div>
 
-                {/* Contenuto tabs */}
+                {/* Tabs content */}
                 {activeTab === "details" && (
                   <div className="space-y-3">
                     <div className="flex justify-between">
@@ -272,25 +272,25 @@ export default function NFTModal({ nft, isOpen, onClose }: NFTModalProps) {
                 {activeTab === "history" && (
                   <div className="space-y-3">
                     <div className="text-sm text-gray-500">
-                      Storia delle transazioni
+                      Transaction history
                     </div>
                     <div className="space-y-2">
                       <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                        <span className="text-sm">Creazione</span>
+                        <span className="text-sm">Creation</span>
                         <span className="text-sm text-gray-500">
-                          30 giorni fa
+                          30 days ago
                         </span>
                       </div>
                       <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                        <span className="text-sm">Primo acquisto</span>
+                        <span className="text-sm">First purchase</span>
                         <span className="text-sm text-gray-500">
-                          25 giorni fa
+                          25 days ago
                         </span>
                       </div>
                       <div className="flex justify-between items-center py-2">
-                        <span className="text-sm">Ultima vendita</span>
+                        <span className="text-sm">Last sale</span>
                         <span className="text-sm text-gray-500">
-                          15 giorni fa
+                          15 days ago
                         </span>
                       </div>
                     </div>
@@ -298,7 +298,7 @@ export default function NFTModal({ nft, isOpen, onClose }: NFTModalProps) {
                 )}
               </div>
 
-              {/* Azioni */}
+              {/* Actions */}
               {!isOwner && nft.isForSale && (
                 <div className="flex space-x-3">
                   <Button
@@ -309,7 +309,7 @@ export default function NFTModal({ nft, isOpen, onClose }: NFTModalProps) {
                     {isPurchasing ? (
                       <>
                         <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
-                        Acquistando...
+                        Buying...
                       </>
                     ) : (
                       `Acquista per ${nft.price} ${nft.currency}`
@@ -320,7 +320,7 @@ export default function NFTModal({ nft, isOpen, onClose }: NFTModalProps) {
                     onClick={handleMakeOffer}
                     disabled={!isConnected}
                   >
-                    Fai un'offerta
+                    Make an offer
                   </Button>
                 </div>
               )}
@@ -332,23 +332,21 @@ export default function NFTModal({ nft, isOpen, onClose }: NFTModalProps) {
                   disabled={!isConnected}
                   className="w-full"
                 >
-                  Fai un'offerta
+                  Make an offer
                 </Button>
               )}
 
               {isOwner && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <div className="text-blue-800 font-medium mb-2">
-                    🎉 Questo NFT è tuo!
+                    🎉 This NFT is yours!
                   </div>
                   <div className="space-y-2">
                     <Button variant="outline" size="sm" className="w-full">
-                      Trasferisci
+                      Transfer
                     </Button>
                     <Button variant="outline" size="sm" className="w-full">
-                      {nft.isForSale
-                        ? "Rimuovi dalla vendita"
-                        : "Metti in vendita"}
+                      {nft.isForSale ? "Remove from sale" : "Put on sale"}
                     </Button>
                   </div>
                 </div>
@@ -357,10 +355,10 @@ export default function NFTModal({ nft, isOpen, onClose }: NFTModalProps) {
               {!isConnected && (
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                   <div className="text-yellow-800 font-medium mb-2">
-                    ⚠️ Wallet non connesso
+                    ⚠️ Wallet not connected
                   </div>
                   <div className="text-yellow-700 text-sm">
-                    Connetti il tuo wallet per acquistare o fare offerte.
+                    Connect your wallet to purchase or make offers.
                   </div>
                 </div>
               )}
