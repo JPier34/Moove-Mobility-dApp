@@ -734,7 +734,7 @@ function VehiclePassCard({
         <div className="absolute bottom-4 left-4">
           <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-2xl px-4 py-3 shadow-lg border border-gray-200/50">
             <div className="text-2xl font-bold text-gray-900 dark:text-white">
-              {pass.priceETH}
+              {pass.priceETH} ETH
             </div>
             <div className="text-xs text-gray-500 dark:text-gray-400 text-center">
               {pass.duration} days

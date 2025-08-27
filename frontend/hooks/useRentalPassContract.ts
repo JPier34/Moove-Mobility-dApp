@@ -9,6 +9,58 @@ import { parseEther, formatEther } from "viem";
 import { toast } from "react-hot-toast";
 import { VehicleType } from "@/types/nft";
 
+// Vehicle configuration mapped to VehicleType enum
+const VEHICLE_CONFIG = {
+  [VehicleType.BIKE]: {
+    name: "E-Bike Pass",
+    icon: "🚲",
+    description: "Perfect for city exploration and daily commutes",
+    price: 18,
+    priceETH: "0.0075",
+    networkFee: "0.000021",
+    serviceFee: "0.0000004",
+    gradient: "from-green-400 to-emerald-600",
+    features: [
+      "30 days unlimited rides",
+      "All partner bike networks",
+      "Priority support",
+      "City-wide coverage",
+    ],
+  },
+  [VehicleType.SCOOTER]: {
+    name: "E-Scooter Pass",
+    icon: "🛴",
+    description: "Fast and convenient for short to medium trips",
+    price: 28,
+    priceETH: "0.0117",
+    networkFee: "0.000021",
+    serviceFee: "0.0000006",
+    gradient: "from-blue-400 to-indigo-600",
+    features: [
+      "30 days unlimited rides",
+      "Premium scooter fleet",
+      "Fast unlock speeds",
+      "Extended range vehicles",
+    ],
+  },
+  [VehicleType.MONOPATTINO]: {
+    name: "Monopattino Pass",
+    icon: "🛵",
+    description: "Premium urban mobility with exclusive access",
+    price: 42,
+    priceETH: "0.0175",
+    networkFee: "0.000021",
+    serviceFee: "0.0000008",
+    gradient: "from-purple-400 to-pink-600",
+    features: [
+      "30 days unlimited rides",
+      "Exclusive vehicle access",
+      "VIP customer support",
+      "Premium parking spots",
+    ],
+  },
+};
+
 // ============= TYPES =============
 export interface RentalPassData {
   tokenId: bigint;
@@ -57,49 +109,10 @@ const VEHICLE_TYPE_NAMES = {
 } as const;
 
 const VEHICLE_PRICES = {
-  [VehicleType.BIKE]: "0.025", // 25 EUR equivalent
-  [VehicleType.SCOOTER]: "0.035", // 35 EUR equivalent
-  [VehicleType.MONOPATTINO]: "0.045", // 45 EUR equivalent
+  [VehicleType.BIKE]: "0.0075",
+  [VehicleType.SCOOTER]: "0.0117",
+  [VehicleType.MONOPATTINO]: "0.0175",
 } as const;
-
-const VEHICLE_CONFIG = {
-  [VehicleType.BIKE]: {
-    name: "E-Bike Pass",
-    icon: "🚲",
-    description: "Perfect for city exploration and daily commutes",
-    features: [
-      "30 days unlimited access",
-      "All partner bike networks",
-      "Priority support",
-      "City-wide coverage",
-    ],
-    gradient: "from-green-400 to-emerald-600",
-  },
-  [VehicleType.SCOOTER]: {
-    name: "E-Scooter Pass",
-    icon: "🛴",
-    description: "Fast and convenient for short to medium trips",
-    features: [
-      "30 days unlimited access",
-      "Premium scooter fleet",
-      "Fast unlock speeds",
-      "Extended range vehicles",
-    ],
-    gradient: "from-blue-400 to-indigo-600",
-  },
-  [VehicleType.MONOPATTINO]: {
-    name: "Monopattino Pass",
-    icon: "🛵",
-    description: "Premium urban mobility with exclusive access",
-    features: [
-      "30 days unlimited access",
-      "Exclusive vehicle access",
-      "VIP customer support",
-      "Premium parking spots",
-    ],
-    gradient: "from-purple-400 to-pink-600",
-  },
-};
 
 // Smart Contract ABI (simplified for rental passes)
 const RENTAL_PASS_ABI = [
@@ -194,7 +207,7 @@ const RENTAL_PASS_ABI = [
 
 // Contract address
 const CONTRACT_ADDRESS = process.env
-  .NEXT_PUBLIC_RENTAL_PASS_CONTRACT as `0x${string}`;
+  .NEXT_PUBLIC_MOOVE_RENTAL_PASS_ADDRESS as `0x${string}`;
 
 // ============= CUSTOM HOOK =============
 export function useRentalPassContract() {

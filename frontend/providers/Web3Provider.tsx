@@ -12,9 +12,19 @@ import { sepolia } from "wagmi/chains";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import "@rainbow-me/rainbowkit/styles.css";
 
+// Check if WalletConnect projectId is configured
+const projectId = process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID;
+
+if (!projectId || projectId === "your-walletconnect-project-id-here") {
+  console.warn(
+    "⚠️ NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID not configured. Please add it to your .env.local file."
+  );
+  console.warn("Get your projectId from: https://cloud.walletconnect.com/");
+}
+
 const config = getDefaultConfig({
   appName: "Moove NFT Platform",
-  projectId: process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID!, // From .env.local
+  projectId: projectId || "00000000000000000000000000000000", // Fallback projectId
   chains: [sepolia], // Only Sepolia for deployment
   ssr: true, // Enable SSR for Next.js
 });

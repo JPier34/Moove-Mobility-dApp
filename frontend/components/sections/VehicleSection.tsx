@@ -35,7 +35,7 @@ export const VEHICLE_OPTIONS: VehicleOption[] = [
     name: "E-Bike Access",
     icon: "🚲",
     image: "/images/vehicles/e-bike-city.jpg",
-    priceEth: "0.025 ETH",
+    priceEth: "0.00000075 ETH",
     description: "Perfect for city exploration and daily commutes",
     range: "25-50 km",
     features: [
@@ -50,7 +50,7 @@ export const VEHICLE_OPTIONS: VehicleOption[] = [
     name: "E-Scooter Access",
     icon: "🛴",
     image: "/images/vehicles/scooter-urban.jpg",
-    priceEth: "0.035 ETH",
+    priceEth: "0.00000117 ETH",
     description: "Fast and convenient for short to medium trips",
     range: "30-60 km",
     features: [
@@ -65,7 +65,7 @@ export const VEHICLE_OPTIONS: VehicleOption[] = [
     name: "Monopattino Access",
     icon: "🛵",
     image: "/images/vehicles/monopattino-premium.jpg",
-    priceEth: "0.045 ETH",
+    priceEth: "0.00000175 ETH",
     description: "Premium urban mobility experience",
     range: "15-35 km",
     features: [

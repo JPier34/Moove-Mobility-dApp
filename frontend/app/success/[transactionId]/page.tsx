@@ -112,6 +112,28 @@ function SuccessAnimation() {
 function TransactionCard({ transaction }: { transaction: TransactionDetails }) {
   const config = VEHICLE_CONFIG[transaction.vehicleType];
 
+  // Handle case where config is undefined
+  if (!config) {
+    return (
+      <motion.div
+        className="bg-white dark:bg-gray-800 rounded-3xl p-8 shadow-xl mb-8"
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, delay: 0.8 }}
+      >
+        <div className="text-center">
+          <div className="text-6xl mb-4">❌</div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+            Invalid Vehicle Type
+          </h2>
+          <p className="text-gray-600 dark:text-gray-300">
+            Vehicle type "{transaction.vehicleType}" not found
+          </p>
+        </div>
+      </motion.div>
+    );
+  }
+
   return (
     <motion.div
       className="bg-white dark:bg-gray-800 rounded-3xl p-8 shadow-xl mb-8"
@@ -394,13 +416,40 @@ export default function SuccessPage() {
   const transactionId = params?.transactionId as string;
 
   // Parse transaction details from ID (in real app, fetch from API/blockchain)
-  const [vehicleType] = transactionId.split("-");
+  const [vehicleType, ...hashParts] = transactionId.split("-");
+  const transactionHash = hashParts.join("-"); // Rejoin in case hash contains dashes
+
+  // Validate vehicle type
+  const validVehicleTypes = ["bike", "scooter", "monopattino"];
+  if (!validVehicleTypes.includes(vehicleType)) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 dark:from-gray-900 dark:to-gray-800">
+        <div className="max-w-4xl mx-auto px-6 py-20">
+          <div className="text-center">
+            <div className="text-6xl mb-4">❌</div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+              Invalid Vehicle Type
+            </h1>
+            <p className="text-gray-600 dark:text-gray-300 mb-8">
+              Vehicle type "{vehicleType}" is not supported
+            </p>
+            <Link href="/marketplace">
+              <button className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-6 rounded-xl">
+                Go to Marketplace
+              </button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const mockTransaction: TransactionDetails = {
     id: transactionId,
     vehicleType: vehicleType as "bike" | "scooter" | "monopattino",
     tokenId: Math.floor(Math.random() * 10000).toString(),
-    transactionHash: "0x" + Math.random().toString(16).substring(2, 66),
+    transactionHash:
+      transactionHash || "0x" + Math.random().toString(16).substring(2, 66),
     purchaseDate: new Date(),
     expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
     price: vehicleType === "bike" ? 27 : vehicleType === "scooter" ? 37 : 47,
