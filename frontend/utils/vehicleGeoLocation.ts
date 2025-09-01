@@ -1055,13 +1055,16 @@ export class VehicleGeolocationSystem {
             );
             const location = this.generateRandomLocationInCity(city);
 
+            // Make availability deterministic: first 85% of vehicles are available
+            const isAvailable = i < Math.floor(limit * 0.85);
+
             this.vehicleLocations.set(vehicleId, {
               vehicleId,
               vehicleType: vehicleType as VehicleType,
               cityId: city.id,
               coordinates: location,
               batteryLevel: Math.floor(Math.random() * 40) + 60, // 60-100%
-              isAvailable: Math.random() > 0.15, // 85% available
+              isAvailable: isAvailable, // Deterministic availability
               lastUpdate: new Date(),
               estimatedRange: this.calculateRange(vehicleType as VehicleType),
             });

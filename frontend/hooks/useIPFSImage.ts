@@ -94,7 +94,9 @@ export const usePreloadCityImages = () => {
     setIsPreloading(true);
     const cityImages = EUROPEAN_CITIES.filter(
       (city) => city.heroImage?.ipfsHash
-    ).map((city) => city.heroImage!.ipfsHash);
+    )
+      .map((city) => city.heroImage!.ipfsHash)
+      .filter((hash): hash is string => hash !== undefined);
 
     let loaded = 0;
     const promises = cityImages.map(async (hash) => {

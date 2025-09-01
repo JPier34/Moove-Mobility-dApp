@@ -5,86 +5,29 @@ import { motion, useInView } from "framer-motion";
 import Link from "next/link";
 import { EUROPEAN_CITIES, VehicleType } from "../../config/cities";
 import type { NearbyVehicle } from "@/utils/vehicleGeoLocation";
-
-export interface VehicleOption {
-  type: VehicleType;
-  name: string;
-  icon: string;
-  image: string;
-  priceEth: string;
-  description: string;
-  range: string;
-  features: string[];
-  gradient: string;
-}
+import { parsePrice } from "@/utils/helpers";
+import { VehicleOption, VEHICLE_OPTIONS } from "@/config/vehicles";
 
 interface LocationState {
   currentCity: any | null;
   isLoading: boolean;
   error: string | null;
   canRent: boolean;
-  nearbyVehicles: NearbyVehicle[];
   location: any | null;
   showLocationModal: boolean;
   locationMethod: "gps" | "manual" | "none";
 }
 
-export const VEHICLE_OPTIONS: VehicleOption[] = [
-  {
-    type: "bike",
-    name: "E-Bike Access",
-    icon: "🚲",
-    image: "/images/vehicles/e-bike-city.jpg",
-    priceEth: "0.00000075 ETH",
-    description: "Perfect for city exploration and daily commutes",
-    range: "25-50 km",
-    features: [
-      "30 days unlimited access",
-      "All partner bikes",
-      "City-wide coverage",
-    ],
-    gradient: "from-green-400 to-blue-500",
-  },
-  {
-    type: "scooter",
-    name: "E-Scooter Access",
-    icon: "🛴",
-    image: "/images/vehicles/scooter-urban.jpg",
-    priceEth: "0.00000117 ETH",
-    description: "Fast and convenient for short to medium trips",
-    range: "30-60 km",
-    features: [
-      "30 days unlimited access",
-      "All partner scooters",
-      "Premium locations",
-    ],
-    gradient: "from-purple-400 to-pink-500",
-  },
-  {
-    type: "monopattino",
-    name: "Monopattino Access",
-    icon: "🛵",
-    image: "/images/vehicles/monopattino-premium.jpg",
-    priceEth: "0.00000175 ETH",
-    description: "Premium urban mobility experience",
-    range: "15-35 km",
-    features: [
-      "30 days unlimited access",
-      "Exclusive vehicles",
-      "Priority support",
-    ],
-    gradient: "from-orange-400 to-red-500",
-  },
-];
-
 function PremiumVehicleCard({
   vehicle,
   onSelect,
   userHasPass,
+  citySpecificAvailability,
 }: {
   vehicle: VehicleOption;
   onSelect: () => void;
   userHasPass: boolean;
+  citySpecificAvailability: number;
 }) {
   return (
     <motion.div
@@ -118,6 +61,13 @@ function PremiumVehicleCard({
             </motion.span>
           </div>
         )}
+
+        {/* City-specific availability indicator */}
+        <div className="absolute top-4 left-4">
+          <div className="bg-blue-500/90 text-white px-3 py-1 rounded-full text-sm font-medium shadow-lg">
+            {citySpecificAvailability} available
+          </div>
+        </div>
 
         <div className="absolute bottom-4 left-4">
           <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-full px-4 py-2 shadow-lg">
@@ -285,7 +235,7 @@ export default function VehicleSection({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const isInView = useInView(ref, { once: true, amount: 0.2 });
-  const { currentCity, canRent, nearbyVehicles } = locationState;
+  const { currentCity, canRent } = locationState;
 
   return (
     <motion.section
@@ -326,23 +276,49 @@ export default function VehicleSection({
               {VEHICLE_OPTIONS.filter(
                 (vehicle) =>
                   currentCity.allowedVehicles?.includes(vehicle.type) || true
-              ).map((vehicle: VehicleOption) => (
-                <PremiumVehicleCard
-                  key={vehicle.type}
-                  vehicle={vehicle}
-                  onSelect={() => onRentVehicle(vehicle)}
-                  userHasPass={false}
-                />
-              ))}
+              ).map((vehicle: VehicleOption) => {
+                const cityAvailability = currentCity.vehicleAvailability
+                  ? currentCity.vehicleAvailability[vehicle.type] || 0
+                  : 0;
+                return (
+                  <PremiumVehicleCard
+                    key={vehicle.type}
+                    vehicle={vehicle}
+                    onSelect={() => onRentVehicle(vehicle)}
+                    userHasPass={false}
+                    citySpecificAvailability={cityAvailability}
+                  />
+                );
+              })}
             </motion.div>
 
-            {nearbyVehicles.length > 0 && (
+            {/* Debug: City Vehicle Limits */}
+            {process.env.NODE_ENV === "development" && currentCity && (
               <motion.div
                 initial={{ opacity: 0, y: 30 }}
                 animate={isInView ? { opacity: 1, y: 0 } : {}}
-                transition={{ duration: 0.8, delay: 0.8 }}
+                transition={{ duration: 0.8, delay: 1.0 }}
+                className="mt-8 p-6 bg-gray-100 dark:bg-gray-700 rounded-xl"
               >
-                <NearbyVehiclesSection vehicles={nearbyVehicles} />
+                <h4 className="text-lg font-semibold mb-4 text-gray-700 dark:text-gray-300">
+                  🧪 Debug: City Vehicle Limits
+                </h4>
+                <div className="grid grid-cols-3 gap-4 text-sm">
+                  {VEHICLE_OPTIONS.map((vehicle) => {
+                    const cityAvailability = currentCity.vehicleAvailability
+                      ? currentCity.vehicleAvailability[vehicle.type] || 0
+                      : 0;
+                    return (
+                      <div key={vehicle.type} className="text-center">
+                        <div className="text-2xl mb-2">{vehicle.icon}</div>
+                        <div className="font-medium">{vehicle.type}</div>
+                        <div className="text-blue-600 dark:text-blue-400">
+                          {cityAvailability} available
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </motion.div>
             )}
           </>

@@ -11,7 +11,7 @@ import { useLocationAndCity } from "@/hooks/useLocationAndCity";
 
 // ============= TYPES =============
 interface VehiclePassDisplay {
-  type: number; // VehicleType enum from contract
+  type: string; // VehicleType from config (string)
   typeString: string; // "bike", "scooter", "monopattino"
   name: string;
   icon: string;
@@ -331,9 +331,9 @@ export default function VehicleMarketplace() {
     if (!selectedCity) {
       console.log("📍 No city selected, showing all vehicles");
       return availableVehicles.map((vehicle) => {
-        const config = getVehicleConfig(vehicle.vehicleType);
+        const config = getVehicleConfig(vehicle.vehicleType as any);
         const priceETH = formatPrice(vehicle.priceWei);
-        const typeString = vehicleTypeToString(vehicle.vehicleType);
+        const typeString = vehicleTypeToString(vehicle.vehicleType as any);
 
         return {
           type: vehicle.vehicleType,
@@ -361,25 +361,25 @@ export default function VehicleMarketplace() {
       .filter((vehicle) => {
         // Check if vehicle type is allowed in this city
         const isAllowed = selectedCity.allowedVehicles.includes(
-          vehicleTypeToString(vehicle.vehicleType)
+          vehicleTypeToString(vehicle.vehicleType as any)
         );
         console.log(
-          `🚲 Vehicle ${vehicleTypeToString(vehicle.vehicleType)} allowed in ${
-            selectedCity.name
-          }: ${isAllowed}`
+          `🚲 Vehicle ${vehicleTypeToString(
+            vehicle.vehicleType as any
+          )} allowed in ${selectedCity.name}: ${isAllowed}`
         );
         return isAllowed;
       })
       .map((vehicle) => {
-        const config = getVehicleConfig(vehicle.vehicleType);
+        const config = getVehicleConfig(vehicle.vehicleType as any);
         const priceETH = formatPrice(vehicle.priceWei);
-        const typeString = vehicleTypeToString(vehicle.vehicleType);
+        const typeString = vehicleTypeToString(vehicle.vehicleType as any);
 
         // Get availability from city limits instead of global availability
         const cityVehicleLimit =
           selectedCity.vehicleLimit[
             vehicleTypeToString(
-              vehicle.vehicleType
+              vehicle.vehicleType as any
             ) as keyof typeof selectedCity.vehicleLimit
           ] || 0;
         const availability = Math.min(
@@ -409,12 +409,12 @@ export default function VehicleMarketplace() {
     locationHook.currentCity,
   ]);
 
-  const handleSelectVehicle = (vehicleType: number) => {
+  const handleSelectVehicle = (vehicleType: string) => {
     if (!isConnected || !locationHook.canRent) {
       return;
     }
 
-    const typeString = vehicleTypeToString(vehicleType);
+    const typeString = vehicleTypeToString(vehicleType as any);
     // Use preferred city (manually selected or detected) for routing
     router.push(`/purchase/${typeString}?city=${locationHook.currentCity?.id}`);
   };
@@ -505,7 +505,7 @@ export default function VehicleMarketplace() {
                     key={pass.type}
                     pass={pass}
                     onSelect={() => handleSelectVehicle(pass.type)}
-                    userHasPass={userHasPass(pass.type)}
+                    userHasPass={userHasPass(pass.type as any)}
                     isLoading={isLoading}
                     isLocationRequired={!locationHook.canRent}
                     canPurchase={isConnected}

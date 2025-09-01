@@ -1,11 +1,5 @@
-export enum VehicleType {
-  BIKE = 0,
-  SCOOTER = 1,
-  MONOPATTINO = 2,
-}
-
 export interface VehicleInfo {
-  vehicleType: VehicleType;
+  vehicleType: string; // Changed from VehicleType enum to string to match config/cities
   name: string;
   description: string;
   dailyRate: bigint;

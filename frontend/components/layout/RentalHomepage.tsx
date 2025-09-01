@@ -11,9 +11,8 @@ import type {
 } from "@/utils/vehicleGeoLocation";
 import { usePreloadCityImages } from "@/hooks/useIPFSImage";
 import StatsSection from "@/components/sections/StatsSection";
-import VehicleSection, {
-  VehicleOption,
-} from "@/components/sections/VehicleSection";
+import VehicleSection from "@/components/sections/VehicleSection";
+import { VehicleOption, VEHICLE_OPTIONS } from "@/config/vehicles";
 import NFTMarketplaceSection from "@/components/sections/NFTMarketplaceSection";
 import HowItWorksSection from "@/components/sections/HowItWorksSection";
 
@@ -24,7 +23,6 @@ interface LocationState {
   isLoading: boolean;
   error: string | null;
   canRent: boolean;
-  nearbyVehicles: NearbyVehicle[];
   location: LocationCoordinates | null;
   showLocationModal: boolean;
   locationMethod: "gps" | "manual" | "none";
@@ -72,7 +70,6 @@ function useLocationWithModal(): [
     isLoading: false,
     error: null,
     canRent: false,
-    nearbyVehicles: [],
     location: null,
     showLocationModal: true,
     locationMethod: "none",
@@ -151,19 +148,12 @@ function useLocationWithModal(): [
 
       let currentCity = null;
       let canRent = false;
-      let nearbyVehicles: NearbyVehicle[] = [];
 
       if (cityCheck.inCity && cityCheck.cityName) {
         currentCity = EUROPEAN_CITIES.find(
           (city) => city.id === cityCheck.cityName
         );
         canRent = true;
-
-        try {
-          nearbyVehicles = await geoSystem.getNearbyVehicles(location, 2);
-        } catch (error) {
-          console.warn("Could not fetch nearby vehicles:", error);
-        }
       }
 
       setLocationState((prev) => ({
@@ -171,7 +161,6 @@ function useLocationWithModal(): [
         currentCity,
         location,
         canRent,
-        nearbyVehicles,
         isLoading: false,
         error: null,
       }));
@@ -453,14 +442,8 @@ function LocationStatusBanner({
   locationState: LocationState;
   onRequestLocation: () => void;
 }) {
-  const {
-    currentCity,
-    isLoading,
-    error,
-    canRent,
-    nearbyVehicles,
-    locationMethod,
-  } = locationState;
+  const { currentCity, isLoading, error, canRent, locationMethod } =
+    locationState;
 
   if (isLoading) {
     return (
@@ -493,11 +476,6 @@ function LocationStatusBanner({
         </span>
         <div className="text-left">
           <div>Service available in {currentCity.name}</div>
-          <div className="text-sm opacity-75">
-            {locationMethod === "gps"
-              ? `${nearbyVehicles.length} vehicles nearby`
-              : "Manual city selection"}
-          </div>
         </div>
       </motion.div>
     );

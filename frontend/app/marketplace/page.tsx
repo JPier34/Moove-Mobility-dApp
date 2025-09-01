@@ -1,29 +1,28 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, Suspense } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useAccount } from "wagmi";
 import { useRentalPassContract } from "@/hooks/useRentalPassContract";
-import { VehicleType } from "@/types/nft";
+import { VehicleType, EUROPEAN_CITIES } from "@/config/cities";
 import { useLocationAndCity } from "@/hooks/useLocationAndCity";
-import { EUROPEAN_CITIES } from "../../config/cities";
-
+import { formatUnits, parseUnits } from "ethers";
 // ============= TYPES =============
 interface VehiclePassDisplay {
   type: VehicleType;
   typeString: string;
   name: string;
   icon: string;
-  priceETH: string;
+  priceETH?: string;
+  priceGwei: bigint;
   duration: number;
   description: string;
   features: string[];
   availability: number;
   gradient: string;
-  priceWei: bigint;
 }
 
 // ============= COMPONENTS =============
@@ -34,7 +33,6 @@ function EnhancedLocationStatusHeader({
 }: {
   locationState: ReturnType<typeof useLocationAndCity>;
   onRefreshLocation: () => void;
-  onClearLocation: () => void;
 }) {
   const {
     currentCity,
@@ -166,7 +164,7 @@ function EnhancedLocationStatusHeader({
 }
 
 // ============= MAIN COMPONENT =============
-export default function EnhancedMarketplacePage() {
+function MarketplaceContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isConnected } = useAccount();
@@ -185,7 +183,6 @@ export default function EnhancedMarketplacePage() {
     vehicleTypeToString,
     getVehicleConfig,
     refetchVehicles,
-    VehicleType,
   } = useRentalPassContract();
 
   // Pre-selected vehicle from URL params
@@ -200,7 +197,7 @@ export default function EnhancedMarketplacePage() {
       console.log("📍 No city selected, showing all vehicles");
       return availableVehicles.map((vehicle) => {
         const config = getVehicleConfig(vehicle.vehicleType);
-        const priceETH = formatPrice(vehicle.priceWei);
+        const priceETH = formatPrice(vehicle.priceWei!);
         const typeString = vehicleTypeToString(vehicle.vehicleType);
 
         return {
@@ -212,7 +209,7 @@ export default function EnhancedMarketplacePage() {
           features: config.features,
           gradient: config.gradient,
           priceETH,
-          priceWei: vehicle.priceWei,
+          priceGwei: vehicle.priceGwei!,
           duration: 30,
           availability: Number(vehicle.available),
         };
@@ -240,10 +237,10 @@ export default function EnhancedMarketplacePage() {
       })
       .map((vehicle) => {
         const config = getVehicleConfig(vehicle.vehicleType);
-        const priceETH = formatPrice(vehicle.priceWei);
+        const priceETH = formatPrice(vehicle.priceWei!);
         const typeString = vehicleTypeToString(vehicle.vehicleType);
 
-        // Get availability from city limits instead of global availability
+        // Get availability from city limits
         const cityVehicleLimit =
           selectedCity.vehicleLimit[
             vehicleTypeToString(
@@ -264,7 +261,7 @@ export default function EnhancedMarketplacePage() {
           features: config.features,
           gradient: config.gradient,
           priceETH,
-          priceWei: vehicle.priceWei,
+          priceGwei: vehicle.priceWei!,
           duration: 30,
           availability: availability,
         };
@@ -323,7 +320,7 @@ export default function EnhancedMarketplacePage() {
         >
           <h1 className="text-5xl md:text-6xl font-bold text-gray-900 dark:text-white mb-6">
             <span className="bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">
-              Moove
+              mOOve
             </span>{" "}
             Marketplace
           </h1>
@@ -335,7 +332,6 @@ export default function EnhancedMarketplacePage() {
           <EnhancedLocationStatusHeader
             locationState={locationHook}
             onRefreshLocation={locationHook.refreshLocation}
-            onClearLocation={locationHook.clearLocation}
           />
 
           {/* Quick Stats */}
@@ -408,7 +404,7 @@ export default function EnhancedMarketplacePage() {
           </>
         )}
 
-        {/* Bottom CTA - Enhanced for location awareness */}
+        {/* Bottom CTA */}
         {isConnected && !isLoadingVehicles && !error && (
           <motion.div
             className="text-center mt-20"
@@ -704,6 +700,7 @@ function VehiclePassCard({
           transition={{ duration: 2, repeat: Infinity }}
         >
           {formatAvailability(pass.availability)}
+          <span className="ml-1">vehicles available</span>
         </motion.div>
       </div>
 
@@ -730,14 +727,33 @@ function VehiclePassCard({
           {pass.icon}
         </motion.div>
 
-        {/* ETH Price Badge - Updated Design */}
+        {/* Gwei Price Badge with EUR conversion */}
         <div className="absolute bottom-4 left-4">
           <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-2xl px-4 py-3 shadow-lg border border-gray-200/50">
-            <div className="text-2xl font-bold text-gray-900 dark:text-white">
-              {pass.priceETH} ETH
+            <div className="text-xl font-bold text-gray-900 dark:text-white">
+              {(() => {
+                try {
+                  // Extract numeric part
+                  const ethValue = pass.priceETH
+                    ? pass.priceETH.split(" ")[0]
+                    : "0";
+                  // Parse as ETH and format as gwei
+                  const gweiValue = formatUnits(
+                    parseUnits(ethValue, "ether"),
+                    "gwei"
+                  );
+
+                  return Number(gweiValue).toLocaleString("en-US", {
+                    maximumFractionDigits: 2,
+                  });
+                } catch (error) {
+                  return "0";
+                }
+              })()}{" "}
+              gwei
             </div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 text-center">
-              {pass.duration} days
+            <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              {pass.duration} days access
             </div>
           </div>
         </div>
@@ -811,5 +827,13 @@ function VehiclePassCard({
         </motion.button>
       </div>
     </motion.div>
+  );
+}
+
+export default function MarketplacePage() {
+  return (
+    <Suspense fallback={<LoadingSpinner />}>
+      <MarketplaceContent />
+    </Suspense>
   );
 }

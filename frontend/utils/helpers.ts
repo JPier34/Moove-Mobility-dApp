@@ -1,6 +1,6 @@
 import { formatEther, parseEther } from "viem";
 import { AuctionType, AuctionStatus } from "../types/auction";
-import { VehicleType } from "@/types/nft";
+import { VehicleType } from "@/config/cities";
 
 // ABI for the Moove Vehicle NFT contract (copied from the contract)
 export const MOOVE_NFT_ABI = [
@@ -62,18 +62,18 @@ export function parsePrice(price: string): bigint {
 
 export function getVehicleTypeName(type: VehicleType): string {
   const names = {
-    [VehicleType.BIKE]: "Electric Bike",
-    [VehicleType.SCOOTER]: "Electric Scooter",
-    [VehicleType.MONOPATTINO]: "Electric Monopattino",
+    bike: "Electric Bike",
+    scooter: "Electric Scooter",
+    monopattino: "Electric Monopattino",
   };
   return names[type] || "Unknown Vehicle";
 }
 
 export function getVehicleTypeIcon(type: VehicleType): string {
   const icons = {
-    [VehicleType.BIKE]: "🚲",
-    [VehicleType.SCOOTER]: "🛴",
-    [VehicleType.MONOPATTINO]: "🛵",
+    bike: "🚲",
+    scooter: "🛴",
+    monopattino: "🛵",
   };
   return icons[type] || "🚗";
 }

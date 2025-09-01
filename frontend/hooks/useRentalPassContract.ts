@@ -7,59 +7,8 @@ import {
 } from "wagmi";
 import { parseEther, formatEther } from "viem";
 import { toast } from "react-hot-toast";
-import { VehicleType } from "@/types/nft";
-
-// Vehicle configuration mapped to VehicleType enum
-const VEHICLE_CONFIG = {
-  [VehicleType.BIKE]: {
-    name: "E-Bike Pass",
-    icon: "🚲",
-    description: "Perfect for city exploration and daily commutes",
-    price: 18,
-    priceETH: "0.0075",
-    networkFee: "0.000021",
-    serviceFee: "0.0000004",
-    gradient: "from-green-400 to-emerald-600",
-    features: [
-      "30 days unlimited rides",
-      "All partner bike networks",
-      "Priority support",
-      "City-wide coverage",
-    ],
-  },
-  [VehicleType.SCOOTER]: {
-    name: "E-Scooter Pass",
-    icon: "🛴",
-    description: "Fast and convenient for short to medium trips",
-    price: 28,
-    priceETH: "0.0117",
-    networkFee: "0.000021",
-    serviceFee: "0.0000006",
-    gradient: "from-blue-400 to-indigo-600",
-    features: [
-      "30 days unlimited rides",
-      "Premium scooter fleet",
-      "Fast unlock speeds",
-      "Extended range vehicles",
-    ],
-  },
-  [VehicleType.MONOPATTINO]: {
-    name: "Monopattino Pass",
-    icon: "🛵",
-    description: "Premium urban mobility with exclusive access",
-    price: 42,
-    priceETH: "0.0175",
-    networkFee: "0.000021",
-    serviceFee: "0.0000008",
-    gradient: "from-purple-400 to-pink-600",
-    features: [
-      "30 days unlimited rides",
-      "Exclusive vehicle access",
-      "VIP customer support",
-      "Premium parking spots",
-    ],
-  },
-};
+import { VehicleType, EUROPEAN_CITIES } from "@/config/cities";
+import { VEHICLE_OPTIONS } from "@/config/vehicles";
 
 // ============= TYPES =============
 export interface RentalPassData {
@@ -91,8 +40,10 @@ export interface VehicleAvailability {
   vehicleType: VehicleType;
   available: bigint;
   priceWei: bigint;
+  priceGwei: bigint;
   name: string;
   description: string;
+  citySpecificAvailability: number;
 }
 
 export interface ContractError {
@@ -102,17 +53,20 @@ export interface ContractError {
 }
 
 // ============= CONSTANTS =============
-const VEHICLE_TYPE_NAMES = {
-  [VehicleType.BIKE]: "bike",
-  [VehicleType.SCOOTER]: "scooter",
-  [VehicleType.MONOPATTINO]: "monopattino",
-} as const;
-
-const VEHICLE_PRICES = {
-  [VehicleType.BIKE]: "0.0075",
-  [VehicleType.SCOOTER]: "0.0117",
-  [VehicleType.MONOPATTINO]: "0.0175",
-} as const;
+// Convert VEHICLE_OPTIONS to a more accessible format
+const VEHICLE_CONFIG_MAP = new Map(
+  VEHICLE_OPTIONS.map((option) => [
+    option.type,
+    {
+      name: option.name,
+      icon: option.icon,
+      description: option.description,
+      priceETH: option.priceEth,
+      gradient: option.gradient,
+      features: option.features,
+    },
+  ])
+);
 
 // Smart Contract ABI (simplified for rental passes)
 const RENTAL_PASS_ABI = [
@@ -223,8 +177,8 @@ export function useRentalPassContract() {
     error: mintError,
   } = useWriteContract();
 
-  // Wait for transaction confirmation
-  const { isLoading: isConfirming, isSuccess: isConfirmed } =
+  // ✅ MONITOR TRANSACTION CONFIRMATION
+  const { data: receipt, isSuccess: isConfirmed } =
     useWaitForTransactionReceipt({
       hash: mintTxHash,
     });
@@ -264,7 +218,19 @@ export function useRentalPassContract() {
    * Convert VehicleType enum to string
    */
   const vehicleTypeToString = (vehicleType: VehicleType): string => {
-    return VEHICLE_TYPE_NAMES[vehicleType];
+    return vehicleType;
+  };
+
+  /**
+   * Convert VehicleType to contract number
+   */
+  const vehicleTypeToContractNumber = (vehicleType: VehicleType): number => {
+    const mapping = {
+      bike: 0,
+      scooter: 1,
+      monopattino: 2,
+    };
+    return mapping[vehicleType];
   };
 
   /**
@@ -273,21 +239,38 @@ export function useRentalPassContract() {
   const stringToVehicleType = (vehicleString: string): VehicleType => {
     switch (vehicleString.toLowerCase()) {
       case "bike":
-        return VehicleType.BIKE;
+        return "bike";
       case "scooter":
-        return VehicleType.SCOOTER;
+        return "scooter";
       case "monopattino":
-        return VehicleType.MONOPATTINO;
+        return "monopattino";
       default:
-        return VehicleType.BIKE;
+        return "bike";
     }
   };
 
   /**
-   * Get vehicle configuration
+   * Get vehicle configuration from VEHICLE_OPTIONS
    */
   const getVehicleConfig = (vehicleType: VehicleType) => {
-    return VEHICLE_CONFIG[vehicleType];
+    const config = VEHICLE_CONFIG_MAP.get(vehicleType);
+    if (!config) {
+      throw new Error(`Vehicle type ${vehicleType} not found in configuration`);
+    }
+    return config;
+  };
+
+  /**
+   * Get city-specific vehicle availability
+   */
+  const getCityVehicleAvailability = (
+    cityId: string,
+    vehicleType: VehicleType
+  ): number => {
+    const city = EUROPEAN_CITIES.find((c) => c.id === cityId);
+    if (!city) return 0;
+
+    return city.vehicleLimit[vehicleType] || 0;
   };
 
   /**
@@ -337,34 +320,78 @@ export function useRentalPassContract() {
     setIsLoading(true);
 
     try {
-      const price = VEHICLE_PRICES[vehicleType];
-      const priceInWei = parseEther(price);
+      console.log("🚀 Starting mintPass transaction...");
+      console.log("📋 Parameters:", { vehicleType, cityId, duration });
 
-      const txHash = await writeContract({
+      const config = getVehicleConfig(vehicleType);
+      console.log("⚙️ Vehicle config:", config);
+
+      const priceInWei = parseEther(config.priceETH.replace(" ETH", ""));
+      console.log("💰 Price in Wei:", priceInWei.toString());
+
+      const contractVehicleType = vehicleTypeToContractNumber(vehicleType);
+      console.log("🔢 Contract vehicle type:", contractVehicleType);
+
+      console.log("📡 Contract details:", {
+        address: CONTRACT_ADDRESS,
+        functionName: "mintRentalPass",
+        args: [contractVehicleType, cityId, BigInt(duration)],
+        value: priceInWei.toString(),
+      });
+
+      // ✅ Invia la transazione
+      console.log("📤 Sending transaction to blockchain...");
+
+      writeContract({
         address: CONTRACT_ADDRESS,
         abi: RENTAL_PASS_ABI,
         functionName: "mintRentalPass",
-        args: [vehicleType, cityId, BigInt(duration)],
+        args: [contractVehicleType, cityId, BigInt(duration)],
         value: priceInWei,
       });
 
+      // ✅ Mostra messaggio di successo
       toast.success("Transaction submitted! Waiting for confirmation...");
 
+      // ✅ Ritorna un oggetto temporaneo (l'hash sarà disponibile tramite mintTxHash)
       return {
-        txHash,
+        txHash: "pending", // Sarà aggiornato dal hook
         vehicleType,
         cityId,
         duration,
         price: priceInWei,
+        confirmed: false,
+        receipt: null,
+        success: true,
       };
     } catch (err: any) {
+      console.error("❌ Transaction failed with error:", err);
+      console.error("🔍 Error details:", {
+        message: err.message,
+        code: err.code,
+        data: err.data,
+        stack: err.stack,
+        name: err.name,
+      });
+
       const error: ContractError = {
         message: err.message || "Failed to mint rental pass",
         code: err.code,
         data: err.data,
       };
       setError(error);
-      toast.error(error.message);
+
+      // Toast specifico per transazioni fallite
+      if (err.message?.includes("execution reverted")) {
+        toast.error("Transaction failed on chain - execution reverted");
+      } else if (err.message?.includes("insufficient funds")) {
+        toast.error("Insufficient funds for transaction");
+      } else if (err.message?.includes("user rejected")) {
+        toast.error("Transaction was rejected by user");
+      } else {
+        toast.error(`Transaction failed: ${err.message}`);
+      }
+
       throw error;
     } finally {
       setIsLoading(false);
@@ -436,39 +463,40 @@ export function useRentalPassContract() {
   };
 
   /**
-   * Get available vehicles with real-time availability
+   * Get available vehicles with city-specific availability
    */
-  const getAvailableVehicles = (): VehicleAvailability[] => {
+  const getAvailableVehicles = (cityId?: string): VehicleAvailability[] => {
     if (!availableVehiclesData) {
       // Return default data if contract call fails
-      return [
-        {
-          vehicleType: VehicleType.BIKE,
-          available: BigInt(150),
-          priceWei: parseEther(VEHICLE_PRICES[VehicleType.BIKE]),
-          ...VEHICLE_CONFIG[VehicleType.BIKE],
-        },
-        {
-          vehicleType: VehicleType.SCOOTER,
-          available: BigInt(89),
-          priceWei: parseEther(VEHICLE_PRICES[VehicleType.SCOOTER]),
-          ...VEHICLE_CONFIG[VehicleType.SCOOTER],
-        },
-        {
-          vehicleType: VehicleType.MONOPATTINO,
-          available: BigInt(67),
-          priceWei: parseEther(VEHICLE_PRICES[VehicleType.MONOPATTINO]),
-          ...VEHICLE_CONFIG[VehicleType.MONOPATTINO],
-        },
-      ];
+      return VEHICLE_OPTIONS.map((option) => ({
+        vehicleType: option.type,
+        available: BigInt(150), // Global fallback
+        priceWei: parseEther(option.priceEth.replace(" ETH", "")),
+        priceGwei: parseEther(option.priceEth.replace(" ETH", "")),
+        name: option.name,
+        description: option.description,
+        citySpecificAvailability: cityId
+          ? getCityVehicleAvailability(cityId, option.type)
+          : 0,
+      }));
     }
 
-    return (availableVehiclesData as any[]).map((vehicle: any) => ({
-      vehicleType: vehicle.vehicleType as VehicleType,
-      available: vehicle.available,
-      priceWei: vehicle.priceWei,
-      ...VEHICLE_CONFIG[vehicle.vehicleType as VehicleType],
-    }));
+    return (availableVehiclesData as any[]).map((vehicle: any) => {
+      const vehicleType = vehicle.vehicleType as VehicleType;
+      const config = getVehicleConfig(vehicleType);
+
+      return {
+        vehicleType,
+        available: vehicle.available,
+        priceWei: vehicle.priceWei,
+        priceGwei: vehicle.priceGwei,
+        name: config.name,
+        description: config.description,
+        citySpecificAvailability: cityId
+          ? getCityVehicleAvailability(cityId, vehicleType)
+          : 0,
+      };
+    });
   };
 
   /**
@@ -510,15 +538,10 @@ export function useRentalPassContract() {
       expiredPasses: userPasses.length - activePasses.length,
       totalValue: totalValue.toFixed(3),
       passesByType: {
-        [VehicleType.BIKE]: userPasses.filter(
-          (p) => p.vehicleType === VehicleType.BIKE
-        ).length,
-        [VehicleType.SCOOTER]: userPasses.filter(
-          (p) => p.vehicleType === VehicleType.SCOOTER
-        ).length,
-        [VehicleType.MONOPATTINO]: userPasses.filter(
-          (p) => p.vehicleType === VehicleType.MONOPATTINO
-        ).length,
+        bike: userPasses.filter((p) => p.vehicleType === "bike").length,
+        scooter: userPasses.filter((p) => p.vehicleType === "scooter").length,
+        monopattino: userPasses.filter((p) => p.vehicleType === "monopattino")
+          .length,
       },
     };
   };
@@ -546,7 +569,7 @@ export function useRentalPassContract() {
 
   return {
     // State
-    isLoading: isLoading || isMintPending || isConfirming,
+    isLoading: isLoading || isMintPending,
     isLoadingPasses,
     isLoadingVehicles,
     error,
@@ -556,7 +579,7 @@ export function useRentalPassContract() {
     // Transaction status
     mintTxHash,
     isConfirmed,
-    isConfirming,
+    receipt,
 
     // Functions
     mintPass,
@@ -569,11 +592,13 @@ export function useRentalPassContract() {
 
     // Utility functions
     vehicleTypeToString,
+    vehicleTypeToContractNumber,
     stringToVehicleType,
     getVehicleConfig,
     formatPrice,
     isPassActive,
     getDaysRemaining,
+    getCityVehicleAvailability,
 
     // Data
     userPasses: getUserPasses(),
@@ -585,7 +610,6 @@ export function useRentalPassContract() {
     refetchVehicles,
 
     // Constants
-    VehicleType,
-    VEHICLE_CONFIG,
+    VEHICLE_OPTIONS,
   };
 }

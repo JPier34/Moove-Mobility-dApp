@@ -12,10 +12,7 @@ export default function LocationIndicator() {
     error,
     canRent,
     locationMethod,
-    preferredCityMethod,
     refreshLocation,
-    setTestLocation,
-    setPreferredCity,
   } = useLocationAndCity();
 
   const handleEnhancedGPS = async () => {
@@ -26,10 +23,6 @@ export default function LocationIndicator() {
     } catch (error) {
       console.error("Enhanced GPS failed:", error);
     }
-  };
-
-  const handleSetPreferredCity = (cityId: string) => {
-    setPreferredCity(cityId);
   };
 
   if (isLoading) {

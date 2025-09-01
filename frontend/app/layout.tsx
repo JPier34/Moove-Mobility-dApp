@@ -100,7 +100,6 @@ export default function RootLayout({ children }: RootLayoutProps) {
         <meta name="ethereum-provider" content="rainbowkit" />
         <meta name="web3-provider" content="wagmi" />
       </head>
-
       <body
         className={`
         ${inter.className} 

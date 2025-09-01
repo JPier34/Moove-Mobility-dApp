@@ -94,3 +94,4 @@ Se i problemi persistono:
 2. Verifica la configurazione del contratto
 3. Controlla che il contratto sia deployato correttamente
 4. Verifica che l'ABI sia compatibile
+

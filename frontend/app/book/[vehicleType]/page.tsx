@@ -7,7 +7,9 @@ import { CurrencyConverter } from "@/utils/currencyConverter";
 import { useAccount } from "wagmi";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useRentalPassContract } from "@/hooks/useRentalPassContract";
-import { VehicleType } from "@/types/nft";
+import { VehicleType, EUROPEAN_CITIES } from "@/config/cities";
+import { toast } from "react-hot-toast";
+import { useLocationAndCity } from "@/hooks/useLocationAndCity";
 
 // ============= TYPES =============
 interface BookingDetails {
@@ -507,6 +509,7 @@ const PriceBreakdown: React.FC<PriceBreakdownProps> = ({ config }) => {
 
 // ============= MAIN COMPONENT =============
 export default function BookingPage() {
+  const locationHook = useLocationAndCity();
   const router = useRouter();
   const params = useParams();
   const { address, isConnected } = useAccount();
@@ -519,8 +522,20 @@ export default function BookingPage() {
     mintPass,
     isLoading: contractLoading,
     error,
+    isConfirmed,
+    mintTxHash,
   } = useRentalPassContract();
   const [isLoading, setIsLoading] = useState(false);
+
+  // ✅ MONITORA LA CONFERMA DELLA TRANSAZIONE
+  useEffect(() => {
+    if (isConfirmed && mintTxHash) {
+      console.log("🎉 Transaction confirmed! Navigating to success page...");
+
+      // ✅ NAVIGA ALLA SUCCESS PAGE SOLO DOPO CONFERMA
+      router.push(`/success/${vehicleType}-${mintTxHash}`);
+    }
+  }, [isConfirmed, mintTxHash, router, vehicleType]);
 
   const [steps, setSteps] = useState<BookingStep[]>([
     { id: 1, title: "Vehicle Selection", completed: true, active: false },
@@ -538,19 +553,28 @@ export default function BookingPage() {
   const getVehicleTypeEnum = (type: string): VehicleType => {
     switch (type) {
       case "bike":
-        return VehicleType.BIKE;
+        return "bike";
       case "scooter":
-        return VehicleType.SCOOTER;
+        return "scooter";
       case "monopattino":
-        return VehicleType.MONOPATTINO;
+        return "monopattino";
       default:
-        return VehicleType.BIKE;
+        return "bike";
     }
   };
 
   const handlePurchase = async () => {
+    console.log("🚀 Starting purchase process...");
+    console.log("📍 Location hook state:", {
+      currentCity: locationHook.currentCity,
+      detectedCity: locationHook.detectedCity,
+      canRent: locationHook.canRent,
+      locationMethod: locationHook.locationMethod,
+    });
+
     // Check if contract is configured
     if (!process.env.NEXT_PUBLIC_MOOVE_RENTAL_PASS_ADDRESS) {
+      console.error("❌ Contract address not configured");
       alert(
         "Smart contract not configured. Please check your environment variables."
       );
@@ -571,13 +595,13 @@ export default function BookingPage() {
       // Call the actual smart contract
       const result = await mintPass({
         vehicleType: getVehicleTypeEnum(vehicleType),
-        cityId: "default-city", // TODO: Get actual city ID from user location
-        duration: 30, // 30 days as default
+        cityId: locationHook.currentCity?.id || "sanbenedetto",
+        duration: 30,
       });
 
-      console.log("NFT Pass minted successfully:", result);
+      console.log("✅ NFT Pass minted successfully:", result);
 
-      // Update steps
+      // ✅ actualize steps
       setSteps((prev) =>
         prev.map((step) => ({
           ...step,
@@ -586,13 +610,20 @@ export default function BookingPage() {
         }))
       );
 
-      // Navigate to success page with vehicle type and transaction hash
-      setTimeout(() => {
-        router.push(`/success/${vehicleType}-${result.txHash}`);
-      }, 1000);
+      // ✅ show success message
+      toast.success("Transaction submitted! Waiting for confirmation...");
+
+      // ✅ navigation to success page will be handled by the useEffect when isConfirmed is true
+      // isConfirmed becomes true
     } catch (error) {
-      console.error("Purchase failed:", error);
-      alert(
+      console.error("❌ Purchase failed:", error);
+      console.error("🔍 Error details:", {
+        message: error instanceof Error ? error.message : "Unknown error",
+        name: error instanceof Error ? error.name : "Unknown",
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+
+      toast.error(
         `Purchase failed: ${
           error instanceof Error ? error.message : "Unknown error"
         }`
@@ -636,6 +667,37 @@ export default function BookingPage() {
               The smart contract address is not configured. Please add
               NEXT_PUBLIC_MOOVE_RENTAL_PASS_ADDRESS to your .env.local file.
             </p>
+          </div>
+        )}
+
+        {/* Debug Information */}
+        {process.env.NODE_ENV === "development" && (
+          <div className="bg-gray-50 dark:bg-gray-700 rounded-xl p-4 mb-6">
+            <div className="flex items-center mb-2">
+              <span className="text-blue-500 mr-2">🔍</span>
+              <span className="font-medium text-gray-800 dark:text-gray-200">
+                Debug Information
+              </span>
+            </div>
+            <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
+              <div>
+                Contract Address:{" "}
+                {process.env.NEXT_PUBLIC_MOOVE_RENTAL_PASS_ADDRESS || "Not set"}
+              </div>
+              <div>Vehicle Type: {vehicleType}</div>
+              <div>Current City: {locationHook.currentCity?.id || "None"}</div>
+              <div>
+                Detected City: {locationHook.detectedCity?.id || "None"}
+              </div>
+              <div>Can Rent: {locationHook.canRent ? "Yes" : "No"}</div>
+              <div>Location Method: {locationHook.locationMethod}</div>
+              <div>Contract Loading: {contractLoading ? "Yes" : "No"}</div>
+              <div>Transaction Loading: {isLoading ? "Yes" : "No"}</div>
+              {mintTxHash && <div>Transaction Hash: {mintTxHash}</div>}
+              {isConfirmed && (
+                <div className="text-green-600">✅ Transaction Confirmed!</div>
+              )}
+            </div>
           </div>
         )}
 
