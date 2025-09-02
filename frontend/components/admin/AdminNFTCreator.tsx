@@ -400,7 +400,9 @@ export default function AdminNFTCreator() {
           parseInt(nftData.editionSize) <= 10000 &&
           nftData.editionName.trim().length > 0)) &&
       // Controllo nome unico (da implementare con smart contract)
-      !isDuplicateName(nftData.name.trim())
+      !isDuplicateName(nftData.name.trim()) &&
+      // Controllo caratteri speciali
+      !hasInvalidCharacters(nftData.name.trim())
     );
   };
 
@@ -410,6 +412,65 @@ export default function AdminNFTCreator() {
     // Per ora, controlliamo nomi comuni che potrebbero essere duplicati
     const commonNames = ["Test Sticker", "Sample NFT", "Demo Sticker"];
     return commonNames.includes(name);
+  };
+
+  // Controllo caratteri speciali nel nome
+  const hasInvalidCharacters = (name: string) => {
+    // Permette lettere, numeri, spazi, trattini, underscore
+    const validPattern = /^[a-zA-Z0-9\s\-_]+$/;
+    return !validPattern.test(name);
+  };
+
+  // Controllo dimensioni immagine ottimali
+  const isImageSizeOptimal = (file: File | null) => {
+    if (!file) return true; // Non controllare se non c'è immagine
+    // Dimensioni ottimali per NFT: 512x512, 1024x1024, 2048x2048
+    return new Promise<boolean>((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const isSquare = img.width === img.height;
+        const isPowerOfTwo = [512, 1024, 2048].includes(img.width);
+        resolve(isSquare && isPowerOfTwo);
+      };
+      img.onerror = () => resolve(false);
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
+  // Controllo prezzo ragionevole per rarità
+  const isPriceReasonableForRarity = (price: number, rarity: string) => {
+    const rarityMultipliers = {
+      COMMON: { min: 0.000001, max: 0.001 },
+      UNCOMMON: { min: 0.001, max: 0.01 },
+      RARE: { min: 0.01, max: 0.1 },
+      EPIC: { min: 0.1, max: 1 },
+      LEGENDARY: { min: 1, max: 10 },
+      MYTHIC: { min: 10, max: 100 },
+    };
+
+    const range = rarityMultipliers[rarity as keyof typeof rarityMultipliers];
+    return range ? price >= range.min && price <= range.max : true;
+  };
+
+  // Controllo durata aste per tipo
+  const isDurationAppropriateForType = (
+    duration: number,
+    unit: string,
+    type: AuctionType
+  ) => {
+    const durationInHours = unit === "minutes" ? duration / 60 : duration;
+
+    const typeRecommendations = {
+      [AuctionType.ENGLISH]: { min: 1, max: 168 }, // 1 ora - 1 settimana
+      [AuctionType.DUTCH]: { min: 0.5, max: 24 }, // 30 min - 1 giorno
+      [AuctionType.TRADITIONAL]: { min: 24, max: 720 }, // 1 giorno - 1 mese
+      [AuctionType.SEALED_BID]: { min: 24, max: 168 }, // 1 giorno - 1 settimana
+    };
+
+    const range = typeRecommendations[type];
+    return range
+      ? durationInHours >= range.min && durationInHours <= range.max
+      : true;
   };
 
   // Controllo campi obbligatori per Auction
@@ -456,6 +517,9 @@ export default function AdminNFTCreator() {
       }
       if (isDuplicateName(nftData.name.trim())) {
         missingFields.push("Name already exists");
+      }
+      if (hasInvalidCharacters(nftData.name.trim())) {
+        missingFields.push("Name contains invalid characters");
       }
 
       toast.error(`Missing required fields: ${missingFields.join(", ")}`);
@@ -563,9 +627,15 @@ export default function AdminNFTCreator() {
                       setNftData((prev) => ({ ...prev, name: e.target.value }))
                     }
                     className={`w-full px-4 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
-                      nftData.name.length > 0 && nftData.name.length < 3
+                      nftData.name.length > 0 &&
+                      (nftData.name.length < 3 ||
+                        isDuplicateName(nftData.name.trim()) ||
+                        hasInvalidCharacters(nftData.name.trim()))
                         ? "border-red-500 focus:border-red-500"
-                        : nftData.name.length >= 3 && nftData.name.length <= 50
+                        : nftData.name.length >= 3 &&
+                          nftData.name.length <= 50 &&
+                          !isDuplicateName(nftData.name.trim()) &&
+                          !hasInvalidCharacters(nftData.name.trim())
                         ? "border-green-500 focus:border-green-500"
                         : nftData.name.length > 50
                         ? "border-red-500 focus:border-red-500"
@@ -582,9 +652,27 @@ export default function AdminNFTCreator() {
                     {nftData.name.length > 50 && (
                       <span className="text-red-500 ml-2">Too long</span>
                     )}
-                    {nftData.name.length >= 3 && nftData.name.length <= 50 && (
-                      <span className="text-green-500 ml-2">✓ Good</span>
-                    )}
+                    {nftData.name.length >= 3 &&
+                      isDuplicateName(nftData.name.trim()) && (
+                        <span className="text-red-500 ml-2">
+                          Name already exists
+                        </span>
+                      )}
+                    {nftData.name.length >= 3 &&
+                      hasInvalidCharacters(nftData.name.trim()) && (
+                        <span className="text-red-500 ml-2">
+                          Invalid characters (use letters, numbers, spaces, -,
+                          _)
+                        </span>
+                      )}
+                    {nftData.name.length >= 3 &&
+                      nftData.name.length <= 50 &&
+                      !isDuplicateName(nftData.name.trim()) &&
+                      !hasInvalidCharacters(nftData.name.trim()) && (
+                        <span className="text-green-500 ml-2">
+                          ✓ Valid unique name
+                        </span>
+                      )}
                   </div>
                 </div>
 
@@ -917,6 +1005,9 @@ export default function AdminNFTCreator() {
                         <p className="text-xs text-gray-500 dark:text-gray-400">
                           PNG, JPG, GIF up to 10MB (min 200x200px)
                         </p>
+                        <p className="text-xs text-blue-500 mt-1">
+                          💡 Optimal: 512x512, 1024x1024, or 2048x2048 (square)
+                        </p>
                       </label>
                     )}
                   </div>
@@ -1110,6 +1201,12 @@ export default function AdminNFTCreator() {
                     parseFloat(auctionData.startPrice) <= 1000 && (
                       <span className="text-green-500">✓ Valid price</span>
                     )}
+                  <div className="mt-1">
+                    <span className="text-blue-500 text-xs">
+                      💡 Price suggestions: Common (0.000001-0.001), Rare
+                      (0.01-0.1), Epic (0.1-1), Legendary (1-10)
+                    </span>
+                  </div>
                 </div>
               </div>
 
