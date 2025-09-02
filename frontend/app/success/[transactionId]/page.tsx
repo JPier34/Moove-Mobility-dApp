@@ -231,7 +231,7 @@ function TransactionCard({ transaction }: { transaction: TransactionDetails }) {
               Total Paid
             </h4>
             <p className="text-2xl font-bold text-gray-900 dark:text-white">
-              €{transaction.price}
+              ETH{transaction.price}
             </p>
           </div>
         </div>

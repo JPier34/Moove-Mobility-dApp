@@ -68,7 +68,7 @@ const VEHICLE_CONFIG_MAP = new Map(
   ])
 );
 
-// Smart Contract ABI (simplified for rental passes)
+// Smart Contract ABI (updated for new contract)
 const RENTAL_PASS_ABI = [
   {
     inputs: [
@@ -76,56 +76,26 @@ const RENTAL_PASS_ABI = [
       { name: "cityId", type: "string" },
       { name: "duration", type: "uint256" },
     ],
-    name: "mintRentalPass",
+    name: "mintRentalPassPublic",
     outputs: [{ name: "tokenId", type: "uint256" }],
     stateMutability: "payable",
     type: "function",
   },
   {
     inputs: [{ name: "tokenId", type: "uint256" }],
-    name: "generateAccessCode",
-    outputs: [{ name: "code", type: "string" }],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [{ name: "owner", type: "address" }],
-    name: "getUserRentalPasses",
-    outputs: [
-      {
-        name: "",
-        type: "tuple[]",
-        components: [
-          { name: "tokenId", type: "uint256" },
-          { name: "vehicleType", type: "uint8" },
-          { name: "cityId", type: "string" },
-          { name: "duration", type: "uint256" },
-          { name: "price", type: "uint256" },
-          { name: "purchaseDate", type: "uint256" },
-          { name: "expiryDate", type: "uint256" },
-          { name: "isActive", type: "bool" },
-        ],
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [{ name: "tokenId", type: "uint256" }],
-    name: "getRentalPassDetails",
+    name: "getRentalPass",
     outputs: [
       {
         name: "",
         type: "tuple",
         components: [
-          { name: "tokenId", type: "uint256" },
           { name: "vehicleType", type: "uint8" },
-          { name: "cityId", type: "string" },
-          { name: "duration", type: "uint256" },
-          { name: "price", type: "uint256" },
-          { name: "purchaseDate", type: "uint256" },
-          { name: "expiryDate", type: "uint256" },
+          { name: "accessCode", type: "string" },
+          { name: "expirationDate", type: "uint256" },
+          { name: "purchasePrice", type: "uint256" },
+          { name: "location", type: "string" },
           { name: "isActive", type: "bool" },
+          { name: "originalOwner", type: "address" },
         ],
       },
     ],
@@ -133,26 +103,15 @@ const RENTAL_PASS_ABI = [
     type: "function",
   },
   {
-    inputs: [],
-    name: "getAvailableVehicleTypes",
-    outputs: [
-      {
-        name: "",
-        type: "tuple[]",
-        components: [
-          { name: "vehicleType", type: "uint8" },
-          { name: "available", type: "uint256" },
-          { name: "priceWei", type: "uint256" },
-          { name: "isActive", type: "bool" },
-        ],
-      },
-    ],
+    inputs: [{ name: "user", type: "address" }],
+    name: "getUserActivePasses",
+    outputs: [{ name: "", type: "uint256[]" }],
     stateMutability: "view",
     type: "function",
   },
   {
     inputs: [{ name: "vehicleType", type: "uint8" }],
-    name: "getVehicleTypePrice",
+    name: "getVehiclePrice",
     outputs: [{ name: "", type: "uint256" }],
     stateMutability: "view",
     type: "function",
@@ -191,7 +150,7 @@ export function useRentalPassContract() {
   } = useReadContract({
     address: CONTRACT_ADDRESS,
     abi: RENTAL_PASS_ABI,
-    functionName: "getUserRentalPasses",
+    functionName: "getUserActivePasses",
     args: address ? [address] : undefined,
     query: {
       enabled: !!address && !!CONTRACT_ADDRESS,
@@ -206,7 +165,7 @@ export function useRentalPassContract() {
   } = useReadContract({
     address: CONTRACT_ADDRESS,
     abi: RENTAL_PASS_ABI,
-    functionName: "getAvailableVehicleTypes",
+    functionName: "getVehiclePrice",
     query: {
       enabled: !!CONTRACT_ADDRESS,
     },
@@ -332,26 +291,35 @@ export function useRentalPassContract() {
       const contractVehicleType = vehicleTypeToContractNumber(vehicleType);
       console.log("🔢 Contract vehicle type:", contractVehicleType);
 
+      // Metadata is now generated automatically by the contract
+      console.log("📝 Contract will auto-generate metadata and access code");
+
       console.log("📡 Contract details:", {
         address: CONTRACT_ADDRESS,
-        functionName: "mintRentalPass",
+        functionName: "mintRentalPassPublic",
         args: [contractVehicleType, cityId, BigInt(duration)],
         value: priceInWei.toString(),
       });
 
       // ✅ Invia la transazione
       console.log("📤 Sending transaction to blockchain...");
+      console.log("💰 Payment amount:", priceInWei.toString(), "wei");
 
       writeContract({
         address: CONTRACT_ADDRESS,
         abi: RENTAL_PASS_ABI,
-        functionName: "mintRentalPass",
+        functionName: "mintRentalPassPublic",
         args: [contractVehicleType, cityId, BigInt(duration)],
         value: priceInWei,
       });
 
       // ✅ Mostra messaggio di successo
-      toast.success("Transaction submitted! Waiting for confirmation...");
+      toast.success(
+        "NFT minting transaction submitted! Waiting for confirmation..."
+      );
+      toast(
+        `Payment of ${formatEther(priceInWei)} ETH included in transaction`
+      );
 
       // ✅ Ritorna un oggetto temporaneo (l'hash sarà disponibile tramite mintTxHash)
       return {
@@ -398,50 +366,8 @@ export function useRentalPassContract() {
     }
   };
 
-  /**
-   * Generate access code for a rental pass
-   */
-  const generateAccessCode = async (tokenId: bigint): Promise<AccessCode> => {
-    if (!isConnected || !address) {
-      throw new Error("Please connect your wallet first");
-    }
-
-    if (!CONTRACT_ADDRESS) {
-      throw new Error("Contract address not configured");
-    }
-
-    setError(null);
-    setIsLoading(true);
-
-    try {
-      const code = await writeContract({
-        address: CONTRACT_ADDRESS,
-        abi: RENTAL_PASS_ABI,
-        functionName: "generateAccessCode",
-        args: [tokenId],
-      });
-
-      toast.success("Access code generated successfully!");
-
-      return {
-        code: code!,
-        tokenId,
-        expiresAt: BigInt(Date.now() + 15 * 60 * 1000), // 15 minutes
-        isUsed: false,
-      };
-    } catch (err: any) {
-      const error: ContractError = {
-        message: err.message || "Failed to generate access code",
-        code: err.code,
-        data: err.data,
-      };
-      setError(error);
-      toast.error(error.message);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // Note: Access codes are now generated automatically by the contract during minting
+  // No need for separate generateAccessCode function
 
   /**
    * Get formatted user passes
@@ -449,15 +375,17 @@ export function useRentalPassContract() {
   const getUserPasses = (): RentalPassData[] => {
     if (!userPassesData) return [];
 
-    return (userPassesData as any[]).map((pass: any) => ({
-      tokenId: pass.tokenId,
-      vehicleType: pass.vehicleType as VehicleType,
-      cityId: pass.cityId,
-      duration: pass.duration,
-      price: pass.price,
-      purchaseDate: pass.purchaseDate,
-      expiryDate: pass.expiryDate,
-      isActive: pass.isActive,
+    // userPassesData now returns array of token IDs
+    // We need to fetch individual pass details for each token
+    return (userPassesData as bigint[]).map((tokenId: bigint) => ({
+      tokenId,
+      vehicleType: "bike" as VehicleType, // Default, will be updated when we fetch details
+      cityId: "unknown", // Will be updated when we fetch details
+      duration: BigInt(30), // Default 30 days
+      price: BigInt(0), // Will be updated when we fetch details
+      purchaseDate: BigInt(0), // Will be updated when we fetch details
+      expiryDate: BigInt(0), // Will be updated when we fetch details
+      isActive: true, // Default, will be updated when we fetch details
       owner: address!,
     }));
   };
@@ -481,15 +409,17 @@ export function useRentalPassContract() {
       }));
     }
 
-    return (availableVehiclesData as any[]).map((vehicle: any) => {
-      const vehicleType = vehicle.vehicleType as VehicleType;
+    // availableVehiclesData now returns individual vehicle prices
+    // We need to map them to the expected format
+    return VEHICLE_OPTIONS.map((option) => {
+      const vehicleType = option.type;
       const config = getVehicleConfig(vehicleType);
 
       return {
         vehicleType,
-        available: vehicle.available,
-        priceWei: vehicle.priceWei,
-        priceGwei: vehicle.priceGwei,
+        available: BigInt(150), // Default availability
+        priceWei: parseEther(option.priceEth.replace(" ETH", "")),
+        priceGwei: parseEther(option.priceEth.replace(" ETH", "")),
         name: config.name,
         description: config.description,
         citySpecificAvailability: cityId
@@ -583,7 +513,7 @@ export function useRentalPassContract() {
 
     // Functions
     mintPass,
-    generateAccessCode,
+    // generateAccessCode removed - now handled by contract
     getUserPasses,
     getAvailableVehicles,
     userHasPass,
@@ -613,3 +543,34 @@ export function useRentalPassContract() {
     VEHICLE_OPTIONS,
   };
 }
+
+// Hook to read vehicle prices from contract
+export const useVehiclePrices = () => {
+  const { data: bikePrice } = useReadContract({
+    address: CONTRACT_ADDRESS,
+    abi: RENTAL_PASS_ABI,
+    functionName: "getVehiclePrice",
+    args: [0], // BIKE
+  });
+
+  const { data: scooterPrice } = useReadContract({
+    address: CONTRACT_ADDRESS,
+    abi: RENTAL_PASS_ABI,
+    functionName: "getVehiclePrice",
+    args: [1], // SCOOTER
+  });
+
+  const { data: monopattinoPrice } = useReadContract({
+    address: CONTRACT_ADDRESS,
+    abi: RENTAL_PASS_ABI,
+    functionName: "getVehiclePrice",
+    args: [2], // MONOPATTINO
+  });
+
+  return {
+    bikePrice: bikePrice || BigInt(0),
+    scooterPrice: scooterPrice || BigInt(0),
+    monopattinoPrice: monopattinoPrice || BigInt(0),
+    isLoading: !bikePrice || !scooterPrice || !monopattinoPrice,
+  };
+};

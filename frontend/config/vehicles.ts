@@ -59,3 +59,4 @@ export const VEHICLE_OPTIONS: VehicleOption[] = [
     gradient: "from-orange-400 to-red-500",
   },
 ];
+

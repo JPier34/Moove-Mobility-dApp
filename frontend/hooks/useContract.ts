@@ -17,7 +17,7 @@ const ROLES = {
     "0xf0887ba65ee2024ea881d91b74c2450ef19e1557f03bed3ea9f16b037cbe2dc9", // keccak256("CUSTOMIZATION_ADMIN_ROLE")
 } as const;
 
-// Tipi helper per migliorare la type safety
+// Helper types
 interface ReadContractResult<T> {
   data: T;
   isLoading: boolean;
@@ -33,22 +33,22 @@ interface WriteContractResult {
   error: Error | null;
 }
 
-// Hook to read MooveNFT contracts
+// Hook to read MooveNFT contracts (placeholder for future use)
 export function useReadMooveNFT<T = unknown>(
   functionName: string,
   args: readonly unknown[] = [],
   options?: { enabled?: boolean }
 ): ReadContractResult<T> {
-  return useReadContract({
-    address: contracts.MooveNFT.address as `0x${string}`,
-    abi: contracts.MooveNFT.abi as any,
-    functionName,
-    args,
-    ...options,
-  }) as ReadContractResult<T>;
+  // Placeholder - will be implemented when MooveNFT contract is deployed
+  return {
+    data: undefined as T,
+    isLoading: false,
+    error: new Error("MooveNFT contract not yet deployed"),
+    refetch: () => {},
+  } as ReadContractResult<T>;
 }
 
-// Hook to read MooveNFT contracts
+// Hook to write MooveNFT contracts (placeholder for future use)
 export function useWriteMooveNFT() {
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
@@ -60,19 +60,8 @@ export function useWriteMooveNFT() {
     args: readonly unknown[] = [],
     value?: bigint
   ) => {
-    const contractParams: any = {
-      address: contracts.MooveNFT.address as `0x${string}`,
-      abi: contracts.MooveNFT.abi as any,
-      functionName,
-      args,
-    };
-
-    // Adds value only if present (payable only)
-    if (value !== undefined && value > 0n) {
-      contractParams.value = value;
-    }
-
-    writeContract(contractParams);
+    // Placeholder - will be implemented when MooveNFT contract is deployed
+    console.warn("MooveNFT contract not yet deployed");
   };
 
   return {
@@ -85,22 +74,22 @@ export function useWriteMooveNFT() {
   } satisfies WriteContractResult & { writeMooveNFT: typeof writeMooveNFT };
 }
 
-// Hook to read MooveAuction contracts
+// Hook to read MooveAuction contracts (placeholder for future use)
 export function useReadMooveAuction<T = unknown>(
   functionName: string,
   args: readonly unknown[] = [],
   options?: { enabled?: boolean }
 ): ReadContractResult<T> {
-  return useReadContract({
-    address: contracts.MooveAuction.address as `0x${string}`,
-    abi: contracts.MooveAuction.abi as any,
-    functionName,
-    args,
-    ...options,
-  }) as ReadContractResult<T>;
+  // Placeholder - will be implemented when MooveAuction contract is deployed
+  return {
+    data: undefined as T,
+    isLoading: false,
+    error: new Error("MooveAuction contract not yet deployed"),
+    refetch: () => {},
+  } as ReadContractResult<T>;
 }
 
-// Hook to read MooveAuction contracts
+// Hook to write MooveAuction contracts (placeholder for future use)
 export function useWriteMooveAuction() {
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
@@ -112,19 +101,8 @@ export function useWriteMooveAuction() {
     args: readonly unknown[] = [],
     value?: bigint
   ) => {
-    const contractParams: any = {
-      address: contracts.MooveAuction.address as `0x${string}`,
-      abi: contracts.MooveAuction.abi as any,
-      functionName,
-      args,
-    };
-
-    // Adds value only if present (payable only)
-    if (value !== undefined && value > 0n) {
-      contractParams.value = value;
-    }
-
-    writeContract(contractParams);
+    // Placeholder - will be implemented when MooveAuction contract is deployed
+    console.warn("MooveAuction contract not yet deployed");
   };
 
   return {
@@ -139,6 +117,7 @@ export function useWriteMooveAuction() {
   };
 }
 
+// Hook to read MooveRentalPass contracts (ACTIVE - currently deployed)
 export function useReadMooveRentalPass<T = unknown>(
   functionName: string,
   args: readonly unknown[] = [],
@@ -153,6 +132,7 @@ export function useReadMooveRentalPass<T = unknown>(
   }) as ReadContractResult<T>;
 }
 
+// Hook to write MooveRentalPass contracts (ACTIVE - currently deployed)
 export function useWriteMooveRentalPass() {
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
@@ -161,14 +141,22 @@ export function useWriteMooveRentalPass() {
 
   const writeMooveRentalPass = (
     functionName: string,
-    args: readonly unknown[] = []
+    args: readonly unknown[] = [],
+    value?: bigint
   ) => {
-    writeContract({
+    const contractParams: any = {
       address: contracts.MooveRentalPass.address as `0x${string}`,
       abi: contracts.MooveRentalPass.abi as any,
       functionName,
       args,
-    });
+    };
+
+    // Adds value only if present (payable only)
+    if (value !== undefined && value > 0n) {
+      contractParams.value = value;
+    }
+
+    writeContract(contractParams);
   };
 
   return {
@@ -181,20 +169,22 @@ export function useWriteMooveRentalPass() {
   };
 }
 
+// Hook to read MooveStickerNFT contracts (placeholder for future use)
 export function useReadMooveStickerNFT<T = unknown>(
   functionName: string,
   args: readonly unknown[] = [],
   options?: { enabled?: boolean }
 ): ReadContractResult<T> {
-  return useReadContract({
-    address: contracts.MooveNFT.address as `0x${string}`,
-    abi: contracts.MooveNFT.abi as any,
-    functionName,
-    args,
-    ...options,
-  }) as ReadContractResult<T>;
+  // Placeholder - will be implemented when MooveStickerNFT contract is deployed
+  return {
+    data: undefined as T,
+    isLoading: false,
+    error: new Error("MooveStickerNFT contract not yet deployed"),
+    refetch: () => {},
+  } as ReadContractResult<T>;
 }
 
+// Hook to write MooveStickerNFT contracts (placeholder for future use)
 export function useWriteMooveStickerNFT() {
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
@@ -205,12 +195,8 @@ export function useWriteMooveStickerNFT() {
     functionName: string,
     args: readonly unknown[] = []
   ) => {
-    writeContract({
-      address: contracts.MooveNFT.address as `0x${string}`,
-      abi: contracts.MooveNFT.abi as any,
-      functionName,
-      args,
-    });
+    // Placeholder - will be implemented when MooveStickerNFT contract is deployed
+    console.warn("MooveStickerNFT contract not yet deployed");
   };
 
   return {
@@ -223,7 +209,7 @@ export function useWriteMooveStickerNFT() {
   };
 }
 
-// Hook helper for common ops
+// Hook helper for common ops (placeholder for future use)
 export function useMooveNFTOperations() {
   const { writeMooveNFT, ...writeState } = useWriteMooveNFT();
 
@@ -247,6 +233,7 @@ export function useMooveNFTOperations() {
   };
 }
 
+// Hook helper for auction operations (placeholder for future use)
 export function useMooveAuctionOperations() {
   const { writeMooveAuction, ...writeState } = useWriteMooveAuction();
 
@@ -274,6 +261,7 @@ export function useMooveAuctionOperations() {
   };
 }
 
+// Hook to read MooveAccessControl contracts (ACTIVE - currently deployed)
 export function useReadMooveAccessControl<T = unknown>(
   functionName: string,
   args: readonly unknown[] = [],
@@ -288,6 +276,7 @@ export function useReadMooveAccessControl<T = unknown>(
   }) as ReadContractResult<T>;
 }
 
+// Hook to write MooveAccessControl contracts (ACTIVE - currently deployed)
 export function useWriteMooveAccessControl() {
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
@@ -318,12 +307,14 @@ export function useWriteMooveAccessControl() {
   };
 }
 
+// Hook to check user roles (ACTIVE - currently deployed)
 export function useHasRole(role: string, userAddress?: string) {
   return useReadMooveAccessControl<boolean>("hasRole", [role, userAddress], {
     enabled: !!userAddress,
   });
 }
 
+// Hook to get user roles (ACTIVE - currently deployed)
 export function useUserRoles(userAddress?: string) {
   const masterAdmin = useHasRole(ROLES.MASTER_ADMIN, userAddress);
   const { data: canMint } = useReadMooveAccessControl<boolean>(
