@@ -1,7 +1,7 @@
 // Auto-generated contract configuration (UPDATED - NEW DEPLOYMENT)
 export const contracts = {
   MooveAccessControl: {
-    address: "0x93b6F6F4b28cd61F68c16A85c9FC107Bf8f47e42",
+    address: "0x01EfE9998c764bc1f41E71DBa0f946Ad057E50C2",
     abi: [
       {
         inputs: [

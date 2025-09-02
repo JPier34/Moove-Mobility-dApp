@@ -7,7 +7,10 @@ import { CurrencyConverter } from "@/utils/currencyConverter";
 import { useAccount } from "wagmi";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useRentalPassContract } from "@/hooks/useRentalPassContract";
+import { useRouteLoading } from "@/hooks/useRouteLoading";
 import { VehicleType, EUROPEAN_CITIES } from "@/config/cities";
+import { VEHICLE_OPTIONS } from "@/config/vehicles";
+
 import { toast } from "react-hot-toast";
 import { useLocationAndCity } from "@/hooks/useLocationAndCity";
 
@@ -513,6 +516,7 @@ export default function BookingPage() {
   const router = useRouter();
   const params = useParams();
   const { address, isConnected } = useAccount();
+  const { navigateWithLoading } = useRouteLoading();
 
   if (!params) return null;
 
@@ -521,7 +525,6 @@ export default function BookingPage() {
   const {
     mintPass,
     isLoading: contractLoading,
-    error,
     isConfirmed,
     mintTxHash,
   } = useRentalPassContract();
@@ -533,7 +536,7 @@ export default function BookingPage() {
       console.log("🎉 Transaction confirmed! Navigating to success page...");
 
       // ✅ NAVIGA ALLA SUCCESS PAGE SOLO DOPO CONFERMA
-      router.push(`/success/${vehicleType}-${mintTxHash}`);
+      navigateWithLoading(`/success/${vehicleType}-${mintTxHash}`);
     }
   }, [isConfirmed, mintTxHash, router, vehicleType]);
 
@@ -543,11 +546,19 @@ export default function BookingPage() {
     { id: 3, title: "Confirmation", completed: false, active: false },
   ]);
 
+  // Get config from VEHICLE_OPTIONS to ensure correct prices
+  const vehicleOption = VEHICLE_OPTIONS.find((v) => v.type === vehicleType);
   const config = VEHICLE_CONFIG[vehicleType as keyof typeof VEHICLE_CONFIG];
 
-  if (!config) {
+  if (!config || !vehicleOption) {
     return <div>Vehicle type not found</div>;
   }
+
+  // Override price with correct value from VEHICLE_OPTIONS
+  const configWithCorrectPrice = {
+    ...config,
+    priceETH: vehicleOption.priceEth,
+  };
 
   // Map vehicle type string to VehicleType enum
   const getVehicleTypeEnum = (type: string): VehicleType => {
@@ -592,12 +603,23 @@ export default function BookingPage() {
     setIsLoading(true);
 
     try {
-      // Call the actual smart contract
-      const result = await mintPass({
-        vehicleType: getVehicleTypeEnum(vehicleType),
-        cityId: locationHook.currentCity?.id || "sanbenedetto",
-        duration: 30,
+      // Add timeout for transaction
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(
+          () => reject(new Error("Transaction timeout - please try again")),
+          120000
+        ); // 2 minutes
       });
+
+      // Call the actual smart contract with timeout
+      const result = await Promise.race([
+        mintPass({
+          vehicleType: getVehicleTypeEnum(vehicleType),
+          cityId: locationHook.currentCity?.id || "sanbenedetto",
+          duration: 30,
+        }),
+        timeoutPromise,
+      ]);
 
       console.log("✅ NFT Pass minted successfully:", result);
 
@@ -623,10 +645,36 @@ export default function BookingPage() {
         stack: error instanceof Error ? error.stack : undefined,
       });
 
-      toast.error(
-        `Purchase failed: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
+      // Enhanced error handling with specific messages
+      let errorMessage = "Purchase failed";
+
+      if (error instanceof Error) {
+        if (error.message.includes("user rejected")) {
+          errorMessage = "Transaction was cancelled by user";
+        } else if (error.message.includes("insufficient funds")) {
+          errorMessage = "Insufficient funds for transaction";
+        } else if (error.message.includes("execution reverted")) {
+          errorMessage = "Transaction failed on blockchain";
+        } else if (error.message.includes("network")) {
+          errorMessage = "Network error - please check your connection";
+        } else if (error.message.includes("gas")) {
+          errorMessage = "Gas estimation failed - please try again";
+        } else if (error.message.includes("timeout")) {
+          errorMessage = "Transaction took too long - please try again";
+        } else {
+          errorMessage = `Purchase failed: ${error.message}`;
+        }
+      }
+
+      toast.error(errorMessage);
+
+      // Reset steps on error
+      setSteps((prev) =>
+        prev.map((step) => ({
+          ...step,
+          completed: step.id <= 1,
+          active: step.id === 2,
+        }))
       );
     } finally {
       setIsLoading(false);
@@ -638,21 +686,10 @@ export default function BookingPage() {
       <div className="max-w-4xl mx-auto px-6 py-20">
         <BookingSteps steps={steps} />
 
-        <VehicleDetails config={config} vehicleType={vehicleType} />
-
-        {error && (
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 mb-6">
-            <div className="flex items-center">
-              <span className="text-red-500 mr-2">❌</span>
-              <span className="font-medium text-red-800 dark:text-red-200">
-                Contract Error
-              </span>
-            </div>
-            <p className="text-sm text-red-600 dark:text-red-300 mt-1">
-              {error.message || "An error occurred with the smart contract"}
-            </p>
-          </div>
-        )}
+        <VehicleDetails
+          config={configWithCorrectPrice}
+          vehicleType={vehicleType}
+        />
 
         {/* Contract Configuration Warning */}
         {!process.env.NEXT_PUBLIC_MOOVE_RENTAL_PASS_ADDRESS && (
@@ -670,44 +707,13 @@ export default function BookingPage() {
           </div>
         )}
 
-        {/* Debug Information */}
-        {process.env.NODE_ENV === "development" && (
-          <div className="bg-gray-50 dark:bg-gray-700 rounded-xl p-4 mb-6">
-            <div className="flex items-center mb-2">
-              <span className="text-blue-500 mr-2">🔍</span>
-              <span className="font-medium text-gray-800 dark:text-gray-200">
-                Debug Information
-              </span>
-            </div>
-            <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
-              <div>
-                Contract Address:{" "}
-                {process.env.NEXT_PUBLIC_MOOVE_RENTAL_PASS_ADDRESS || "Not set"}
-              </div>
-              <div>Vehicle Type: {vehicleType}</div>
-              <div>Current City: {locationHook.currentCity?.id || "None"}</div>
-              <div>
-                Detected City: {locationHook.detectedCity?.id || "None"}
-              </div>
-              <div>Can Rent: {locationHook.canRent ? "Yes" : "No"}</div>
-              <div>Location Method: {locationHook.locationMethod}</div>
-              <div>Contract Loading: {contractLoading ? "Yes" : "No"}</div>
-              <div>Transaction Loading: {isLoading ? "Yes" : "No"}</div>
-              {mintTxHash && <div>Transaction Hash: {mintTxHash}</div>}
-              {isConfirmed && (
-                <div className="text-green-600">✅ Transaction Confirmed!</div>
-              )}
-            </div>
-          </div>
-        )}
-
         <PaymentSection
           onPurchase={handlePurchase}
           isLoading={isLoading || contractLoading}
           totalETH={(
-            parseFloat(config.priceETH) +
-            parseFloat(config.networkFee) +
-            parseFloat(config.serviceFee)
+            parseFloat(configWithCorrectPrice.priceETH) +
+            parseFloat(configWithCorrectPrice.networkFee) +
+            parseFloat(configWithCorrectPrice.serviceFee)
           ).toFixed(6)}
           walletAddress={address}
           isWalletConnected={isConnected}

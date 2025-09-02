@@ -3,6 +3,7 @@ import Web3Provider from "../providers/Web3Provider";
 import Header from "../components/layout/Header";
 import Footer from "../components/layout/Footer";
 import { ThemeProvider } from "@/providers/ThemeProvider";
+import RouteLoadingWrapper from "@/components/layout/RouteLoadingWrapper";
 import { Inter } from "next/font/google";
 
 // Font config
@@ -19,34 +20,45 @@ export const metadata = {
     template: "%s | Moove NFT Platform",
   },
   description:
-    "Piattaforma decentralizzata per NFT di micro-mobilità. Acquista, personalizza e utilizza veicoli sostenibili attraverso la tecnologia blockchain.",
+    "Decentralized mobility platform for NFT-based vehicle rental passes",
   keywords: [
     "NFT",
-    "micro-mobilità",
+    "mobility",
+    "rental",
     "blockchain",
-    "sostenibilità",
-    "scooter elettrici",
-    "bici elettriche",
-    "monopattini elettrici",
-    "Milano",
+    "ethereum",
+    "decentralized",
+    "vehicle",
+    "scooter",
+    "bike",
   ],
   authors: [{ name: "Moove Team" }],
-  creator: "Moove NFT Platform",
+  creator: "Moove",
   publisher: "Moove",
+  formatDetection: {
+    email: false,
+    address: false,
+    telephone: false,
+  },
+  metadataBase: new URL("https://moove-nft.vercel.app"),
+  alternates: {
+    canonical: "/",
+  },
   openGraph: {
     type: "website",
-    locale: "it_IT",
-    url: "",
-    title: "Moove NFT Platform - Mobilità Decentralizzata",
+    locale: "en_US",
+    url: "https://moove-nft.vercel.app",
+    title: "Moove NFT Platform",
     description:
-      "La nuova era della micro-mobilità urbana attraverso NFT e blockchain.",
+      "Decentralized mobility platform for NFT-based vehicle rental passes",
     siteName: "Moove NFT Platform",
   },
   twitter: {
     card: "summary_large_image",
     title: "Moove NFT Platform",
-    description: "Mobilità decentralizzata con NFT",
-    creator: "@MooveNFT",
+    description:
+      "Decentralized mobility platform for NFT-based vehicle rental passes",
+    creator: "@moove",
   },
   robots: {
     index: true,
@@ -59,11 +71,9 @@ export const metadata = {
       "max-snippet": -1,
     },
   },
-  manifest: "/manifest.json",
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#00D4AA" },
-    { media: "(prefers-color-scheme: dark)", color: "#1f2937" },
-  ],
+  verification: {
+    google: "your-google-verification-code",
+  },
 };
 
 // Viewport configuration
@@ -71,6 +81,11 @@ export const viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
+  userScalable: false,
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#00d4aa" },
+    { media: "(prefers-color-scheme: dark)", color: "#00d4aa" },
+  ],
 };
 
 interface RootLayoutProps {
@@ -79,25 +94,18 @@ interface RootLayoutProps {
 
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
-    <html lang="it" className={`light ${inter.variable}`}>
+    <html lang="en" className={`${inter.variable} antialiased`}>
       <head>
-        {/* ✅ IPFS Gateways preconnect */}
-        <link rel="preconnect" href="https://ipfs.io" />
-        <link rel="preconnect" href="https://gateway.pinata.cloud" />
-        <link rel="preconnect" href="https://cloudflare-ipfs.com" />
-
-        {/* Favicon and icons */}
-        <link rel="icon" href="/favicon.ico" sizes="any" />
-        <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-
-        {/* Meta tags */}
-        <meta name="format-detection" content="telephone=no" />
+        <link rel="icon" href="/favicon.ico" />
+        <link rel="apple-touch-icon" href="/icon.svg" />
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="theme-color" content="#00d4aa" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-
-        {/* ✅ Web3 related meta tags */}
-        <meta name="ethereum-provider" content="rainbowkit" />
+        <meta name="apple-mobile-web-app-title" content="Moove" />
+        <meta name="msapplication-TileColor" content="#00d4aa" />
+        <meta name="msapplication-config" content="/browserconfig.xml" />
         <meta name="web3-provider" content="wagmi" />
       </head>
       <body
@@ -153,6 +161,9 @@ export default function RootLayout({ children }: RootLayoutProps) {
               id="toast-root"
               className="fixed top-4 right-4 z-50 space-y-2"
             />
+
+            {/* Route loading overlay */}
+            <RouteLoadingWrapper />
           </Web3Provider>
         </ThemeProvider>
 

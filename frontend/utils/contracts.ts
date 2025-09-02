@@ -1,135 +1,13 @@
 // Auto-generated contract configuration
+import MooveAccessControlABI from "@/src/abis/MooveAccessControl.json";
+
 export const contracts = {
   MooveAccessControl: {
-    address: "0x74aAb47A0439B728A5956A1d7faAc6716F1F18Df",
-    abi: [
-      {
-        inputs: [
-          {
-            internalType: "address",
-            name: "admin",
-            type: "address",
-          },
-        ],
-        stateMutability: "nonpayable",
-        type: "constructor",
-      },
-      {
-        inputs: [
-          {
-            internalType: "address",
-            name: "contractAddress",
-            type: "address",
-          },
-        ],
-        name: "authorizeContract",
-        outputs: [],
-        stateMutability: "nonpayable",
-        type: "function",
-      },
-      {
-        inputs: [
-          {
-            internalType: "address",
-            name: "user",
-            type: "address",
-          },
-        ],
-        name: "canMint",
-        outputs: [
-          {
-            internalType: "bool",
-            name: "",
-            type: "bool",
-          },
-        ],
-        stateMutability: "view",
-        type: "function",
-      },
-      {
-        inputs: [
-          {
-            internalType: "address",
-            name: "user",
-            type: "address",
-          },
-        ],
-        name: "canPause",
-        outputs: [
-          {
-            internalType: "bool",
-            name: "",
-            type: "bool",
-          },
-        ],
-        stateMutability: "view",
-        type: "function",
-      },
-      {
-        inputs: [
-          {
-            internalType: "bytes32",
-            name: "role",
-            type: "bytes32",
-          },
-          {
-            internalType: "address",
-            name: "account",
-            type: "address",
-          },
-        ],
-        name: "grantRole",
-        outputs: [],
-        stateMutability: "nonpayable",
-        type: "function",
-      },
-      {
-        inputs: [
-          {
-            internalType: "bytes32",
-            name: "role",
-            type: "bytes32",
-          },
-          {
-            internalType: "address",
-            name: "account",
-            type: "address",
-          },
-        ],
-        name: "hasRole",
-        outputs: [
-          {
-            internalType: "bool",
-            name: "",
-            type: "bool",
-          },
-        ],
-        stateMutability: "view",
-        type: "function",
-      },
-      {
-        inputs: [
-          {
-            internalType: "address",
-            name: "",
-            type: "address",
-          },
-        ],
-        name: "authorizedContracts",
-        outputs: [
-          {
-            internalType: "bool",
-            name: "",
-            type: "bool",
-          },
-        ],
-        stateMutability: "view",
-        type: "function",
-      },
-    ],
+    address: "0x01EfE9998c764bc1f41E71DBa0f946Ad057E50C2",
+    abi: MooveAccessControlABI,
   },
   MooveRentalPass: {
-    address: "0x460353902aF2A73f0323EC888BBFcE64681932E8",
+    address: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
     abi: [
       {
         inputs: [
@@ -1349,8 +1227,7 @@ export const contracts = {
 } as const;
 
 export const CONTRACT_ADDRESSES = {
-  MOOVEACCESSCONTROL: "0x74aAb47A0439B728A5956A1d7faAc6716F1F18Df",
-  MOOVERENTALPASS: "0x460353902aF2A73f0323EC888BBFcE64681932E8",
+  MOOVERENTALPASS: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
 } as const;
 
 // Vehicle type constants for MooveRentalPass

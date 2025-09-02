@@ -1,202 +1,12 @@
 "use client";
 
-import React, { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import AuctionFilters from "@/components/auctions/AuctionFilters";
+import React from "react";
+import { motion } from "framer-motion";
 import AuctionGrid from "@/components/auctions/AuctionGrid";
-import { AuctionType, AuctionStatus, type Auction } from "@/types/auction";
+import { AuctionType } from "@/types/auction";
+import { useAuctions } from "@/hooks/useAuctions";
 
 // ============= TYPES =============
-interface FilterOptions {
-  status: "all" | "active" | "ended" | "revealing";
-  type: "all" | "traditional" | "english" | "dutch" | "sealed";
-  category: "all" | "bike" | "scooter" | "skateboard" | "moped";
-  priceRange: "all" | "low" | "medium" | "high";
-}
-
-// ============= DATA =============
-const MOCK_AUCTIONS: Auction[] = [
-  {
-    auctionId: "1",
-    nftId: "1",
-    nftName: "Sunset Rome Sticker",
-    nftImage: "/api/placeholder/300/300",
-    nftCategory: "sticker",
-    seller: "0x1234567890abcdef1234567890abcdef12345678",
-    auctionType: AuctionType.ENGLISH,
-    status: AuctionStatus.ACTIVE,
-    startPrice: "0.001",
-    reservePrice: "0.0015",
-    buyNowPrice: "0.003",
-    currentBid: "0.0018",
-    highestBidder: "0x9876543210fedcba9876543210fedcba98765432",
-    bidCount: 5,
-    startTime: new Date(Date.now() - 2 * 60 * 60 * 1000),
-    endTime: new Date(Date.now() + 45 * 60 * 1000),
-    bidIncrement: "0.0001",
-    currency: "ETH",
-    attributes: {
-      rarity: "rare",
-      designer: "ArtMoove",
-      collection: "City Views",
-      edition: "Limited",
-      range: "",
-      speed: "",
-      battery: "",
-      condition: "",
-    },
-  },
-  {
-    auctionId: "2",
-    nftId: "2",
-    nftName: "Neon Lightning Badge",
-    nftImage: "/api/placeholder/300/300",
-    nftCategory: "badge",
-    seller: "0x5555555555555555555555555555555555555555",
-    auctionType: AuctionType.DUTCH,
-    status: AuctionStatus.ACTIVE,
-    startPrice: "0.005",
-    reservePrice: "0.001",
-    buyNowPrice: null,
-    currentBid: "0.003",
-    highestBidder: null,
-    bidCount: 0,
-    startTime: new Date(Date.now() - 30 * 60 * 1000),
-    endTime: new Date(Date.now() + 30 * 60 * 1000),
-    bidIncrement: "0",
-    currency: "ETH",
-    attributes: {
-      rarity: "epic",
-      achievement: "Eco Warrior",
-      requirement: "100kg CO₂ saved",
-      holders: "47",
-      range: "",
-      speed: "",
-      battery: "",
-      condition: "",
-    },
-  },
-  {
-    auctionId: "3",
-    nftId: "3",
-    nftName: "Cyber Punk Vehicle Skin",
-    nftImage: "/api/placeholder/300/300",
-    nftCategory: "skin",
-    seller: "0x7777777777777777777777777777777777777777",
-    auctionType: AuctionType.TRADITIONAL,
-    status: AuctionStatus.ACTIVE,
-    startPrice: "0.002",
-    reservePrice: "0.0025",
-    buyNowPrice: "0.006",
-    currentBid: "0.0032",
-    highestBidder: "0x3333333333333333333333333333333333333333",
-    bidCount: 8,
-    startTime: new Date(Date.now() - 60 * 60 * 1000),
-    endTime: new Date(Date.now() + 25 * 60 * 1000),
-    bidIncrement: "0.0002",
-    currency: "ETH",
-    attributes: {
-      rarity: "legendary",
-      effects: "RGB Animation",
-      compatibility: "All Vehicles",
-      designer: "CyberDesign",
-      range: "",
-      speed: "",
-      battery: "",
-      condition: "",
-    },
-  },
-  {
-    auctionId: "4",
-    nftId: "4",
-    nftName: "Golden Moove Avatar",
-    nftImage: "/api/placeholder/300/300",
-    nftCategory: "avatar",
-    seller: "0x9999999999999999999999999999999999999999",
-    auctionType: AuctionType.SEALED_BID,
-    status: AuctionStatus.REVEALING,
-    startPrice: "0.0015",
-    reservePrice: "0.002",
-    buyNowPrice: null,
-    currentBid: "???",
-    highestBidder: "???",
-    bidCount: 3,
-    startTime: new Date(Date.now() - 25 * 60 * 1000),
-    endTime: new Date(Date.now() + 5 * 60 * 1000),
-    bidIncrement: "0.0001",
-    currency: "ETH",
-    attributes: {
-      rarity: "legendary",
-      special: "Animated",
-      traits: "Golden Glow",
-      supply: "1/1",
-      range: "",
-      speed: "",
-      battery: "",
-      condition: "",
-    },
-  },
-  {
-    auctionId: "5",
-    nftId: "5",
-    nftName: "Venice Sunset Sticker",
-    nftImage: "/api/placeholder/300/300",
-    nftCategory: "sticker",
-    seller: "0x1111111111111111111111111111111111111111",
-    auctionType: AuctionType.ENGLISH,
-    status: AuctionStatus.ENDED,
-    startPrice: "0.003",
-    reservePrice: "0.004",
-    buyNowPrice: "0.008",
-    currentBid: "0.0055",
-    highestBidder: "0x2222222222222222222222222222222222222222",
-    bidCount: 12,
-    startTime: new Date(Date.now() - 3 * 60 * 60 * 1000),
-    endTime: new Date(Date.now() - 30 * 60 * 1000),
-    bidIncrement: "0.0002",
-    currency: "ETH",
-    attributes: {
-      rarity: "rare",
-      designer: "ItalianArt",
-      collection: "Italian Cities",
-      edition: "3/50",
-      range: "",
-      speed: "",
-      battery: "",
-      condition: "",
-    },
-  },
-  {
-    auctionId: "6",
-    nftId: "6",
-    nftName: "Mystery Eco Badge",
-    nftImage: "/api/placeholder/300/300",
-    nftCategory: "badge",
-    seller: "0x8888888888888888888888888888888888888888",
-    auctionType: AuctionType.SEALED_BID,
-    status: AuctionStatus.ACTIVE,
-    startPrice: "0.002",
-    reservePrice: "0.003",
-    buyNowPrice: null,
-    currentBid: "???",
-    highestBidder: null,
-    bidCount: 1,
-    startTime: new Date(Date.now() - 10 * 60 * 1000),
-    endTime: new Date(Date.now() + 20 * 60 * 1000),
-    bidIncrement: "0.0001",
-    currency: "ETH",
-    attributes: {
-      rarity: "epic",
-      mystery: "Unknown Power",
-      unlocks: "Special Features",
-      community: "Green Warriors",
-      range: "",
-      speed: "",
-      battery: "",
-      condition: "",
-    },
-  },
-];
 
 const AUCTION_TYPE_CONFIG = {
   [AuctionType.TRADITIONAL]: {
@@ -516,65 +326,54 @@ function FilterBar({
 
 // ============= MAIN COMPONENT =============
 export default function AuctionsPage() {
-  const [filters, setFilters] = useState<FilterOptions>({
-    status: "all",
-    type: "all",
-    category: "all",
-    priceRange: "all",
-  });
+  const {
+    auctions,
+    activeAuctions,
+    endedAuctions,
+    revealingAuctions,
+    stats,
+    filters,
+    setFilters,
+    isLoading,
+    error,
+    isMasterAdmin,
+    canMint,
+  } = useAuctions();
 
-  // Filter auctions based on current filters
-  const filteredAuctions = MOCK_AUCTIONS.filter((auction) => {
-    if (
-      filters.status !== "all" &&
-      String(auction.status).toLowerCase() !== filters.status
-    )
-      return false;
-    if (
-      filters.type !== "all" &&
-      String(auction.auctionType).toLowerCase() !== filters.type
-    )
-      return false;
-    if (filters.category !== "all" && auction.nftCategory !== filters.category)
-      return false;
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-purple-50 dark:from-gray-900 dark:to-purple-900/20 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-purple-600 mx-auto mb-4"></div>
+          <p className="text-xl text-gray-600 dark:text-gray-300">
+            Loading auctions...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
-    // Price range filtering
-    if (filters.priceRange !== "all") {
-      const price = parseFloat(
-        auction.currentBid === "???" ? auction.startPrice : auction.currentBid
-      );
-      if (filters.priceRange === "low" && price >= 0.001) return false;
-      if (filters.priceRange === "medium" && (price < 0.001 || price > 0.005))
-        return false;
-      if (filters.priceRange === "high" && price <= 0.005) return false;
-    }
-
-    return true;
-  });
-
-  const activeAuctions = filteredAuctions.filter(
-    (a) => a.status === AuctionStatus.ACTIVE
-  );
-  const endedAuctions = filteredAuctions.filter(
-    (a) => a.status === AuctionStatus.ENDED
-  );
-  const revealingAuctions = filteredAuctions.filter(
-    (a) => a.status === AuctionStatus.REVEALING
-  );
-
-  // Calculate stats
-  const stats = {
-    activeAuctions: MOCK_AUCTIONS.filter(
-      (a) => a.status === AuctionStatus.ACTIVE
-    ).length,
-    totalBids: MOCK_AUCTIONS.reduce(
-      (sum, auction) => sum + auction.bidCount,
-      0
-    ),
-    endedAuctions: MOCK_AUCTIONS.filter((a) => a.status === AuctionStatus.ENDED)
-      .length,
-    totalVolume: "0.0287",
-  };
+  // Show error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-purple-50 dark:from-gray-900 dark:to-purple-900/20 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-6xl mb-4">⚠️</div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+            Error Loading Auctions
+          </h2>
+          <p className="text-gray-600 dark:text-gray-300 mb-4">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-purple-50 dark:from-gray-900 dark:to-purple-900/20">

@@ -6,6 +6,8 @@ import LocationIndicator from "@/components/layout/LocationIndicator";
 import { useTheme } from "@/providers/ThemeProvider";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useAccount } from "wagmi";
+import { useUserRoles } from "@/hooks/useContract";
 
 export default function Header() {
   const pathname = usePathname();
@@ -13,6 +15,12 @@ export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const [lastScrollY, setLastScrollY] = useState(0);
+  const { address, isConnected } = useAccount();
+  const {
+    isMasterAdmin,
+    canMint,
+    isLoading: rolesLoading,
+  } = useUserRoles(address);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -38,6 +46,13 @@ export default function Header() {
     { label: "Auctions", href: "/auctions" },
     { label: "My Collection", href: "/my-collection" },
   ];
+
+  // Admin items - only visible to users with admin permissions
+  const adminItems = [{ label: "Admin Panel", href: "/admin", icon: "⚙️" }];
+
+  // Check if user has admin access
+  const hasAdminAccess =
+    isConnected && !rolesLoading && (isMasterAdmin || canMint);
 
   return (
     <>
@@ -68,6 +83,23 @@ export default function Header() {
                 {link.label}
               </Link>
             ))}
+
+            {/* Admin Section - Only visible to admins */}
+            {hasAdminAccess && (
+              <div className="flex items-center space-x-2 ml-4 pl-4 border-l border-gray-300 dark:border-gray-600">
+                {adminItems.map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className="flex items-center space-x-1 text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors font-medium"
+                    title="Admin Panel"
+                  >
+                    <span>{link.icon}</span>
+                    <span>{link.label}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
           </nav>
 
           {/* Desktop Actions */}
@@ -219,6 +251,26 @@ export default function Header() {
                   {link.label}
                 </Link>
               ))}
+
+              {/* Mobile Admin Section - Only visible to admins */}
+              {hasAdminAccess && (
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                  <div className="text-xs text-gray-500 dark:text-gray-400 px-2 mb-2">
+                    Admin Access:
+                  </div>
+                  {adminItems.map((link) => (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      className="flex items-center space-x-2 text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors px-2 font-medium"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      <span>{link.icon}</span>
+                      <span>{link.label}</span>
+                    </Link>
+                  ))}
+                </div>
+              )}
 
               {/* Mobile theme toggle */}
               <div className="flex items-center justify-between px-2 pt-4 border-t border-gray-200 dark:border-gray-700">

@@ -8,6 +8,7 @@ import {
 import { parseEther, formatEther } from "viem";
 import { toast } from "react-hot-toast";
 import { VehicleType, EUROPEAN_CITIES } from "@/config/cities";
+
 import { VEHICLE_OPTIONS } from "@/config/vehicles";
 
 // ============= TYPES =============
@@ -291,7 +292,7 @@ export function useRentalPassContract() {
       const contractVehicleType = vehicleTypeToContractNumber(vehicleType);
       console.log("🔢 Contract vehicle type:", contractVehicleType);
 
-      // Metadata is now generated automatically by the contract
+      // Metadata is generated automatically by the contract
       console.log("📝 Contract will auto-generate metadata and access code");
 
       console.log("📡 Contract details:", {
@@ -319,6 +320,28 @@ export function useRentalPassContract() {
       );
       toast(
         `Payment of ${formatEther(priceInWei)} ETH included in transaction`
+      );
+
+      // Store transaction data for success page
+      const transactionData = {
+        id: `${vehicleType}-${Date.now()}`,
+        vehicleType,
+        cityId,
+        duration,
+        price: parseFloat(formatEther(priceInWei)),
+        gasFee: 0, // Will be updated when confirmed
+        totalCost: parseFloat(formatEther(priceInWei)), // Will be updated when confirmed
+        purchaseDate: new Date().toISOString(),
+        expiryDate: new Date(
+          Date.now() + duration * 24 * 60 * 60 * 1000
+        ).toISOString(),
+        status: "pending",
+        transactionHash: "pending", // Will be updated when confirmed
+      };
+
+      localStorage.setItem(
+        `tx_${transactionData.id}`,
+        JSON.stringify(transactionData)
       );
 
       // ✅ Ritorna un oggetto temporaneo (l'hash sarà disponibile tramite mintTxHash)
@@ -367,7 +390,6 @@ export function useRentalPassContract() {
   };
 
   // Note: Access codes are now generated automatically by the contract during minting
-  // No need for separate generateAccessCode function
 
   /**
    * Get formatted user passes
@@ -478,12 +500,45 @@ export function useRentalPassContract() {
 
   // Handle transaction confirmation
   useEffect(() => {
-    if (isConfirmed) {
+    if (isConfirmed && receipt && mintTxHash) {
       toast.success("Rental pass minted successfully! 🎉");
       refetchPasses(); // Refresh user passes
       refetchVehicles(); // Refresh availability
+
+      // Update stored transaction data with real hash and token ID
+      // Find the most recent transaction in localStorage
+      const keys = Object.keys(localStorage).filter((key) =>
+        key.startsWith("tx_")
+      );
+      const latestKey = keys[keys.length - 1];
+      if (latestKey) {
+        const storedTx = localStorage.getItem(latestKey);
+        if (storedTx) {
+          try {
+            const parsed = JSON.parse(storedTx);
+
+            // Calculate actual gas fee from receipt
+            const gasUsed = receipt.gasUsed;
+            const gasPrice = receipt.effectiveGasPrice;
+            const actualGasFee = Number(gasUsed * gasPrice) / 1e18;
+            const totalCost = parsed.price + actualGasFee;
+
+            const updatedTx = {
+              ...parsed,
+              transactionHash: mintTxHash,
+              status: "confirmed",
+              tokenId: receipt.logs[0]?.topics[3] || "2", // Extract token ID from logs
+              gasFee: actualGasFee,
+              totalCost: totalCost,
+            };
+            localStorage.setItem(latestKey, JSON.stringify(updatedTx));
+          } catch (e) {
+            console.error("Error updating transaction data:", e);
+          }
+        }
+      }
     }
-  }, [isConfirmed, refetchPasses, refetchVehicles]);
+  }, [isConfirmed, receipt, mintTxHash, refetchPasses, refetchVehicles]);
 
   // Handle mint errors
   useEffect(() => {
@@ -513,7 +568,6 @@ export function useRentalPassContract() {
 
     // Functions
     mintPass,
-    // generateAccessCode removed - now handled by contract
     getUserPasses,
     getAvailableVehicles,
     userHasPass,

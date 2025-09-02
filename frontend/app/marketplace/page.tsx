@@ -9,6 +9,8 @@ import { useAccount } from "wagmi";
 import { useRentalPassContract } from "@/hooks/useRentalPassContract";
 import { VehicleType, EUROPEAN_CITIES } from "@/config/cities";
 import { useLocationAndCity } from "@/hooks/useLocationAndCity";
+import { useRouteLoading } from "@/hooks/useRouteLoading";
+
 import { formatUnits, parseUnits } from "ethers";
 // ============= TYPES =============
 interface VehiclePassDisplay {
@@ -168,6 +170,7 @@ function MarketplaceContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isConnected } = useAccount();
+  const { navigateWithLoading } = useRouteLoading();
 
   // Persistence hook
   const locationHook = useLocationAndCity();
@@ -280,8 +283,10 @@ function MarketplaceContent() {
     }
 
     const typeString = vehicleTypeToString(vehicleType);
-    // Use preferred city (detected) for routing
-    router.push(`/book/${typeString}?city=${locationHook.currentCity?.id}`);
+    // Use preferred city (detected) for routing with loading spinner
+    navigateWithLoading(
+      `/book/${typeString}?city=${locationHook.currentCity?.id}`
+    );
   };
 
   const handleRetry = () => {
@@ -394,7 +399,7 @@ function MarketplaceContent() {
                       userHasPass={userHasPass(pass.type)}
                       isLoading={isLoading}
                       isLocationRequired={!locationHook.canRent}
-                      isPurchasing={false}
+                      isPurchasing={isLoading}
                       onPurchasePass={() => {}}
                     />
                   </div>
@@ -481,6 +486,18 @@ function MarketplaceContent() {
               )}
             </div>
           </motion.div>
+        )}
+
+        {/* Test button for loading spinner */}
+        {process.env.NODE_ENV === "development" && isConnected && (
+          <div className="text-center mt-8">
+            <button
+              onClick={() => navigateWithLoading("/book/bike")}
+              className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors"
+            >
+              Test Loading Spinner
+            </button>
+          </div>
         )}
 
         {/* Real-time Updates Indicator */}
@@ -635,7 +652,7 @@ function VehiclePassCard({
   isPurchasing?: boolean;
   onPurchasePass?: () => void;
 }) {
-  const isDisabled = isLoading || isLocationRequired;
+  const isDisabled = isLoading || isLocationRequired || isPurchasing;
 
   const formatAvailability = (count: number): string => {
     if (count > 100) return "100+";
@@ -750,7 +767,7 @@ function VehiclePassCard({
                   return "0";
                 }
               })()}{" "}
-              gwei
+              gWei
             </div>
             <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
               {pass.duration} days access
@@ -816,6 +833,15 @@ function VehiclePassCard({
                 transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
               />
               Loading...
+            </div>
+          ) : isPurchasing ? (
+            <div className="flex items-center justify-center">
+              <motion.div
+                className="w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-3"
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+              />
+              Transaction Pending...
             </div>
           ) : isLocationRequired ? (
             "📍 Location Required"

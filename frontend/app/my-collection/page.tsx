@@ -717,7 +717,27 @@ function CodeGenerationModal({
     setIsGenerating(true);
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
-    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+    // Generate secure access code using Web Crypto API
+    const generateSecureCode = async (): Promise<string> => {
+      const entropy = crypto.getRandomValues(new Uint8Array(16));
+      const timestamp = Date.now();
+      const seedData = `${timestamp}-${entropy.join("")}`;
+      const encoder = new TextEncoder();
+      const data = encoder.encode(seedData);
+      const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+      const hashArray = new Uint8Array(hashBuffer);
+
+      // Generate 8-character code from hash (exclude confusing chars)
+      const allowedChars = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+      let code = "";
+      for (let i = 0; i < 8; i++) {
+        const index = hashArray[i] % allowedChars.length;
+        code += allowedChars[index];
+      }
+      return code;
+    };
+
+    const code = await generateSecureCode();
     const expires = new Date(Date.now() + 15 * 60 * 1000);
 
     setAccessCode(code);

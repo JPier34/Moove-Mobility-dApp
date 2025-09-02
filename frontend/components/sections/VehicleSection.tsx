@@ -291,36 +291,6 @@ export default function VehicleSection({
                 );
               })}
             </motion.div>
-
-            {/* Debug: City Vehicle Limits */}
-            {process.env.NODE_ENV === "development" && currentCity && (
-              <motion.div
-                initial={{ opacity: 0, y: 30 }}
-                animate={isInView ? { opacity: 1, y: 0 } : {}}
-                transition={{ duration: 0.8, delay: 1.0 }}
-                className="mt-8 p-6 bg-gray-100 dark:bg-gray-700 rounded-xl"
-              >
-                <h4 className="text-lg font-semibold mb-4 text-gray-700 dark:text-gray-300">
-                  🧪 Debug: City Vehicle Limits
-                </h4>
-                <div className="grid grid-cols-3 gap-4 text-sm">
-                  {VEHICLE_OPTIONS.map((vehicle) => {
-                    const cityAvailability = currentCity.vehicleAvailability
-                      ? currentCity.vehicleAvailability[vehicle.type] || 0
-                      : 0;
-                    return (
-                      <div key={vehicle.type} className="text-center">
-                        <div className="text-2xl mb-2">{vehicle.icon}</div>
-                        <div className="font-medium">{vehicle.type}</div>
-                        <div className="text-blue-600 dark:text-blue-400">
-                          {cityAvailability} available
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </motion.div>
-            )}
           </>
         ) : (
           <motion.div
