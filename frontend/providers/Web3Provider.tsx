@@ -10,6 +10,7 @@ import {
 import { WagmiProvider } from "wagmi";
 import { sepolia } from "wagmi/chains";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { createStorage, noopStorage } from "wagmi";
 import "@rainbow-me/rainbowkit/styles.css";
 
 // Check if WalletConnect projectId is configured
@@ -22,11 +23,18 @@ if (!projectId || projectId === "your-walletconnect-project-id-here") {
   console.warn("Get your projectId from: https://cloud.walletconnect.com/");
 }
 
+// Create storage for wallet persistence
+const storage = createStorage({
+  storage: typeof window !== "undefined" ? window.localStorage : noopStorage,
+  key: "moove-wagmi-store", // Custom key to avoid conflicts
+});
+
 const config = getDefaultConfig({
   appName: "Moove NFT Platform",
   projectId: projectId || "00000000000000000000000000000000", // Fallback projectId
   chains: [sepolia], // Only Sepolia for deployment
   ssr: true, // Enable SSR for Next.js
+  storage, // Add storage for persistence
 });
 
 // React Query client
@@ -36,6 +44,8 @@ const queryClient = new QueryClient({
       retry: 3,
       staleTime: 30_000, // 30 seconds
       refetchOnWindowFocus: false,
+      refetchOnMount: true,
+      refetchOnReconnect: true,
     },
   },
 });
@@ -59,6 +69,7 @@ export default function Web3Provider({
             //learnMoreUrl: "https://moove-nft.vercel.app/about",
           }}
           modalSize="compact"
+          initialChain={sepolia}
         >
           {children}
         </RainbowKitProvider>

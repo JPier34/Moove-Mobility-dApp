@@ -184,7 +184,7 @@ export function useReadMooveStickerNFT<T = unknown>(
   } as ReadContractResult<T>;
 }
 
-// Hook to write MooveStickerNFT contracts (placeholder for future use)
+// Hook to write MooveStickerNFT contracts (using MooveNFT)
 export function useWriteMooveStickerNFT() {
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
@@ -195,8 +195,22 @@ export function useWriteMooveStickerNFT() {
     functionName: string,
     args: readonly unknown[] = []
   ) => {
-    // Placeholder - will be implemented when MooveStickerNFT contract is deployed
-    console.warn("MooveStickerNFT contract not yet deployed");
+    console.log("🎨 Creating NFT with MooveNFT contract:", {
+      functionName,
+      args: args.map((arg, index) => ({
+        index,
+        type: typeof arg,
+        value: typeof arg === "object" ? JSON.stringify(arg) : String(arg),
+      })),
+    });
+
+    // Use MooveNFT contract for minting
+    writeContract({
+      address: contracts.MooveNFT.address as `0x${string}`,
+      abi: contracts.MooveNFT.abi,
+      functionName: functionName as any,
+      args: args as any,
+    });
   };
 
   return {

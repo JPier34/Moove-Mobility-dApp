@@ -1,4 +1,6 @@
 // Auto-generated contract configuration (UPDATED - NEW DEPLOYMENT)
+import MooveNFTABI from "../src/abis/MooveNFT.json";
+
 export const contracts = {
   MooveAccessControl: {
     address: "0x01EfE9998c764bc1f41E71DBa0f946Ad057E50C2",
@@ -850,8 +852,8 @@ export const contracts = {
     ],
   },
   MooveNFT: {
-    address: "0x0000000000000000000000000000000000000000",
-    abi: [],
+    address: "0x40E455515bf712144C1A5D859F19d64b537754f7",
+    abi: MooveNFTABI,
   },
   MooveAuction: {
     address: "0x0000000000000000000000000000000000000000",

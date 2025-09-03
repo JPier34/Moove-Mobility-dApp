@@ -4,6 +4,7 @@ import Header from "../components/layout/Header";
 import Footer from "../components/layout/Footer";
 import { ThemeProvider } from "@/providers/ThemeProvider";
 import RouteLoadingWrapper from "@/components/layout/RouteLoadingWrapper";
+import WalletPersistence from "@/components/wallet/WalletPersistence";
 import { Inter } from "next/font/google";
 
 // Font config
@@ -121,22 +122,24 @@ export default function RootLayout({ children }: RootLayoutProps) {
       >
         <ThemeProvider>
           <Web3Provider>
-            {/* App main structure */}
-            <div className="flex min-h-screen flex-col">
-              {/* Header */}
-              <Header />
+            <WalletPersistence>
+              {/* App main structure */}
+              <div className="flex min-h-screen flex-col">
+                {/* Header */}
+                <Header />
 
-              {/* Main content area */}
-              <main className="flex-1 relative">
-                {/* Theme-aware background pattern */}
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(0,212,170,0.1),transparent_50%)] dark:bg-[radial-gradient(circle_at_50%_50%,rgba(0,212,170,0.05),transparent_50%)] pointer-events-none" />
+                {/* Main content area */}
+                <main className="flex-1 relative">
+                  {/* Theme-aware background pattern */}
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(0,212,170,0.1),transparent_50%)] dark:bg-[radial-gradient(circle_at_50%_50%,rgba(0,212,170,0.05),transparent_50%)] pointer-events-none" />
 
-                {/* Page content */}
-                <div className="relative z-10">{children}</div>
-              </main>
+                  {/* Page content */}
+                  <div className="relative z-10">{children}</div>
+                </main>
 
-              <Footer />
-            </div>
+                <Footer />
+              </div>
+            </WalletPersistence>
 
             {/* Theme-aware loading overlay */}
             <div

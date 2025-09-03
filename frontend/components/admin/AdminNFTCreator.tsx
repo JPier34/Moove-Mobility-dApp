@@ -2,8 +2,19 @@
 
 import React, { useState } from "react";
 import { motion } from "framer-motion";
+import { useAccount } from "wagmi";
 import { useCreateAuction } from "@/hooks/useAuction";
-import { useWriteMooveStickerNFT } from "@/hooks/useContract";
+import { useWriteMooveStickerNFT, useUserRoles } from "@/hooks/useContract";
+import { useIPFSUnified } from "@/hooks/useIPFSUnified";
+import { IPFSStatus } from "@/components/admin/IPFSStatus";
+import { PinataTest } from "@/components/admin/PinataTest";
+import { EnvDebug } from "@/components/admin/EnvDebug";
+import { NFTCreationDebug } from "@/components/admin/NFTCreationDebug";
+import { AdminPermissionsDebug } from "@/components/admin/AdminPermissionsDebug";
+import { NFTMetadataPreview } from "@/components/admin/NFTMetadataPreview";
+import { NFTValidationResults } from "@/components/admin/NFTValidationResults";
+import { NFTCacheSync } from "@/components/admin/NFTCacheSync";
+import { useNFTValidationAPI } from "@/hooks/useNFTValidationAPI";
 import { AuctionType } from "@/types/auction";
 import { toast } from "react-hot-toast";
 
@@ -36,6 +47,22 @@ interface AuctionFormData {
 }
 
 export default function AdminNFTCreator() {
+  const { address } = useAccount();
+  const { canMint, isMasterAdmin } = useUserRoles(address);
+  const {
+    uploadNFT,
+    isUploading: isUploadingToIPFS,
+    uploadProgress,
+  } = useIPFSUnified();
+  const {
+    validateNFT,
+    addValidatedNFT,
+    clearCache,
+    getCacheStats,
+    syncWithAPI,
+    isValidating: isValidatingNFT,
+    isSyncing,
+  } = useNFTValidationAPI();
   const [step, setStep] = useState<"nft" | "auction">("nft");
   const [nftData, setNftData] = useState<NFTFormData>({
     name: "",
@@ -63,6 +90,12 @@ export default function AdminNFTCreator() {
     durationUnit: "minutes",
     bidIncrement: "0.000001", // 1 gwei per testing
   });
+  const [validationResult, setValidationResult] = useState<{
+    isValid: boolean;
+    errors: string[];
+    warnings: string[];
+    suggestions: string[];
+  } | null>(null);
 
   const {
     writeMooveStickerNFT,
@@ -202,6 +235,20 @@ export default function AdminNFTCreator() {
   };
 
   const handleNFTCreation = async () => {
+    // Check permissions first
+    if (!canMint && !isMasterAdmin) {
+      toast.error(
+        "You don't have permission to create NFTs. Contact an admin."
+      );
+      return;
+    }
+
+    // Esegui validazione completa prima della creazione
+    if (!validationResult || !validationResult.isValid) {
+      toast.error("Esegui prima la validazione NFT");
+      return;
+    }
+
     const validationErrors = validateNFTCreation();
     if (validationErrors.length > 0) {
       validationErrors.forEach((error) => toast.error(error));
@@ -209,12 +256,29 @@ export default function AdminNFTCreator() {
     }
 
     try {
-      // TODO: Upload image to IPFS and get hash
-      // For now, we'll use a placeholder
-      const imageHash = "QmPlaceholderHash";
+      if (!nftData.image) {
+        toast.error("Please select an image for the NFT");
+        return;
+      }
 
-      // TODO: Create metadata JSON and upload to IPFS
-      const metadataURI = "ipfs://QmMetadataHash";
+      // Upload complete NFT to IPFS (image + metadata)
+      const uploadResult = await uploadNFT(nftData.image, {
+        name: nftData.name,
+        description: nftData.description,
+        rarity: nftData.rarity,
+        isLimitedEdition: nftData.isLimitedEdition,
+        editionSize: nftData.isLimitedEdition
+          ? parseInt(nftData.editionSize)
+          : undefined,
+        editionNumber: nftData.isLimitedEdition ? 1 : undefined, // Will be set by contract
+        customizationOptions: {
+          ...nftData.customizationOptions,
+          maxTextLength: parseInt(nftData.customizationOptions.maxTextLength),
+        },
+        creator: address || "0x0000000000000000000000000000000000000000",
+      });
+
+      const metadataURI = uploadResult.metadataUrl;
 
       // Convert rarity string to enum value (0-5)
       const rarityMap = {
@@ -228,7 +292,7 @@ export default function AdminNFTCreator() {
 
       // Mint Sticker NFT with all required parameters
       writeMooveStickerNFT("mintStickerNFT", [
-        "0x0000000000000000000000000000000000000000", // to (will be set by contract)
+        address || "0x0000000000000000000000000000000000000000", // to (current wallet address)
         nftData.name,
         metadataURI,
         0, // category (VEHICLE_DECORATION = 0)
@@ -244,11 +308,15 @@ export default function AdminNFTCreator() {
           maxTextLength: BigInt(nftData.customizationOptions.maxTextLength),
         },
         nftData.editionName || nftData.name,
-        "0x0000000000000000000000000000000000000000", // royaltyRecipient
+        address || "0x0000000000000000000000000000000000000000", // royaltyRecipient (current wallet)
         500, // royaltyPercentage (5%)
       ]);
 
       toast.success("NFT creation initiated!");
+
+      // Aggiungi NFT alla cache locale
+      await addValidatedNFT(nftData.name, nftData.image);
+
       setStep("auction");
     } catch (error) {
       console.error("Error creating NFT:", error);
@@ -386,11 +454,17 @@ export default function AdminNFTCreator() {
   };
 
   const isProcessing =
-    isMinting || isConfirmingMint || isCreatingAuction || isConfirmingAuction;
+    isMinting ||
+    isConfirmingMint ||
+    isCreatingAuction ||
+    isConfirmingAuction ||
+    isUploadingToIPFS ||
+    isValidatingNFT;
 
   // Controllo campi obbligatori per NFT
   const isNFTCreationReady = () => {
     return (
+      (canMint || isMasterAdmin) && // Check permissions
       nftData.name.trim().length >= 3 &&
       nftData.description.trim().length >= 10 &&
       nftData.image !== null &&
@@ -402,7 +476,9 @@ export default function AdminNFTCreator() {
       // Controllo nome unico (da implementare con smart contract)
       !isDuplicateName(nftData.name.trim()) &&
       // Controllo caratteri speciali
-      !hasInvalidCharacters(nftData.name.trim())
+      !hasInvalidCharacters(nftData.name.trim()) &&
+      // Controllo validazione completata
+      validationResult?.isValid === true
     );
   };
 
@@ -473,6 +549,94 @@ export default function AdminNFTCreator() {
       : true;
   };
 
+  // Esegui validazione NFT
+  const runNFTValidation = async () => {
+    if (!nftData.image) {
+      toast.error("Carica un'immagine prima della validazione");
+      return;
+    }
+
+    try {
+      const result = await validateNFT(
+        nftData.name,
+        nftData.description,
+        nftData.image,
+        nftData.rarity
+      );
+      setValidationResult(result);
+
+      if (result.isValid) {
+        toast.success("NFT validato con successo!");
+      } else {
+        toast.error(
+          `Validazione fallita: ${result.errors.length} errori trovati`
+        );
+      }
+    } catch (error) {
+      toast.error("Errore durante la validazione");
+      console.error("Validation error:", error);
+    }
+  };
+
+  // Applica suggerimento nome
+  const applyNameSuggestion = (suggestion: string) => {
+    setNftData((prev) => ({ ...prev, name: suggestion }));
+    toast.success(`Nome aggiornato: ${suggestion}`);
+  };
+
+  // Genera anteprima metadata
+  const generateMetadataPreview = () => {
+    if (!nftData.image) return null;
+
+    return {
+      name: nftData.name,
+      description: nftData.description,
+      image: URL.createObjectURL(nftData.image),
+      external_url:
+        "https://app.pinata.cloud/ipfs/groups/877735d8-cf1e-408a-9ed5-a0330d004ead",
+      title: nftData.name,
+      symbol: "MOOVE",
+      collection: {
+        name: "Moove Vehicle Stickers",
+        family: "Moove Mobility",
+      },
+      attributes: [
+        {
+          trait_type: "Rarity",
+          value: nftData.rarity,
+        },
+        {
+          trait_type: "Category",
+          value: "Vehicle Decoration",
+        },
+        {
+          trait_type: "Creator",
+          value: address || "0x0000000000000000000000000000000000000000",
+        },
+        {
+          trait_type: "Creation Date",
+          value: new Date().toISOString(),
+          display_type: "date",
+        },
+      ],
+      properties: {
+        category: "Vehicle Decoration",
+        rarity: nftData.rarity,
+        isLimitedEdition: nftData.isLimitedEdition,
+        creator: address || "0x0000000000000000000000000000000000000000",
+        creationDate: new Date().toISOString(),
+        customization: {
+          allowColorChange: nftData.customizationOptions.allowColorChange,
+          allowTextChange: nftData.customizationOptions.allowTextChange,
+          allowSizeChange: nftData.customizationOptions.allowSizeChange,
+          allowEffectsChange: nftData.customizationOptions.allowEffectsChange,
+          availableColors: nftData.customizationOptions.availableColors,
+          maxTextLength: parseInt(nftData.customizationOptions.maxTextLength),
+        },
+      },
+    };
+  };
+
   // Controllo campi obbligatori per Auction
   const isAuctionCreationReady = () => {
     const startPrice = parseFloat(auctionData.startPrice);
@@ -505,6 +669,12 @@ export default function AdminNFTCreator() {
   const handleNFTCreationWithAlert = () => {
     if (!isNFTCreationReady()) {
       const missingFields = [];
+
+      // Check permissions first
+      if (!canMint && !isMasterAdmin) {
+        missingFields.push("Admin permissions required");
+      }
+
       if (nftData.name.trim().length < 3)
         missingFields.push("Name (min 3 characters)");
       if (nftData.description.trim().length < 10)
@@ -612,6 +782,62 @@ export default function AdminNFTCreator() {
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
               NFT Details
             </h2>
+
+            <IPFSStatus />
+            <EnvDebug />
+            <PinataTest />
+            <AdminPermissionsDebug />
+            <NFTCreationDebug
+              nftData={nftData}
+              canMint={canMint}
+              isMasterAdmin={isMasterAdmin}
+              isDuplicateName={isDuplicateName}
+              hasInvalidCharacters={hasInvalidCharacters}
+            />
+            {/* Cache & Sincronizzazione */}
+            <NFTCacheSync
+              onSync={syncWithAPI}
+              isSyncing={isSyncing}
+              cacheStats={getCacheStats()}
+              onClearCache={clearCache}
+            />
+
+            {/* Validazione NFT */}
+            <div className="bg-gray-800 rounded-lg p-4 mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-white">
+                  Validazione NFT
+                </h3>
+                <button
+                  onClick={runNFTValidation}
+                  disabled={!nftData.image || isValidatingNFT}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    nftData.image && !isValidatingNFT
+                      ? "bg-blue-600 text-white hover:bg-blue-700"
+                      : "bg-gray-600 text-gray-300 cursor-not-allowed"
+                  }`}
+                >
+                  {isValidatingNFT ? "Validando..." : "Valida NFT"}
+                </button>
+              </div>
+              <p className="text-gray-400 text-sm">
+                Verifica duplicati, validità campi e compatibilità prima del
+                caricamento IPFS.
+              </p>
+            </div>
+
+            {/* Risultati Validazione */}
+            {validationResult && (
+              <NFTValidationResults
+                result={validationResult}
+                onSuggestionClick={applyNameSuggestion}
+                onClearCache={clearCache}
+              />
+            )}
+
+            {generateMetadataPreview() && (
+              <NFTMetadataPreview metadata={generateMetadataPreview()!} />
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Basic Info */}
@@ -1028,7 +1254,9 @@ export default function AdminNFTCreator() {
                 {isProcessing ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    Creating NFT...
+                    {isUploadingToIPFS
+                      ? `Uploading to IPFS... ${uploadProgress}%`
+                      : "Creating NFT..."}
                   </>
                 ) : (
                   <>
@@ -1063,7 +1291,7 @@ export default function AdminNFTCreator() {
                   onChange={(e) =>
                     setAuctionData((prev) => ({
                       ...prev,
-                      auctionType: e.target.value as AuctionType,
+                      auctionType: e.target.value as unknown as AuctionType,
                     }))
                   }
                   className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"

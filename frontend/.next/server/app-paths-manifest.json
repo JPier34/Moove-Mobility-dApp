@@ -1,4 +1,6 @@
 {
+  "/admin/page": "app/admin/page.js",
   "/page": "app/page.js",
-  "/admin/page": "app/admin/page.js"
+  "/api/upload-ipfs/route": "app/api/upload-ipfs/route.js",
+  "/api/check-nft-duplicates/route": "app/api/check-nft-duplicates/route.js"
 }

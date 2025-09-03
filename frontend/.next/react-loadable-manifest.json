@@ -1,4 +1,8 @@
 {
+  "hooks\\useIPFSUnified.ts -> @/utils/pinata": {
+    "id": "hooks\\useIPFSUnified.ts -> @/utils/pinata",
+    "files": []
+  },
   "node_modules\\@base-org\\account\\dist\\interface\\builder\\core\\wagmiConnector.js -> @base-org/account": {
     "id": "node_modules\\@base-org\\account\\dist\\interface\\builder\\core\\wagmiConnector.js -> @base-org/account",
     "files": []

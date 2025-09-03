@@ -1,7 +1,10 @@
 import axios from "axios";
 
-const PINATA_API_KEY = process.env.NEXT_PUBLIC_PINATA_API_KEY!;
-const PINATA_SECRET_KEY = process.env.NEXT_PUBLIC_PINATA_SECRET_KEY!;
+// Support both NEXT_PUBLIC_ prefixed and non-prefixed versions
+const PINATA_API_KEY =
+  process.env.NEXT_PUBLIC_PINATA_API_KEY || process.env.PINATA_API_KEY!;
+const PINATA_SECRET_KEY =
+  process.env.NEXT_PUBLIC_PINATA_SECRET_KEY || process.env.PINATA_SECRET_KEY!;
 
 // Cache for IPFS images to improve performance
 const imageCache = new Map<string, { url: string; timestamp: number }>();

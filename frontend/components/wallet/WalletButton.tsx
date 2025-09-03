@@ -3,7 +3,6 @@
 import React, { useState } from "react";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect, useChainId } from "wagmi";
-import { sepolia } from "wagmi/chains";
 import { useChainValidation } from "@/hooks/useChainValidation";
 
 // Disconnect confirmation modal
