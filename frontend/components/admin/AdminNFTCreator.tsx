@@ -14,8 +14,10 @@ import { AdminPermissionsDebug } from "@/components/admin/AdminPermissionsDebug"
 import { NFTMetadataPreview } from "@/components/admin/NFTMetadataPreview";
 import { NFTValidationResults } from "@/components/admin/NFTValidationResults";
 import { NFTCacheSync } from "@/components/admin/NFTCacheSync";
+import { ValidationFailureModal } from "@/components/admin/ValidationFailureModal";
 import { useNFTValidationAPI } from "@/hooks/useNFTValidationAPI";
 import { AuctionType } from "@/types/auction";
+import { contracts } from "@/utils/contracts";
 import { toast } from "react-hot-toast";
 
 interface NFTFormData {
@@ -96,6 +98,7 @@ export default function AdminNFTCreator() {
     warnings: string[];
     suggestions: string[];
   } | null>(null);
+  const [showFailureModal, setShowFailureModal] = useState(false);
 
   const {
     writeMooveStickerNFT,
@@ -243,12 +246,28 @@ export default function AdminNFTCreator() {
       return;
     }
 
-    // Esegui validazione completa prima della creazione
-    if (!validationResult || !validationResult.isValid) {
-      toast.error("Esegui prima la validazione NFT");
+    // FORZA validazione completa prima della creazione
+    if (!nftData.image) {
+      toast.error("Carica un'immagine prima della validazione");
       return;
     }
 
+    // Esegui validazione in tempo reale
+    const realTimeValidation = await validateNFT(
+      nftData.name,
+      nftData.description,
+      nftData.image,
+      nftData.rarity
+    );
+
+    // Se validazione fallisce, mostra modal
+    if (!realTimeValidation.isValid) {
+      setValidationResult(realTimeValidation);
+      setShowFailureModal(true);
+      return;
+    }
+
+    // Controlli aggiuntivi
     const validationErrors = validateNFTCreation();
     if (validationErrors.length > 0) {
       validationErrors.forEach((error) => toast.error(error));
@@ -298,26 +317,27 @@ export default function AdminNFTCreator() {
         0, // category (VEHICLE_DECORATION = 0)
         rarityMap[nftData.rarity],
         nftData.isLimitedEdition,
-        nftData.isLimitedEdition ? BigInt(nftData.editionSize) : BigInt(0),
+        nftData.isLimitedEdition ? parseInt(nftData.editionSize) : 0,
         {
           allowColorChange: nftData.customizationOptions.allowColorChange,
           allowTextChange: nftData.customizationOptions.allowTextChange,
           allowSizeChange: nftData.customizationOptions.allowSizeChange,
           allowEffectsChange: nftData.customizationOptions.allowEffectsChange,
           availableColors: nftData.customizationOptions.availableColors,
-          maxTextLength: BigInt(nftData.customizationOptions.maxTextLength),
+          maxTextLength: parseInt(nftData.customizationOptions.maxTextLength),
         },
         nftData.editionName || nftData.name,
         address || "0x0000000000000000000000000000000000000000", // royaltyRecipient (current wallet)
         500, // royaltyPercentage (5%)
       ]);
 
-      toast.success("NFT creation initiated!");
+      toast.success("NFT minted successfully!");
 
       // Aggiungi NFT alla cache locale
       await addValidatedNFT(nftData.name, nftData.image);
 
-      setStep("auction");
+      // Non procedere automaticamente alla fase auction
+      // L'utente deve configurare l'asta e poi cliccare "Create Auction"
     } catch (error) {
       console.error("Error creating NFT:", error);
       toast.error("Failed to create NFT");
@@ -405,12 +425,37 @@ export default function AdminNFTCreator() {
     if (auctionData.auctionType === AuctionType.DUTCH) {
       if (!auctionData.buyNowPrice) {
         errors.push("Dutch auctions require a buy now price");
+      } else {
+        const buyNowPrice = parseFloat(auctionData.buyNowPrice);
+        if (buyNowPrice <= startPrice) {
+          errors.push(
+            "Dutch auction buy now price must be greater than start price"
+          );
+        }
+        if (buyNowPrice > startPrice * 10) {
+          errors.push(
+            "Dutch auction buy now price should not exceed 10x start price"
+          );
+        }
       }
     }
 
     if (auctionData.auctionType === AuctionType.SEALED_BID) {
       if (auctionData.bidIncrement) {
         errors.push("Sealed bid auctions don't use bid increments");
+      }
+      if (auctionData.buyNowPrice) {
+        errors.push("Sealed bid auctions don't use buy now price");
+      }
+      // Sealed bid auctions should have longer duration for reveal period
+      const duration = parseInt(auctionData.duration);
+      const durationUnit = auctionData.durationUnit || "hours";
+      const durationInHours =
+        durationUnit === "minutes" ? duration / 60 : duration;
+      if (durationInHours < 24) {
+        errors.push(
+          "Sealed bid auctions should last at least 24 hours for reveal period"
+        );
       }
     }
 
@@ -425,28 +470,46 @@ export default function AdminNFTCreator() {
     }
 
     try {
-      // TODO: Get the minted NFT ID from the previous transaction
-      const nftId = 1; // Placeholder
-      const nftContract = "0x..."; // Placeholder for NFT contract address
+      // Prima mint l'NFT e aspetta il risultato
+      await handleNFTCreation();
 
-      // Convert duration to seconds based on unit
+      // Per ora usiamo un token ID incrementale basato sul timestamp
+      // TODO: Implementare recupero token ID dal mint transaction
+      const nftId = Math.floor(Date.now() / 1000) % 1000000; // Token ID temporaneo
+      const nftContract = contracts.MooveNFT.address;
+
+      // Convert duration to seconds based on unit (con fallback sicuro)
       const durationInSeconds =
-        auctionData.durationUnit === "minutes"
+        (auctionData.durationUnit || "hours") === "minutes"
           ? parseInt(auctionData.duration) * 60
           : parseInt(auctionData.duration) * 3600;
+
+      // Validazione bid increment con fallback sicuro
+      const bidIncrementValue = auctionData.bidIncrement || "0.000001";
+      const bidIncrement = BigInt(parseFloat(bidIncrementValue) * 1e18);
+
+      // Protezione overflow per i prezzi
+      const safeParsePrice = (price: string): bigint => {
+        const numPrice = parseFloat(price);
+        if (isNaN(numPrice) || numPrice < 0) return BigInt(0);
+        if (numPrice > 1000) {
+          throw new Error(`Price too high: ${numPrice} ETH (max 1000 ETH)`);
+        }
+        return BigInt(Math.floor(numPrice * 1e18));
+      };
 
       createAuction(
         nftId,
         nftContract,
         auctionData.auctionType,
-        BigInt(parseFloat(auctionData.startPrice) * 1e18),
-        BigInt(parseFloat(auctionData.reservePrice || "0") * 1e18),
-        BigInt(parseFloat(auctionData.buyNowPrice || "0") * 1e18),
+        safeParsePrice(auctionData.startPrice),
+        safeParsePrice(auctionData.reservePrice || "0"),
+        safeParsePrice(auctionData.buyNowPrice || "0"),
         durationInSeconds,
-        BigInt(parseFloat(auctionData.bidIncrement) * 1e18)
+        bidIncrement
       );
 
-      toast.success("Auction creation initiated!");
+      toast.success("NFT minted and auction created successfully!");
     } catch (error) {
       console.error("Error creating auction:", error);
       toast.error("Failed to create auction");
@@ -476,9 +539,7 @@ export default function AdminNFTCreator() {
       // Controllo nome unico (da implementare con smart contract)
       !isDuplicateName(nftData.name.trim()) &&
       // Controllo caratteri speciali
-      !hasInvalidCharacters(nftData.name.trim()) &&
-      // Controllo validazione completata
-      validationResult?.isValid === true
+      !hasInvalidCharacters(nftData.name.trim())
     );
   };
 
@@ -665,8 +726,8 @@ export default function AdminNFTCreator() {
     return basicValidation;
   };
 
-  // Handler per alert campi mancanti NFT
-  const handleNFTCreationWithAlert = () => {
+  // Handler per validazione NFT (senza mint)
+  const handleNFTValidation = async () => {
     if (!isNFTCreationReady()) {
       const missingFields = [];
 
@@ -695,11 +756,33 @@ export default function AdminNFTCreator() {
       toast.error(`Missing required fields: ${missingFields.join(", ")}`);
       return;
     }
-    handleNFTCreation();
+
+    // Esegui validazione completa
+    if (!nftData.image) {
+      toast.error("Carica un'immagine prima della validazione");
+      return;
+    }
+
+    const realTimeValidation = await validateNFT(
+      nftData.name,
+      nftData.description,
+      nftData.image,
+      nftData.rarity
+    );
+
+    if (!realTimeValidation.isValid) {
+      setValidationResult(realTimeValidation);
+      setShowFailureModal(true);
+      return;
+    }
+
+    // Se validazione passa, vai alla fase auction
+    toast.success("NFT validation passed! Configure auction settings.");
+    setStep("auction");
   };
 
-  // Handler per alert campi mancanti Auction
-  const handleAuctionCreationWithAlert = () => {
+  // Handler per creazione completa (mint NFT + asta)
+  const handleCompleteCreation = async () => {
     if (!isAuctionCreationReady()) {
       const missingFields = [];
       if (
@@ -724,7 +807,10 @@ export default function AdminNFTCreator() {
       toast.error(`Missing required fields: ${missingFields.join(", ")}`);
       return;
     }
-    handleAuctionCreation();
+
+    // Prima mint l'NFT, poi crea l'asta
+    await handleNFTCreation();
+    // handleAuctionCreation() verrà chiamato automaticamente dopo il mint
   };
 
   return (
@@ -1243,7 +1329,7 @@ export default function AdminNFTCreator() {
 
             <div className="flex justify-end mt-8">
               <button
-                onClick={handleNFTCreationWithAlert}
+                onClick={handleNFTValidation}
                 disabled={isProcessing}
                 className={`px-8 py-3 rounded-lg font-semibold flex items-center gap-2 transition-all ${
                   isNFTCreationReady()
@@ -1256,14 +1342,14 @@ export default function AdminNFTCreator() {
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                     {isUploadingToIPFS
                       ? `Uploading to IPFS... ${uploadProgress}%`
-                      : "Creating NFT..."}
+                      : "Validating NFT..."}
                   </>
                 ) : (
                   <>
                     {!isNFTCreationReady() && (
                       <span className="text-yellow-300 mr-2">⚠️</span>
                     )}
-                    Create NFT & Continue
+                    Validate NFT & Continue
                   </>
                 )}
               </button>
@@ -1632,7 +1718,7 @@ export default function AdminNFTCreator() {
                 ← Back to NFT
               </button>
               <button
-                onClick={handleAuctionCreationWithAlert}
+                onClick={handleCompleteCreation}
                 disabled={isProcessing}
                 className={`px-8 py-3 rounded-lg font-semibold flex items-center gap-2 transition-all ${
                   isAuctionCreationReady()
@@ -1643,14 +1729,14 @@ export default function AdminNFTCreator() {
                 {isProcessing ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    Creating Auction...
+                    Minting NFT & Creating Auction...
                   </>
                 ) : (
                   <>
                     {!isAuctionCreationReady() && (
                       <span className="text-yellow-300 mr-2">⚠️</span>
                     )}
-                    Create Auction
+                    Mint NFT & Create Auction
                   </>
                 )}
               </button>
@@ -1658,6 +1744,21 @@ export default function AdminNFTCreator() {
           </motion.div>
         )}
       </motion.div>
+
+      {/* Modal per Fallimenti Validazione */}
+      <ValidationFailureModal
+        isOpen={showFailureModal}
+        onClose={() => setShowFailureModal(false)}
+        validationResult={
+          validationResult || {
+            isValid: false,
+            errors: [],
+            warnings: [],
+            suggestions: [],
+          }
+        }
+        onSuggestionClick={applyNameSuggestion}
+      />
     </div>
   );
 }

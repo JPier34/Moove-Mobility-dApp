@@ -45,6 +45,62 @@ export function NFTCacheSync({
             {isSyncing ? "Sincronizzando..." : "🔄 Sincronizza"}
           </button>
           <button
+            onClick={() => {
+              console.log(
+                "🔍 DEBUG Cache Locale:",
+                localStorage.getItem("moove-nft-cache")
+              );
+              toast.success("Cache loggata in console");
+            }}
+            className="px-3 py-1 rounded text-sm font-medium bg-green-600 text-white hover:bg-green-700 transition-all"
+          >
+            🔍 Debug Cache
+          </button>
+          <button
+            onClick={() => {
+              // Test aggiunta NFT alla cache
+              const testNFT = {
+                name: "TestNFT",
+                imageHash: "test123",
+                creator: "0x123456789",
+                timestamp: Date.now(),
+                source: "local" as const,
+              };
+              const cached = JSON.parse(
+                localStorage.getItem("moove-nft-cache") || "[]"
+              );
+              cached.push(testNFT);
+              localStorage.setItem("moove-nft-cache", JSON.stringify(cached));
+              console.log("🧪 DEBUG: NFT di test aggiunto alla cache");
+              toast.success("NFT di test aggiunto alla cache");
+            }}
+            className="px-3 py-1 rounded text-sm font-medium bg-purple-600 text-white hover:bg-purple-700 transition-all"
+          >
+            🧪 Test Cache
+          </button>
+          <button
+            onClick={() => {
+              const elephantNFT = {
+                name: "Elephant",
+                imageHash:
+                  "1fbbf946b30c6d0e40a3d0504f4faa270433d37c0f145fc72cd9da7ed7f706d2",
+                creator: "0x777382955f33Bb8540602E914D9b650C962EF6Cc",
+                timestamp: Date.now(),
+                source: "local" as const,
+              };
+              const cached = JSON.parse(
+                localStorage.getItem("moove-nft-cache") || "[]"
+              );
+              cached.push(elephantNFT);
+              localStorage.setItem("moove-nft-cache", JSON.stringify(cached));
+              console.log("🐘 DEBUG: Elephant aggiunto alla cache");
+              toast.success("Elephant aggiunto alla cache");
+            }}
+            className="px-3 py-1 rounded text-sm font-medium bg-orange-600 text-white hover:bg-orange-700 transition-all"
+          >
+            🐘 Add Elephant
+          </button>
+          <button
             onClick={onClearCache}
             className="px-3 py-1 rounded text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition-all"
           >

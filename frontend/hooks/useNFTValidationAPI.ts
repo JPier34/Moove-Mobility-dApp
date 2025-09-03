@@ -53,6 +53,7 @@ export function useNFTValidationAPI() {
           (cachedNFT) =>
             cachedNFT.name === nft.name && cachedNFT.imageHash === nft.imageHash
         );
+
         if (!exists) {
           cached.push(nft);
           localStorage.setItem("moove-nft-cache", JSON.stringify(cached));
@@ -388,6 +389,7 @@ export function useNFTValidationAPI() {
           tokenId,
           source: "local",
         };
+
         addToCache(nft);
 
         // Sincronizza con API in background

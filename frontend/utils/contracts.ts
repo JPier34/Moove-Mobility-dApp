@@ -1,10 +1,15 @@
 // Auto-generated contract configuration
 import MooveAccessControlABI from "@/src/abis/MooveAccessControl.json";
+import MooveNFTABI from "@/src/abis/MooveNFT.json";
 
 export const contracts = {
   MooveAccessControl: {
     address: "0x01EfE9998c764bc1f41E71DBa0f946Ad057E50C2",
     abi: MooveAccessControlABI,
+  },
+  MooveNFT: {
+    address: "0x40E455515bf712144C1A5D859F19d64b537754f7",
+    abi: MooveNFTABI,
   },
   MooveRentalPass: {
     address: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
