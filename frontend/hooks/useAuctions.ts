@@ -39,8 +39,35 @@ export function useAuctions() {
     refetch: refetchActive,
   } = useActiveAuctions();
 
-  // TODO: Implement fetching individual auction details
-  // For now, we'll use empty array since contracts are not deployed yet
+  // Fetch individual auction details when auctionIds change
+  useEffect(() => {
+    if (auctionIds && auctionIds.length > 0) {
+      const fetchAuctionDetails = async () => {
+        const auctionPromises = auctionIds.map(async (auctionId) => {
+          try {
+            // TODO: Implement actual auction detail fetching from contract
+            // For now, return empty array until real implementation
+            console.log(
+              `Fetching auction ${auctionId} - implementation needed`
+            );
+            return null;
+          } catch (error) {
+            console.error(`Error fetching auction ${auctionId}:`, error);
+            return null;
+          }
+        });
+
+        const auctionDetails = await Promise.all(auctionPromises);
+        setAuctions(auctionDetails.filter(Boolean) as Auction[]);
+      };
+
+      fetchAuctionDetails();
+    } else {
+      setAuctions([]);
+    }
+  }, [auctionIds, address]);
+
+  // Fetching individual auction details - contracts are deployed
   const isLoading = isLoadingActive;
   const error = activeError?.message || null;
 
@@ -94,6 +121,11 @@ export function useAuctions() {
     (a) => a.status === AuctionStatus.REVEALING
   );
 
+  // Auto-refetch when auctions change
+  const refetch = () => {
+    refetchActive();
+  };
+
   return {
     auctions: filteredAuctions,
     activeAuctions,
@@ -104,7 +136,7 @@ export function useAuctions() {
     setFilters,
     isLoading,
     error,
-    refetch: refetchActive,
+    refetch,
     // Admin permissions
     isMasterAdmin,
     canMint,

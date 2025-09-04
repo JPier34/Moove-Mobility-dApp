@@ -1,3 +1,7 @@
 {
+  "/_not-found/page": "app/_not-found/page.js",
+  "/page": "app/page.js",
+  "/admin/nft-success/[transactionId]/page": "app/admin/nft-success/[transactionId]/page.js",
+  "/auctions/page": "app/auctions/page.js",
   "/admin/page": "app/admin/page.js"
 }

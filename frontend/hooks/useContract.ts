@@ -74,22 +74,31 @@ export function useWriteMooveNFT() {
   } satisfies WriteContractResult & { writeMooveNFT: typeof writeMooveNFT };
 }
 
-// Hook to read MooveAuction contracts (placeholder for future use)
+// Hook to read MooveAuction contracts
 export function useReadMooveAuction<T = unknown>(
   functionName: string,
   args: readonly unknown[] = [],
   options?: { enabled?: boolean }
 ): ReadContractResult<T> {
-  // Placeholder - will be implemented when MooveAuction contract is deployed
+  const { data, isLoading, error, refetch } = useReadContract({
+    address: contracts.MooveAuction.address as `0x${string}`,
+    abi: contracts.MooveAuction.abi,
+    functionName: functionName as any,
+    args: args as readonly unknown[],
+    query: {
+      enabled: options?.enabled !== false,
+    },
+  });
+
   return {
-    data: undefined as T,
-    isLoading: false,
-    error: new Error("MooveAuction contract not yet deployed"),
-    refetch: () => {},
-  } as ReadContractResult<T>;
+    data: data as T,
+    isLoading,
+    error: error as Error | null,
+    refetch,
+  };
 }
 
-// Hook to write MooveAuction contracts (placeholder for future use)
+// Hook to write MooveAuction contracts
 export function useWriteMooveAuction() {
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
@@ -101,8 +110,13 @@ export function useWriteMooveAuction() {
     args: readonly unknown[] = [],
     value?: bigint
   ) => {
-    // Placeholder - will be implemented when MooveAuction contract is deployed
-    console.warn("MooveAuction contract not yet deployed");
+    writeContract({
+      address: contracts.MooveAuction.address as `0x${string}`,
+      abi: contracts.MooveAuction.abi,
+      functionName: functionName as any,
+      args: args as readonly unknown[],
+      value: value,
+    });
   };
 
   return {

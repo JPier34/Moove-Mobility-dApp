@@ -64,33 +64,12 @@ export function useIPFSUnified() {
     );
   }, []);
 
-  // Fallback upload for demo mode
-  const uploadToFallback = useCallback(
-    async (
-      file: File,
-      type: "image" | "json" = "image"
-    ): Promise<IPFSUploadResult> => {
-      const mockHash = `Qm${Math.random()
-        .toString(36)
-        .substring(2, 15)}${Math.random().toString(36).substring(2, 15)}`;
-
-      // Simulate upload delay
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      const result: IPFSUploadResult = {
-        hash: mockHash,
-        url: `ipfs://${mockHash}`,
-      };
-
-      toast.success(
-        `${
-          type === "image" ? "Image" : "Metadata"
-        } uploaded to IPFS (demo mode)`
-      );
-      return result;
-    },
-    []
-  );
+  // No fallback - return error if IPFS fails
+  const handleIPFSError = useCallback((error: any) => {
+    console.error("IPFS upload failed:", error);
+    toast.error("IPFS upload failed. Please check your configuration.");
+    throw error;
+  }, []);
 
   // Upload file to IPFS
   const uploadFile = useCallback(
@@ -151,10 +130,9 @@ export function useIPFSUnified() {
             const result = await response.json();
             hash = result.hash;
           } catch (apiError) {
-            // Fallback to demo mode
-            console.warn("API route failed, using demo mode:", apiError);
-            const result = await uploadToFallback(file, "image");
-            hash = result.hash;
+            // No fallback - throw error
+            console.error("API route failed:", apiError);
+            handleIPFSError(apiError);
           }
         }
 
@@ -167,7 +145,7 @@ export function useIPFSUnified() {
         throw new Error(errorMessage);
       }
     },
-    [isPinataConfigured, uploadToFallback]
+    [isPinataConfigured]
   );
 
   // Upload JSON metadata to IPFS
@@ -206,15 +184,9 @@ export function useIPFSUnified() {
             const result = await response.json();
             hash = result.hash;
           } catch (apiError) {
-            // Fallback to demo mode
-            console.warn("API route failed, using demo mode:", apiError);
-            const result = await uploadToFallback(
-              new File([JSON.stringify(metadata, null, 2)], "metadata.json", {
-                type: "application/json",
-              }),
-              "json"
-            );
-            hash = result.hash;
+            // No fallback - throw error
+            console.error("API route failed:", apiError);
+            handleIPFSError(apiError);
           }
         }
 
@@ -227,7 +199,7 @@ export function useIPFSUnified() {
         throw new Error(errorMessage);
       }
     },
-    [isPinataConfigured, uploadToFallback]
+    [isPinataConfigured]
   );
 
   // Upload complete NFT (image + metadata)

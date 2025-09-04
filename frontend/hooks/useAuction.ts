@@ -53,7 +53,7 @@ export function useCreateAuction() {
   const { writeMooveAuction, isPending, isConfirming, isSuccess, error } =
     useWriteMooveAuction();
 
-  const createAuction = (
+  const createAuction = async (
     nftId: number,
     nftContract: string,
     auctionType: AuctionType,
@@ -63,16 +63,23 @@ export function useCreateAuction() {
     duration: number,
     bidIncrement: bigint
   ) => {
-    writeMooveAuction("createAuction", [
-      nftId,
-      nftContract,
-      auctionType,
-      startPrice,
-      reservePrice,
-      buyNowPrice,
-      duration,
-      bidIncrement,
-    ]);
+    return new Promise((resolve, reject) => {
+      try {
+        writeMooveAuction("createAuction", [
+          nftId,
+          nftContract,
+          auctionType,
+          startPrice,
+          reservePrice,
+          buyNowPrice,
+          duration,
+          bidIncrement,
+        ]);
+        resolve(true);
+      } catch (error) {
+        reject(error);
+      }
+    });
   };
 
   return {

@@ -234,3 +234,4 @@ export function NFTMetadataPreview({ metadata }: NFTMetadataPreviewProps) {
     </div>
   );
 }
+

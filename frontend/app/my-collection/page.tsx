@@ -83,102 +83,9 @@ const RARITY_CONFIG = {
   },
 };
 
-// Mock data - rental passes
-const mockRentalPasses: RentalPass[] = [
-  {
-    id: "1",
-    tokenId: "1001",
-    vehicleType: "bike",
-    purchaseDate: new Date("2024-01-15"),
-    expiryDate: new Date("2024-02-15"),
-    status: "active",
-    cityId: "rome",
-    cityName: "Rome",
-    price: 27,
-    transactionHash: "0x123...",
-    usageStats: {
-      totalRides: 15,
-      totalDistance: 87.5,
-      totalTime: 12.3,
-      lastUsed: new Date("2024-01-28"),
-    },
-  },
-  {
-    id: "2",
-    tokenId: "1002",
-    vehicleType: "scooter",
-    purchaseDate: new Date("2024-01-10"),
-    expiryDate: new Date("2024-01-25"),
-    status: "expired",
-    cityId: "milan",
-    cityName: "Milan",
-    price: 37,
-    transactionHash: "0x456...",
-    usageStats: {
-      totalRides: 8,
-      totalDistance: 45.2,
-      totalTime: 6.7,
-      lastUsed: new Date("2024-01-24"),
-    },
-  },
-];
-
-// Mock data - decorative NFTs
-const mockDecorativeNFTs: DecorativeNFT[] = [
-  {
-    id: "d1",
-    tokenId: "2001",
-    name: "Sunset Rome Sticker",
-    description:
-      "Beautiful sunset view of the Colosseum with vibrant orange and pink gradients",
-    image: "/images/stickers/sunset-rome.png",
-    category: "sticker",
-    rarity: "rare",
-    purchaseDate: new Date("2024-01-20"),
-    price: 15,
-    transactionHash: "0x789...",
-    auctionWon: {
-      auctionId: "auction_001",
-      finalBid: 15,
-      bidders: 8,
-    },
-  },
-  {
-    id: "d2",
-    tokenId: "2002",
-    name: "Electric Lightning Badge",
-    description:
-      "Exclusive achievement badge for eco-warriors who saved 100kg+ CO₂",
-    image: "/images/badges/eco-warrior.png",
-    category: "badge",
-    rarity: "epic",
-    purchaseDate: new Date("2024-01-18"),
-    price: 45,
-    transactionHash: "0xabc...",
-    auctionWon: {
-      auctionId: "auction_002",
-      finalBid: 45,
-      bidders: 15,
-    },
-  },
-  {
-    id: "d3",
-    tokenId: "2003",
-    name: "Neon Cyber Skin",
-    description: "Futuristic neon-lit vehicle skin with animated RGB effects",
-    image: "/images/skins/neon-cyber.png",
-    category: "skin",
-    rarity: "legendary",
-    purchaseDate: new Date("2024-01-22"),
-    price: 120,
-    transactionHash: "0xdef...",
-    auctionWon: {
-      auctionId: "auction_003",
-      finalBid: 120,
-      bidders: 23,
-    },
-  },
-];
+// Empty arrays - data will be fetched from blockchain
+const mockRentalPasses: RentalPass[] = [];
+const mockDecorativeNFTs: DecorativeNFT[] = [];
 
 // ============= COMPONENTS =============
 
@@ -270,7 +177,7 @@ function FilterBar({
 }) {
   return (
     <motion.div
-      className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg mb-8"
+      className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg mb-8 justify-between"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6 }}

@@ -18,6 +18,7 @@ import { ValidationFailureModal } from "@/components/admin/ValidationFailureModa
 import { useNFTValidationAPI } from "@/hooks/useNFTValidationAPI";
 import { AuctionType } from "@/types/auction";
 import { contracts } from "@/utils/contracts";
+import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 
 interface NFTFormData {
@@ -51,6 +52,7 @@ interface AuctionFormData {
 export default function AdminNFTCreator() {
   const { address } = useAccount();
   const { canMint, isMasterAdmin } = useUserRoles(address);
+  const router = useRouter();
   const {
     uploadNFT,
     isUploading: isUploadingToIPFS,
@@ -237,7 +239,7 @@ export default function AdminNFTCreator() {
     return errors;
   };
 
-  const handleNFTCreation = async () => {
+  const handleNFTCreation = async (skipRedirect = false) => {
     // Check permissions first
     if (!canMint && !isMasterAdmin) {
       toast.error(
@@ -336,8 +338,40 @@ export default function AdminNFTCreator() {
       // Aggiungi NFT alla cache locale
       await addValidatedNFT(nftData.name, nftData.image);
 
-      // Non procedere automaticamente alla fase auction
-      // L'utente deve configurare l'asta e poi cliccare "Create Auction"
+      // Save NFT creation data for success page (NFT only, no auction)
+      const nftCreationData = {
+        id: `nft_${Date.now()}`,
+        nftName: nftData.name,
+        nftDescription: nftData.description,
+        nftImage: nftData.image,
+        tokenId: "0", // Will be updated with real token ID from transaction
+        transactionHash:
+          "0x0000000000000000000000000000000000000000000000000000000000000000", // Will be updated with real tx hash
+        creationDate: new Date().toISOString(),
+        price: 0, // Will be updated with real minting cost
+        gasFee: 0, // Will be updated with real gas fee
+        totalCost: 0,
+        auctionCreated: false,
+        status: "confirmed",
+        ipfsHash:
+          nftData.image instanceof File
+            ? nftData.image.name
+            : typeof nftData.image === "string"
+            ? nftData.image
+            : "No IPFS hash",
+      };
+
+      localStorage.setItem(
+        `nft_creation_${nftCreationData.id}`,
+        JSON.stringify(nftCreationData)
+      );
+
+      // Redirect to success page solo se non stiamo creando anche l'asta
+      if (!skipRedirect) {
+        router.push(`/admin/nft-success/${nftCreationData.id}`);
+      }
+
+      // Se skipRedirect è true, non fare redirect - l'asta verrà creata dopo
     } catch (error) {
       console.error("Error creating NFT:", error);
       toast.error("Failed to create NFT");
@@ -470,8 +504,7 @@ export default function AdminNFTCreator() {
     }
 
     try {
-      // Prima mint l'NFT e aspetta il risultato
-      await handleNFTCreation();
+      // Non mintare l'NFT qui - è già stato mintato
 
       // Per ora usiamo un token ID incrementale basato sul timestamp
       // TODO: Implementare recupero token ID dal mint transaction
@@ -498,7 +531,7 @@ export default function AdminNFTCreator() {
         return BigInt(Math.floor(numPrice * 1e18));
       };
 
-      createAuction(
+      await createAuction(
         nftId,
         nftContract,
         auctionData.auctionType,
@@ -509,11 +542,51 @@ export default function AdminNFTCreator() {
         bidIncrement
       );
 
-      toast.success("NFT minted and auction created successfully!");
+      toast.success("Auction created successfully!");
     } catch (error) {
       console.error("Error creating auction:", error);
       toast.error("Failed to create auction");
+      throw error; // Re-throw per gestire l'errore in handleCompleteCreation
     }
+  };
+
+  // Save NFT creation data for success page (moved outside try-catch)
+  const saveNFTCreationData = () => {
+    const nftCreationData = {
+      id: `nft_${Date.now()}`,
+      nftName: nftData.name,
+      nftDescription: nftData.description,
+      nftImage: nftData.image,
+      tokenId: "0", // Will be updated with real token ID
+      transactionHash:
+        "0x0000000000000000000000000000000000000000000000000000000000000000", // Will be updated with real tx hash
+      creationDate: new Date().toISOString(),
+      price: 0, // Will be updated with real minting cost
+      gasFee: 0, // Will be updated with real gas fee
+      totalCost: 0,
+      auctionCreated: true,
+      auctionType: auctionData.auctionType,
+      auctionId: "0", // Will be updated with real auction ID
+      status: "confirmed",
+      ipfsHash:
+        nftData.image instanceof File
+          ? nftData.image.name
+          : typeof nftData.image === "string"
+          ? nftData.image
+          : "No IPFS hash",
+    };
+
+    localStorage.setItem(
+      `nft_creation_${nftCreationData.id}`,
+      JSON.stringify(nftCreationData)
+    );
+
+    router.push(`/admin/nft-success/${nftCreationData.id}`);
+
+    // Trigger refetch of auctions to show the new auction
+    setTimeout(() => {
+      window.location.reload(); // Simple refresh to show new auction
+    }, 2000);
   };
 
   const isProcessing =
@@ -808,9 +881,22 @@ export default function AdminNFTCreator() {
       return;
     }
 
-    // Prima mint l'NFT, poi crea l'asta
-    await handleNFTCreation();
-    // handleAuctionCreation() verrà chiamato automaticamente dopo il mint
+    try {
+      // Prima mint l'NFT (senza redirect)
+      await handleNFTCreation(true);
+
+      // Aspetta un po' per assicurarsi che la transazione sia processata
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      // Crea l'asta dopo il mint dell'NFT
+      await handleAuctionCreation();
+
+      // Save NFT creation data and redirect
+      saveNFTCreationData();
+    } catch (error) {
+      console.error("Error in complete creation:", error);
+      toast.error("Failed to create NFT and auction");
+    }
   };
 
   return (
@@ -869,18 +955,7 @@ export default function AdminNFTCreator() {
               NFT Details
             </h2>
 
-            <IPFSStatus />
-            <EnvDebug />
-            <PinataTest />
-            <AdminPermissionsDebug />
-            <NFTCreationDebug
-              nftData={nftData}
-              canMint={canMint}
-              isMasterAdmin={isMasterAdmin}
-              isDuplicateName={isDuplicateName}
-              hasInvalidCharacters={hasInvalidCharacters}
-            />
-            {/* Cache & Sincronizzazione */}
+            {/* Debug components removed for production */}
             <NFTCacheSync
               onSync={syncWithAPI}
               isSyncing={isSyncing}
