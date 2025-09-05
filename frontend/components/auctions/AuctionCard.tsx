@@ -5,6 +5,13 @@ import { Auction, AuctionType, AuctionStatus } from "../../types/auction";
 import Button from "../ui/Button";
 import { useAccount } from "wagmi";
 import { shortenAddress } from "../../utils/shortenAddress";
+import {
+  useCurrentDutchPrice,
+  useCommitToBuyDutch,
+  useBuyNowDutch,
+} from "@/hooks/useAuction";
+import { formatEther, parseEther } from "viem";
+import { ethers } from "ethers";
 
 interface AuctionCardProps {
   auction: Auction;
@@ -49,11 +56,15 @@ export default function AuctionCard({
   onClick,
   showEndedState = false,
 }: AuctionCardProps) {
-  const { isConnected } = useAccount();
+  const { address, isConnected } = useAccount();
   const [timeLeft, setTimeLeft] = useState("");
   const [currentDutchPrice, setCurrentDutchPrice] = useState(
     auction.currentBid
   );
+
+  // Hooks for auction interactions
+  const { commitToBuyDutch } = useCommitToBuyDutch();
+  const { buyNowDutch } = useBuyNowDutch();
 
   // Calculate time remaining
   useEffect(() => {
@@ -136,7 +147,7 @@ export default function AuctionCard({
     auction.status,
   ]);
 
-  const handleQuickAction = (e: React.MouseEvent) => {
+  const handleQuickAction = async (e: React.MouseEvent) => {
     e.stopPropagation();
 
     if (!isConnected) {
@@ -144,13 +155,46 @@ export default function AuctionCard({
       return;
     }
 
-    // TODO: Implement actual bidding logic. Optional
-    console.log(
-      "Quick action for auction:",
-      auction.auctionId,
-      "Type:",
-      auction.auctionType
-    );
+    try {
+      if (auction.auctionType === AuctionType.DUTCH) {
+        // Generate a random nonce for the commitment
+        const nonce = BigInt(Math.floor(Math.random() * 1000000000));
+
+        // Create commitment hash
+        const commitment = ethers.solidityPackedKeccak256(
+          ["address", "uint256"],
+          [address, nonce]
+        );
+
+        // First commit to buy
+        console.log("Committing to buy Dutch auction...");
+        await commitToBuyDutch(parseInt(auction.auctionId), commitment);
+
+        // Wait a moment for the commitment to be processed
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
+        // Then buy with the commitment
+        console.log("Buying at Dutch price:", currentDutchPrice, "ETH");
+        await buyNowDutch(
+          parseInt(auction.auctionId),
+          nonce,
+          parseEther(currentDutchPrice.toString())
+        );
+
+        alert(`Successfully purchased for ${currentDutchPrice} ETH!`);
+      } else {
+        // For other auction types, just log for now
+        console.log(
+          "Quick action for auction:",
+          auction.auctionId,
+          "Type:",
+          auction.auctionType
+        );
+      }
+    } catch (error) {
+      console.error("Error in quick action:", error);
+      alert("Error processing action");
+    }
   };
 
   const getActionButton = () => {

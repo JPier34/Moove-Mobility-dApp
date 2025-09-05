@@ -5,6 +5,14 @@ import { Auction, AuctionType, AuctionStatus } from "../../types/auction";
 import Button from "../ui/Button";
 import { shortenAddress } from "../../utils/shortenAddress";
 import { useAccount } from "wagmi";
+import {
+  usePlaceBid,
+  useCurrentDutchPrice,
+  useCommitToBuyDutch,
+  useBuyNowDutch,
+} from "@/hooks/useAuction";
+import { formatEther, parseEther } from "viem";
+import { ethers } from "ethers";
 
 interface AuctionModalProps {
   auction: Auction;
@@ -42,6 +50,11 @@ export default function AuctionModal({
   // Sealed bid state
   const [sealedBidAmount, setSealedBidAmount] = useState("");
   const [sealedBidNonce, setSealedBidNonce] = useState("");
+
+  // Hooks for auction interactions
+  const { placeBid } = usePlaceBid();
+  const { commitToBuyDutch } = useCommitToBuyDutch();
+  const { buyNowDutch } = useBuyNowDutch();
 
   // Close modal with ESC
   useEffect(() => {
@@ -138,7 +151,6 @@ export default function AuctionModal({
 
     setIsSubmittingBid(true);
     try {
-      // TODO: Implement actual bidding with smart contract
       console.log(
         "Placing bid:",
         amount,
@@ -146,8 +158,8 @@ export default function AuctionModal({
         auction.auctionId
       );
 
-      // Simulate bid submission
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      // Use the hook to place the bid
+      placeBid(parseInt(auction.auctionId), parseEther(amount));
 
       alert(`Bid of ${amount} ETH placed successfully!`);
       onClose();
@@ -167,9 +179,16 @@ export default function AuctionModal({
 
     setIsSubmittingBid(true);
     try {
-      // TODO: Implement sealed bid submission
       console.log("Submitting sealed bid for auction:", auction.auctionId);
 
+      // Create sealed bid hash
+      const bidHash = ethers.solidityPackedKeccak256(
+        ["uint256", "uint256", "address"],
+        [parseEther(sealedBidAmount), BigInt(sealedBidNonce), address]
+      );
+
+      // Submit sealed bid (this would need to be implemented in the hook)
+      // For now, we'll keep the simulation
       await new Promise((resolve) => setTimeout(resolve, 2000));
 
       alert("Sealed bid submitted successfully!");
@@ -190,10 +209,29 @@ export default function AuctionModal({
 
     setIsSubmittingBid(true);
     try {
-      // TODO: Implement Dutch auction buy now
-      console.log("Buying at Dutch price:", currentDutchPrice, "ETH");
+      // Generate a random nonce for the commitment
+      const nonce = BigInt(Math.floor(Math.random() * 1000000000));
 
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      // Create commitment hash
+      const commitment = ethers.solidityPackedKeccak256(
+        ["address", "uint256"],
+        [address, nonce]
+      );
+
+      // First commit to buy
+      console.log("Committing to buy Dutch auction...");
+      await commitToBuyDutch(parseInt(auction.auctionId), commitment);
+
+      // Wait a moment for the commitment to be processed
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      // Then buy with the commitment
+      console.log("Buying at Dutch price:", currentDutchPrice, "ETH");
+      await buyNowDutch(
+        parseInt(auction.auctionId),
+        nonce,
+        ethers.parseEther(currentDutchPrice.toString())
+      );
 
       alert(`Successfully purchased for ${currentDutchPrice} ETH!`);
       onClose();

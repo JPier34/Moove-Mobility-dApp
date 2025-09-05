@@ -236,7 +236,7 @@ export function useWriteMooveStickerNFT() {
     // Use MooveNFT contract for minting
     writeContract({
       address: contracts.MooveNFT.address as `0x${string}`,
-      abi: contracts.MooveNFT.abi,
+      abi: contracts.MooveNFT.abi as any,
       functionName: functionName as any,
       args: args as any,
     });

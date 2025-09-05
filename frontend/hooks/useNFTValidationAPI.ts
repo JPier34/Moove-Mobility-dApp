@@ -264,6 +264,10 @@ export function useNFTValidationAPI() {
         }
 
         // 2. Verifica duplicati (locale + API)
+        if (!image) {
+          result.errors.push("Immagine richiesta per la validazione");
+          return result;
+        }
         const duplicateCheck = await checkDuplicates(name, image);
         if (duplicateCheck.nameDuplicate) {
           result.errors.push(`Nome "${name}" già utilizzato`);

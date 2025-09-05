@@ -197,3 +197,82 @@ export function useClaimNFT() {
     error,
   };
 }
+
+// New hooks for Dutch auction commit-reveal functionality
+export function useCommitToBuyDutch() {
+  const { writeMooveAuction, isPending, isConfirming, isSuccess, error } =
+    useWriteMooveAuction();
+
+  const commitToBuyDutch = (auctionId: number, commitment: string) => {
+    writeMooveAuction("commitToBuyDutch", [auctionId, commitment]);
+  };
+
+  return {
+    commitToBuyDutch,
+    isPending,
+    isConfirming,
+    isSuccess,
+    error,
+  };
+}
+
+export function useBuyNowDutch() {
+  const { writeMooveAuction, isPending, isConfirming, isSuccess, error } =
+    useWriteMooveAuction();
+
+  const buyNowDutch = (auctionId: number, nonce: bigint, value: bigint) => {
+    writeMooveAuction("buyNowDutch", [auctionId, nonce], value);
+  };
+
+  return {
+    buyNowDutch,
+    isPending,
+    isConfirming,
+    isSuccess,
+    error,
+  };
+}
+
+// Hook for sealed bid reveal phase management
+export function useStartRevealPhase() {
+  const { writeMooveAuction, isPending, isConfirming, isSuccess, error } =
+    useWriteMooveAuction();
+
+  const startRevealPhase = (auctionId: number) => {
+    writeMooveAuction("startRevealPhase", [auctionId]);
+  };
+
+  return {
+    startRevealPhase,
+    isPending,
+    isConfirming,
+    isSuccess,
+    error,
+  };
+}
+
+// Hook for batch refund functionality (admin only)
+export function useRefundRemainingBidders() {
+  const { writeMooveAuction, isPending, isConfirming, isSuccess, error } =
+    useWriteMooveAuction();
+
+  const refundRemainingBidders = (
+    auctionId: number,
+    startIndex: number,
+    batchSize: number
+  ) => {
+    writeMooveAuction("refundRemainingBidders", [
+      auctionId,
+      startIndex,
+      batchSize,
+    ]);
+  };
+
+  return {
+    refundRemainingBidders,
+    isPending,
+    isConfirming,
+    isSuccess,
+    error,
+  };
+}

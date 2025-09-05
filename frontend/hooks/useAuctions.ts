@@ -7,10 +7,15 @@ import { useActiveAuctions } from "./useAuction";
 import { useUserRoles } from "./useContract";
 
 interface AuctionFilters {
-  status: "all" | "active" | "ended" | "revealing";
-  type: "all" | "traditional" | "english" | "dutch" | "sealed";
-  category: "all" | "sticker" | "badge" | "skin" | "avatar";
-  priceRange: "all" | "low" | "medium" | "high";
+  type: AuctionType | "all";
+  status: "active" | "ended" | "all";
+  category: string;
+  priceRange: {
+    min: number;
+    max: number;
+  };
+  sortBy: "price" | "time" | "bids";
+  sortOrder: "asc" | "desc";
 }
 
 interface AuctionStats {
@@ -25,10 +30,12 @@ export function useAuctions() {
   const { isMasterAdmin, canMint } = useUserRoles(address);
   const [auctions, setAuctions] = useState<Auction[]>([]);
   const [filters, setFilters] = useState<AuctionFilters>({
-    status: "all",
     type: "all",
+    status: "all",
     category: "all",
-    priceRange: "all",
+    priceRange: { min: 0, max: 1000 },
+    sortBy: "time",
+    sortOrder: "desc",
   });
 
   // Use existing hook to get active auctions
@@ -69,7 +76,9 @@ export function useAuctions() {
         });
 
         const auctionDetails = await Promise.all(auctionPromises);
-        const validAuctions = auctionDetails.filter(Boolean) as Auction[];
+        const validAuctions = auctionDetails.filter(
+          (auction) => auction !== null
+        ) as unknown as Auction[];
         console.log("🔍 useAuctions: Fetched auction details", {
           total: auctionDetails.length,
           valid: validAuctions.length,
@@ -98,23 +107,17 @@ export function useAuctions() {
       String(auction.status).toLowerCase() !== filters.status
     )
       return false;
-    if (
-      filters.type !== "all" &&
-      String(auction.auctionType).toLowerCase() !== filters.type
-    )
+    if (filters.type !== "all" && auction.auctionType !== filters.type)
       return false;
     if (filters.category !== "all" && auction.nftCategory !== filters.category)
       return false;
 
     // Price range filtering
-    if (filters.priceRange !== "all") {
-      const price = parseFloat(
-        auction.currentBid === "???" ? auction.startPrice : auction.currentBid
-      );
-      if (filters.priceRange === "low" && price >= 0.001) return false;
-      if (filters.priceRange === "medium" && (price < 0.001 || price > 0.005))
-        return false;
-      if (filters.priceRange === "high" && price <= 0.005) return false;
+    const price = parseFloat(
+      auction.currentBid === "???" ? auction.startPrice : auction.currentBid
+    );
+    if (price < filters.priceRange.min || price > filters.priceRange.max) {
+      return false;
     }
 
     return true;

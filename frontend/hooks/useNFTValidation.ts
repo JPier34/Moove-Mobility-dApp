@@ -155,6 +155,10 @@ export function useNFTValidation() {
         }
 
         // 3. Verifica duplicati immagine
+        if (!image) {
+          result.errors.push("Immagine richiesta per la validazione");
+          return result;
+        }
         const imageCheck = await checkImageDuplicates(image);
         if (imageCheck.isDuplicate) {
           result.errors.push("Immagine già utilizzata in un NFT esistente");
@@ -307,5 +311,3 @@ export function useNFTValidation() {
     getCachedNFTs,
   };
 }
-
-

@@ -133,7 +133,12 @@ export function useIPFSUnified() {
             // No fallback - throw error
             console.error("API route failed:", apiError);
             handleIPFSError(apiError);
+            throw apiError; // Re-throw to prevent undefined hash
           }
+        }
+
+        if (!hash) {
+          throw new Error("Failed to upload file to IPFS");
         }
 
         setUploadProgress(70);
@@ -187,7 +192,12 @@ export function useIPFSUnified() {
             // No fallback - throw error
             console.error("API route failed:", apiError);
             handleIPFSError(apiError);
+            throw apiError; // Re-throw to prevent undefined hash
           }
+        }
+
+        if (!hash) {
+          throw new Error("Failed to upload metadata to IPFS");
         }
 
         setUploadProgress(100);
@@ -259,8 +269,6 @@ export function useIPFSUnified() {
             category: "Vehicle Decoration",
             rarity: nftData.rarity,
             isLimitedEdition: nftData.isLimitedEdition,
-            editionSize: nftData.editionSize,
-            editionNumber: nftData.editionNumber,
             creator: nftData.creator,
             creationDate: new Date().toISOString(),
             customization: nftData.customizationOptions,

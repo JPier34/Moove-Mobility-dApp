@@ -21,7 +21,7 @@ interface NFTCreationDetails {
   auctionCreated: boolean;
   auctionType?: string;
   auctionId?: string;
-  status: "confirmed" | "pending" | "failed";
+  status: "confirmed" | "pending" | "failed" | "loading" | "unknown";
   ipfsHash?: string;
 }
 

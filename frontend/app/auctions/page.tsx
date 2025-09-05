@@ -8,6 +8,18 @@ import { useAuctions } from "@/hooks/useAuctions";
 
 // ============= TYPES =============
 
+interface FilterOptions {
+  type: AuctionType | "all";
+  status: "active" | "ended" | "all";
+  category: string;
+  priceRange: {
+    min: number;
+    max: number;
+  };
+  sortBy: "price" | "time" | "bids";
+  sortOrder: "asc" | "desc";
+}
+
 const AUCTION_TYPE_CONFIG = {
   [AuctionType.TRADITIONAL]: {
     name: "Traditional",
@@ -307,10 +319,35 @@ function FilterBar({
             Price Range
           </label>
           <select
-            value={filters.priceRange}
-            onChange={(e) =>
-              onFilterChange({ ...filters, priceRange: e.target.value as any })
+            value={
+              filters.priceRange.min === 0 && filters.priceRange.max === 1000
+                ? "all"
+                : "custom"
             }
+            onChange={(e) => {
+              const value = e.target.value;
+              if (value === "all") {
+                onFilterChange({
+                  ...filters,
+                  priceRange: { min: 0, max: 1000 },
+                });
+              } else if (value === "low") {
+                onFilterChange({
+                  ...filters,
+                  priceRange: { min: 0, max: 0.001 },
+                });
+              } else if (value === "medium") {
+                onFilterChange({
+                  ...filters,
+                  priceRange: { min: 0.001, max: 0.005 },
+                });
+              } else if (value === "high") {
+                onFilterChange({
+                  ...filters,
+                  priceRange: { min: 0.005, max: 1000 },
+                });
+              }
+            }}
             className="bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm"
           >
             <option value="all">All Prices</option>
