@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { useAccount } from "wagmi";
 import { useCreateAuction } from "@/hooks/useAuction";
+import { useWriteMooveAuction } from "@/hooks/useContract";
 import { useWriteMooveStickerNFT, useUserRoles } from "@/hooks/useContract";
 import { useIPFSUnified } from "@/hooks/useIPFSUnified";
 import { IPFSStatus } from "@/components/admin/IPFSStatus";
@@ -16,6 +17,7 @@ import { NFTValidationResults } from "@/components/admin/NFTValidationResults";
 import { NFTCacheSync } from "@/components/admin/NFTCacheSync";
 import { ValidationFailureModal } from "@/components/admin/ValidationFailureModal";
 import { useNFTValidationAPI } from "@/hooks/useNFTValidationAPI";
+import { useWalletPersistence } from "@/hooks/useWalletPersistence";
 import { AuctionType } from "@/types/auction";
 import { contracts } from "@/utils/contracts";
 import { useRouter } from "next/navigation";
@@ -67,6 +69,13 @@ export default function AdminNFTCreator() {
     isValidating: isValidatingNFT,
     isSyncing,
   } = useNFTValidationAPI();
+
+  // Hook per persistenza wallet con auto-reconnection
+  const { forceReconnect, isConnected, isConnecting } = useWalletPersistence();
+
+  // Hook per creazione aste
+  const { writeMooveAuction, hash, isPending, isConfirming, isSuccess, error } =
+    useWriteMooveAuction();
   const [step, setStep] = useState<"nft" | "auction">("nft");
   const [nftData, setNftData] = useState<NFTFormData>({
     name: "",
@@ -497,8 +506,11 @@ export default function AdminNFTCreator() {
   };
 
   const handleAuctionCreation = async () => {
+    console.log("🏆 Starting auction creation...");
+
     const validationErrors = validateAuctionCreation();
     if (validationErrors.length > 0) {
+      console.log("❌ Auction validation errors:", validationErrors);
       validationErrors.forEach((error) => toast.error(error));
       return;
     }
@@ -508,18 +520,39 @@ export default function AdminNFTCreator() {
 
       // Per ora usiamo un token ID incrementale basato sul timestamp
       // TODO: Implementare recupero token ID dal mint transaction
-      const nftId = Math.floor(Date.now() / 1000) % 1000000; // Token ID temporaneo
+      // Usiamo un ID più realistico basato sul timestamp attuale
+      const nftId = Math.floor(Date.now() / 1000) % 100000; // Token ID temporaneo (ridotto range)
       const nftContract = contracts.MooveNFT.address;
 
-      // Convert duration to seconds based on unit (con fallback sicuro)
-      const durationInSeconds =
-        (auctionData.durationUnit || "hours") === "minutes"
-          ? parseInt(auctionData.duration) * 60
-          : parseInt(auctionData.duration) * 3600;
+      console.log("🔍 NFT Contract and ID:", {
+        nftContract,
+        nftId,
+        nftContractValid:
+          nftContract &&
+          nftContract.startsWith("0x") &&
+          nftContract.length === 42,
+      });
 
-      // Validazione bid increment con fallback sicuro
-      const bidIncrementValue = auctionData.bidIncrement || "0.000001";
-      const bidIncrement = BigInt(parseFloat(bidIncrementValue) * 1e18);
+      // Verifica che il contratto MooveAuction abbia i permessi per gestire l'NFT
+      console.log("🔍 Auction Contract:", {
+        auctionContract: contracts.MooveAuction.address,
+        auctionContractValid:
+          contracts.MooveAuction.address &&
+          contracts.MooveAuction.address.startsWith("0x") &&
+          contracts.MooveAuction.address.length === 42,
+      });
+
+      // Convert auction type to number first
+      const auctionTypeNumber = parseInt(
+        String(auctionData.auctionType) || "0"
+      );
+
+      // Validazione tipo asta (0-3 sono i tipi validi)
+      if (auctionTypeNumber < 0 || auctionTypeNumber > 3) {
+        throw new Error(
+          `Invalid auction type: ${auctionTypeNumber}. Must be between 0-3`
+        );
+      }
 
       // Protezione overflow per i prezzi
       const safeParsePrice = (price: string): bigint => {
@@ -528,19 +561,137 @@ export default function AdminNFTCreator() {
         if (numPrice > 1000) {
           throw new Error(`Price too high: ${numPrice} ETH (max 1000 ETH)`);
         }
+        // Prezzo minimo di 0.000001 ETH per evitare errori del contratto
+        if (numPrice > 0 && numPrice < 0.000001) {
+          console.log("⚠️ Price too low, setting minimum to 0.000001 ETH");
+          return BigInt(1000000000000); // 0.000001 ETH in wei
+        }
         return BigInt(Math.floor(numPrice * 1e18));
       };
 
-      await createAuction(
+      // Convert duration to seconds based on unit (con fallback sicuro)
+      // Assicuriamoci che la durata sia almeno 1 ora (3600 secondi) per evitare errori del contratto
+      let durationInSeconds =
+        (auctionData.durationUnit || "hours") === "minutes"
+          ? parseInt(auctionData.duration) * 60
+          : parseInt(auctionData.duration) * 3600;
+
+      // Durata minima di 1 ora per evitare errori del contratto
+      if (durationInSeconds < 3600) {
+        console.log(
+          "⚠️ Duration too short, setting minimum to 1 hour (3600 seconds)"
+        );
+        durationInSeconds = 3600;
+      }
+
+      // Validazione bid increment con fallback sicuro
+      const bidIncrementValue = auctionData.bidIncrement || "0.000001";
+      let bidIncrement = BigInt(parseFloat(bidIncrementValue) * 1e18);
+
+      // Bid increment minimo di 0.000001 ETH per evitare errori del contratto
+      if (bidIncrement > 0n && bidIncrement < BigInt(1000000000000)) {
+        console.log(
+          "⚠️ Bid increment too low, setting minimum to 0.000001 ETH"
+        );
+        bidIncrement = BigInt(1000000000000); // 0.000001 ETH in wei
+      }
+
+      console.log("📊 Auction parameters:", {
         nftId,
         nftContract,
-        auctionData.auctionType,
+        auctionType: auctionData.auctionType,
+        startPrice: auctionData.startPrice,
+        reservePrice: auctionData.reservePrice,
+        buyNowPrice: auctionData.buyNowPrice,
+        duration: auctionData.duration,
+        durationUnit: auctionData.durationUnit,
+        bidIncrement: auctionData.bidIncrement,
+      });
+
+      // Debug: Check if NFT contract is valid
+      console.log("🔍 Contract validation:", {
+        nftContractValid:
+          nftContract &&
+          nftContract.startsWith("0x") &&
+          nftContract.length === 42,
+        nftIdValid: nftId && nftId > 0,
+        auctionTypeValid: auctionTypeNumber >= 0 && auctionTypeNumber <= 3,
+        startPriceValid: safeParsePrice(auctionData.startPrice) > 0n,
+        durationValid: durationInSeconds > 0,
+        bidIncrementValid: bidIncrement >= 0n,
+      });
+
+      console.log("📞 Calling createAuction with parameters:", {
+        nftContract, // nftContract comes first
+        nftId, // tokenId comes second
+        auctionType: auctionData.auctionType,
+        auctionTypeNumber,
+        startPrice: safeParsePrice(auctionData.startPrice).toString(),
+        reservePrice: safeParsePrice(
+          auctionData.reservePrice || "0"
+        ).toString(),
+        buyNowPrice: safeParsePrice(auctionData.buyNowPrice || "0").toString(),
+        durationInSeconds,
+        bidIncrement: bidIncrement.toString(),
+      });
+
+      // Call the write function directly
+      console.log("🔧 Calling writeMooveAuction directly...");
+      writeMooveAuction("createAuction", [
+        nftContract, // nftContract comes first
+        nftId, // tokenId comes second
+        auctionTypeNumber, // Use number instead of enum
         safeParsePrice(auctionData.startPrice),
         safeParsePrice(auctionData.reservePrice || "0"),
         safeParsePrice(auctionData.buyNowPrice || "0"),
         durationInSeconds,
-        bidIncrement
-      );
+        bidIncrement,
+      ]);
+
+      console.log("✅ writeMooveAuction called successfully");
+      console.log("🔍 Current auction status:", {
+        hash,
+        isPending,
+        isConfirming,
+        isSuccess,
+        error,
+      });
+
+      // Wait for transaction to be submitted
+      console.log("⏳ Waiting for auction transaction to be submitted...");
+      await new Promise((resolve) => setTimeout(resolve, 3000)); // Wait 3 seconds for submission
+
+      console.log("🔍 Final auction status:", {
+        hash,
+        isPending,
+        isConfirming,
+        isSuccess,
+        error,
+      });
+
+      // Check if auction creation was successful
+      if (error) {
+        throw new Error(`Auction creation failed: ${error.message || error}`);
+      }
+
+      if (!hash) {
+        throw new Error(
+          "No transaction hash received - transaction may have failed"
+        );
+      }
+
+      // Wait for transaction confirmation
+      console.log("⏳ Waiting for auction transaction confirmation...");
+      console.log("🔗 Transaction hash:", hash);
+
+      // Check if we can verify the transaction on Etherscan
+      if (hash) {
+        console.log(
+          `🔍 Check transaction on Etherscan: https://sepolia.etherscan.io/tx/${hash}`
+        );
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 5000)); // Wait 5 seconds for confirmation
 
       toast.success("Auction created successfully!");
     } catch (error) {
@@ -581,13 +732,18 @@ export default function AdminNFTCreator() {
       JSON.stringify(nftCreationData)
     );
 
-    router.push(`/admin/nft-success/${nftCreationData.id}`);
+    // Delay per permettere ai log di essere visibili
+    console.log("⏳ Waiting 3 seconds before redirect...");
+    toast.success("NFT and auction created! Redirecting in 3 seconds...");
 
-    // Trigger refetch of auctions to show the new auction
     setTimeout(() => {
-      window.location.reload(); // Simple refresh to show new auction
-    }, 2000);
+      console.log("🔄 Redirecting to success page...");
+      router.push(`/admin/nft-success/${nftCreationData.id}`);
+    }, 3000);
   };
+
+  // Stato per tracking del complete creation
+  const [isCompletingCreation, setIsCompletingCreation] = useState(false);
 
   const isProcessing =
     isMinting ||
@@ -595,7 +751,8 @@ export default function AdminNFTCreator() {
     isCreatingAuction ||
     isConfirmingAuction ||
     isUploadingToIPFS ||
-    isValidatingNFT;
+    isValidatingNFT ||
+    isCompletingCreation;
 
   // Controllo campi obbligatori per NFT
   const isNFTCreationReady = () => {
@@ -801,6 +958,33 @@ export default function AdminNFTCreator() {
 
   // Handler per validazione NFT (senza mint)
   const handleNFTValidation = async () => {
+    console.log("🎯 Validate NFT button clicked!");
+    console.log("🔍 Starting NFT validation...");
+    console.log("🔍 Wallet state:", { address, isConnected, isConnecting });
+
+    // Controlla se il wallet è connesso
+    if (!isConnected || !address) {
+      console.error("❌ Wallet not connected during validation");
+      console.log("🔄 Attempting auto-reconnection...");
+
+      const reconnected = await forceReconnect();
+      if (!reconnected) {
+        toast.error("Wallet not connected. Please reconnect and try again.");
+        return;
+      }
+
+      // Aspetta un po' per la riconnessione
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      // Ricontrolla dopo la riconnessione
+      if (!isConnected || !address) {
+        toast.error("Failed to reconnect wallet. Please try again.");
+        return;
+      }
+
+      console.log("✅ Wallet reconnected successfully");
+    }
+
     if (!isNFTCreationReady()) {
       const missingFields = [];
 
@@ -832,30 +1016,72 @@ export default function AdminNFTCreator() {
 
     // Esegui validazione completa
     if (!nftData.image) {
+      console.log("❌ No image uploaded");
       toast.error("Carica un'immagine prima della validazione");
       return;
     }
 
-    const realTimeValidation = await validateNFT(
-      nftData.name,
-      nftData.description,
-      nftData.image,
-      nftData.rarity
-    );
+    console.log("🔍 Running real-time validation...");
+    try {
+      const realTimeValidation = await validateNFT(
+        nftData.name,
+        nftData.description,
+        nftData.image,
+        nftData.rarity
+      );
 
-    if (!realTimeValidation.isValid) {
-      setValidationResult(realTimeValidation);
-      setShowFailureModal(true);
-      return;
+      console.log("🔍 Validation result:", realTimeValidation);
+
+      if (!realTimeValidation.isValid) {
+        console.log("❌ Validation failed:", realTimeValidation.errors);
+        setValidationResult(realTimeValidation);
+        setShowFailureModal(true);
+        return;
+      }
+
+      // Se validazione passa, vai alla fase auction
+      console.log("✅ NFT validation passed!");
+      toast.success("NFT validation passed! Configure auction settings.");
+      setStep("auction");
+    } catch (error) {
+      console.error("❌ Error during validation:", error);
+      toast.error("Validation failed. Please try again.");
     }
-
-    // Se validazione passa, vai alla fase auction
-    toast.success("NFT validation passed! Configure auction settings.");
-    setStep("auction");
   };
 
   // Handler per creazione completa (mint NFT + asta)
   const handleCompleteCreation = async () => {
+    console.log("🎯 Complete Creation button clicked!");
+
+    // Blocca il bottone per evitare doppi click
+    if (isCompletingCreation) {
+      console.log("⚠️ Creation already in progress, ignoring click");
+      return;
+    }
+
+    // Controlla connessione wallet prima di iniziare
+    if (!isConnected || !address) {
+      console.error("❌ Wallet not connected during complete creation");
+      console.log("🔄 Attempting auto-reconnection...");
+
+      const reconnected = await forceReconnect();
+      if (!reconnected) {
+        toast.error("Wallet not connected. Please reconnect and try again.");
+        return;
+      }
+
+      // Aspetta un po' per la riconnessione
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      // Ricontrolla dopo la riconnessione
+      if (!isConnected || !address) {
+        toast.error("Failed to reconnect wallet. Please try again.");
+        return;
+      }
+
+      console.log("✅ Wallet reconnected successfully");
+    }
+
     if (!isAuctionCreationReady()) {
       const missingFields = [];
       if (
@@ -881,22 +1107,64 @@ export default function AdminNFTCreator() {
       return;
     }
 
+    setIsCompletingCreation(true);
+    console.log("🚀 Starting complete NFT + Auction creation...");
+
     try {
       // Prima mint l'NFT (senza redirect)
+      console.log("📝 Step 1: Minting NFT...");
       await handleNFTCreation(true);
+      console.log("✅ NFT minted successfully");
 
       // Aspetta un po' per assicurarsi che la transazione sia processata
+      console.log("⏳ Waiting for transaction processing...");
       await new Promise((resolve) => setTimeout(resolve, 2000));
 
       // Crea l'asta dopo il mint dell'NFT
+      console.log("🏆 Step 2: Creating auction...");
       await handleAuctionCreation();
+      console.log("✅ Auction created successfully");
 
-      // Save NFT creation data and redirect
+      // Save NFT creation data and redirect ONLY if auction creation succeeded
+      console.log("💾 Step 3: Saving data and redirecting...");
       saveNFTCreationData();
+      console.log("✅ Complete creation finished successfully");
+
+      // Log persistente che non si perde
+      localStorage.setItem(
+        "last_nft_creation_log",
+        JSON.stringify({
+          timestamp: new Date().toISOString(),
+          nftName: nftData.name,
+          auctionType: auctionData.auctionType,
+          status: "success",
+        })
+      );
     } catch (error) {
-      console.error("Error in complete creation:", error);
-      toast.error("Failed to create NFT and auction");
+      console.error("❌ Error in complete creation:", error);
+
+      // Mostra errore specifico
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to create NFT and auction: ${errorMessage}`);
+
+      // Log persistente per errori
+      localStorage.setItem(
+        "last_nft_creation_log",
+        JSON.stringify({
+          timestamp: new Date().toISOString(),
+          nftName: nftData.name,
+          auctionType: auctionData.auctionType,
+          status: "error",
+          error: errorMessage,
+        })
+      );
+
+      setIsCompletingCreation(false); // Reset stato in caso di errore
+      // Non fare redirect se c'è un errore
+      return;
     }
+    // Non resettiamo isCompletingCreation qui perché stiamo per fare redirect
   };
 
   return (
@@ -954,6 +1222,87 @@ export default function AdminNFTCreator() {
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
               NFT Details
             </h2>
+
+            {/* Wallet Status Debug */}
+            <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+              <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
+                Wallet Status
+              </h3>
+              <div className="text-xs text-blue-600 dark:text-blue-300 space-y-1">
+                <div>Connected: {isConnected ? "✅ Yes" : "❌ No"}</div>
+                <div>
+                  Address:{" "}
+                  {address
+                    ? `${address.slice(0, 6)}...${address.slice(-4)}`
+                    : "None"}
+                </div>
+                <div>Connecting: {isConnecting ? "🔄 Yes" : "No"}</div>
+                <div>
+                  Admin:{" "}
+                  {isMasterAdmin
+                    ? "✅ Master"
+                    : canMint
+                    ? "✅ Can Mint"
+                    : "❌ No"}
+                </div>
+              </div>
+            </div>
+
+            {/* Contract Status Debug */}
+            <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+              <h3 className="text-sm font-medium text-green-800 dark:text-green-200 mb-2">
+                Contract Status
+              </h3>
+              <div className="text-xs text-green-600 dark:text-green-300 space-y-1">
+                <div>MooveAuction: {contracts.MooveAuction.address}</div>
+                <div>MooveNFT: {contracts.MooveNFT.address}</div>
+                <div>ABI Length: {contracts.MooveAuction.abi.length}</div>
+                <div>
+                  Has createAuction:{" "}
+                  {contracts.MooveAuction.abi.some(
+                    (item: any) => item.name === "createAuction"
+                  )
+                    ? "✅ Yes"
+                    : "❌ No"}
+                </div>
+              </div>
+            </div>
+
+            {/* Last Creation Log */}
+            <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+              <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-200 mb-2">
+                Last Creation Log
+              </h3>
+              <div className="text-xs text-yellow-600 dark:text-yellow-300">
+                {(() => {
+                  try {
+                    const log = localStorage.getItem("last_nft_creation_log");
+                    if (log) {
+                      const parsed = JSON.parse(log);
+                      return (
+                        <div>
+                          <div>
+                            Status:{" "}
+                            {parsed.status === "success"
+                              ? "✅ Success"
+                              : "❌ Error"}
+                          </div>
+                          <div>NFT: {parsed.nftName}</div>
+                          <div>Auction Type: {parsed.auctionType}</div>
+                          <div>
+                            Time: {new Date(parsed.timestamp).toLocaleString()}
+                          </div>
+                          {parsed.error && <div>Error: {parsed.error}</div>}
+                        </div>
+                      );
+                    }
+                    return "No logs available";
+                  } catch {
+                    return "Error reading logs";
+                  }
+                })()}
+              </div>
+            </div>
 
             {/* Debug components removed for production */}
             <NFTCacheSync

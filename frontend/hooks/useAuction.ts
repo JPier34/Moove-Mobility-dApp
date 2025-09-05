@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useReadMooveAuction, useWriteMooveAuction } from "./useContract";
 import { Auction, Bid, AuctionType } from "@/types/auction";
 import { useMemo } from "react";
@@ -50,12 +51,12 @@ export function useCurrentDutchPrice(auctionId: number) {
 }
 
 export function useCreateAuction() {
-  const { writeMooveAuction, isPending, isConfirming, isSuccess, error } =
+  const { writeMooveAuction, isPending, isConfirming, isSuccess, error, hash } =
     useWriteMooveAuction();
 
   const createAuction = async (
-    nftId: number,
-    nftContract: string,
+    nftContract: string, // nftContract comes first
+    nftId: number, // tokenId comes second
     auctionType: AuctionType,
     startPrice: bigint,
     reservePrice: bigint,
@@ -63,11 +64,26 @@ export function useCreateAuction() {
     duration: number,
     bidIncrement: bigint
   ) => {
+    console.log("🔧 useCreateAuction: Starting auction creation...");
+    console.log("🔧 Parameters:", {
+      nftContract, // nftContract comes first
+      nftId, // tokenId comes second
+      auctionType,
+      startPrice: startPrice.toString(),
+      reservePrice: reservePrice.toString(),
+      buyNowPrice: buyNowPrice.toString(),
+      duration,
+      bidIncrement: bidIncrement.toString(),
+    });
+
     return new Promise((resolve, reject) => {
       try {
+        console.log("🔧 Calling writeMooveAuction...");
+
+        // Call the write function
         writeMooveAuction("createAuction", [
-          nftId,
-          nftContract,
+          nftContract, // nftContract comes first
+          nftId, // tokenId comes second
           auctionType,
           startPrice,
           reservePrice,
@@ -75,12 +91,52 @@ export function useCreateAuction() {
           duration,
           bidIncrement,
         ]);
-        resolve(true);
+
+        console.log("🔧 writeMooveAuction called successfully");
+
+        // Wait a bit for the transaction to be submitted
+        setTimeout(() => {
+          console.log("🔧 Checking transaction status after 2 seconds...");
+          console.log("🔧 Current status:", {
+            hash,
+            isPending,
+            isConfirming,
+            isSuccess,
+            error,
+          });
+
+          // Return the transaction hash and status
+          // Only consider it successful if we have a hash and no error
+          const isActuallySuccessful = hash && !error;
+
+          resolve({
+            success: isActuallySuccessful,
+            hash: hash,
+            isPending: isPending,
+            isConfirming: isConfirming,
+            isSuccess: isSuccess,
+            error: error,
+          });
+        }, 2000); // Wait 2 seconds for transaction to be submitted
       } catch (error) {
+        console.error("🔧 Error in writeMooveAuction:", error);
         reject(error);
       }
     });
   };
+
+  // Debug per il risultato della transazione
+  useEffect(() => {
+    if (hash) {
+      console.log("🔗 Auction creation transaction hash:", hash);
+    }
+    if (isSuccess) {
+      console.log("🎉 Auction creation transaction successful!");
+    }
+    if (error) {
+      console.error("❌ Auction creation error:", error);
+    }
+  }, [hash, isSuccess, error]);
 
   return {
     createAuction,

@@ -4,9 +4,10 @@ import { useEffect, useState } from "react";
 import { useAccount, useConnect } from "wagmi";
 
 export function useWalletPersistence() {
-  const { isConnected, address } = useAccount();
+  const { isConnected, address, isConnecting } = useAccount();
   const { connect, connectors } = useConnect();
   const [isInitialized, setIsInitialized] = useState(false);
+  const [reconnectAttempts, setReconnectAttempts] = useState(0);
 
   useEffect(() => {
     // Mark as initialized immediately to avoid blocking UI
@@ -46,9 +47,33 @@ export function useWalletPersistence() {
     checkStoredConnection();
   }, [isConnected, connect, connectors]);
 
+  // Funzione per forzare la riconnessione
+  const forceReconnect = async () => {
+    if (reconnectAttempts >= 3) {
+      console.log("Max reconnection attempts reached");
+      return false;
+    }
+
+    try {
+      setReconnectAttempts((prev) => prev + 1);
+      const connector = connectors[0];
+      if (connector) {
+        await connect({ connector });
+        console.log("Force reconnection successful");
+        return true;
+      }
+    } catch (error) {
+      console.log("Force reconnection failed:", error);
+    }
+    return false;
+  };
+
   return {
     isConnected,
     address,
     isInitialized,
+    isConnecting,
+    reconnectAttempts,
+    forceReconnect,
   };
 }

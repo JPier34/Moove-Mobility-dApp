@@ -41,28 +41,48 @@ export function useAuctions() {
 
   // Fetch individual auction details when auctionIds change
   useEffect(() => {
+    console.log("🔍 useAuctions: auctionIds changed", {
+      auctionIds,
+      length: auctionIds?.length,
+    });
+
     if (auctionIds && auctionIds.length > 0) {
+      console.log(
+        "🔍 useAuctions: Fetching auction details for",
+        auctionIds.length,
+        "auctions"
+      );
+
       const fetchAuctionDetails = async () => {
         const auctionPromises = auctionIds.map(async (auctionId) => {
           try {
             // TODO: Implement actual auction detail fetching from contract
             // For now, return empty array until real implementation
             console.log(
-              `Fetching auction ${auctionId} - implementation needed`
+              `🔍 Fetching auction ${auctionId} - implementation needed`
             );
             return null;
           } catch (error) {
-            console.error(`Error fetching auction ${auctionId}:`, error);
+            console.error(`❌ Error fetching auction ${auctionId}:`, error);
             return null;
           }
         });
 
         const auctionDetails = await Promise.all(auctionPromises);
-        setAuctions(auctionDetails.filter(Boolean) as Auction[]);
+        const validAuctions = auctionDetails.filter(Boolean) as Auction[];
+        console.log("🔍 useAuctions: Fetched auction details", {
+          total: auctionDetails.length,
+          valid: validAuctions.length,
+          auctions: validAuctions,
+        });
+        setAuctions(validAuctions);
       };
 
       fetchAuctionDetails();
     } else {
+      console.log(
+        "🔍 useAuctions: No auction IDs available, clearing auctions"
+      );
       setAuctions([]);
     }
   }, [auctionIds, address]);

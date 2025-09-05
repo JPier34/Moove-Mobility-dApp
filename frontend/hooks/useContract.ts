@@ -110,6 +110,21 @@ export function useWriteMooveAuction() {
     args: readonly unknown[] = [],
     value?: bigint
   ) => {
+    console.log("🔨 useWriteMooveAuction: Calling contract function", {
+      functionName,
+      contractAddress: contracts.MooveAuction.address,
+      args: args.map((arg, index) => ({
+        index,
+        type: typeof arg,
+        value: typeof arg === "bigint" ? arg.toString() : String(arg),
+        isBigInt: typeof arg === "bigint",
+        isNumber: typeof arg === "number",
+        isString: typeof arg === "string",
+      })),
+      value: value?.toString(),
+      abiLength: contracts.MooveAuction.abi.length,
+    });
+
     writeContract({
       address: contracts.MooveAuction.address as `0x${string}`,
       abi: contracts.MooveAuction.abi,

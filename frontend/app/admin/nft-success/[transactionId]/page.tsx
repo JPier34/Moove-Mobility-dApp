@@ -390,11 +390,35 @@ function ActionButtons({ nft }: { nft: NFTCreationDetails }) {
 export default function NFTSuccessPage() {
   const params = useParams();
   const transactionId = params?.transactionId as string;
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   // Get NFT creation data from localStorage (set during creation)
+  const getDefaultNFTCreationData = (): NFTCreationDetails => {
+    return {
+      id: `nft_${Date.now()}`,
+      nftName: "Loading...",
+      nftDescription: "Loading NFT data...",
+      nftImage: "/images/default-nft.png",
+      tokenId: "0",
+      transactionHash:
+        "0x0000000000000000000000000000000000000000000000000000000000000000",
+      creationDate: new Date(),
+      price: 0,
+      gasFee: 0,
+      totalCost: 0,
+      auctionCreated: false,
+      status: "loading",
+      ipfsHash: "Loading...",
+    };
+  };
+
   const getNFTCreationData = (): NFTCreationDetails => {
     // Check if we're on the client side
-    if (typeof window === "undefined") {
+    if (!isClient) {
       return getDefaultNFTCreationData();
     }
 
