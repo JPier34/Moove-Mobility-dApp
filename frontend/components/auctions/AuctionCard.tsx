@@ -12,6 +12,7 @@ import {
 } from "@/hooks/useAuction";
 import { formatEther, parseEther } from "viem";
 import { ethers } from "ethers";
+import toast from "react-hot-toast";
 
 interface AuctionCardProps {
   auction: Auction;
@@ -164,7 +165,7 @@ export default function AuctionCard({
     e.stopPropagation();
 
     if (!isConnected) {
-      alert("Connect wallet to participate");
+      toast.error("Connect wallet to participate");
       return;
     }
 
@@ -194,7 +195,7 @@ export default function AuctionCard({
           parseEther(currentDutchPrice.toString())
         );
 
-        alert(`Successfully purchased for ${currentDutchPrice} ETH!`);
+        toast.success(`Successfully purchased for ${currentDutchPrice} ETH!`);
       } else {
         // For other auction types, just log for now
         console.log(
@@ -206,63 +207,12 @@ export default function AuctionCard({
       }
     } catch (error) {
       console.error("Error in quick action:", error);
-      alert("Error processing action");
+      toast.error("Error processing action");
     }
   };
 
-  const getActionButton = () => {
-    if (showEndedState || auction.status !== AuctionStatus.ACTIVE) {
-      return null;
-    }
-
-    switch (auction.auctionType) {
-      case AuctionType.DUTCH:
-        return (
-          <Button
-            size="sm"
-            onClick={handleQuickAction}
-            disabled={!isConnected}
-            className="opacity-0 group-hover:opacity-100 transition-opacity"
-          >
-            Buy Now ({currentDutchPrice} ETH)
-          </Button>
-        );
-
-      case AuctionType.SEALED_BID:
-        return (auction.status as AuctionStatus) === AuctionStatus.PENDING ? (
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={handleQuickAction}
-            disabled={!isConnected}
-            className="opacity-0 group-hover:opacity-100 transition-opacity"
-          >
-            Reveal Bid
-          </Button>
-        ) : (
-          <Button
-            size="sm"
-            onClick={handleQuickAction}
-            disabled={!isConnected}
-            className="opacity-0 group-hover:opacity-100 transition-opacity"
-          >
-            Submit Sealed Bid
-          </Button>
-        );
-
-      default: // TRADITIONAL and ENGLISH
-        return (
-          <Button
-            size="sm"
-            onClick={handleQuickAction}
-            disabled={!isConnected}
-            className="opacity-0 group-hover:opacity-100 transition-opacity"
-          >
-            {isConnected ? "Place Bid" : "Connect Wallet"}
-          </Button>
-        );
-    }
-  };
+  // Removed hover action button - users can click the card to open modal
+  // All auction interactions are handled in the modal
 
   const getTimeStatus = () => {
     if (showEndedState || auction.status !== AuctionStatus.ACTIVE) {
@@ -361,26 +311,7 @@ export default function AuctionCard({
         </h3>
 
         {/* Attributes */}
-        <div className="grid grid-cols-2 gap-2 mb-3 text-xs">
-          <div className="flex items-center space-x-1">
-            <span className="text-gray-500">🔋</span>
-            <span className="text-gray-700">{auction.attributes.range}</span>
-          </div>
-          <div className="flex items-center space-x-1">
-            <span className="text-gray-500">⚡</span>
-            <span className="text-gray-700">{auction.attributes.speed}</span>
-          </div>
-          <div className="flex items-center space-x-1">
-            <span className="text-gray-500">⭐</span>
-            <span className="text-gray-700">
-              {auction.attributes.condition}
-            </span>
-          </div>
-          <div className="flex items-center space-x-1">
-            <span className="text-gray-500">🔧</span>
-            <span className="text-gray-700">{auction.attributes.battery}</span>
-          </div>
-        </div>
+        {/* Vehicle details removed - not applicable for stickers */}
 
         {/* Seller */}
         <div className="text-xs text-gray-500 mb-3">
@@ -445,12 +376,16 @@ export default function AuctionCard({
                   ETH
                 </div>
               )}
+              {auction.currentBid === "0" && (
+                <div className="text-xs text-gray-500">
+                  First bid: {auction.startPrice} ETH (minimum)
+                </div>
+              )}
             </div>
           )}
         </div>
 
-        {/* Action button */}
-        <div className="flex justify-end">{getActionButton()}</div>
+        {/* Action button removed - click card to open modal */}
       </div>
     </div>
   );

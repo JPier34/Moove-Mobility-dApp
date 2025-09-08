@@ -48,10 +48,10 @@ export interface Auction {
     unlocks?: string;
     community?: string;
     edition?: string;
-    range: string;
-    speed: string;
-    battery: string;
-    condition: string;
+    range?: string;
+    speed?: string;
+    battery?: string;
+    condition?: string;
   };
 }
 

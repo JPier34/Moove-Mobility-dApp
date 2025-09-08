@@ -7,6 +7,7 @@ import { useUserRoles } from "./useContract";
 import { contracts } from "@/utils/contracts";
 import { Auction, AuctionType } from "@/types/auction";
 import { useActiveAuctions } from "./useAuction";
+import { useSmartRefresh } from "./useSmartRefresh";
 
 // ============================================================================
 // SECURE NFT-AUCTION FLOW ARCHITECTURE
@@ -481,7 +482,8 @@ function processIPFSMetadata(metadata: any): any {
 async function buildAuctionWithCompleteData(
   auctionId: number,
   auctionData: any,
-  nftContract: ethers.Contract
+  nftContract: ethers.Contract,
+  auctionContract?: ethers.Contract
 ): Promise<Auction | null> {
   try {
     // Validate auction data first
@@ -507,6 +509,21 @@ async function buildAuctionWithCompleteData(
       attributesCount: metadata.attributes?.length || 0,
       hasCollection: !!metadata.collection,
     });
+
+    // Fetch bid data if auction contract is available
+    let bidCount = 0;
+    if (auctionContract) {
+      try {
+        const bidData = await fetchAuctionBids(auctionContract, auctionId);
+        bidCount = bidData.bidCount;
+        console.log(`📊 [Auction ${auctionId}] Found ${bidCount} active bids`);
+      } catch (error) {
+        console.warn(
+          `⚠️ [Auction ${auctionId}] Could not fetch bid data:`,
+          error
+        );
+      }
+    }
 
     // Calculate correct status with enhanced logic
     const currentTime = Math.floor(Date.now() / 1000);
@@ -580,7 +597,7 @@ async function buildAuctionWithCompleteData(
       buyNowPrice: ethers.formatEther(auctionData.buyNowPrice || 0),
       currentBid: ethers.formatEther(auctionData.highestBid || 0),
       highestBidder: auctionData.highestBidder || ethers.ZeroAddress,
-      bidCount: 0,
+      bidCount: bidCount,
       startTime: new Date(startTime * 1000),
       endTime: new Date(endTime * 1000),
       bidIncrement: ethers.formatEther(auctionData.bidIncrement || 0),
@@ -595,22 +612,6 @@ async function buildAuctionWithCompleteData(
             (attr: { trait_type: string }) => attr.trait_type === "Designer"
           )?.value || "Moove",
         collection: metadata.collection?.name || "Genesis",
-        range:
-          metadata.attributes?.find(
-            (attr: { trait_type: string }) => attr.trait_type === "Range"
-          )?.value || "100",
-        speed:
-          metadata.attributes?.find(
-            (attr: { trait_type: string }) => attr.trait_type === "Speed"
-          )?.value || "50",
-        battery:
-          metadata.attributes?.find(
-            (attr: { trait_type: string }) => attr.trait_type === "Battery"
-          )?.value || "80",
-        condition:
-          metadata.attributes?.find(
-            (attr: { trait_type: string }) => attr.trait_type === "Condition"
-          )?.value || "New",
       },
     };
 
@@ -676,6 +677,35 @@ function calculateAuctionStatusFixed(auctionData: any): number {
   }
 }
 
+// Function to fetch bid data for an auction
+export const fetchAuctionBids = async (
+  auctionContract: any,
+  auctionId: number
+): Promise<{ bidCount: number; bids: any[] }> => {
+  try {
+    console.log(`🔍 Fetching bids for auction ${auctionId}...`);
+
+    // Call getAuctionBids function
+    const bids = await auctionContract.getAuctionBids(auctionId);
+
+    console.log(`📊 Found ${bids.length} bids for auction ${auctionId}:`, bids);
+
+    // Filter out refunded bids and count active bids
+    const activeBids = bids.filter((bid: any) => !bid.isRefunded);
+
+    return {
+      bidCount: activeBids.length,
+      bids: activeBids,
+    };
+  } catch (error) {
+    console.error(`❌ Error fetching bids for auction ${auctionId}:`, error);
+    return {
+      bidCount: 0,
+      bids: [],
+    };
+  }
+};
+
 // 7. ENHANCED AUCTION FETCHING WITH SECURE NFT ID TRACKING
 async function fetchAuctionFromContractCorrected(
   auctionId: number
@@ -735,7 +765,8 @@ async function fetchAuctionFromContractCorrected(
     const auction = await buildAuctionWithCompleteData(
       auctionId,
       auctionData,
-      nftContract
+      nftContract,
+      auctionContract
     );
 
     if (!auction) {
@@ -770,6 +801,8 @@ export function useAuctionsEnhanced() {
   const [lastFetchTime, setLastFetchTime] = useState<number>(0);
 
   const fetchCorrectedAuctions = useCallback(async () => {
+    console.log("🚀 fetchCorrectedAuctions called");
+
     try {
       setIsLoading(true);
       setError(null);
@@ -779,6 +812,11 @@ export function useAuctionsEnhanced() {
       }
 
       const provider = new ethers.BrowserProvider(window.ethereum);
+      console.log("📊 Contract addresses:", {
+        auction: contracts.MooveAuction.address,
+        nft: contracts.MooveNFT.address,
+      });
+
       const auctionContract = new ethers.Contract(
         contracts.MooveAuction.address,
         contracts.MooveAuction.abi,
@@ -791,18 +829,23 @@ export function useAuctionsEnhanced() {
         provider
       );
 
+      console.log("✅ Contracts created successfully");
+
       // Get secure NFT count first
       const secureNFTCount = await getSecureNFTCount(nftContract);
       console.log(`🔒 Secure NFT count: ${secureNFTCount}`);
 
       // Get total auction count
+      console.log("🔍 Getting total auction count...");
       const totalAuctions = await auctionContract.totalAuctions();
       const totalAuctionsCount = Number(totalAuctions);
 
       console.log(`📊 Total auctions in contract: ${totalAuctionsCount}`);
 
       if (totalAuctionsCount === 0) {
+        console.log("⚠️ No auctions found");
         setAuctions([]);
+        setLastFetchTime(Date.now());
         setIsLoading(false);
         return;
       }
@@ -892,13 +935,13 @@ export function useAuctionsEnhanced() {
     }
   }, []);
 
-  useEffect(() => {
-    fetchCorrectedAuctions();
-
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchCorrectedAuctions, 30000);
-    return () => clearInterval(interval);
-  }, [fetchCorrectedAuctions]);
+  // Use smart refresh hook for intelligent refresh management
+  useSmartRefresh({
+    refreshFunction: fetchCorrectedAuctions,
+    intervalMs: 120000, // 2 minutes
+    pauseOnModal: true,
+    pauseOnHidden: true,
+  });
 
   // Filter by status with enhanced filtering
   const activeAuctions = auctions.filter((auction) => auction.status === 1);

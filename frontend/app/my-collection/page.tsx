@@ -3,6 +3,12 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
+import { useUserCollection } from "@/hooks/useUserCollection";
+import { useAuctionNotifications } from "@/hooks/useAuctionNotifications";
+import { useSmartRefresh } from "@/hooks/useSmartRefresh";
+import { useAccount } from "wagmi";
+import { toast } from "react-hot-toast";
+import { contracts } from "@/utils/contracts";
 
 // ============= TYPES =============
 interface RentalPass {
@@ -39,6 +45,7 @@ interface DecorativeNFT {
     auctionId: string;
     finalBid: number;
     bidders: number;
+    isClaimed?: boolean;
   };
 }
 
@@ -89,7 +96,17 @@ const mockDecorativeNFTs: DecorativeNFT[] = [];
 
 // ============= COMPONENTS =============
 
-function CollectionHeader({ stats }: { stats: any }) {
+function CollectionHeader({
+  stats,
+  isRefreshing,
+  lastUpdated,
+  onRefresh,
+}: {
+  stats: any;
+  isRefreshing: boolean;
+  lastUpdated: Date;
+  onRefresh: () => void;
+}) {
   return (
     <motion.div
       className="text-center mb-16"
@@ -107,6 +124,27 @@ function CollectionHeader({ stats }: { stats: any }) {
         Manage your rental passes, showcase your decorative NFTs, and track your
         achievements
       </p>
+
+      {/* Refresh Status */}
+      <div className="flex items-center justify-center space-x-2 text-sm text-gray-500 dark:text-gray-400 mb-4">
+        {isRefreshing ? (
+          <>
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+            <span>Updating collection...</span>
+          </>
+        ) : (
+          <>
+            <span>Last updated: {lastUpdated.toLocaleTimeString()}</span>
+            <button
+              onClick={onRefresh}
+              className="ml-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+              disabled={isRefreshing}
+            >
+              🔄 Refresh
+            </button>
+          </>
+        )}
+      </div>
 
       {/* Enhanced Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-6xl mx-auto">
@@ -404,6 +442,7 @@ function RentalPassCard({
 
 function DecorativeNFTCard({ nft }: { nft: DecorativeNFT }) {
   const rarityConfig = RARITY_CONFIG[nft.rarity];
+  const [showDetails, setShowDetails] = useState(false);
 
   return (
     <motion.div
@@ -419,9 +458,6 @@ function DecorativeNFTCard({ nft }: { nft: DecorativeNFT }) {
         className={`bg-gradient-to-r ${rarityConfig.gradient} p-4 text-white relative overflow-hidden`}
       >
         <div className="flex items-center justify-between">
-          <span className="bg-white/20 backdrop-blur-sm px-2 py-1 rounded-full text-xs font-medium">
-            🎨 NFT
-          </span>
           <motion.div
             className="flex items-center space-x-1"
             whileHover={{ scale: 1.1 }}
@@ -434,40 +470,45 @@ function DecorativeNFTCard({ nft }: { nft: DecorativeNFT }) {
 
       {/* Image/Preview */}
       <div className="relative h-48 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 overflow-hidden">
-        <div className="absolute inset-0 flex items-center justify-center">
-          {/* Placeholder for actual NFT image */}
-          <div className="w-32 h-32 bg-gradient-to-br from-white/20 to-white/5 rounded-2xl border border-white/20 flex items-center justify-center">
-            <motion.div
-              className="text-4xl"
-              animate={{
-                scale: [1, 1.1, 1],
-                rotate: [0, 5, -5, 0],
-              }}
-              transition={{ duration: 3, repeat: Infinity }}
-            >
-              {nft.category === "sticker"
-                ? "🏷️"
-                : nft.category === "badge"
-                ? "🏆"
-                : nft.category === "skin"
-                ? "🎨"
-                : "👤"}
-            </motion.div>
-          </div>
-        </div>
-
-        {/* Auction Won Badge */}
-        {nft.auctionWon && (
-          <div className="absolute top-4 left-4">
-            <motion.div
-              className="bg-yellow-500 text-yellow-900 px-2 py-1 rounded-lg text-xs font-bold shadow-lg"
-              animate={{ scale: [1, 1.05, 1] }}
-              transition={{ duration: 2, repeat: Infinity }}
-            >
-              🏆 AUCTION WON
-            </motion.div>
+        {nft.image && nft.image !== "/images/default-nft.png" ? (
+          <img
+            src={nft.image}
+            alt={nft.name}
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              console.log("❌ NFT image failed to load:", nft.image);
+              e.currentTarget.style.display = "none";
+            }}
+            onLoad={() =>
+              console.log("✅ NFT image loaded successfully:", nft.image)
+            }
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center">
+            {/* Fallback placeholder */}
+            <div className="w-32 h-32 bg-gradient-to-br from-white/20 to-white/5 rounded-2xl border border-white/20 flex items-center justify-center">
+              <motion.div
+                className="text-4xl"
+                animate={{
+                  scale: [1, 1.1, 1],
+                  rotate: [0, 5, -5, 0],
+                }}
+                transition={{ duration: 3, repeat: Infinity }}
+              >
+                {nft.category === "sticker"
+                  ? "🏷️"
+                  : nft.category === "badge"
+                  ? "🏆"
+                  : nft.category === "skin"
+                  ? "🎨"
+                  : "👤"}
+              </motion.div>
+            </div>
           </div>
         )}
+
+        {/* Auction Won Badge */}
+        {nft.auctionWon && <div className="absolute top-4 left-4"></div>}
       </div>
 
       {/* Content */}
@@ -507,6 +548,7 @@ function DecorativeNFTCard({ nft }: { nft: DecorativeNFT }) {
         {/* Actions */}
         <div className="flex gap-2">
           <motion.button
+            onClick={() => setShowDetails(true)}
             className="flex-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 py-2 px-4 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm font-medium"
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
@@ -516,16 +558,191 @@ function DecorativeNFTCard({ nft }: { nft: DecorativeNFT }) {
 
           <motion.button
             onClick={() =>
-              window.open(`https://opensea.io/assets/${nft.tokenId}`, "_blank")
+              window.open(
+                `https://sepolia.etherscan.io/token/${contracts.MooveNFT.address}?a=${nft.tokenId}`,
+                "_blank"
+              )
             }
             className="bg-blue-500 text-white py-2 px-4 rounded-xl hover:bg-blue-600 transition-colors text-sm font-medium"
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
           >
-            🔗 OpenSea
+            🔗 Etherscan
           </motion.button>
         </div>
       </div>
+
+      {/* NFT Details Modal */}
+      <AnimatePresence>
+        {showDetails && (
+          <motion.div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowDetails(false)}
+          >
+            <motion.div
+              className="bg-white dark:bg-gray-800 rounded-3xl p-8 max-w-2xl w-full shadow-2xl max-h-[90vh] overflow-y-auto"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
+                  NFT Details
+                </h3>
+                <button
+                  onClick={() => setShowDetails(false)}
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Image */}
+                <div className="space-y-4">
+                  <div className="aspect-square bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 rounded-2xl overflow-hidden">
+                    {nft.image && nft.image !== "/images/default-nft.png" ? (
+                      <img
+                        src={nft.image}
+                        alt={nft.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <div className="text-6xl">
+                          {nft.category === "sticker"
+                            ? "🏷️"
+                            : nft.category === "badge"
+                            ? "🏆"
+                            : nft.category === "skin"
+                            ? "🎨"
+                            : "👤"}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Details */}
+                <div className="space-y-6">
+                  <div>
+                    <h4 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                      {nft.name}
+                    </h4>
+                    <p className="text-gray-600 dark:text-gray-300">
+                      {nft.description}
+                    </p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-500 dark:text-gray-400">
+                        Token ID:
+                      </span>
+                      <span className="font-mono text-gray-900 dark:text-white">
+                        #{nft.tokenId}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-500 dark:text-gray-400">
+                        Category:
+                      </span>
+                      <span className="capitalize text-gray-900 dark:text-white">
+                        {nft.category}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-500 dark:text-gray-400">
+                        Rarity:
+                      </span>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-lg">{rarityConfig.emoji}</span>
+                        <span className="capitalize font-medium text-gray-900 dark:text-white">
+                          {nft.rarity}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-500 dark:text-gray-400">
+                        Acquired:
+                      </span>
+                      <span className="text-gray-900 dark:text-white">
+                        {nft.purchaseDate.toLocaleDateString()}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-500 dark:text-gray-400">
+                        Price Paid:
+                      </span>
+                      <span className="font-bold text-gray-900 dark:text-white">
+                        €{nft.price}
+                      </span>
+                    </div>
+
+                    {nft.auctionWon && (
+                      <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-xl p-4">
+                        <h5 className="font-bold text-yellow-800 dark:text-yellow-200 mb-2">
+                          🏆 Auction Details
+                        </h5>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-yellow-700 dark:text-yellow-300">
+                              Auction ID:
+                            </span>
+                            <span className="font-mono text-yellow-800 dark:text-yellow-200">
+                              #{nft.auctionWon.auctionId}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-yellow-700 dark:text-yellow-300">
+                              Final Bid:
+                            </span>
+                            <span className="font-bold text-yellow-800 dark:text-yellow-200">
+                              €{nft.auctionWon.finalBid}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-yellow-700 dark:text-yellow-300">
+                              Total Bidders:
+                            </span>
+                            <span className="text-yellow-800 dark:text-yellow-200">
+                              {nft.auctionWon.bidders}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex gap-3 pt-4">
+                    <motion.button
+                      onClick={() =>
+                        window.open(
+                          `https://sepolia.etherscan.io/token/${contracts.MooveNFT.address}?a=${nft.tokenId}`,
+                          "_blank"
+                        )
+                      }
+                      className="flex-1 bg-blue-500 text-white py-3 px-4 rounded-xl hover:bg-blue-600 transition-colors font-medium"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      🔗 View on Etherscan
+                    </motion.button>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
@@ -754,8 +971,36 @@ function CodeGenerationModal({
 
 // ============= MAIN COMPONENT =============
 export default function MyCollection() {
+  const { address, isConnected } = useAccount();
+  const { wonAuctions, isLoading, error, refetch } = useUserCollection();
+  const { hasNewWins, newWinsCount } = useAuctionNotifications();
+
+  // Wrapper function for refresh with loading state
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refetch();
+      setLastUpdated(new Date());
+      console.log(
+        "🔄 Collection refreshed at:",
+        new Date().toLocaleTimeString()
+      );
+    } catch (error) {
+      console.error("❌ Error refreshing collection:", error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  // Smart refresh for collection data
+  useSmartRefresh({
+    refreshFunction: handleRefresh,
+    intervalMs: 2 * 60 * 1000, // 2 minutes
+    pauseOnModal: true,
+    pauseOnHidden: true,
+  });
+
   const [rentalPasses] = useState<RentalPass[]>(mockRentalPasses);
-  const [decorativeNFTs] = useState<DecorativeNFT[]>(mockDecorativeNFTs);
   const [filters, setFilters] = useState<FilterOptions>({
     type: "all",
     status: "all",
@@ -764,6 +1009,33 @@ export default function MyCollection() {
   });
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedPassId, setSelectedPassId] = useState<string>("");
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Convert won auctions to decorative NFTs format
+  const decorativeNFTs: DecorativeNFT[] = wonAuctions.map((auction) => ({
+    id: `auction-${auction.auctionId}`,
+    tokenId: auction.tokenId,
+    name: auction.nftName,
+    description: `Won from auction #${auction.auctionId}`,
+    image: auction.nftImage,
+    category: auction.nftCategory as "sticker" | "avatar" | "badge" | "skin",
+    rarity:
+      (auction.nftRarity?.toLowerCase() as
+        | "common"
+        | "rare"
+        | "epic"
+        | "legendary") || "common",
+    purchaseDate: new Date(auction.endTime),
+    price: auction.finalBid,
+    transactionHash: auction.transactionHash || "",
+    auctionWon: {
+      auctionId: auction.auctionId,
+      finalBid: auction.finalBid,
+      bidders: auction.bidders,
+      isClaimed: auction.isClaimed,
+    },
+  }));
 
   // Filter items based on current filters
   const filteredRentals = rentalPasses.filter((pass) => {
@@ -812,10 +1084,82 @@ export default function MyCollection() {
     }
   };
 
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+        <div className="container mx-auto px-4 py-8">
+          <div className="text-center py-20">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              Loading your collection...
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400">
+              Fetching your won NFTs from the blockchain
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+        <div className="container mx-auto px-4 py-8">
+          <div className="text-center py-20">
+            <div className="text-6xl mb-4">❌</div>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              Error loading collection
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400 mb-6">{error}</p>
+            <button
+              onClick={handleRefresh}
+              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show not connected state
+  if (!isConnected) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+        <div className="container mx-auto px-4 py-8">
+          <div className="text-center py-20">
+            <div className="text-6xl mb-4">🔌</div>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              Connect your wallet
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400 mb-6">
+              Please connect your wallet to view your collection
+            </p>
+            <Link
+              href="/auctions"
+              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Go to Auctions
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 dark:from-gray-900 dark:to-gray-800">
       <div className="max-w-7xl mx-auto px-6 py-20">
-        <CollectionHeader stats={stats} />
+        <CollectionHeader
+          stats={stats}
+          isRefreshing={isRefreshing}
+          lastUpdated={lastUpdated}
+          onRefresh={handleRefresh}
+        />
 
         {rentalPasses.length > 0 || decorativeNFTs.length > 0 ? (
           <>

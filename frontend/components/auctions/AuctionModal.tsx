@@ -13,6 +13,7 @@ import {
 } from "@/hooks/useAuction";
 import { formatEther, parseEther } from "viem";
 import { ethers } from "ethers";
+import toast from "react-hot-toast";
 
 interface AuctionModalProps {
   auction: Auction;
@@ -145,7 +146,7 @@ export default function AuctionModal({
 
   const handleBid = async (amount: string) => {
     if (!isConnected) {
-      alert("Connect wallet to place bid");
+      toast.error("Connect wallet to place bid");
       return;
     }
 
@@ -161,11 +162,11 @@ export default function AuctionModal({
       // Use the hook to place the bid
       placeBid(parseInt(auction.auctionId), parseEther(amount));
 
-      alert(`Bid of ${amount} ETH placed successfully!`);
+      toast.success(`Bid of ${amount} ETH placed successfully!`);
       onClose();
     } catch (error) {
       console.error("Error placing bid:", error);
-      alert("Error placing bid");
+      toast.error("Error placing bid");
     } finally {
       setIsSubmittingBid(false);
     }
@@ -173,7 +174,7 @@ export default function AuctionModal({
 
   const handleSealedBid = async () => {
     if (!sealedBidAmount || !sealedBidNonce) {
-      alert("Please enter both bid amount and nonce");
+      toast.error("Please enter both bid amount and nonce");
       return;
     }
 
@@ -191,11 +192,11 @@ export default function AuctionModal({
       // For now, we'll keep the simulation
       await new Promise((resolve) => setTimeout(resolve, 2000));
 
-      alert("Sealed bid submitted successfully!");
+      toast.success("Sealed bid submitted successfully!");
       onClose();
     } catch (error) {
       console.error("Error submitting sealed bid:", error);
-      alert("Error submitting sealed bid");
+      toast.error("Error submitting sealed bid");
     } finally {
       setIsSubmittingBid(false);
     }
@@ -203,7 +204,7 @@ export default function AuctionModal({
 
   const handleDutchBuy = async () => {
     if (!isConnected) {
-      alert("Connect wallet to buy");
+      toast.error("Connect wallet to buy");
       return;
     }
 
@@ -233,21 +234,42 @@ export default function AuctionModal({
         ethers.parseEther(currentDutchPrice.toString())
       );
 
-      alert(`Successfully purchased for ${currentDutchPrice} ETH!`);
+      toast.success(`Successfully purchased for ${currentDutchPrice} ETH!`);
       onClose();
     } catch (error) {
       console.error("Error buying:", error);
-      alert("Error processing purchase");
+      toast.error("Error processing purchase");
     } finally {
       setIsSubmittingBid(false);
     }
   };
 
-  // Quick bid amounts (FIFA-style)
+  // Quick bid amounts - first bid can be startPrice, subsequent bids need increment
   const getQuickBidAmounts = () => {
     const currentBid = parseFloat(auction.currentBid);
     const increment = parseFloat(auction.bidIncrement);
+    const startPrice = parseFloat(auction.startPrice);
 
+    // If no bids yet, first bid can be startPrice
+    if (currentBid === 0) {
+      return [
+        {
+          label: `${startPrice} ETH`,
+          amount: startPrice.toFixed(4),
+        },
+        {
+          label: `+${increment} ETH`,
+          amount: (startPrice + increment).toFixed(4),
+        },
+        {
+          label: `+${(increment * 2).toFixed(4)} ETH`,
+          amount: (startPrice + increment * 2).toFixed(4),
+        },
+        { label: "Custom", amount: "custom" },
+      ];
+    }
+
+    // If bids exist, need to add increment
     return [
       {
         label: `+${increment} ETH`,
@@ -271,7 +293,7 @@ export default function AuctionModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
+    <div className="fixed inset-0 z-50 overflow-y-auto" data-modal="true">
       {/* Overlay */}
       <div
         className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
