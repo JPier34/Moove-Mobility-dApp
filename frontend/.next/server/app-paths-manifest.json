@@ -1,8 +1,5 @@
 {
-  "/_not-found/page": "app/_not-found/page.js",
-  "/api/upload-ipfs/route": "app/api/upload-ipfs/route.js",
+  "/admin/page": "app/admin/page.js",
   "/page": "app/page.js",
-  "/api/check-nft-duplicates/route": "app/api/check-nft-duplicates/route.js",
-  "/api/add-nft/route": "app/api/add-nft/route.js",
-  "/admin/page": "app/admin/page.js"
+  "/auctions/page": "app/auctions/page.js"
 }

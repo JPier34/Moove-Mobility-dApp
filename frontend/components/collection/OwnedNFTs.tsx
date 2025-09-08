@@ -48,20 +48,20 @@ export default function OwnedNFTs({ nfts }: OwnedNFTsProps) {
   });
 
   const handleSellNFT = (nft: OwnedNFT) => {
-    // TODO: Implement sell NFT logic
     console.log("Selling NFT:", nft.id);
-    alert(`Mettendo in vendita ${nft.name}...`);
+    // Navigate to admin panel for NFT creation/auction
+    window.location.href = `/admin?action=sell&nftId=${nft.id}`;
   };
 
   const handleCreateAuction = (nft: OwnedNFT) => {
-    // TODO: Implement create auction logic
     console.log("Creating auction for NFT:", nft.id);
-    alert(`Creando asta per ${nft.name}...`);
+    // Navigate to admin panel for auction creation
+    window.location.href = `/admin?action=auction&nftId=${nft.id}`;
   };
 
   const handleRemoveFromSale = (nft: OwnedNFT) => {
-    // TODO: Implement remove from sale logic
     console.log("Removing from sale:", nft.id);
+    // TODO: Implement remove from sale logic when marketplace is ready
     alert(`Rimuovendo ${nft.name} dalla vendita...`);
   };
 

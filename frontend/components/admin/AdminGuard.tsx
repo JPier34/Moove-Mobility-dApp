@@ -17,6 +17,10 @@ export default function AdminGuard({ children }: AdminGuardProps) {
   } = useUserRoles(address);
   const [isReady, setIsReady] = useState(false);
 
+  // Master admin wallet - always has access
+  const MASTER_WALLET = "0x777382955f33Bb8540602E914D9b650C962EF6Cc";
+  const isMasterWallet = address?.toLowerCase() === MASTER_WALLET.toLowerCase();
+
   useEffect(() => {
     // Mark as ready after a short delay to ensure wallet state is stable
     const timer = setTimeout(() => {
@@ -72,7 +76,7 @@ export default function AdminGuard({ children }: AdminGuardProps) {
   }
 
   // Check admin permissions
-  if (!isMasterAdmin && !canMint) {
+  if (!isMasterWallet && !isMasterAdmin && !canMint) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-purple-50 dark:from-gray-900 dark:to-purple-900/20 flex items-center justify-center">
         <div className="text-center">

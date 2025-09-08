@@ -4,8 +4,9 @@ import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { useAccount } from "wagmi";
 import { useCreateAuction } from "@/hooks/useAuction";
-import { useWriteMooveAuction } from "@/hooks/useContract";
+import { useWriteMooveAuction, useWriteMooveNFT } from "@/hooks/useContract";
 import { useWriteMooveStickerNFT, useUserRoles } from "@/hooks/useContract";
+import { useSecureNFTAuctionFlow } from "@/hooks/useSecureNFTAuction";
 import { useIPFSUnified } from "@/hooks/useIPFSUnified";
 import { IPFSStatus } from "@/components/admin/IPFSStatus";
 import { PinataTest } from "@/components/admin/PinataTest";
@@ -22,6 +23,7 @@ import { AuctionType } from "@/types/auction";
 import { contracts } from "@/utils/contracts";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
+import { ethers } from "ethers";
 
 interface NFTFormData {
   name: string;
@@ -53,7 +55,25 @@ interface AuctionFormData {
 
 export default function AdminNFTCreator() {
   const { address } = useAccount();
-  const { canMint, isMasterAdmin } = useUserRoles(address);
+  const { canMint, isMasterAdmin, isLoading } = useUserRoles(address);
+  // Secure NFT-Auction flow hook
+  const {
+    executeFlow: executeSecureFlow,
+    isProcessing: isSecureProcessing,
+    currentPhase: securePhase,
+    result: secureResult,
+    error: secureError,
+  } = useSecureNFTAuctionFlow();
+
+  // Debug admin permissions
+
+  // Master admin wallet - always has access
+  const MASTER_WALLET = "0x777382955f33Bb8540602E914D9b650C962EF6Cc";
+  const isMasterWallet = address?.toLowerCase() === MASTER_WALLET.toLowerCase();
+
+  // Allow access for master wallet or users with proper permissions
+  const hasAdminAccess = isMasterWallet || canMint || isMasterAdmin;
+
   const router = useRouter();
   const {
     uploadNFT,
@@ -76,6 +96,14 @@ export default function AdminNFTCreator() {
   // Hook per creazione aste
   const { writeMooveAuction, hash, isPending, isConfirming, isSuccess, error } =
     useWriteMooveAuction();
+  const {
+    writeMooveNFT: writeMooveNFT,
+    hash: nftHash,
+    isPending: nftIsPending,
+    isConfirming: nftIsConfirming,
+    isSuccess: nftIsSuccess,
+    error: nftError,
+  } = useWriteMooveNFT();
   const [step, setStep] = useState<"nft" | "auction">("nft");
   const [nftData, setNftData] = useState<NFTFormData>({
     name: "",
@@ -156,6 +184,31 @@ export default function AdminNFTCreator() {
   };
 
   const validateAndSetImage = (file: File) => {
+    // RATE LIMITING: Controlla cooldown tra upload
+    const now = Date.now();
+    if (now - lastUploadTime < UPLOAD_COOLDOWN) {
+      const remainingTime = Math.ceil(
+        (UPLOAD_COOLDOWN - (now - lastUploadTime)) / 1000
+      );
+      toast.error(
+        `Please wait ${remainingTime} seconds before uploading another image`
+      );
+      return;
+    }
+
+    // RATE LIMITING: Controlla limite upload per ora
+    const oneHourAgo = now - 60 * 60 * 1000;
+    const recentUploads =
+      uploadCount > 0 && now - lastUploadTime < 60 * 60 * 1000
+        ? uploadCount
+        : 0;
+    if (recentUploads >= MAX_UPLOADS_PER_HOUR) {
+      toast.error(
+        `Maximum ${MAX_UPLOADS_PER_HOUR} uploads per hour allowed. Please try again later.`
+      );
+      return;
+    }
+
     // Validazione tipo file
     if (!file.type.startsWith("image/")) {
       toast.error("Please select a valid image file");
@@ -182,6 +235,11 @@ export default function AdminNFTCreator() {
       }
 
       setNftData((prev) => ({ ...prev, image: file }));
+
+      // Aggiorna rate limiting
+      setLastUploadTime(now);
+      setUploadCount((prev) => prev + 1);
+
       toast.success("Image uploaded successfully!");
     };
     img.onerror = () => {
@@ -248,9 +306,93 @@ export default function AdminNFTCreator() {
     return errors;
   };
 
+  const handleNFTCreationWithId = async (skipRedirect = false) => {
+    try {
+      console.log("🎨 Starting NFT creation with ID tracking...");
+
+      // Chiama la funzione di mint esistente
+      await handleNFTCreation(skipRedirect);
+
+      // Aspetta che la transazione sia confermata
+      console.log("⏳ Waiting for mint transaction to be confirmed...");
+      await new Promise((resolve) => setTimeout(resolve, 5000));
+
+      // Ottieni il totalSupply DOPO il mint per calcolare l'ID reale
+      let realNFTId = 0;
+      try {
+        const provider = new ethers.BrowserProvider(window.ethereum!);
+        const nftContract = new ethers.Contract(
+          contracts.MooveNFT.address,
+          contracts.MooveNFT.abi,
+          provider
+        );
+        const currentSupply = await nftContract.totalSupply();
+        realNFTId = Number(currentSupply);
+        console.log(
+          "📊 Current total supply after mint:",
+          currentSupply.toString()
+        );
+      } catch (error) {
+        console.warn("⚠️ Could not get total supply, using fallback:", error);
+        realNFTId = 1; // Fallback
+      }
+
+      console.log("🆔 Calculated real NFT ID:", realNFTId);
+      console.log("📊 Based on total supply after mint:", realNFTId);
+
+      // Verifica che l'NFT esista effettivamente
+      try {
+        const provider = new ethers.BrowserProvider(window.ethereum!);
+        const nftContract = new ethers.Contract(
+          contracts.MooveNFT.address,
+          contracts.MooveNFT.abi,
+          provider
+        );
+        const owner = await nftContract.ownerOf(realNFTId);
+        console.log("✅ NFT exists and is owned by:", owner);
+
+        // Verifica che sia nostro
+        if (owner.toLowerCase() !== address?.toLowerCase()) {
+          throw new Error(`NFT ID ${realNFTId} is not owned by ${address}`);
+        }
+
+        return realNFTId;
+      } catch (error: any) {
+        console.error("❌ NFT verification failed:", error);
+
+        // Se l'NFT non esiste, prova con l'ID precedente
+        const fallbackId = realNFTId - 1;
+        console.log("🔄 Trying fallback ID:", fallbackId);
+
+        try {
+          const provider = new ethers.BrowserProvider(window.ethereum!);
+          const nftContract = new ethers.Contract(
+            contracts.MooveNFT.address,
+            contracts.MooveNFT.abi,
+            provider
+          );
+          const owner = await nftContract.ownerOf(fallbackId);
+          if (owner.toLowerCase() === address?.toLowerCase()) {
+            console.log("✅ Fallback ID verified:", fallbackId);
+            return fallbackId;
+          }
+        } catch (fallbackError) {
+          console.error("❌ Fallback ID also failed:", fallbackError);
+        }
+
+        throw new Error(
+          `NFT ID ${realNFTId} does not exist or verification failed`
+        );
+      }
+    } catch (error) {
+      console.error("❌ Error in NFT creation with ID:", error);
+      throw error;
+    }
+  };
+
   const handleNFTCreation = async (skipRedirect = false) => {
     // Check permissions first
-    if (!canMint && !isMasterAdmin) {
+    if (!hasAdminAccess) {
       toast.error(
         "You don't have permission to create NFTs. Contact an admin."
       );
@@ -321,7 +463,8 @@ export default function AdminNFTCreator() {
       };
 
       // Mint Sticker NFT with all required parameters
-      writeMooveStickerNFT("mintStickerNFT", [
+      console.log("🎨 Calling writeMooveStickerNFT...");
+      const mintResult = writeMooveStickerNFT("mintStickerNFT", [
         address || "0x0000000000000000000000000000000000000000", // to (current wallet address)
         nftData.name,
         metadataURI,
@@ -342,6 +485,41 @@ export default function AdminNFTCreator() {
         500, // royaltyPercentage (5%)
       ]);
 
+      console.log("🔗 Mint result:", mintResult);
+
+      // Aspetta che la transazione sia confermata
+      console.log("⏳ Waiting for mint transaction confirmation...");
+      let attempts = 0;
+      const maxAttempts = 30;
+      const startTime = Date.now();
+      const TIMEOUT_MS = 30000;
+
+      while (!nftHash && !nftError && attempts < maxAttempts) {
+        if (Date.now() - startTime > TIMEOUT_MS) {
+          throw new Error("Mint transaction timeout - please try again");
+        }
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        attempts++;
+        console.log(`🔍 Mint attempt ${attempts}/${maxAttempts} - Status:`, {
+          nftHash,
+          nftIsPending,
+          nftIsConfirming,
+          nftIsSuccess,
+          nftError,
+        });
+      }
+
+      if (nftError) {
+        throw new Error(`NFT mint failed: ${nftError.message || nftError}`);
+      }
+
+      if (!nftHash) {
+        throw new Error(
+          "No mint transaction hash received - mint may have failed"
+        );
+      }
+
+      console.log("✅ NFT minted successfully with hash:", nftHash);
       toast.success("NFT minted successfully!");
 
       // Aggiungi NFT alla cache locale
@@ -505,7 +683,104 @@ export default function AdminNFTCreator() {
     return errors;
   };
 
-  const handleAuctionCreation = async () => {
+  const handleNFTApproval = async (nftId: number) => {
+    try {
+      console.log("🔐 Starting NFT approval process...");
+
+      // Get the NFT contract address and token ID
+      const nftContract = contracts.MooveNFT.address;
+      const auctionContract = contracts.MooveAuction.address;
+
+      console.log("🔍 Approval parameters:", {
+        nftContract,
+        nftId,
+        auctionContract,
+      });
+
+      if (!nftId) {
+        throw new Error("NFT ID not available for approval");
+      }
+
+      if (!address) {
+        throw new Error("Wallet not connected");
+      }
+
+      // SECURITY: Verify ownership before approval
+      console.log("🔒 Verifying NFT ownership...");
+      try {
+        const provider = new ethers.BrowserProvider(window.ethereum!);
+        const nftContractInstance = new ethers.Contract(
+          nftContract,
+          contracts.MooveNFT.abi as any,
+          provider
+        );
+
+        const owner = await nftContractInstance.ownerOf(nftId);
+        if (owner.toLowerCase() !== address.toLowerCase()) {
+          throw new Error(
+            `You don't own this NFT. Owner: ${owner}, Your address: ${address}`
+          );
+        }
+        console.log("✅ Ownership verified:", owner);
+      } catch (error) {
+        if ((error as any).message?.includes("ERC721NonexistentToken")) {
+          throw new Error(`NFT ID ${nftId} does not exist`);
+        }
+        throw new Error(
+          `Ownership verification failed: ${(error as any).message || error}`
+        );
+      }
+
+      // Call the approve function on the NFT contract
+      console.log("📞 Calling approve on NFT contract...");
+      writeMooveNFT("approve", [auctionContract, nftId]);
+
+      console.log("✅ NFT approval transaction submitted");
+
+      // Wait for the approval to be processed with timeout
+      let attempts = 0;
+      const maxAttempts = 30; // 30 seconds max wait
+      const startTime = Date.now();
+      const TIMEOUT_MS = 30000; // 30 secondi timeout
+
+      while (!nftHash && !nftError && attempts < maxAttempts) {
+        // Controlla timeout
+        if (Date.now() - startTime > TIMEOUT_MS) {
+          throw new Error("Approval transaction timeout - please try again");
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait 1 second
+        attempts++;
+        console.log(
+          `🔍 Approval attempt ${attempts}/${maxAttempts} - Current status:`,
+          {
+            nftHash,
+            nftIsPending,
+            nftIsConfirming,
+            nftIsSuccess,
+            nftError,
+          }
+        );
+      }
+
+      if (nftError) {
+        throw new Error(`NFT approval failed: ${nftError.message || nftError}`);
+      }
+
+      if (!nftHash) {
+        throw new Error(
+          "No approval transaction hash received - approval may have failed"
+        );
+      }
+
+      console.log("✅ NFT approved successfully for auction contract");
+    } catch (error) {
+      console.error("❌ Error in NFT approval:", error);
+      throw error;
+    }
+  };
+
+  const handleAuctionCreation = async (nftId: number) => {
     console.log("🏆 Starting auction creation...");
 
     const validationErrors = validateAuctionCreation();
@@ -518,10 +793,7 @@ export default function AdminNFTCreator() {
     try {
       // Non mintare l'NFT qui - è già stato mintato
 
-      // Per ora usiamo un token ID incrementale basato sul timestamp
-      // TODO: Implementare recupero token ID dal mint transaction
-      // Usiamo un ID più realistico basato sul timestamp attuale
-      const nftId = Math.floor(Date.now() / 1000) % 100000; // Token ID temporaneo (ridotto range)
+      // Usa l'NFT ID passato come parametro
       const nftContract = contracts.MooveNFT.address;
 
       console.log("🔍 NFT Contract and ID:", {
@@ -554,19 +826,33 @@ export default function AdminNFTCreator() {
         );
       }
 
-      // Protezione overflow per i prezzi
+      // Protezione overflow per i prezzi usando ethers per precisione
       const safeParsePrice = (price: string): bigint => {
-        const numPrice = parseFloat(price);
-        if (isNaN(numPrice) || numPrice < 0) return BigInt(0);
-        if (numPrice > 1000) {
-          throw new Error(`Price too high: ${numPrice} ETH (max 1000 ETH)`);
+        try {
+          const numPrice = parseFloat(price);
+          if (isNaN(numPrice) || numPrice < 0) return BigInt(0);
+          if (numPrice > 1000) {
+            throw new Error(`Price too high: ${numPrice} ETH (max 1000 ETH)`);
+          }
+
+          // Usa ethers.parseEther per evitare errori di precisione
+          const priceInWei = ethers.parseEther(price);
+
+          // Prezzo minimo di 0.000001 ETH per evitare errori del contratto
+          if (numPrice > 0 && numPrice < 0.000001) {
+            console.log("⚠️ Price too low, setting minimum to 0.000001 ETH");
+            return BigInt(1000000000000); // 0.000001 ETH in wei
+          }
+
+          return priceInWei;
+        } catch (error: any) {
+          if (error.message?.includes("invalid BigNumber string")) {
+            throw new Error(
+              `Invalid price format: ${price}. Use decimal format (e.g., 0.001)`
+            );
+          }
+          throw error;
         }
-        // Prezzo minimo di 0.000001 ETH per evitare errori del contratto
-        if (numPrice > 0 && numPrice < 0.000001) {
-          console.log("⚠️ Price too low, setting minimum to 0.000001 ETH");
-          return BigInt(1000000000000); // 0.000001 ETH in wei
-        }
-        return BigInt(Math.floor(numPrice * 1e18));
       };
 
       // Convert duration to seconds based on unit (con fallback sicuro)
@@ -609,6 +895,32 @@ export default function AdminNFTCreator() {
       });
 
       // Debug: Check if NFT contract is valid
+      // SECURITY: Verify NFT ownership before creating auction
+      console.log("🔒 Verifying NFT ownership for auction creation...");
+      try {
+        const provider = new ethers.BrowserProvider(window.ethereum!);
+        const nftContractInstance = new ethers.Contract(
+          nftContract,
+          contracts.MooveNFT.abi as any,
+          provider
+        );
+
+        const owner = await nftContractInstance.ownerOf(nftId);
+        if (owner.toLowerCase() !== address?.toLowerCase()) {
+          throw new Error(
+            `You don't own this NFT. Owner: ${owner}, Your address: ${address}`
+          );
+        }
+        console.log("✅ NFT ownership verified for auction:", owner);
+      } catch (error) {
+        if ((error as any).message?.includes("ERC721NonexistentToken")) {
+          throw new Error(`NFT ID ${nftId} does not exist`);
+        }
+        throw new Error(
+          `Ownership verification failed: ${(error as any).message || error}`
+        );
+      }
+
       console.log("🔍 Contract validation:", {
         nftContractValid:
           nftContract &&
@@ -637,6 +949,8 @@ export default function AdminNFTCreator() {
 
       // Call the write function directly
       console.log("🔧 Calling writeMooveAuction directly...");
+
+      // Call the function and wait for it to be submitted
       writeMooveAuction("createAuction", [
         nftContract, // nftContract comes first
         nftId, // tokenId comes second
@@ -649,17 +963,32 @@ export default function AdminNFTCreator() {
       ]);
 
       console.log("✅ writeMooveAuction called successfully");
-      console.log("🔍 Current auction status:", {
-        hash,
-        isPending,
-        isConfirming,
-        isSuccess,
-        error,
-      });
 
-      // Wait for transaction to be submitted
+      // Wait for the transaction to be submitted (hash to be available) with timeout
       console.log("⏳ Waiting for auction transaction to be submitted...");
-      await new Promise((resolve) => setTimeout(resolve, 3000)); // Wait 3 seconds for submission
+      let attempts = 0;
+      const maxAttempts = 30; // 30 seconds max wait
+      const startTime = Date.now();
+      const TIMEOUT_MS = 30000; // 30 secondi timeout
+
+      while (!hash && !error && attempts < maxAttempts) {
+        // Controlla timeout
+        if (Date.now() - startTime > TIMEOUT_MS) {
+          throw new Error(
+            "Auction creation transaction timeout - please try again"
+          );
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait 1 second
+        attempts++;
+        console.log(`🔍 Attempt ${attempts}/${maxAttempts} - Current status:`, {
+          hash,
+          isPending,
+          isConfirming,
+          isSuccess,
+          error,
+        });
+      }
 
       console.log("🔍 Final auction status:", {
         hash,
@@ -744,6 +1073,13 @@ export default function AdminNFTCreator() {
 
   // Stato per tracking del complete creation
   const [isCompletingCreation, setIsCompletingCreation] = useState(false);
+  const [mintedNFTId, setMintedNFTId] = useState<number | null>(null);
+
+  // Rate limiting per prevenire spam
+  const [lastUploadTime, setLastUploadTime] = useState<number>(0);
+  const [uploadCount, setUploadCount] = useState<number>(0);
+  const UPLOAD_COOLDOWN = 5000; // 5 secondi tra upload
+  const MAX_UPLOADS_PER_HOUR = 10; // Massimo 10 upload per ora
 
   const isProcessing =
     isMinting ||
@@ -752,12 +1088,13 @@ export default function AdminNFTCreator() {
     isConfirmingAuction ||
     isUploadingToIPFS ||
     isValidatingNFT ||
-    isCompletingCreation;
+    isCompletingCreation ||
+    isSecureProcessing;
 
   // Controllo campi obbligatori per NFT
   const isNFTCreationReady = () => {
     return (
-      (canMint || isMasterAdmin) && // Check permissions
+      hasAdminAccess && // Check permissions
       nftData.name.trim().length >= 3 &&
       nftData.description.trim().length >= 10 &&
       nftData.image !== null &&
@@ -766,19 +1103,52 @@ export default function AdminNFTCreator() {
           parseInt(nftData.editionSize) >= 1 &&
           parseInt(nftData.editionSize) <= 10000 &&
           nftData.editionName.trim().length > 0)) &&
-      // Controllo nome unico (da implementare con smart contract)
-      !isDuplicateName(nftData.name.trim()) &&
       // Controllo caratteri speciali
       !hasInvalidCharacters(nftData.name.trim())
     );
   };
 
-  // Controllo nome duplicato (placeholder - da implementare con smart contract)
-  const isDuplicateName = (name: string) => {
-    // TODO: Implementare controllo con smart contract
-    // Per ora, controlliamo nomi comuni che potrebbero essere duplicati
-    const commonNames = ["Test Sticker", "Sample NFT", "Demo Sticker"];
-    return commonNames.includes(name);
+  // Controllo nome duplicato - verifica con smart contract
+  const isDuplicateName = async (name: string): Promise<boolean> => {
+    try {
+      if (typeof window === "undefined" || !window.ethereum) {
+        return false;
+      }
+
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const nftContract = new ethers.Contract(
+        contracts.MooveNFT.address,
+        contracts.MooveNFT.abi,
+        provider
+      );
+
+      // Controlla se esiste già un NFT con questo nome
+      // Usa un approccio incrementale per evitare problemi con totalSupply
+      let tokenId = 1;
+      let maxAttempts = 1000; // Limite di sicurezza per evitare loop infiniti
+
+      while (tokenId <= maxAttempts) {
+        try {
+          const nftData = await nftContract.getStickerData(tokenId);
+          if (nftData.name === name) {
+            console.log(
+              `⚠️ Duplicate name found: ${name} (Token ID: ${tokenId})`
+            );
+            return true;
+          }
+          tokenId++;
+        } catch (error) {
+          // NFT non esiste o errore, interrompi la ricerca
+          console.log(`🔍 No more NFTs found after token ${tokenId - 1}`);
+          break;
+        }
+      }
+
+      return false;
+    } catch (error) {
+      console.error("❌ Error checking duplicate name:", error);
+      return false;
+    }
   };
 
   // Controllo caratteri speciali nel nome
@@ -989,7 +1359,7 @@ export default function AdminNFTCreator() {
       const missingFields = [];
 
       // Check permissions first
-      if (!canMint && !isMasterAdmin) {
+      if (!hasAdminAccess) {
         missingFields.push("Admin permissions required");
       }
 
@@ -1003,14 +1373,26 @@ export default function AdminNFTCreator() {
           missingFields.push("Edition Size");
         if (!nftData.editionName.trim()) missingFields.push("Edition Name");
       }
-      if (isDuplicateName(nftData.name.trim())) {
-        missingFields.push("Name already exists");
-      }
       if (hasInvalidCharacters(nftData.name.trim())) {
         missingFields.push("Name contains invalid characters");
       }
 
       toast.error(`Missing required fields: ${missingFields.join(", ")}`);
+      return;
+    }
+
+    // Controllo nome duplicato (async)
+    try {
+      console.log("🔍 Checking for duplicate names...");
+      const isDuplicate = await isDuplicateName(nftData.name.trim());
+      if (isDuplicate) {
+        toast.error("Name already exists. Please choose a different name.");
+        return;
+      }
+      console.log("✅ Name is unique");
+    } catch (error) {
+      console.error("❌ Error checking duplicate name:", error);
+      toast.error("Error checking name uniqueness. Please try again.");
       return;
     }
 
@@ -1049,7 +1431,232 @@ export default function AdminNFTCreator() {
     }
   };
 
-  // Handler per creazione completa (mint NFT + asta)
+  // Handler per creazione sicura (mint NFT + asta) con event parsing
+  const handleSecureCreation = async () => {
+    console.log("🔒 Starting secure NFT-Auction creation...");
+
+    if (isSecureProcessing) {
+      console.log("⚠️ Secure creation already in progress");
+      return;
+    }
+
+    if (!isConnected || !address) {
+      toast.error("Wallet not connected. Please connect and try again.");
+      return;
+    }
+
+    try {
+      // Prima carica l'immagine su IPFS per ottenere l'URL
+      if (!nftData.image) {
+        toast.error("Please upload an image first");
+        return;
+      }
+
+      console.log("📤 Uploading image to IPFS...");
+      const ipfsResult = await uploadNFT(nftData.image, {
+        name: nftData.name,
+        description: nftData.description,
+        rarity: nftData.rarity,
+        isLimitedEdition: nftData.isLimitedEdition,
+        editionSize: parseInt(nftData.editionSize) || 1,
+        editionNumber: 1,
+        customizationOptions: {
+          ...nftData.customizationOptions,
+          maxTextLength:
+            parseInt(nftData.customizationOptions.maxTextLength) || 100,
+        },
+        creator: address || "",
+      });
+
+      if (!ipfsResult.imageUrl) {
+        toast.error("Failed to upload image to IPFS");
+        return;
+      }
+
+      console.log("✅ Image uploaded to IPFS:", ipfsResult.imageUrl);
+
+      // 2. Crea metadati JSON completi per l'NFT
+      const nftMetadata = {
+        name: nftData.name,
+        description: nftData.description,
+        image: ipfsResult.imageUrl,
+        external_url: `https://moove-mobility.com/nft/${Date.now()}`,
+        attributes: [
+          {
+            trait_type: "Rarity",
+            value: nftData.rarity,
+          },
+          {
+            trait_type: "Category",
+            value: "VEHICLE_DECORATION",
+          },
+          {
+            trait_type: "Designer",
+            value: "Moove",
+          },
+          {
+            trait_type: "Collection",
+            value: nftData.isLimitedEdition ? nftData.editionName : "Genesis",
+          },
+          {
+            trait_type: "Range",
+            value: "100",
+          },
+          {
+            trait_type: "Speed",
+            value: "50",
+          },
+          {
+            trait_type: "Battery",
+            value: "80",
+          },
+          {
+            trait_type: "Condition",
+            value: "New",
+          },
+        ],
+      };
+
+      // 3. Carica i metadati JSON su IPFS
+      console.log("📤 Uploading NFT metadata to IPFS...");
+      const metadataBlob = new Blob([JSON.stringify(nftMetadata, null, 2)], {
+        type: "application/json",
+      });
+
+      const metadataFormData = new FormData();
+      metadataFormData.append("file", metadataBlob, "metadata.json");
+
+      const metadataResponse = await fetch("/api/upload-ipfs", {
+        method: "POST",
+        body: metadataFormData,
+      });
+
+      if (!metadataResponse.ok) {
+        throw new Error("Failed to upload metadata to IPFS");
+      }
+
+      const metadataResult = await metadataResponse.json();
+      console.log("📋 Metadata API response:", metadataResult);
+
+      const metadataUrl = `ipfs://${metadataResult.hash}`;
+
+      console.log("✅ Metadata uploaded to IPFS:", metadataUrl);
+
+      // Preparazione parametri per il mint
+      // La funzione mintNFT richiede: to (address) e metadataURI (string)
+      const mintParams = [
+        address || "", // to: indirizzo del chiamante
+        metadataUrl, // metadataURI: URL dei metadati JSON su IPFS
+      ];
+
+      // Preparazione parametri per l'asta
+      const startPrice = ethers.parseEther(auctionData.startPrice);
+      let reservePrice = 0n;
+
+      // Per le aste Dutch, se non specificato, imposta il prezzo di riserva a metà del prezzo di partenza
+      if (auctionData.auctionType === 2) {
+        // DUTCH
+        if (auctionData.reservePrice) {
+          reservePrice = ethers.parseEther(auctionData.reservePrice);
+        } else {
+          // Imposta il prezzo di riserva a metà del prezzo di partenza per le aste Dutch
+          reservePrice = startPrice / 2n;
+        }
+      } else {
+        // Per le aste tradizionali, usa il prezzo di riserva specificato o 0
+        reservePrice = auctionData.reservePrice
+          ? ethers.parseEther(auctionData.reservePrice)
+          : 0n;
+      }
+
+      const auctionParams = {
+        auctionType: Number(auctionData.auctionType),
+        startPrice,
+        reservePrice,
+        buyNowPrice: auctionData.buyNowPrice
+          ? ethers.parseEther(auctionData.buyNowPrice)
+          : 0n,
+        duration: Math.max(
+          3600, // Minimo 1 ora
+          parseInt(auctionData.duration) *
+            (auctionData.durationUnit === "hours" ? 3600 : 60)
+        ),
+        bidIncrement: ethers.parseEther(auctionData.bidIncrement),
+      };
+
+      console.log("🚀 Executing secure flow with params:", {
+        mintParams,
+        auctionParams,
+      });
+
+      console.log("⏰ Auction duration details:", {
+        duration: auctionParams.duration,
+        durationInHours: auctionParams.duration / 3600,
+        startTime: new Date(),
+        expectedEndTime: new Date(Date.now() + auctionParams.duration * 1000),
+      });
+
+      console.log("💰 Auction price details:", {
+        auctionType: auctionParams.auctionType,
+        startPrice: ethers.formatEther(auctionParams.startPrice),
+        reservePrice: ethers.formatEther(auctionParams.reservePrice),
+        buyNowPrice: ethers.formatEther(auctionParams.buyNowPrice),
+        isDutch: auctionParams.auctionType === 2,
+        reserveLessThanStart:
+          auctionParams.reservePrice < auctionParams.startPrice,
+      });
+
+      // Esegui il flusso sicuro
+      await executeSecureFlow(mintParams, auctionParams);
+
+      // Aspetta un po' per il risultato
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      if (secureResult) {
+        console.log("✅ Secure flow completed successfully:", secureResult);
+        toast.success("NFT and auction created securely!");
+
+        // Salva i dati per la pagina di successo
+        const nftCreationData = {
+          id: `nft_${Date.now()}`,
+          nftName: nftData.name,
+          nftDescription: nftData.description,
+          nftImage: ipfsResult.imageUrl, // Usa l'URL IPFS
+          tokenId: secureResult.nft.tokenId.toString(),
+          transactionHash: secureResult.nft.transactionHash,
+          creationDate: new Date().toISOString(),
+          price: 0.001, // Prezzo di minting
+          gasFee: 0.0001, // Stima gas fee
+          totalCost: 0.0011, // Totale stimato
+          auctionCreated: true,
+          auctionType: auctionData.auctionType === 0 ? "Traditional" : "Dutch",
+          auctionId: secureResult.auction.auctionId.toString(),
+          status: "confirmed",
+          ipfsHash: ipfsResult.imageUrl,
+        };
+
+        localStorage.setItem(
+          `nft_creation_${secureResult.nft.transactionHash}`,
+          JSON.stringify(nftCreationData)
+        );
+
+        // Naviga alla pagina di successo con l'ID della transazione
+        router.push(`/admin/nft-success/${secureResult.nft.transactionHash}`);
+      } else {
+        console.log("⚠️ Secure result not available, but flow completed");
+        toast.success("NFT and auction created! Check the auctions page.");
+      }
+    } catch (error) {
+      console.error("❌ Secure creation failed:", error);
+      toast.error(
+        `Secure creation failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    }
+  };
+
+  // Handler per creazione completa (mint NFT + asta) - metodo legacy
   const handleCompleteCreation = async () => {
     console.log("🎯 Complete Creation button clicked!");
 
@@ -1111,18 +1718,31 @@ export default function AdminNFTCreator() {
     console.log("🚀 Starting complete NFT + Auction creation...");
 
     try {
-      // Prima mint l'NFT (senza redirect)
+      // Prima mint l'NFT e ottieni l'ID reale
       console.log("📝 Step 1: Minting NFT...");
-      await handleNFTCreation(true);
-      console.log("✅ NFT minted successfully");
+      const realNFTId = await handleNFTCreationWithId(true);
+      console.log("✅ NFT minted successfully with ID:", realNFTId);
+
+      // Usa l'ID reale dell'NFT
+      setMintedNFTId(realNFTId);
+      console.log("🆔 Using real NFT ID:", realNFTId);
 
       // Aspetta un po' per assicurarsi che la transazione sia processata
       console.log("⏳ Waiting for transaction processing...");
       await new Promise((resolve) => setTimeout(resolve, 2000));
 
-      // Crea l'asta dopo il mint dell'NFT
-      console.log("🏆 Step 2: Creating auction...");
-      await handleAuctionCreation();
+      // Approva l'NFT per il contratto di asta
+      console.log("🔐 Step 2: Approving NFT for auction contract...");
+      await handleNFTApproval(realNFTId);
+      console.log("✅ NFT approved successfully");
+
+      // Aspetta un po' per l'approvazione
+      console.log("⏳ Waiting for approval processing...");
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      // Crea l'asta dopo l'approvazione
+      console.log("🏆 Step 3: Creating auction...");
+      await handleAuctionCreation(realNFTId);
       console.log("✅ Auction created successfully");
 
       // Save NFT creation data and redirect ONLY if auction creation succeeded
@@ -1239,12 +1859,15 @@ export default function AdminNFTCreator() {
                 <div>Connecting: {isConnecting ? "🔄 Yes" : "No"}</div>
                 <div>
                   Admin:{" "}
-                  {isMasterAdmin
+                  {isMasterWallet
+                    ? "👑 Master Wallet"
+                    : isMasterAdmin
                     ? "✅ Master"
                     : canMint
                     ? "✅ Can Mint"
                     : "❌ No"}
                 </div>
+                <div>Access: {hasAdminAccess ? "✅ Granted" : "❌ Denied"}</div>
               </div>
             </div>
 
@@ -1365,12 +1988,10 @@ export default function AdminNFTCreator() {
                     className={`w-full px-4 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
                       nftData.name.length > 0 &&
                       (nftData.name.length < 3 ||
-                        isDuplicateName(nftData.name.trim()) ||
                         hasInvalidCharacters(nftData.name.trim()))
                         ? "border-red-500 focus:border-red-500"
                         : nftData.name.length >= 3 &&
                           nftData.name.length <= 50 &&
-                          !isDuplicateName(nftData.name.trim()) &&
                           !hasInvalidCharacters(nftData.name.trim())
                         ? "border-green-500 focus:border-green-500"
                         : nftData.name.length > 50
@@ -1388,12 +2009,7 @@ export default function AdminNFTCreator() {
                     {nftData.name.length > 50 && (
                       <span className="text-red-500 ml-2">Too long</span>
                     )}
-                    {nftData.name.length >= 3 &&
-                      isDuplicateName(nftData.name.trim()) && (
-                        <span className="text-red-500 ml-2">
-                          Name already exists
-                        </span>
-                      )}
+                    {/* Duplicate name check is async - will be handled in validation */}
                     {nftData.name.length >= 3 &&
                       hasInvalidCharacters(nftData.name.trim()) && (
                         <span className="text-red-500 ml-2">
@@ -2141,29 +2757,52 @@ export default function AdminNFTCreator() {
               >
                 ← Back to NFT
               </button>
-              <button
-                onClick={handleCompleteCreation}
-                disabled={isProcessing}
-                className={`px-8 py-3 rounded-lg font-semibold flex items-center gap-2 transition-all ${
-                  isAuctionCreationReady()
-                    ? "bg-green-600 text-white hover:bg-green-700"
-                    : "bg-gray-400 text-gray-200 cursor-not-allowed"
-                } ${isProcessing ? "opacity-50 cursor-not-allowed" : ""}`}
-              >
-                {isProcessing ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    Minting NFT & Creating Auction...
-                  </>
-                ) : (
-                  <>
-                    {!isAuctionCreationReady() && (
-                      <span className="text-yellow-300 mr-2">⚠️</span>
-                    )}
-                    Mint NFT & Create Auction
-                  </>
-                )}
-              </button>
+              <div className="flex gap-3">
+                {/* Secure Flow Button */}
+                <button
+                  onClick={handleSecureCreation}
+                  disabled={isSecureProcessing || !isAuctionCreationReady()}
+                  className={`px-6 py-3 rounded-lg font-semibold flex items-center gap-2 transition-all ${
+                    isAuctionCreationReady() && !isSecureProcessing
+                      ? "bg-blue-600 text-white hover:bg-blue-700"
+                      : "bg-gray-400 text-gray-200 cursor-not-allowed"
+                  }`}
+                >
+                  {isSecureProcessing ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      {securePhase}
+                    </>
+                  ) : (
+                    <>🔒 Secure Creation</>
+                  )}
+                </button>
+
+                {/* Legacy Flow Button */}
+                <button
+                  onClick={handleCompleteCreation}
+                  disabled={isProcessing}
+                  className={`px-6 py-3 rounded-lg font-semibold flex items-center gap-2 transition-all ${
+                    isAuctionCreationReady()
+                      ? "bg-green-600 text-white hover:bg-green-700"
+                      : "bg-gray-400 text-gray-200 cursor-not-allowed"
+                  } ${isProcessing ? "opacity-50 cursor-not-allowed" : ""}`}
+                >
+                  {isProcessing ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Minting NFT & Creating Auction...
+                    </>
+                  ) : (
+                    <>
+                      {!isAuctionCreationReady() && (
+                        <span className="text-yellow-300 mr-2">⚠️</span>
+                      )}
+                      Legacy Creation
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </motion.div>
         )}

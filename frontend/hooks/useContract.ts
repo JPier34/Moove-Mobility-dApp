@@ -18,12 +18,6 @@ const ROLES = {
 } as const;
 
 // Helper types
-interface ReadContractResult<T> {
-  data: T;
-  isLoading: boolean;
-  error: Error | null;
-  refetch: () => void;
-}
 
 interface WriteContractResult {
   hash: `0x${string}` | undefined;
@@ -33,19 +27,19 @@ interface WriteContractResult {
   error: Error | null;
 }
 
-// Hook to read MooveNFT contracts (placeholder for future use)
+// Hook to read MooveNFT contracts (ACTIVE - currently deployed)
 export function useReadMooveNFT<T = unknown>(
   functionName: string,
   args: readonly unknown[] = [],
   options?: { enabled?: boolean }
-): ReadContractResult<T> {
-  // Placeholder - will be implemented when MooveNFT contract is deployed
-  return {
-    data: undefined as T,
-    isLoading: false,
-    error: new Error("MooveNFT contract not yet deployed"),
-    refetch: () => {},
-  } as ReadContractResult<T>;
+) {
+  return useReadContract({
+    address: contracts.MooveNFT.address as `0x${string}`,
+    abi: contracts.MooveNFT.abi as any,
+    functionName,
+    args,
+    ...options,
+  });
 }
 
 // Hook to write MooveNFT contracts (placeholder for future use)
@@ -60,8 +54,27 @@ export function useWriteMooveNFT() {
     args: readonly unknown[] = [],
     value?: bigint
   ) => {
-    // Placeholder - will be implemented when MooveNFT contract is deployed
-    console.warn("MooveNFT contract not yet deployed");
+    console.log("🎨 Calling MooveNFT contract:", {
+      functionName,
+      args: args.map((arg, index) => ({
+        index,
+        type: typeof arg,
+        value: typeof arg === "object" ? JSON.stringify(arg) : String(arg),
+      })),
+      value: value?.toString(),
+    });
+
+    // Use MooveNFT contract for NFT operations
+    const result = writeContract({
+      address: contracts.MooveNFT.address as `0x${string}`,
+      abi: contracts.MooveNFT.abi as any,
+      functionName: functionName as any,
+      args: args as any,
+      value: value,
+    });
+
+    console.log("🔗 writeContract result:", result);
+    return result;
   };
 
   return {
@@ -79,7 +92,7 @@ export function useReadMooveAuction<T = unknown>(
   functionName: string,
   args: readonly unknown[] = [],
   options?: { enabled?: boolean }
-): ReadContractResult<T> {
+) {
   const { data, isLoading, error, refetch } = useReadContract({
     address: contracts.MooveAuction.address as `0x${string}`,
     abi: contracts.MooveAuction.abi,
@@ -151,14 +164,14 @@ export function useReadMooveRentalPass<T = unknown>(
   functionName: string,
   args: readonly unknown[] = [],
   options?: { enabled?: boolean }
-): ReadContractResult<T> {
+) {
   return useReadContract({
     address: contracts.MooveRentalPass.address as `0x${string}`,
     abi: contracts.MooveRentalPass.abi as any,
     functionName,
     args,
     ...options,
-  }) as ReadContractResult<T>;
+  });
 }
 
 // Hook to write MooveRentalPass contracts (ACTIVE - currently deployed)
@@ -198,19 +211,19 @@ export function useWriteMooveRentalPass() {
   };
 }
 
-// Hook to read MooveStickerNFT contracts (placeholder for future use)
+// Hook to read MooveStickerNFT contracts (ACTIVE - uses MooveNFT contract)
 export function useReadMooveStickerNFT<T = unknown>(
   functionName: string,
   args: readonly unknown[] = [],
   options?: { enabled?: boolean }
-): ReadContractResult<T> {
-  // Placeholder - will be implemented when MooveStickerNFT contract is deployed
-  return {
-    data: undefined as T,
-    isLoading: false,
-    error: new Error("MooveStickerNFT contract not yet deployed"),
-    refetch: () => {},
-  } as ReadContractResult<T>;
+) {
+  return useReadContract({
+    address: contracts.MooveNFT.address as `0x${string}`,
+    abi: contracts.MooveNFT.abi as any,
+    functionName,
+    args,
+    ...options,
+  });
 }
 
 // Hook to write MooveStickerNFT contracts (using MooveNFT)
@@ -234,12 +247,15 @@ export function useWriteMooveStickerNFT() {
     });
 
     // Use MooveNFT contract for minting
-    writeContract({
+    const result = writeContract({
       address: contracts.MooveNFT.address as `0x${string}`,
       abi: contracts.MooveNFT.abi as any,
       functionName: functionName as any,
       args: args as any,
     });
+
+    console.log("🔗 writeContract result:", result);
+    return result;
   };
 
   return {
@@ -309,14 +325,14 @@ export function useReadMooveAccessControl<T = unknown>(
   functionName: string,
   args: readonly unknown[] = [],
   options?: { enabled?: boolean }
-): ReadContractResult<T> {
+) {
   return useReadContract({
     address: contracts.MooveAccessControl.address as `0x${string}`,
     abi: contracts.MooveAccessControl.abi as any,
     functionName,
     args,
     ...options,
-  }) as ReadContractResult<T>;
+  });
 }
 
 // Hook to write MooveAccessControl contracts (ACTIVE - currently deployed)

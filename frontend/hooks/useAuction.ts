@@ -1,7 +1,106 @@
-import { useEffect } from "react";
+"use client";
+
+import { useState, useEffect, useMemo } from "react";
+import { useAccount } from "wagmi";
 import { useReadMooveAuction, useWriteMooveAuction } from "./useContract";
-import { Auction, Bid, AuctionType } from "@/types/auction";
-import { useMemo } from "react";
+import { Auction, Bid, AuctionType, AuctionStatus } from "@/types/auction";
+import { useUserRoles } from "./useContract";
+import { contracts } from "@/utils/contracts";
+import { ethers } from "ethers";
+
+// ============================================================================
+// TYPES & INTERFACES
+// ============================================================================
+
+interface AuctionFilters {
+  type: AuctionType | "all";
+  status: "active" | "ended" | "all";
+  category: string;
+  priceRange: {
+    min: number;
+    max: number;
+  };
+  sortBy: "price" | "time" | "bids";
+  sortOrder: "asc" | "desc";
+}
+
+interface AuctionStats {
+  activeAuctions: number;
+  totalBids: number;
+  endedAuctions: number;
+  totalVolume: string;
+}
+
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
+// Function to fetch individual auction details from contract
+async function fetchAuctionFromContract(
+  auctionId: number
+): Promise<Auction | null> {
+  try {
+    console.log(`🔍 Fetching auction ${auctionId} from contract...`);
+
+    if (typeof window === "undefined" || !window.ethereum) {
+      console.warn("⚠️ No ethereum provider available");
+      return null;
+    }
+
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    const auctionContract = new ethers.Contract(
+      contracts.MooveAuction.address,
+      contracts.MooveAuction.abi,
+      provider
+    );
+
+    // Fetch auction details from contract
+    const auctionData = await auctionContract.getAuction(auctionId);
+
+    console.log(`📊 Auction ${auctionId} raw data:`, auctionData);
+
+    // Convert contract data to Auction type
+    const auction: Auction = {
+      auctionId: auctionId.toString(),
+      nftId: auctionData.tokenId.toString(),
+      nftName: `NFT #${auctionData.tokenId}`,
+      nftImage: "/images/default-nft.png",
+      nftCategory: "VEHICLE_DECORATION",
+      seller: auctionData.seller,
+      auctionType: Number(auctionData.auctionType),
+      status: Number(auctionData.status),
+      startPrice: ethers.formatEther(auctionData.startingPrice),
+      reservePrice: ethers.formatEther(auctionData.reservePrice),
+      buyNowPrice: ethers.formatEther(auctionData.buyNowPrice),
+      currentBid: ethers.formatEther(auctionData.highestBid),
+      highestBidder: auctionData.highestBidder,
+      bidCount: 0, // Will be fetched separately if needed
+      startTime: new Date(Number(auctionData.startTime) * 1000),
+      endTime: new Date(Number(auctionData.endTime) * 1000),
+      bidIncrement: ethers.formatEther(auctionData.bidIncrement),
+      currency: "ETH",
+      attributes: {
+        rarity: "COMMON",
+        designer: "Moove",
+        collection: "Genesis",
+        range: "100",
+        speed: "50",
+        battery: "80",
+        condition: "New",
+      },
+    };
+
+    console.log(`✅ Auction ${auctionId} processed:`, auction);
+    return auction;
+  } catch (error) {
+    console.error(`❌ Error fetching auction ${auctionId}:`, error);
+    return null;
+  }
+}
+
+// ============================================================================
+// SINGLE AUCTION HOOKS
+// ============================================================================
 
 export function useActiveAuctions() {
   const {
@@ -50,13 +149,17 @@ export function useCurrentDutchPrice(auctionId: number) {
   return { price, isLoading, error };
 }
 
+// ============================================================================
+// AUCTION CREATION & MANAGEMENT HOOKS
+// ============================================================================
+
 export function useCreateAuction() {
   const { writeMooveAuction, isPending, isConfirming, isSuccess, error, hash } =
     useWriteMooveAuction();
 
   const createAuction = async (
-    nftContract: string, // nftContract comes first
-    nftId: number, // tokenId comes second
+    nftContract: string,
+    nftId: number,
     auctionType: AuctionType,
     startPrice: bigint,
     reservePrice: bigint,
@@ -66,8 +169,8 @@ export function useCreateAuction() {
   ) => {
     console.log("🔧 useCreateAuction: Starting auction creation...");
     console.log("🔧 Parameters:", {
-      nftContract, // nftContract comes first
-      nftId, // tokenId comes second
+      nftContract,
+      nftId,
       auctionType,
       startPrice: startPrice.toString(),
       reservePrice: reservePrice.toString(),
@@ -80,10 +183,9 @@ export function useCreateAuction() {
       try {
         console.log("🔧 Calling writeMooveAuction...");
 
-        // Call the write function
         writeMooveAuction("createAuction", [
-          nftContract, // nftContract comes first
-          nftId, // tokenId comes second
+          nftContract,
+          nftId,
           auctionType,
           startPrice,
           reservePrice,
@@ -94,7 +196,6 @@ export function useCreateAuction() {
 
         console.log("🔧 writeMooveAuction called successfully");
 
-        // Wait a bit for the transaction to be submitted
         setTimeout(() => {
           console.log("🔧 Checking transaction status after 2 seconds...");
           console.log("🔧 Current status:", {
@@ -105,8 +206,6 @@ export function useCreateAuction() {
             error,
           });
 
-          // Return the transaction hash and status
-          // Only consider it successful if we have a hash and no error
           const isActuallySuccessful = hash && !error;
 
           resolve({
@@ -117,7 +216,7 @@ export function useCreateAuction() {
             isSuccess: isSuccess,
             error: error,
           });
-        }, 2000); // Wait 2 seconds for transaction to be submitted
+        }, 2000);
       } catch (error) {
         console.error("🔧 Error in writeMooveAuction:", error);
         reject(error);
@@ -125,7 +224,6 @@ export function useCreateAuction() {
     });
   };
 
-  // Debug per il risultato della transazione
   useEffect(() => {
     if (hash) {
       console.log("🔗 Auction creation transaction hash:", hash);
@@ -198,7 +296,10 @@ export function useClaimNFT() {
   };
 }
 
-// New hooks for Dutch auction commit-reveal functionality
+// ============================================================================
+// DUTCH AUCTION COMMIT-REVEAL HOOKS
+// ============================================================================
+
 export function useCommitToBuyDutch() {
   const { writeMooveAuction, isPending, isConfirming, isSuccess, error } =
     useWriteMooveAuction();
@@ -233,7 +334,6 @@ export function useBuyNowDutch() {
   };
 }
 
-// Hook for sealed bid reveal phase management
 export function useStartRevealPhase() {
   const { writeMooveAuction, isPending, isConfirming, isSuccess, error } =
     useWriteMooveAuction();
@@ -251,7 +351,6 @@ export function useStartRevealPhase() {
   };
 }
 
-// Hook for batch refund functionality (admin only)
 export function useRefundRemainingBidders() {
   const { writeMooveAuction, isPending, isConfirming, isSuccess, error } =
     useWriteMooveAuction();
@@ -276,3 +375,165 @@ export function useRefundRemainingBidders() {
     error,
   };
 }
+
+// ============================================================================
+// COLLECTION & FILTERING HOOKS
+// ============================================================================
+
+export function useAuctions() {
+  const { address, isConnected } = useAccount();
+  const { isMasterAdmin, canMint } = useUserRoles(address);
+  const [auctions, setAuctions] = useState<Auction[]>([]);
+  const [filters, setFilters] = useState<AuctionFilters>({
+    type: "all",
+    status: "all",
+    category: "all",
+    priceRange: { min: 0, max: 1000 },
+    sortBy: "time",
+    sortOrder: "desc",
+  });
+
+  // Use existing hook to get active auctions
+  const {
+    auctionIds,
+    isLoading: isLoadingActive,
+    error: activeError,
+    refetch: refetchActive,
+  } = useActiveAuctions();
+
+  // Fetch individual auction details when auctionIds change
+  useEffect(() => {
+    console.log("🔍 useAuctions: auctionIds changed", {
+      auctionIds,
+      length: auctionIds?.length,
+    });
+
+    if (auctionIds && auctionIds.length > 0) {
+      console.log(
+        "🔍 useAuctions: Fetching auction details for",
+        auctionIds.length,
+        "auctions"
+      );
+
+      const fetchAuctionDetails = async () => {
+        const auctionPromises = auctionIds.map(async (auctionId) => {
+          try {
+            console.log(`🔍 Fetching auction ${auctionId} details...`);
+            const auctionData = await fetchAuctionFromContract(auctionId);
+
+            if (auctionData) {
+              console.log(`✅ Auction ${auctionId} fetched:`, auctionData);
+              return auctionData;
+            } else {
+              console.warn(`⚠️ Auction ${auctionId} not found or invalid`);
+              return null;
+            }
+          } catch (error) {
+            console.error(`❌ Error fetching auction ${auctionId}:`, error);
+            return null;
+          }
+        });
+
+        const auctionDetails = await Promise.all(auctionPromises);
+        const validAuctions = auctionDetails.filter(
+          (auction) => auction !== null
+        ) as unknown as Auction[];
+        console.log("🔍 useAuctions: Fetched auction details", {
+          total: auctionDetails.length,
+          valid: validAuctions.length,
+          auctions: validAuctions,
+        });
+        setAuctions(validAuctions);
+      };
+
+      fetchAuctionDetails();
+    } else {
+      console.log(
+        "🔍 useAuctions: No auction IDs available, clearing auctions"
+      );
+      setAuctions([]);
+    }
+  }, [auctionIds, address]);
+
+  const isLoading = isLoadingActive;
+  const error = activeError?.message || null;
+
+  // Filter auctions based on current filters
+  const filteredAuctions = auctions.filter((auction) => {
+    if (
+      filters.status !== "all" &&
+      String(auction.status).toLowerCase() !== filters.status
+    )
+      return false;
+    if (filters.type !== "all" && auction.auctionType !== filters.type)
+      return false;
+    if (filters.category !== "all" && auction.nftCategory !== filters.category)
+      return false;
+
+    // Price range filtering
+    const price = parseFloat(
+      auction.currentBid === "???" ? auction.startPrice : auction.currentBid
+    );
+    if (price < filters.priceRange.min || price > filters.priceRange.max) {
+      return false;
+    }
+
+    return true;
+  });
+
+  // Calculate stats
+  const stats: AuctionStats = {
+    activeAuctions: auctions.filter((a) => a.status === AuctionStatus.ACTIVE)
+      .length,
+    totalBids: auctions.reduce((sum, auction) => sum + auction.bidCount, 0),
+    endedAuctions: auctions.filter((a) => a.status === AuctionStatus.ENDED)
+      .length,
+    totalVolume: auctions
+      .filter((a) => a.status === AuctionStatus.ENDED)
+      .reduce((total, auction) => {
+        const price = parseFloat(
+          auction.currentBid || auction.startPrice || "0"
+        );
+        return total + price;
+      }, 0)
+      .toFixed(4),
+  };
+
+  // Categorized auctions
+  const activeAuctions = filteredAuctions.filter(
+    (a) => a.status === AuctionStatus.ACTIVE
+  );
+  const endedAuctions = filteredAuctions.filter(
+    (a) => a.status === AuctionStatus.ENDED
+  );
+  const revealingAuctions = filteredAuctions.filter(
+    (a) => a.status === AuctionStatus.REVEALING
+  );
+
+  // Auto-refetch when auctions change
+  const refetch = () => {
+    refetchActive();
+  };
+
+  return {
+    auctions: filteredAuctions,
+    activeAuctions,
+    endedAuctions,
+    revealingAuctions,
+    stats,
+    filters,
+    setFilters,
+    isLoading,
+    error,
+    refetch,
+    // Admin permissions
+    isMasterAdmin,
+    canMint,
+  };
+}
+
+// ============================================================================
+// EXPORT ALL HOOKS
+// ============================================================================
+
+export { type AuctionFilters, type AuctionStats, fetchAuctionFromContract };

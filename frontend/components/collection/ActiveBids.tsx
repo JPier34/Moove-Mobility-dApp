@@ -87,9 +87,9 @@ export default function ActiveBids({ bids }: ActiveBidsProps) {
   };
 
   const handleIncreaseBid = (bid: ActiveBid) => {
-    // TODO: Implement increase bid logic
     console.log("Increasing bid for auction:", bid.auctionId);
-    alert(`Aumentando offerta per ${bid.nftName}...`);
+    // Navigate to auction page for bidding
+    window.location.href = `/auctions?auctionId=${bid.auctionId}&action=bid`;
   };
 
   if (bids.length === 0) {

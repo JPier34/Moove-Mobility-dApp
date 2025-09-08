@@ -59,9 +59,9 @@ export default function WonAuctions({ auctions }: WonAuctionsProps) {
   }, [auctions]);
 
   const handleClaimNFT = (auction: WonAuction) => {
-    // TODO: Implement claim NFT logic
     console.log("Claiming NFT from auction:", auction.auctionId);
-    alert(`Reclamando ${auction.nftName}...`);
+    // Navigate to auction page for claiming
+    window.location.href = `/auctions?auctionId=${auction.auctionId}&action=claim`;
   };
 
   const handleViewAuction = (auctionId: string) => {

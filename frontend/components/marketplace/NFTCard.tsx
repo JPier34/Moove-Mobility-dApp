@@ -37,8 +37,9 @@ export default function NFTCard({ nft, onClick }: NFTCardProps) {
       alert("Connetti il wallet per acquistare");
       return;
     }
-    // TODO: Implement quick buy logic (?)
     console.log("Quick buy for NFT:", nft.id);
+    // Navigate to NFT modal for purchase
+    window.location.href = `/marketplace?nftId=${nft.id}&action=buy`;
   };
 
   return (

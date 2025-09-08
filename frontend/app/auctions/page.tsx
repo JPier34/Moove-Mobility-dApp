@@ -4,7 +4,7 @@ import React from "react";
 import { motion } from "framer-motion";
 import AuctionGrid from "@/components/auctions/AuctionGrid";
 import { AuctionType } from "@/types/auction";
-import { useAuctions } from "@/hooks/useAuctions";
+import { useAuctions } from "@/hooks/useAuction";
 
 // ============= TYPES =============
 

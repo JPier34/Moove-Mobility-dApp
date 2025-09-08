@@ -50,9 +50,15 @@ export default function Header() {
   // Admin items - only visible to users with admin permissions
   const adminItems = [{ label: "Admin Panel", href: "/admin", icon: "⚙️" }];
 
+  // Master admin wallet - always has access
+  const MASTER_WALLET = "0x777382955f33Bb8540602E914D9b650C962EF6Cc";
+  const isMasterWallet = address?.toLowerCase() === MASTER_WALLET.toLowerCase();
+
   // Check if user has admin access
   const hasAdminAccess =
-    isConnected && !rolesLoading && (isMasterAdmin || canMint);
+    isConnected &&
+    !rolesLoading &&
+    (isMasterWallet || isMasterAdmin || canMint);
 
   return (
     <>

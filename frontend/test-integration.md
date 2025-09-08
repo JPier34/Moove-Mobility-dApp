@@ -36,3 +36,5 @@
 - ✅ UI responsive e funzionale
 - ✅ Integrazione con contratti aggiornati
 
+
+
