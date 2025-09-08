@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useUserCollection } from "@/hooks/useUserCollection";
 import { useAuctionNotifications } from "@/hooks/useAuctionNotifications";
 import { useSmartRefresh } from "@/hooks/useSmartRefresh";
+import { useWalletPersistence } from "@/hooks/useWalletPersistence";
 import { useAccount } from "wagmi";
 import { toast } from "react-hot-toast";
 import { contracts } from "@/utils/contracts";
@@ -95,116 +96,6 @@ const mockRentalPasses: RentalPass[] = [];
 const mockDecorativeNFTs: DecorativeNFT[] = [];
 
 // ============= COMPONENTS =============
-
-function CollectionHeader({
-  stats,
-  isRefreshing,
-  lastUpdated,
-  onRefresh,
-}: {
-  stats: any;
-  isRefreshing: boolean;
-  lastUpdated: Date;
-  onRefresh: () => void;
-}) {
-  return (
-    <motion.div
-      className="text-center mb-16"
-      initial={{ opacity: 0, y: 30 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.8 }}
-    >
-      <h1 className="text-5xl md:text-6xl font-bold text-gray-900 dark:text-white mb-6">
-        My{" "}
-        <span className="bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">
-          Collection
-        </span>
-      </h1>
-      <p className="text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-3xl mx-auto">
-        Manage your rental passes, showcase your decorative NFTs, and track your
-        achievements
-      </p>
-
-      {/* Refresh Status */}
-      <div className="flex items-center justify-center space-x-2 text-sm text-gray-500 dark:text-gray-400 mb-4">
-        {isRefreshing ? (
-          <>
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-            <span>Updating collection...</span>
-          </>
-        ) : (
-          <>
-            <span>Last updated: {lastUpdated.toLocaleTimeString()}</span>
-            <button
-              onClick={onRefresh}
-              className="ml-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
-              disabled={isRefreshing}
-            >
-              🔄 Refresh
-            </button>
-          </>
-        )}
-      </div>
-
-      {/* Enhanced Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-6xl mx-auto">
-        <motion.div
-          className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg"
-          whileHover={{
-            y: -5,
-            boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
-          }}
-        >
-          <div className="text-3xl font-bold text-green-600 mb-2">
-            {stats.totalRentals}
-          </div>
-          <div className="text-gray-600 dark:text-gray-300">Rental Passes</div>
-        </motion.div>
-
-        <motion.div
-          className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg"
-          whileHover={{
-            y: -5,
-            boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
-          }}
-        >
-          <div className="text-3xl font-bold text-blue-600 mb-2">
-            {stats.totalDecorative}
-          </div>
-          <div className="text-gray-600 dark:text-gray-300">
-            Decorative NFTs
-          </div>
-        </motion.div>
-
-        <motion.div
-          className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg"
-          whileHover={{
-            y: -5,
-            boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
-          }}
-        >
-          <div className="text-3xl font-bold text-purple-600 mb-2">
-            {stats.auctionsWon}
-          </div>
-          <div className="text-gray-600 dark:text-gray-300">Auctions Won</div>
-        </motion.div>
-
-        <motion.div
-          className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg"
-          whileHover={{
-            y: -5,
-            boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
-          }}
-        >
-          <div className="text-3xl font-bold text-orange-600 mb-2">
-            €{stats.totalValue}
-          </div>
-          <div className="text-gray-600 dark:text-gray-300">Total Value</div>
-        </motion.div>
-      </div>
-    </motion.div>
-  );
-}
 
 function FilterBar({
   filters,
@@ -444,6 +335,19 @@ function DecorativeNFTCard({ nft }: { nft: DecorativeNFT }) {
   const rarityConfig = RARITY_CONFIG[nft.rarity];
   const [showDetails, setShowDetails] = useState(false);
 
+  // Debug log for showDetails state changes
+  useEffect(() => {
+    console.log(
+      "🔍 showDetails state changed:",
+      showDetails,
+      "for NFT:",
+      nft.name
+    );
+    if (showDetails) {
+      console.log("🔍 Modal should be visible for NFT:", nft.name);
+    }
+  }, [showDetails, nft.name]);
+
   return (
     <motion.div
       layout
@@ -548,7 +452,10 @@ function DecorativeNFTCard({ nft }: { nft: DecorativeNFT }) {
         {/* Actions */}
         <div className="flex gap-2">
           <motion.button
-            onClick={() => setShowDetails(true)}
+            onClick={() => {
+              console.log("🔍 View Details clicked for NFT:", nft.name);
+              setShowDetails(true);
+            }}
             className="flex-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 py-2 px-4 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm font-medium"
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
@@ -576,7 +483,7 @@ function DecorativeNFTCard({ nft }: { nft: DecorativeNFT }) {
       <AnimatePresence>
         {showDetails && (
           <motion.div
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999] flex items-center justify-center p-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -975,6 +882,13 @@ export default function MyCollection() {
   const { wonAuctions, isLoading, error, refetch } = useUserCollection();
   const { hasNewWins, newWinsCount } = useAuctionNotifications();
 
+  // Wallet persistence hook for better connection management
+  const {
+    forceReconnect,
+    isInitialized,
+    isConnecting: walletConnecting,
+  } = useWalletPersistence();
+
   // Wrapper function for refresh with loading state
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -1085,17 +999,21 @@ export default function MyCollection() {
   };
 
   // Show loading state
-  if (isLoading) {
+  if (isLoading || !isInitialized || walletConnecting) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
         <div className="container mx-auto px-4 py-8">
           <div className="text-center py-20">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-              Loading your collection...
+              {!isInitialized || walletConnecting
+                ? "Connecting wallet..."
+                : "Loading your collection..."}
             </h2>
             <p className="text-gray-600 dark:text-gray-400">
-              Fetching your won NFTs from the blockchain
+              {!isInitialized || walletConnecting
+                ? "Please wait while we connect to your wallet"
+                : "Fetching your won NFTs from the blockchain"}
             </p>
           </div>
         </div>
@@ -1139,12 +1057,20 @@ export default function MyCollection() {
             <p className="text-gray-600 dark:text-gray-400 mb-6">
               Please connect your wallet to view your collection
             </p>
-            <Link
-              href="/auctions"
-              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              Go to Auctions
-            </Link>
+            <div className="flex gap-4 justify-center">
+              <button
+                onClick={forceReconnect}
+                className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors"
+              >
+                🔄 Reconnect Wallet
+              </button>
+              <Link
+                href="/auctions"
+                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Go to Auctions
+              </Link>
+            </div>
           </div>
         </div>
       </div>
@@ -1154,12 +1080,87 @@ export default function MyCollection() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 dark:from-gray-900 dark:to-gray-800">
       <div className="max-w-7xl mx-auto px-6 py-20">
-        <CollectionHeader
-          stats={stats}
-          isRefreshing={isRefreshing}
-          lastUpdated={lastUpdated}
-          onRefresh={handleRefresh}
-        />
+        {/* Page Title and Description */}
+        <motion.div
+          className="text-center mb-16"
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8 }}
+        >
+          <h1 className="text-5xl md:text-6xl font-bold text-gray-900 dark:text-white mb-6">
+            My{" "}
+            <span className="bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">
+              Collection
+            </span>
+          </h1>
+          <p className="text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-3xl mx-auto">
+            Manage your rental passes, showcase your decorative NFTs, and track
+            your achievements
+          </p>
+
+          {/* Refresh Status */}
+          <div className="flex items-center justify-center space-x-2 text-sm text-gray-500 dark:text-gray-400 mb-4">
+            {isRefreshing ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                <span>Updating collection...</span>
+              </>
+            ) : (
+              <>
+                <span>Last updated: {lastUpdated.toLocaleTimeString()}</span>
+                <button
+                  onClick={handleRefresh}
+                  className="ml-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+                  disabled={isRefreshing}
+                >
+                  🔄 Refresh
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <motion.div
+              className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg border border-gray-200 dark:border-gray-700"
+              whileHover={{ scale: 1.05 }}
+              transition={{ type: "spring", stiffness: 300 }}
+            >
+              <div className="text-3xl font-bold text-green-600 dark:text-green-400 mb-2">
+                {stats.totalRentals}
+              </div>
+              <div className="text-gray-600 dark:text-gray-300">
+                Rental Passes
+              </div>
+            </motion.div>
+
+            <motion.div
+              className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg border border-gray-200 dark:border-gray-700"
+              whileHover={{ scale: 1.05 }}
+              transition={{ type: "spring", stiffness: 300 }}
+            >
+              <div className="text-3xl font-bold text-blue-600 dark:text-blue-400 mb-2">
+                {stats.totalDecorative}
+              </div>
+              <div className="text-gray-600 dark:text-gray-300">
+                Decorative NFTs
+              </div>
+            </motion.div>
+
+            <motion.div
+              className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg border border-gray-200 dark:border-gray-700"
+              whileHover={{ scale: 1.05 }}
+              transition={{ type: "spring", stiffness: 300 }}
+            >
+              <div className="text-3xl font-bold text-purple-600 dark:text-purple-400 mb-2">
+                {stats.totalValue}
+              </div>
+              <div className="text-gray-600 dark:text-gray-300">
+                Total Value (ETH)
+              </div>
+            </motion.div>
+          </div>
+        </motion.div>
 
         {rentalPasses.length > 0 || decorativeNFTs.length > 0 ? (
           <>
