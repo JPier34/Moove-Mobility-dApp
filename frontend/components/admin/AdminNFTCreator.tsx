@@ -8,8 +8,11 @@ import { useWriteMooveAuction, useWriteMooveNFT } from "@/hooks/useContract";
 import { useWriteMooveStickerNFT, useUserRoles } from "@/hooks/useContract";
 import { useSecureNFTAuctionFlow } from "@/hooks/useSecureNFTAuction";
 import { useIPFSUnified } from "@/hooks/useIPFSUnified";
+import { trackIPFSFileCreation } from "@/hooks/enhanced-auction-utils";
 import { IPFSStatus } from "@/components/admin/IPFSStatus";
 import { PinataTest } from "@/components/admin/PinataTest";
+import IPFSTrackingDebug from "@/components/admin/IPFSTrackingDebug";
+import IPFSTestComponent from "@/components/admin/IPFSTestComponent";
 import { EnvDebug } from "@/components/admin/EnvDebug";
 import { NFTCreationDebug } from "@/components/admin/NFTCreationDebug";
 import { AdminPermissionsDebug } from "@/components/admin/AdminPermissionsDebug";
@@ -451,6 +454,19 @@ export default function AdminNFTCreator() {
       });
 
       const metadataURI = uploadResult.metadataUrl;
+
+      // Track IPFS file creation
+      if (uploadResult.metadataUrl) {
+        const hash = uploadResult.metadataUrl
+          .replace("ipfs://", "")
+          .replace("https://gateway.pinata.cloud/ipfs/", "");
+        trackIPFSFileCreation(
+          hash,
+          "https://gateway.pinata.cloud/ipfs/",
+          "pinata"
+        );
+        console.log(`📍 [IPFS Tracker] Tracked metadata file: ${hash}`);
+      }
 
       // Convert rarity string to enum value (0-5)
       const rarityMap = {
@@ -1616,6 +1632,13 @@ export default function AdminNFTCreator() {
         console.log("✅ Secure flow completed successfully:", secureResult);
         toast.success("NFT and auction created securely!");
 
+        // Clear auction cache to force refresh
+        Object.keys(localStorage).forEach((key) => {
+          if (key.startsWith("auction_")) {
+            localStorage.removeItem(key);
+          }
+        });
+
         // Salva i dati per la pagina di successo
         const nftCreationData = {
           id: `nft_${Date.now()}`,
@@ -1645,6 +1668,11 @@ export default function AdminNFTCreator() {
       } else {
         console.log("⚠️ Secure result not available, but flow completed");
         toast.success("NFT and auction created! Check the auctions page.");
+
+        // Force refresh auction list
+        setTimeout(() => {
+          window.location.href = "/auctions";
+        }, 2000);
       }
     } catch (error) {
       console.error("❌ Secure creation failed:", error);
@@ -2822,6 +2850,10 @@ export default function AdminNFTCreator() {
         }
         onSuggestionClick={applyNameSuggestion}
       />
+
+      {/* IPFS Tracking Debug Component */}
+      <IPFSTrackingDebug />
+      <IPFSTestComponent className="mt-6" />
     </div>
   );
 }

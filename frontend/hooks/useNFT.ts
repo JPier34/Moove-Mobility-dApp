@@ -157,7 +157,7 @@ export function useNFTImage(tokenId: number) {
   const [isLoading, setIsLoading] = React.useState(false);
 
   React.useEffect(() => {
-    if (tokenURI) {
+    if (tokenURI && typeof tokenURI === "string") {
       setIsLoading(true);
       fetchMetadata(tokenURI).then((metadata) => {
         if (metadata?.image) {

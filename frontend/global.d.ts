@@ -5,3 +5,8 @@ interface Window {
     removeListener: (event: string, callback: (...args: any[]) => void) => void;
   };
 }
+
+declare module "*.json" {
+  const value: any;
+  export default value;
+}

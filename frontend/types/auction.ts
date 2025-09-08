@@ -6,10 +6,11 @@ export enum AuctionType {
 }
 
 export enum AuctionStatus {
-  ACTIVE = 0,
-  ENDED = 1,
-  CANCELLED = 2,
-  REVEALING = 3,
+  PENDING = 0, // Non ancora iniziata
+  ACTIVE = 1, // In corso
+  ENDED = 2, // Terminata
+  CANCELLED = 3, // Cancellata
+  CLAIMED = 4, // Vincita reclamata
 }
 
 export interface Auction {

@@ -90,20 +90,22 @@ export function getAuctionTypeName(type: AuctionType): string {
 
 export function getAuctionStatusName(status: AuctionStatus): string {
   const names = {
+    [AuctionStatus.PENDING]: "Pending",
     [AuctionStatus.ACTIVE]: "Active",
     [AuctionStatus.ENDED]: "Ended",
     [AuctionStatus.CANCELLED]: "Cancelled",
-    [AuctionStatus.REVEALING]: "Revealing",
+    [AuctionStatus.CLAIMED]: "Claimed",
   };
   return names[status] || "Unknown Status";
 }
 
 export function getAuctionStatusColor(status: AuctionStatus): string {
   const colors = {
+    [AuctionStatus.PENDING]: "bg-yellow-100 text-yellow-800",
     [AuctionStatus.ACTIVE]: "bg-green-100 text-green-800",
     [AuctionStatus.ENDED]: "bg-gray-100 text-gray-800",
     [AuctionStatus.CANCELLED]: "bg-red-100 text-red-800",
-    [AuctionStatus.REVEALING]: "bg-yellow-100 text-yellow-800",
+    [AuctionStatus.CLAIMED]: "bg-blue-100 text-blue-800",
   };
   return colors[status] || "bg-gray-100 text-gray-800";
 }

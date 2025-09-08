@@ -21,6 +21,7 @@ interface AuctionCardProps {
 
 // Category emojis mapping
 const categoryEmojis = {
+  sticker: "🏷️",
   scooter: "🛴",
   bike: "🚲",
   skateboard: "🛹",
@@ -56,6 +57,18 @@ export default function AuctionCard({
   onClick,
   showEndedState = false,
 }: AuctionCardProps) {
+  // Debug log per vedere cosa riceve la card
+  console.log("🎨 AuctionCard received auction:", {
+    id: auction.auctionId,
+    nftId: auction.nftId,
+    name: auction.nftName,
+    image: auction.nftImage,
+    category: auction.nftCategory,
+    status: auction.status,
+    seller: auction.seller,
+    startPrice: auction.startPrice,
+    currentBid: auction.currentBid,
+  });
   const { address, isConnected } = useAccount();
   const [timeLeft, setTimeLeft] = useState("");
   const [currentDutchPrice, setCurrentDutchPrice] = useState(
@@ -216,7 +229,7 @@ export default function AuctionCard({
         );
 
       case AuctionType.SEALED_BID:
-        return (auction.status as AuctionStatus) === AuctionStatus.REVEALING ? (
+        return (auction.status as AuctionStatus) === AuctionStatus.PENDING ? (
           <Button
             size="sm"
             variant="secondary"
@@ -293,7 +306,7 @@ export default function AuctionCard({
             {typeInfo.emoji} {typeInfo.name}
           </span>
 
-          {(auction.status as AuctionStatus) === AuctionStatus.REVEALING && (
+          {(auction.status as AuctionStatus) === AuctionStatus.PENDING && (
             <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium animate-pulse">
               🔓 Apertura buste
             </span>
@@ -311,10 +324,26 @@ export default function AuctionCard({
 
       {/* NFT Image */}
       <div className="relative aspect-square bg-gradient-to-br from-moove-50 to-moove-100 p-6">
-        <div className="w-full h-full bg-gradient-to-br from-moove-primary to-moove-secondary rounded-xl flex items-center justify-center text-6xl text-white">
-          {categoryEmojis[auction.nftCategory as keyof typeof categoryEmojis] ||
-            "🚗"}
-        </div>
+        {auction.nftImage && auction.nftImage !== "/images/default-nft.png" ? (
+          <img
+            src={auction.nftImage}
+            alt={auction.nftName}
+            className="w-full h-full object-cover rounded-xl"
+            onError={(e) => {
+              console.log("❌ Image failed to load:", auction.nftImage);
+              e.currentTarget.style.display = "none";
+            }}
+            onLoad={() =>
+              console.log("✅ Image loaded successfully:", auction.nftImage)
+            }
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-moove-primary to-moove-secondary rounded-xl flex items-center justify-center text-6xl text-white">
+            {categoryEmojis[
+              auction.nftCategory as keyof typeof categoryEmojis
+            ] || "🚗"}
+          </div>
+        )}
 
         {/* Bid count indicator */}
         {auction.bidCount > 0 && (
@@ -380,12 +409,12 @@ export default function AuctionCard({
           ) : auction.auctionType === AuctionType.SEALED_BID ? (
             <div>
               <div className="text-xs text-gray-500">
-                {auction.status === AuctionStatus.REVEALING
+                {auction.status === AuctionStatus.PENDING
                   ? "Hidden Bids"
                   : "Starting Price"}
               </div>
               <div className="text-xl font-bold text-gray-900">
-                {auction.status === AuctionStatus.REVEALING
+                {auction.status === AuctionStatus.PENDING
                   ? "???"
                   : auction.startPrice}
                 <span className="text-sm text-gray-600 ml-1">

@@ -180,7 +180,7 @@ export default function AuctionFilters({
                 <option value={AuctionStatus.ENDED.toString()}>
                   🔴 Terminato
                 </option>
-                <option value={AuctionStatus.REVEALING.toString()}>
+                <option value={AuctionStatus.PENDING.toString()}>
                   🔓 Apertura buste...
                 </option>
                 <option value={AuctionStatus.CANCELLED.toString()}>
@@ -303,13 +303,10 @@ export default function AuctionFilters({
               </button>
               <button
                 onClick={() =>
-                  handleFilterChange(
-                    "status",
-                    AuctionStatus.REVEALING.toString()
-                  )
+                  handleFilterChange("status", AuctionStatus.PENDING.toString())
                 }
                 className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                  filters.status === AuctionStatus.REVEALING.toString()
+                  filters.status === AuctionStatus.PENDING.toString()
                     ? "bg-yellow-100 text-yellow-800 border border-yellow-200"
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}

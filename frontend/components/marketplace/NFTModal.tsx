@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { NFT } from "./NFTGrid";
 import Button from "../ui/Button";
 import { useAccount, useDisconnect } from "wagmi";
+import { toast } from "react-hot-toast";
 
 interface NFTModalProps {
   nft: NFT;

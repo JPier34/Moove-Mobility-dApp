@@ -4,7 +4,7 @@ import React from "react";
 import { motion } from "framer-motion";
 import AuctionGrid from "@/components/auctions/AuctionGrid";
 import { AuctionType } from "@/types/auction";
-import { useAuctions } from "@/hooks/useAuction";
+import { useAuctionsEnhanced as useAuctions } from "@/hooks/enhanced-auction-utils";
 
 // ============= TYPES =============
 
@@ -123,7 +123,7 @@ function AuctionsHeader({ stats }: { stats: any }) {
           }}
         >
           <div className="text-3xl font-bold text-orange-600 mb-2">
-            {stats.totalVolume} ETH
+            {stats.totalVolume.toFixed(4)} ETH
           </div>
           <div className="text-gray-600 dark:text-gray-300">📊 Volume</div>
         </motion.div>
@@ -367,7 +367,6 @@ export default function AuctionsPage() {
     auctions,
     activeAuctions,
     endedAuctions,
-    revealingAuctions,
     stats,
     filters,
     setFilters,
@@ -434,7 +433,20 @@ export default function AuctionsPage() {
           />
 
           {activeAuctions.length > 0 ? (
-            <AuctionGrid auctions={activeAuctions} />
+            <>
+              {console.log(
+                "🎯 Passing to AuctionGrid:",
+                activeAuctions.map((a) => ({
+                  id: a.auctionId,
+                  nftId: a.nftId,
+                  name: a.nftName,
+                  image: a.nftImage,
+                  category: a.nftCategory,
+                  status: a.status,
+                }))
+              )}
+              <AuctionGrid auctions={activeAuctions} />
+            </>
           ) : (
             <motion.div
               className="text-center py-12 bg-white dark:bg-gray-800 rounded-2xl"
@@ -451,23 +463,6 @@ export default function AuctionsPage() {
             </motion.div>
           )}
         </motion.section>
-
-        {/* Revealing Auctions Section */}
-        {revealingAuctions.length > 0 && (
-          <motion.section
-            className="mb-12"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.6, delay: 0.3 }}
-          >
-            <SectionHeader
-              title="Revealing Bids"
-              count={revealingAuctions.length}
-              icon="🔍"
-            />
-            <AuctionGrid auctions={revealingAuctions} />
-          </motion.section>
-        )}
 
         {/* Ended Auctions Section */}
         <motion.section

@@ -324,11 +324,33 @@ export default function AuctionModal({
             <div className="space-y-6">
               {/* NFT Image */}
               <div className="aspect-square bg-gradient-to-br from-moove-50 to-moove-100 rounded-xl p-8">
-                <div className="w-full h-full bg-gradient-to-br from-moove-primary to-moove-secondary rounded-xl flex items-center justify-center text-8xl text-white">
-                  {categoryEmojis[
-                    auction.nftCategory as keyof typeof categoryEmojis
-                  ] || "🚗"}
-                </div>
+                {auction.nftImage &&
+                auction.nftImage !== "/images/default-nft.png" ? (
+                  <img
+                    src={auction.nftImage}
+                    alt={auction.nftName}
+                    className="w-full h-full object-cover rounded-xl"
+                    onError={(e) => {
+                      console.log(
+                        "❌ Modal image failed to load:",
+                        auction.nftImage
+                      );
+                      e.currentTarget.style.display = "none";
+                    }}
+                    onLoad={() =>
+                      console.log(
+                        "✅ Modal image loaded successfully:",
+                        auction.nftImage
+                      )
+                    }
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-moove-primary to-moove-secondary rounded-xl flex items-center justify-center text-8xl text-white">
+                    {categoryEmojis[
+                      auction.nftCategory as keyof typeof categoryEmojis
+                    ] || "🚗"}
+                  </div>
+                )}
               </div>
 
               {/* Tabs */}
@@ -431,7 +453,7 @@ export default function AuctionModal({
                   {auction.auctionType === AuctionType.DUTCH
                     ? "Current Price"
                     : auction.auctionType === AuctionType.SEALED_BID &&
-                      auction.status === AuctionStatus.REVEALING
+                      auction.status === AuctionStatus.PENDING
                     ? "Hidden Bids"
                     : auction.currentBid === "0"
                     ? "Starting Price"
@@ -442,7 +464,7 @@ export default function AuctionModal({
                     {auction.auctionType === AuctionType.DUTCH
                       ? currentDutchPrice
                       : auction.auctionType === AuctionType.SEALED_BID &&
-                        auction.status === AuctionStatus.REVEALING
+                        auction.status === AuctionStatus.PENDING
                       ? "???"
                       : auction.currentBid === "0"
                       ? auction.startPrice
@@ -534,7 +556,7 @@ export default function AuctionModal({
 
                   {auction.auctionType === AuctionType.SEALED_BID &&
                     (auction.status as AuctionStatus) ===
-                      AuctionStatus.REVEALING && (
+                      AuctionStatus.PENDING && (
                       <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                         <div className="text-yellow-800 font-medium mb-2">
                           🔓 Fase di apertura buste attiva

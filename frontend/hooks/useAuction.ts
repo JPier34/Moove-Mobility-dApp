@@ -7,6 +7,10 @@ import { Auction, Bid, AuctionType, AuctionStatus } from "@/types/auction";
 import { useUserRoles } from "./useContract";
 import { contracts } from "@/utils/contracts";
 import { ethers } from "ethers";
+import {
+  fetchAuctionFromContractEnhanced,
+  useAuctionsEnhanced,
+} from "./enhanced-auction-utils";
 
 // ============================================================================
 // TYPES & INTERFACES
@@ -28,7 +32,7 @@ interface AuctionStats {
   activeAuctions: number;
   totalBids: number;
   endedAuctions: number;
-  totalVolume: string;
+  totalVolume: number;
 }
 
 // ============================================================================
@@ -36,67 +40,8 @@ interface AuctionStats {
 // ============================================================================
 
 // Function to fetch individual auction details from contract
-async function fetchAuctionFromContract(
-  auctionId: number
-): Promise<Auction | null> {
-  try {
-    console.log(`🔍 Fetching auction ${auctionId} from contract...`);
-
-    if (typeof window === "undefined" || !window.ethereum) {
-      console.warn("⚠️ No ethereum provider available");
-      return null;
-    }
-
-    const provider = new ethers.BrowserProvider(window.ethereum);
-    const auctionContract = new ethers.Contract(
-      contracts.MooveAuction.address,
-      contracts.MooveAuction.abi,
-      provider
-    );
-
-    // Fetch auction details from contract
-    const auctionData = await auctionContract.getAuction(auctionId);
-
-    console.log(`📊 Auction ${auctionId} raw data:`, auctionData);
-
-    // Convert contract data to Auction type
-    const auction: Auction = {
-      auctionId: auctionId.toString(),
-      nftId: auctionData.tokenId.toString(),
-      nftName: `NFT #${auctionData.tokenId}`,
-      nftImage: "/images/default-nft.png",
-      nftCategory: "VEHICLE_DECORATION",
-      seller: auctionData.seller,
-      auctionType: Number(auctionData.auctionType),
-      status: Number(auctionData.status),
-      startPrice: ethers.formatEther(auctionData.startingPrice),
-      reservePrice: ethers.formatEther(auctionData.reservePrice),
-      buyNowPrice: ethers.formatEther(auctionData.buyNowPrice),
-      currentBid: ethers.formatEther(auctionData.highestBid),
-      highestBidder: auctionData.highestBidder,
-      bidCount: 0, // Will be fetched separately if needed
-      startTime: new Date(Number(auctionData.startTime) * 1000),
-      endTime: new Date(Number(auctionData.endTime) * 1000),
-      bidIncrement: ethers.formatEther(auctionData.bidIncrement),
-      currency: "ETH",
-      attributes: {
-        rarity: "COMMON",
-        designer: "Moove",
-        collection: "Genesis",
-        range: "100",
-        speed: "50",
-        battery: "80",
-        condition: "New",
-      },
-    };
-
-    console.log(`✅ Auction ${auctionId} processed:`, auction);
-    return auction;
-  } catch (error) {
-    console.error(`❌ Error fetching auction ${auctionId}:`, error);
-    return null;
-  }
-}
+// Use the enhanced auction fetching function
+const fetchAuctionFromContract = fetchAuctionFromContractEnhanced;
 
 // ============================================================================
 // SINGLE AUCTION HOOKS
@@ -109,6 +54,13 @@ export function useActiveAuctions() {
     error,
     refetch,
   } = useReadMooveAuction<number[]>("getActiveAuctions");
+
+  console.log(`🔍 useActiveAuctions result:`, {
+    auctionIds,
+    isLoading,
+    error,
+    count: auctionIds?.length || 0,
+  });
 
   return { auctionIds, isLoading, error, refetch };
 }
@@ -488,15 +440,17 @@ export function useAuctions() {
     totalBids: auctions.reduce((sum, auction) => sum + auction.bidCount, 0),
     endedAuctions: auctions.filter((a) => a.status === AuctionStatus.ENDED)
       .length,
-    totalVolume: auctions
-      .filter((a) => a.status === AuctionStatus.ENDED)
-      .reduce((total, auction) => {
-        const price = parseFloat(
-          auction.currentBid || auction.startPrice || "0"
-        );
-        return total + price;
-      }, 0)
-      .toFixed(4),
+    totalVolume: parseFloat(
+      auctions
+        .filter((a) => a.status === AuctionStatus.ENDED)
+        .reduce((total, auction) => {
+          const price = parseFloat(
+            auction.currentBid || auction.startPrice || "0"
+          );
+          return total + price;
+        }, 0)
+        .toFixed(4)
+    ), // Limit to 4 decimal places
   };
 
   // Categorized auctions
@@ -506,8 +460,8 @@ export function useAuctions() {
   const endedAuctions = filteredAuctions.filter(
     (a) => a.status === AuctionStatus.ENDED
   );
-  const revealingAuctions = filteredAuctions.filter(
-    (a) => a.status === AuctionStatus.REVEALING
+  const pendingAuctions = filteredAuctions.filter(
+    (a) => a.status === AuctionStatus.PENDING
   );
 
   // Auto-refetch when auctions change
@@ -519,7 +473,7 @@ export function useAuctions() {
     auctions: filteredAuctions,
     activeAuctions,
     endedAuctions,
-    revealingAuctions,
+    pendingAuctions,
     stats,
     filters,
     setFilters,
