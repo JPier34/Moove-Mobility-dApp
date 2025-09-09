@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { AuctionType } from "@/types/auction";
 import { ethers } from "ethers";
 
@@ -70,8 +70,8 @@ const AUCTION_TYPE_RULES = {
         mustBeLessThan: "startPrice",
       },
       bidIncrement: {
-        min: 0.000001, // Positive values for Dutch auctions (price decrease rate)
-        max: 0.1, // Maximum decrease rate (10% of start price)
+        min: 0.0000001, // Very small minimum for price decrease rate
+        max: 0.01, // Maximum decrease rate (1% of start price - more reasonable)
         required: true,
       },
     },
@@ -169,23 +169,31 @@ function validatePrice(
 
   // Check minimum value
   if (numValue < rules.min) {
+    const fieldName =
+      field === "bidIncrement" && formData.auctionType === AuctionType.DUTCH
+        ? "Price decrease rate"
+        : field;
     errors.push({
       field,
-      message: `${field} must be at least ${rules.min} ETH`,
+      message: `${fieldName} must be at least ${rules.min} ETH`,
       severity: "error",
     });
   }
 
   // Check maximum value
   if (numValue > rules.max) {
+    const fieldName =
+      field === "bidIncrement" && formData.auctionType === AuctionType.DUTCH
+        ? "Price decrease rate"
+        : field;
     errors.push({
       field,
-      message: `${field} cannot exceed ${rules.max} ETH`,
+      message: `${fieldName} cannot exceed ${rules.max} ETH`,
       severity: "error",
     });
   }
 
-  // Special validation for Dutch auction bidIncrement (must be positive)
+  // Basic validation for Dutch auction bidIncrement (must be positive)
   if (field === "bidIncrement" && formData.auctionType === AuctionType.DUTCH) {
     if (numValue <= 0) {
       errors.push({
@@ -194,41 +202,8 @@ function validatePrice(
           "Price decrease rate must be positive for Dutch auctions (how much price decreases per time unit)",
         severity: "error",
       });
-    } else {
-      // Validate that the decrease rate is reasonable for 20-minute intervals
-      const startPrice = parseFloat(formData.startPrice);
-      const reservePrice = parseFloat(formData.reservePrice || "0");
-      const duration = parseInt(formData.duration);
-      const durationUnit = formData.durationUnit;
-
-      if (startPrice > 0 && reservePrice > 0 && duration > 0) {
-        const durationInSeconds =
-          durationUnit === "minutes" ? duration * 60 : duration * 3600;
-        const intervals20min = Math.floor(durationInSeconds / 1200); // 1200 seconds = 20 minutes
-        const totalDecrease = startPrice - reservePrice;
-        const optimalRate =
-          intervals20min > 0 ? totalDecrease / intervals20min : totalDecrease;
-
-        // Check if the rate is too high (more than 50% of optimal) or too low (less than 10% of optimal)
-        if (numValue > optimalRate * 0.5) {
-          errors.push({
-            field,
-            message: `Price decrease rate seems too high. Suggested rate for 20-minute intervals: ${optimalRate.toFixed(
-              6
-            )} ETH`,
-            severity: "warning",
-          });
-        } else if (numValue < optimalRate * 0.1) {
-          errors.push({
-            field,
-            message: `Price decrease rate seems too low. Suggested rate for 20-minute intervals: ${optimalRate.toFixed(
-              6
-            )} ETH`,
-            severity: "warning",
-          });
-        }
-      }
     }
+    // Simplified validation - removed complex calculations to improve performance
   }
 
   // Check relative values
@@ -388,8 +363,13 @@ export function validateAuctionForm(
     }
   }
 
+  // Only count real errors (exclude info messages) for validation
+  const realErrors = errors.filter(
+    (error) => error.severity === "error" || error.severity === "warning"
+  );
+
   return {
-    isValid: errors.length === 0,
+    isValid: realErrors.length === 0,
     errors,
     warnings,
     data: formData,
@@ -415,43 +395,41 @@ export function useAuctionValidation() {
     return validateAuctionForm(formData);
   }, [formData]);
 
-  // Set default values for Dutch auctions on mount
-  useEffect(() => {
-    if (formData.auctionType === AuctionType.DUTCH) {
-      // Check if we need to set default values
-      const needsDefaults =
-        !formData.buyNowPrice ||
-        !formData.reservePrice ||
-        formData.buyNowPrice.trim() === "" ||
-        formData.reservePrice.trim() === "" ||
-        isNaN(parseFloat(formData.buyNowPrice)) ||
-        isNaN(parseFloat(formData.reservePrice)) ||
-        parseFloat(formData.buyNowPrice) === 0 ||
-        parseFloat(formData.reservePrice) === 0;
-
-      if (needsDefaults) {
-        setFormData((prev) => ({
-          ...prev,
-          startPrice: prev.startPrice || "0.01",
-          buyNowPrice: "", // No fixed buy now price for Dutch auctions
-          reservePrice: prev.reservePrice || "0.001",
-          bidIncrement: prev.bidIncrement || "0.003", // Price decreases by 0.003 ETH every 20 minutes
-        }));
-      }
-    }
-  }, [formData.auctionType]);
+  // Default values are set in updateField when switching auction types
 
   const updateField = useCallback(
     (field: keyof AuctionFormData, value: string | AuctionType) => {
       setFormData((prev) => {
         const newData = { ...prev, [field]: value };
 
-        // Set appropriate default values when switching to Dutch auction
-        if (field === "auctionType" && value === AuctionType.DUTCH) {
-          newData.startPrice = "0.01";
-          newData.buyNowPrice = ""; // No fixed buy now price for Dutch auctions
-          newData.reservePrice = "0.001";
-          newData.bidIncrement = "0.003"; // Price decreases by 0.003 ETH every 20 minutes
+        // Set appropriate default values when switching auction types
+        if (field === "auctionType") {
+          switch (value) {
+            case AuctionType.DUTCH:
+              newData.startPrice = "0.01";
+              newData.buyNowPrice = ""; // No fixed buy now price for Dutch auctions
+              newData.reservePrice = "0.001";
+              newData.bidIncrement = "0.001"; // Price decreases by 0.001 ETH every 20 minutes (more reasonable)
+              break;
+            case AuctionType.ENGLISH:
+              newData.startPrice = "0.001";
+              newData.buyNowPrice = "0.01";
+              newData.reservePrice = "";
+              newData.bidIncrement = "0.001";
+              break;
+            case AuctionType.SEALED_BID:
+              newData.startPrice = "0.001";
+              newData.buyNowPrice = "";
+              newData.reservePrice = "";
+              newData.bidIncrement = "0.001";
+              break;
+            case AuctionType.TRADITIONAL:
+              newData.startPrice = "0.001";
+              newData.buyNowPrice = "0.01";
+              newData.reservePrice = "";
+              newData.bidIncrement = "0.001";
+              break;
+          }
         }
 
         return newData;

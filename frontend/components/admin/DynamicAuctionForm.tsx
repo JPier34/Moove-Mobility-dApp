@@ -175,12 +175,24 @@ export default function DynamicAuctionForm({
           </label>
           <select
             value={formData.auctionType.toString()}
-            onChange={(e) =>
-              updateField(
-                "auctionType",
-                parseInt(e.target.value) as AuctionType
-              )
-            }
+            onChange={(e) => {
+              const newType = parseInt(e.target.value) as AuctionType;
+              console.log("🔄 Auction type changed in form:", {
+                oldType: formData.auctionType,
+                newType: newType,
+                newTypeName:
+                  newType === 0
+                    ? "TRADITIONAL"
+                    : newType === 1
+                    ? "ENGLISH"
+                    : newType === 2
+                    ? "DUTCH"
+                    : newType === 3
+                    ? "SEALED_BID"
+                    : "UNKNOWN",
+              });
+              updateField("auctionType", newType);
+            }}
             className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500"
           >
             <option value={AuctionType.ENGLISH.toString()}>
