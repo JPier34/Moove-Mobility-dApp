@@ -5,17 +5,15 @@ import { ConnectButton } from "@rainbow-me/rainbowkit";
 import LocationIndicator from "@/components/layout/LocationIndicator";
 import { useTheme } from "@/providers/ThemeProvider";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useAccount } from "wagmi";
 import { useUserRoles } from "@/hooks/useContract";
+import { useWalletPersistence } from "@/hooks/useWalletPersistence";
 
 export default function Header() {
-  const pathname = usePathname();
   const { resolvedTheme, toggleTheme } = useTheme();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const [lastScrollY, setLastScrollY] = useState(0);
-  const { address, isConnected } = useAccount();
+  const { address, isConnected } = useWalletPersistence();
   const {
     isMasterAdmin,
     canMint,

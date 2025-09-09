@@ -9,4 +9,12 @@ export const config = getDefaultConfig({
   projectId,
   chains: [sepolia, localhost],
   ssr: true,
+  // Optimized configuration for better performance
+  batch: {
+    multicall: {
+      batchSize: 1024,
+    },
+  },
+  // Disable some features for faster loading
+  enableRainbowKit: true,
 });

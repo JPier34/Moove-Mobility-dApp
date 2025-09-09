@@ -2,15 +2,14 @@
 
 import React, { ReactNode } from "react";
 import {
-  getDefaultConfig,
   RainbowKitProvider,
   darkTheme,
   lightTheme,
 } from "@rainbow-me/rainbowkit";
 import { WagmiProvider } from "wagmi";
-import { sepolia } from "wagmi/chains";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { createStorage, noopStorage } from "wagmi";
+import { sepolia } from "wagmi/chains";
+import { config } from "@/lib/wagmi";
 import "@rainbow-me/rainbowkit/styles.css";
 
 // Check if WalletConnect projectId is configured
@@ -23,29 +22,16 @@ if (!projectId || projectId === "your-walletconnect-project-id-here") {
   console.warn("Get your projectId from: https://cloud.walletconnect.com/");
 }
 
-// Create storage for wallet persistence
-const storage = createStorage({
-  storage: typeof window !== "undefined" ? window.localStorage : noopStorage,
-  key: "moove-wagmi-store", // Custom key to avoid conflicts
-});
-
-const config = getDefaultConfig({
-  appName: "Moove NFT Platform",
-  projectId: projectId || "00000000000000000000000000000000", // Fallback projectId
-  chains: [sepolia], // Only Sepolia for deployment
-  ssr: true, // Enable SSR for Next.js
-  storage, // Add storage for persistence
-});
-
-// React Query client
+// Optimized React Query client for better performance
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 3,
-      staleTime: 30_000, // 30 seconds
+      retry: 1, // Reduced retries for faster failure
+      staleTime: 60_000, // 1 minute - increased for better caching
       refetchOnWindowFocus: false,
-      refetchOnMount: true,
+      refetchOnMount: false, // Disabled for faster loading
       refetchOnReconnect: true,
+      gcTime: 300_000, // 5 minutes garbage collection
     },
   },
 });

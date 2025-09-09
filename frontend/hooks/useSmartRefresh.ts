@@ -7,6 +7,7 @@ interface UseSmartRefreshOptions {
   intervalMs?: number;
   pauseOnModal?: boolean;
   pauseOnHidden?: boolean;
+  disabled?: boolean;
 }
 
 /**
@@ -20,6 +21,7 @@ export function useSmartRefresh({
   intervalMs = 120000, // 2 minutes default
   pauseOnModal = true,
   pauseOnHidden = true,
+  disabled = false,
 }: UseSmartRefreshOptions) {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const isPausedRef = useRef(false);
@@ -91,8 +93,10 @@ export function useSmartRefresh({
     console.log("🔄 Calling refresh function immediately");
     refreshFunction();
 
-    // Start initial refresh
-    startRefresh();
+    // Start initial refresh only if not disabled
+    if (!disabled) {
+      startRefresh();
+    }
 
     // Listen for page visibility changes
     document.addEventListener("visibilitychange", handleVisibilityChange);
@@ -112,6 +116,7 @@ export function useSmartRefresh({
     startRefresh,
     handleVisibilityChange,
     handleModalChange,
+    disabled,
   ]);
 
   return {

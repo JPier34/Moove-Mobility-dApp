@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter, useParams } from "next/navigation";
 import { CurrencyConverter } from "@/utils/currencyConverter";
-import { useAccount } from "wagmi";
+import { useWalletPersistence } from "@/hooks/useWalletPersistence";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useRentalPassContract } from "@/hooks/useRentalPassContract";
 import { useRouteLoading } from "@/hooks/useRouteLoading";
@@ -515,7 +515,7 @@ export default function BookingPage() {
   const locationHook = useLocationAndCity();
   const router = useRouter();
   const params = useParams();
-  const { address, isConnected } = useAccount();
+  const { address, isConnected } = useWalletPersistence();
   const { navigateWithLoading } = useRouteLoading();
 
   if (!params) return null;

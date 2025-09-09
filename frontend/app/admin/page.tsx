@@ -2,13 +2,13 @@
 
 import React from "react";
 import { motion } from "framer-motion";
-import { useAccount } from "wagmi";
+import { useWalletPersistence } from "@/hooks/useWalletPersistence";
 import { useUserRoles } from "@/hooks/useContract";
 import AdminNFTCreator from "@/components/admin/AdminNFTCreator";
 import AdminGuard from "@/components/admin/AdminGuard";
 
 export default function AdminPage() {
-  const { address } = useAccount();
+  const { address } = useWalletPersistence();
   const { isMasterAdmin, canMint } = useUserRoles(address);
 
   return (

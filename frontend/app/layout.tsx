@@ -4,7 +4,10 @@ import Header from "../components/layout/Header";
 import Footer from "../components/layout/Footer";
 import { ThemeProvider } from "@/providers/ThemeProvider";
 import RouteLoadingWrapper from "@/components/layout/RouteLoadingWrapper";
-import WalletPersistence from "@/components/wallet/WalletPersistence";
+import WalletProvider from "@/components/wallet/WalletProvider";
+import WalletDebug from "@/components/wallet/WalletDebug";
+import WalletTest from "@/components/wallet/WalletTest";
+import ClientOnly from "@/components/wallet/ClientOnly";
 import { Inter } from "next/font/google";
 
 // Font config
@@ -122,7 +125,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
       >
         <ThemeProvider>
           <Web3Provider>
-            <WalletPersistence>
+            <WalletProvider>
               {/* App main structure */}
               <div className="flex min-h-screen flex-col">
                 {/* Header */}
@@ -139,7 +142,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
 
                 <Footer />
               </div>
-            </WalletPersistence>
+            </WalletProvider>
 
             {/* Theme-aware loading overlay */}
             <div
@@ -167,6 +170,12 @@ export default function RootLayout({ children }: RootLayoutProps) {
 
             {/* Route loading overlay */}
             <RouteLoadingWrapper />
+
+            {/* Wallet debug component (development only) */}
+            <ClientOnly>
+              <WalletDebug />
+              <WalletTest />
+            </ClientOnly>
           </Web3Provider>
         </ThemeProvider>
 
@@ -209,6 +218,21 @@ export default function RootLayout({ children }: RootLayoutProps) {
                   checkTheme: () => {
                     console.log('HTML classes:', document.documentElement.classList.toString());
                     console.log('Saved theme:', localStorage.getItem('moove-theme'));
+                  },
+                  checkWallet: () => {
+                    console.log('Wallet state:', {
+                      isConnected: window.ethereum?.isConnected?.() || false,
+                      accounts: window.ethereum?.selectedAddress || null,
+                      chainId: window.ethereum?.chainId || null,
+                      wagmiStore: localStorage.getItem('moove-wagmi-store')
+                    });
+                  },
+                  forceWalletReconnect: () => {
+                    if (window.forceWalletReconnect) {
+                      window.forceWalletReconnect();
+                    } else {
+                      console.log('Force reconnect not available yet');
+                    }
                   }
                 };
                 console.log('🚀 Moove Debug Tools:', window.mooveDebug);

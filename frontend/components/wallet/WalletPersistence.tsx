@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useAccount, useConnect } from "wagmi";
+import { useAccount, useDisconnect } from "wagmi";
+import WalletLoadingScreen from "./WalletLoadingScreen";
 
 interface WalletPersistenceProps {
   children: React.ReactNode;
@@ -10,53 +11,55 @@ interface WalletPersistenceProps {
 export default function WalletPersistence({
   children,
 }: WalletPersistenceProps) {
-  const { isConnected } = useAccount();
-  const { connect, connectors } = useConnect();
   const [isHydrated, setIsHydrated] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
+  const { disconnect } = useDisconnect();
 
+  // Safe useAccount with error handling
+  let accountData = null;
+  try {
+    accountData = useAccount();
+  } catch (error) {
+    console.warn("useAccount error in WalletPersistence:", error);
+  }
+
+  // Mark as hydrated after component mounts
   useEffect(() => {
-    // Mark as hydrated after component mounts
     setIsHydrated(true);
   }, []);
 
+  // Update connection state safely
   useEffect(() => {
-    // Only run on client side after hydration
+    if (accountData) {
+      setIsConnected(accountData.isConnected);
+    }
+  }, [accountData]);
+
+  // Listen for account changes and handle disconnections
+  useEffect(() => {
     if (!isHydrated) return;
 
-    const attemptReconnection = async () => {
-      try {
-        // Check if there's a stored connection
-        const storedConnection = localStorage.getItem("moove-wagmi-store");
-
-        if (storedConnection && !isConnected) {
-          const parsed = JSON.parse(storedConnection);
-          const hasStoredConnection = parsed?.state?.connections?.size > 0;
-
-          if (hasStoredConnection) {
-            // Try to reconnect with the first available connector
-            const connector = connectors[0];
-            if (connector) {
-              try {
-                await connect({ connector });
-                console.log("Wallet reconnected successfully");
-              } catch (error) {
-                console.log("Failed to auto-reconnect wallet:", error);
-              }
-            }
-          }
-        }
-      } catch (error) {
-        console.log("Error during wallet reconnection:", error);
+    const handleAccountChange = (accounts: string[]) => {
+      if (accounts.length === 0 && isConnected) {
+        console.log("🔄 Account disconnected, clearing state");
+        disconnect();
       }
     };
 
-    // Longer delay to ensure everything is loaded and avoid conflicts
-    const timeoutId = setTimeout(attemptReconnection, 500);
+    // Listen for MetaMask account changes
+    if (typeof window !== "undefined" && window.ethereum) {
+      window.ethereum.on("accountsChanged", handleAccountChange);
 
-    return () => clearTimeout(timeoutId);
-  }, [isHydrated, isConnected, connect, connectors]);
+      return () => {
+        window.ethereum?.removeListener("accountsChanged", handleAccountChange);
+      };
+    }
+  }, [isHydrated, isConnected, disconnect]);
 
-  // Don't show loading state during hydration to avoid flash
-  // Just render children immediately to prevent disconnection issues
+  // Show loading state during hydration to prevent flash
+  if (!isHydrated) {
+    return <WalletLoadingScreen message="Initializing wallet..." />;
+  }
+
   return <>{children}</>;
 }

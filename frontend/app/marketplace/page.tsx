@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { useAccount } from "wagmi";
+import { useWalletPersistence } from "@/hooks/useWalletPersistence";
 import { useRentalPassContract } from "@/hooks/useRentalPassContract";
 import { VehicleType, EUROPEAN_CITIES } from "@/config/cities";
 import { useLocationAndCity } from "@/hooks/useLocationAndCity";
@@ -169,7 +169,7 @@ function EnhancedLocationStatusHeader({
 function MarketplaceContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { isConnected } = useAccount();
+  const { isConnected } = useWalletPersistence();
   const { navigateWithLoading } = useRouteLoading();
 
   // Persistence hook

@@ -792,7 +792,7 @@ async function fetchAuctionFromContractCorrected(
 }
 
 // 8. ENHANCED HOOK WITH SECURE NFT ID TRACKING AND COMPREHENSIVE ERROR HANDLING
-export function useAuctionsEnhanced() {
+export function useAuctionsEnhanced(disableAutoRefresh = false) {
   const { address, isConnected } = useAccount();
   const { isMasterAdmin, canMint } = useUserRoles(address);
   const [auctions, setAuctions] = useState<Auction[]>([]);
@@ -935,12 +935,13 @@ export function useAuctionsEnhanced() {
     }
   }, []);
 
-  // Use smart refresh hook for intelligent refresh management
+  // Use smart refresh hook for intelligent refresh management (only if not disabled)
   useSmartRefresh({
     refreshFunction: fetchCorrectedAuctions,
     intervalMs: 120000, // 2 minutes
     pauseOnModal: true,
     pauseOnHidden: true,
+    disabled: disableAutoRefresh,
   });
 
   // Filter by status with enhanced filtering

@@ -7,7 +7,18 @@ const nextConfig = {
       "framer-motion",
       "@rainbow-me/rainbowkit",
       "wagmi",
+      "ethers",
+      "viem",
     ],
+    // Faster compilation
+    turbo: {
+      rules: {
+        "*.svg": {
+          loaders: ["@svgr/webpack"],
+          as: "*.js",
+        },
+      },
+    },
   },
 
   // Webpack optimizations
@@ -15,9 +26,9 @@ const nextConfig = {
     if (dev) {
       // Optimize dev server performance
       config.watchOptions = {
-        poll: 1000,
-        aggregateTimeout: 300,
-        ignored: ["**/node_modules", "**/.git", "**/.next"],
+        poll: 2000, // Increased for better performance
+        aggregateTimeout: 500,
+        ignored: ["**/node_modules", "**/.git", "**/.next", "**/dist"],
       };
 
       // Reduce bundle analysis in dev
@@ -26,6 +37,33 @@ const nextConfig = {
         removeAvailableModules: false,
         removeEmptyChunks: false,
         splitChunks: false,
+        // Disable source maps in dev for faster builds
+        minimize: false,
+      };
+
+      // Faster rebuilds
+      config.cache = {
+        type: "filesystem",
+        buildDependencies: {
+          config: [__filename],
+        },
+      };
+    }
+
+    // Optimize for production
+    if (!dev) {
+      config.optimization = {
+        ...config.optimization,
+        splitChunks: {
+          chunks: "all",
+          cacheGroups: {
+            vendor: {
+              test: /[\\/]node_modules[\\/]/,
+              name: "vendors",
+              chunks: "all",
+            },
+          },
+        },
       };
     }
 
@@ -39,6 +77,7 @@ const nextConfig = {
   images: {
     unoptimized: false,
     domains: ["xsdctknbxfzpxukj.public.blob.vercel-storage.com"],
+    formats: ["image/webp", "image/avif"],
   },
 
   // Reduce unnecessary work
@@ -48,6 +87,11 @@ const nextConfig = {
 
   typescript: {
     ignoreBuildErrors: false,
+  },
+
+  // Compiler optimizations
+  compiler: {
+    removeConsole: process.env.NODE_ENV === "production",
   },
 };
 
