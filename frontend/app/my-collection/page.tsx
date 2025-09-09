@@ -5,6 +5,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useUserCollectionOptimized } from "@/hooks/useUserCollectionOptimized";
 import { useWalletPersistence } from "@/hooks/useWalletPersistence";
+import { useWonAuctionsManager } from "@/hooks/useWonAuctionsManager";
+import CongratulationsModal from "@/components/collection/CongratulationsModal";
 import { toast } from "react-hot-toast";
 import OptimizedNFTImage from "@/components/collection/OptimizedNFTImage";
 
@@ -515,6 +517,14 @@ export default function MyCollection() {
   const { wonAuctions, isLoading, error, refetch, totalValue, totalItems } =
     useUserCollectionOptimized();
   const { isConnected, address, isInitialized } = useWalletPersistence();
+  const {
+    currentAuction,
+    showCongratulations,
+    isSettling,
+    error: settleError,
+    handleSettleAuction,
+    handleCloseCongratulationsModal,
+  } = useWonAuctionsManager();
 
   const [filters, setFilters] = useState<FilterOptions>({
     rarity: "all",
@@ -799,6 +809,15 @@ export default function MyCollection() {
           nft={selectedNFT}
           isOpen={isModalOpen}
           onClose={handleCloseModal}
+        />
+
+        {/* Congratulations Modal */}
+        <CongratulationsModal
+          auction={currentAuction}
+          isOpen={showCongratulations}
+          onClose={handleCloseCongratulationsModal}
+          onSettle={handleSettleAuction}
+          isSettling={isSettling}
         />
       </div>
     </div>

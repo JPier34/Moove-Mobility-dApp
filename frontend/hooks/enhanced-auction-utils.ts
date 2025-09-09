@@ -525,17 +525,28 @@ async function buildAuctionWithCompleteData(
       }
     }
 
-    // Calculate correct status with enhanced logic
-    const currentTime = Math.floor(Date.now() / 1000);
+    // Use status directly from contract, but correct it if auction has ended
+    let status = Number(auctionData.status);
     const startTime = Number(auctionData.startTime);
     const endTime = Number(auctionData.endTime);
+    const currentTime = Math.floor(Date.now() / 1000);
 
-    let status = 0; // PENDING
-    if (currentTime >= startTime && currentTime < endTime) {
-      status = 1; // ACTIVE
-    } else if (currentTime >= endTime) {
+    // If auction is ACTIVE but endTime has passed, mark it as ENDED
+    if (status === 1 && currentTime >= endTime) {
       status = 2; // ENDED
+      console.log(
+        `🕐 [Auction ${auctionId}] Auto-correcting status: ACTIVE -> ENDED (time expired)`
+      );
     }
+
+    console.log(`🏗️ [Auction ${auctionId}] Using corrected status:`, {
+      originalStatus: Number(auctionData.status),
+      correctedStatus: status,
+      startTime: new Date(startTime * 1000).toISOString(),
+      endTime: new Date(endTime * 1000).toISOString(),
+      currentTime: new Date().toISOString(),
+      timeExpired: currentTime >= endTime,
+    });
 
     console.log(
       `🏗️ [Auction ${auctionId}] Building auction with complete data:`,
@@ -602,6 +613,8 @@ async function buildAuctionWithCompleteData(
       endTime: new Date(endTime * 1000),
       bidIncrement: ethers.formatEther(auctionData.bidIncrement || 0),
       currency: "ETH",
+      isSettled: auctionData.isSettled || false, // Campo isSettled dal contratto
+      transactionHash: undefined, // Non disponibile direttamente dal contratto
       attributes: {
         rarity:
           metadata.attributes?.find(
@@ -945,8 +958,20 @@ export function useAuctionsEnhanced(disableAutoRefresh = false) {
   });
 
   // Filter by status with enhanced filtering
-  const activeAuctions = auctions.filter((auction) => auction.status === 1);
-  const endedAuctions = auctions.filter((auction) => auction.status === 2);
+  const activeAuctions = auctions.filter((auction) => {
+    const isActive = auction.status === 1;
+    const isNotExpired =
+      !auction.endTime || new Date(auction.endTime).getTime() > Date.now();
+    return isActive && isNotExpired;
+  });
+  const endedAuctions = auctions.filter((auction) => {
+    const isEnded = auction.status === 2;
+    const isTimeExpired =
+      auction.status === 1 &&
+      auction.endTime &&
+      new Date(auction.endTime).getTime() <= Date.now();
+    return isEnded || isTimeExpired;
+  });
   const pendingAuctions = auctions.filter((auction) => auction.status === 0);
 
   console.log(

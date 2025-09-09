@@ -182,14 +182,24 @@ async function secureNFTApproval(
 
   // 3. Esegui l'approvazione
   try {
+    console.log("🔄 Sending approval transaction...");
     const tx = await nftContract.approve(auctionContractAddress, tokenId);
     console.log("📡 Approval transaction sent:", tx.hash);
 
+    console.log("⏳ Waiting for approval confirmation...");
     const receipt = await tx.wait();
     console.log("✅ Approval confirmed in block:", receipt.blockNumber);
 
     // 4. Verifica che l'approvazione sia effettiva
+    console.log("🔍 Verifying approval...");
     const newApproval = await nftContract.getApproved(tokenId);
+    console.log("📊 Approval verification:", {
+      newApproval,
+      auctionContractAddress,
+      isApproved:
+        newApproval.toLowerCase() === auctionContractAddress.toLowerCase(),
+    });
+
     if (newApproval.toLowerCase() !== auctionContractAddress.toLowerCase()) {
       throw new Error("Approval verification failed");
     }

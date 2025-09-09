@@ -92,7 +92,7 @@ export function useUserCollection(): UserCollection {
             console.log(`🏆 [Auction ${auction.auctionId}] Rarity:`, {
               raw: auction.attributes?.rarity,
               processed: wonAuction.nftRarity,
-              attributes: auction.attributes
+              attributes: auction.attributes,
             });
 
             userWonAuctions.push(wonAuction);
@@ -132,18 +132,18 @@ export function useUserCollection(): UserCollection {
   };
 }
 
-// Hook to claim a won auction
-export function useClaimAuction() {
-  const [isClaiming, setIsClaiming] = useState(false);
+// Hook to settle a won auction (corrected)
+export function useSettleAuction() {
+  const [isSettling, setIsSettling] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const claimAuction = useCallback(async (auctionId: string) => {
+  const settleAuction = useCallback(async (auctionId: string) => {
     if (typeof window === "undefined" || !window.ethereum) {
       throw new Error("No ethereum provider available");
     }
 
     try {
-      setIsClaiming(true);
+      setIsSettling(true);
       setError(null);
 
       const provider = new ethers.BrowserProvider(window.ethereum);
@@ -155,12 +155,12 @@ export function useClaimAuction() {
         signer
       );
 
-      console.log(`📦 Claiming auction ${auctionId}...`);
-      const tx = await auctionContract.claimAuction(auctionId);
-      console.log(`📦 Claim transaction sent:`, tx.hash);
+      console.log(`🏆 Settling auction ${auctionId}...`);
+      const tx = await auctionContract.settleAuction(auctionId);
+      console.log(`🏆 Settle transaction sent:`, tx.hash);
 
       const receipt = await tx.wait();
-      console.log(`✅ Auction ${auctionId} claimed successfully:`, receipt);
+      console.log(`✅ Auction ${auctionId} settled successfully:`, receipt);
 
       return {
         success: true,
@@ -168,17 +168,17 @@ export function useClaimAuction() {
         receipt,
       };
     } catch (err) {
-      console.error(`❌ Error claiming auction ${auctionId}:`, err);
+      console.error(`❌ Error settling auction ${auctionId}:`, err);
       setError(err instanceof Error ? err.message : "Unknown error");
       throw err;
     } finally {
-      setIsClaiming(false);
+      setIsSettling(false);
     }
   }, []);
 
   return {
-    claimAuction,
-    isClaiming,
+    settleAuction,
+    isSettling,
     error,
   };
 }

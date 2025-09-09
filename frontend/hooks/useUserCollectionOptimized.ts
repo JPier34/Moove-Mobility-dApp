@@ -106,7 +106,7 @@ export function useUserCollectionOptimized(): UserCollectionOptimized {
       setIsLoading(true);
       setError(null);
 
-      // Get all ended auctions where user is the winner
+      // Get all ended auctions where user is the winner AND settled
       const endedAuctions = auctions.filter((auction) => auction.status === 2); // ENDED
       console.log(`🔍 Found ${endedAuctions.length} ended auctions`);
 
@@ -119,35 +119,45 @@ export function useUserCollectionOptimized(): UserCollectionOptimized {
           console.log(`🏆 Auction ${auction.auctionId} winner:`, winner);
 
           if (winner && winner.toLowerCase() === address.toLowerCase()) {
-            console.log(`✅ User won auction ${auction.auctionId}`);
+            // Check if auction is settled (NFT transferred to winner)
+            // Use isSettled as primary indicator, status === 3 as secondary
+            const isSettled = auction.isSettled || auction.status === 3;
+            console.log(
+              `📦 Auction ${auction.auctionId} settled:`,
+              isSettled,
+              `(status: ${auction.status}, isSettled: ${auction.isSettled})`
+            );
 
-            // For now, assume not claimed (we can add claim checking later)
-            const isClaimed = false;
-            console.log(`📦 Auction ${auction.auctionId} claimed:`, isClaimed);
+            // Only show settled auctions in My Collection
+            if (isSettled) {
+              console.log(
+                `✅ User won and settled auction ${auction.auctionId}`
+              );
 
-            const wonAuction: WonAuction = {
-              auctionId: auction.auctionId,
-              tokenId: auction.nftId,
-              nftName: auction.nftName || `NFT #${auction.nftId}`,
-              nftImage: auction.nftImage || "/images/default-nft.png",
-              nftCategory: auction.nftCategory || "sticker",
-              nftRarity: auction.attributes?.rarity || "common",
-              finalBid: parseFloat(auction.currentBid),
-              bidders: auction.bidCount || 0,
-              endTime: new Date(auction.endTime).getTime(),
-              isClaimed: isClaimed,
-              transactionHash:
-                auction.transactionHash ||
-                generateMockTransactionHash(auction.auctionId),
-            };
+              const wonAuction: WonAuction = {
+                auctionId: auction.auctionId,
+                tokenId: auction.nftId,
+                nftName: auction.nftName || `NFT #${auction.nftId}`,
+                nftImage: auction.nftImage || "/images/default-nft.png",
+                nftCategory: auction.nftCategory || "sticker",
+                nftRarity: auction.attributes?.rarity || "common",
+                finalBid: parseFloat(auction.currentBid),
+                bidders: auction.bidCount || 0,
+                endTime: new Date(auction.endTime).getTime(),
+                isClaimed: true, // Se è in My Collection, è già settled/claimed
+                transactionHash:
+                  auction.transactionHash ||
+                  generateMockTransactionHash(auction.auctionId),
+              };
 
-            console.log(`🏆 [Auction ${auction.auctionId}] Rarity:`, {
-              raw: auction.attributes?.rarity,
-              processed: wonAuction.nftRarity,
-              attributes: auction.attributes,
-            });
+              console.log(`🏆 [Auction ${auction.auctionId}] Rarity:`, {
+                raw: auction.attributes?.rarity,
+                processed: wonAuction.nftRarity,
+                attributes: auction.attributes,
+              });
 
-            userWonAuctions.push(wonAuction);
+              userWonAuctions.push(wonAuction);
+            }
           }
         } catch (auctionError) {
           console.error(

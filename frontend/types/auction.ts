@@ -32,6 +32,8 @@ export interface Auction {
   endTime: Date;
   bidIncrement: string;
   currency: string;
+  isSettled?: boolean; // Aggiunto campo per verificare se l'asta è stata settled
+  transactionHash?: string; // Aggiunto campo per l'hash della transazione di settle
   attributes: {
     rarity?: string;
     designer?: string;
