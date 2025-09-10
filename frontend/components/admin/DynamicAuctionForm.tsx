@@ -24,16 +24,23 @@ export default function DynamicAuctionForm({
     isValid,
   } = useAuctionValidation();
 
-  // Update parent component when data changes
+  // Update parent component when data changes (with debouncing)
   React.useEffect(() => {
-    onDataChange(formData);
+    const timeoutId = setTimeout(() => {
+      onDataChange(formData);
+    }, 100); // 100ms debounce
+
+    return () => clearTimeout(timeoutId);
   }, [formData, onDataChange]);
 
-  // Initialize with provided data
+  // Initialize with provided data (only once)
   React.useEffect(() => {
-    if (initialData) {
+    if (initialData && Object.keys(initialData).length > 0) {
       Object.entries(initialData).forEach(([key, value]) => {
-        if (key in formData) {
+        if (
+          key in formData &&
+          formData[key as keyof typeof formData] !== value
+        ) {
           updateField(
             key as keyof typeof formData,
             value as string | AuctionType
@@ -41,7 +48,7 @@ export default function DynamicAuctionForm({
         }
       });
     }
-  }, [initialData, updateField]);
+  }, [initialData]); // Remove updateField from dependencies to avoid loops
 
   const auctionTypeInfo = getAuctionTypeInfo(formData.auctionType);
 
@@ -143,8 +150,16 @@ export default function DynamicAuctionForm({
         {field === "buyNowPrice" &&
           formData.auctionType === AuctionType.DUTCH && (
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              💡 Required for Dutch auctions. This is the final price when the
-              auction ends.
+              💡 For Dutch auctions, this is automatically set to match the
+              reserve price. This represents the final price when the auction
+              ends.
+            </p>
+          )}
+        {field === "buyNowPrice" &&
+          formData.auctionType !== AuctionType.DUTCH && (
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              💡 Optional immediate purchase price. Must be higher than start
+              price.
             </p>
           )}
         {field === "duration" && (
@@ -182,7 +197,7 @@ export default function DynamicAuctionForm({
                 newType: newType,
                 newTypeName:
                   newType === 0
-                    ? "TRADITIONAL"
+                    ? "RESERVE"
                     : newType === 1
                     ? "ENGLISH"
                     : newType === 2
@@ -201,9 +216,7 @@ export default function DynamicAuctionForm({
             <option value={AuctionType.DUTCH.toString()}>
               ⬇️ Dutch Auction
             </option>
-            <option value={AuctionType.TRADITIONAL.toString()}>
-              🏛️ Traditional
-            </option>
+            <option value={AuctionType.RESERVE.toString()}>🏛️ Reserve</option>
             <option value={AuctionType.SEALED_BID.toString()}>
               🔒 Sealed Bid
             </option>
@@ -232,8 +245,13 @@ export default function DynamicAuctionForm({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {renderField("startPrice", "Start Price (ETH)", "number")}
           {renderField("reservePrice", "Reserve Price (ETH)", "number")}
-          {formData.auctionType !== AuctionType.DUTCH &&
-            renderField("buyNowPrice", "Buy Now Price (ETH)", "number")}
+          {renderField(
+            "buyNowPrice",
+            formData.auctionType === AuctionType.DUTCH
+              ? "Final Price (ETH) - Auto-set to Reserve Price"
+              : "Buy Now Price (ETH)",
+            "number"
+          )}
         </div>
       </div>
 

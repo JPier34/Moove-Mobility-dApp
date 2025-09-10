@@ -217,46 +217,21 @@ async function secureNFTApproval(
 // ============================================================================
 
 function validateAuctionParams(params: AuctionParams): void {
-  // Validazione tipo asta
+  // Validazione tipo asta (ENGLISH=0, DUTCH=1, SEALED_BID=2, RESERVE=3)
   if (params.auctionType < 0 || params.auctionType > 3) {
     throw new Error(`Invalid auction type: ${params.auctionType}`);
   }
 
-  // Validazione prezzi
+  // Validazione prezzi base
   if (params.startPrice <= 0n) {
     throw new Error("Start price must be greater than 0");
   }
 
-  // Per le aste Dutch, il prezzo di riserva deve essere minore del prezzo di partenza
-  if (
-    params.auctionType === 2 &&
-    params.reservePrice > 0n &&
-    params.reservePrice >= params.startPrice
-  ) {
-    throw new Error("Dutch auction needs valid reserve < starting price");
-  }
-
-  // Per le aste tradizionali, il prezzo di riserva deve essere >= prezzo di partenza
-  if (
-    params.auctionType !== 2 &&
-    params.reservePrice > 0n &&
-    params.reservePrice < params.startPrice
-  ) {
-    throw new Error("Reserve price must be >= start price");
-  }
-
-  if (params.buyNowPrice > 0n && params.buyNowPrice < params.startPrice) {
-    throw new Error("Buy now price must be >= start price");
-  }
-
   // Validazione durata
   if (params.duration < 3600) {
-    // Minimo 1 ora
     throw new Error("Duration must be at least 1 hour");
   }
-
   if (params.duration > 30 * 24 * 3600) {
-    // Massimo 30 giorni
     throw new Error("Duration cannot exceed 30 days");
   }
 
@@ -264,9 +239,62 @@ function validateAuctionParams(params: AuctionParams): void {
   if (params.bidIncrement <= 0n) {
     throw new Error("Bid increment must be greater than 0");
   }
-
   if (params.bidIncrement > params.startPrice) {
     throw new Error("Bid increment cannot exceed start price");
+  }
+
+  // ========================================
+  // VALIDAZIONI SPECIFICHE PER TIPO ASTA
+  // ========================================
+
+  // DUTCH AUCTION (tipo 1)
+  if (params.auctionType === 1) {
+    // Reserve price deve essere < start price
+    if (params.reservePrice >= params.startPrice) {
+      throw new Error("Dutch auction reserve price must be < start price");
+    }
+    // BuyNowPrice deve essere uguale a reservePrice
+    if (params.buyNowPrice !== params.reservePrice) {
+      throw new Error("Dutch auction buyNowPrice must equal reservePrice");
+    }
+  }
+
+  // ENGLISH AUCTION (tipo 0)
+  else if (params.auctionType === 0) {
+    // Se reserve price è fornito, deve essere >= start price
+    if (params.reservePrice > 0n && params.reservePrice < params.startPrice) {
+      throw new Error("English auction reserve price must be >= start price");
+    }
+    // Se buyNowPrice è fornito, deve essere >= start price
+    if (params.buyNowPrice > 0n && params.buyNowPrice < params.startPrice) {
+      throw new Error("English auction buyNowPrice must be >= start price");
+    }
+  }
+
+  // SEALED_BID AUCTION (tipo 2)
+  else if (params.auctionType === 2) {
+    // Non dovrebbe avere reserve price o buyNowPrice
+    if (params.reservePrice > 0n) {
+      throw new Error("Sealed bid auction should not have reserve price");
+    }
+    if (params.buyNowPrice > 0n) {
+      throw new Error("Sealed bid auction should not have buy now price");
+    }
+  }
+
+  // RESERVE AUCTION (tipo 3)
+  else if (params.auctionType === 3) {
+    // Reserve price è obbligatorio e deve essere >= start price
+    if (params.reservePrice <= 0n) {
+      throw new Error("Reserve auction requires reserve price");
+    }
+    if (params.reservePrice < params.startPrice) {
+      throw new Error("Reserve auction reserve price must be >= start price");
+    }
+    // Se buyNowPrice è fornito, deve essere >= start price
+    if (params.buyNowPrice > 0n && params.buyNowPrice < params.startPrice) {
+      throw new Error("Reserve auction buyNowPrice must be >= start price");
+    }
   }
 }
 

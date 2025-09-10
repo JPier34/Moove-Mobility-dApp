@@ -100,18 +100,18 @@ const AUCTION_TYPE_RULES = {
       max: 30 * 24 * 3600, // 30 days in seconds
     },
   },
-  [AuctionType.TRADITIONAL]: {
-    name: "Traditional Auction",
-    description: "Classic auction format",
-    requiredFields: ["startPrice", "duration", "bidIncrement"],
-    optionalFields: ["reservePrice", "buyNowPrice"],
+  [AuctionType.RESERVE]: {
+    name: "Reserve Auction",
+    description: "Auction with hidden minimum price",
+    requiredFields: ["startPrice", "reservePrice", "duration", "bidIncrement"],
+    optionalFields: ["buyNowPrice"],
     priceRules: {
       startPrice: { min: 0.000001, max: 1000, required: true },
       reservePrice: {
         min: 0.000001,
         max: 1000,
-        required: false,
-        mustBeGreaterThan: "startPrice",
+        required: true, // Reserve price is required for RESERVE auctions
+        mustBeGreaterThanOrEqual: "startPrice", // Reserve >= start for RESERVE auctions
       },
       buyNowPrice: {
         min: 0.000001,
@@ -215,6 +215,21 @@ function validatePrice(
       errors.push({
         field,
         message: `${field} must be greater than ${rules.mustBeGreaterThan}`,
+        severity: "error",
+      });
+    }
+  }
+
+  if (rules.mustBeGreaterThanOrEqual) {
+    const otherValue = parseFloat(
+      formData[
+        rules.mustBeGreaterThanOrEqual as keyof AuctionFormData
+      ] as string
+    );
+    if (!isNaN(otherValue) && numValue < otherValue) {
+      errors.push({
+        field,
+        message: `${field} must be greater than or equal to ${rules.mustBeGreaterThanOrEqual}`,
         severity: "error",
       });
     }
@@ -400,6 +415,11 @@ export function useAuctionValidation() {
   const updateField = useCallback(
     (field: keyof AuctionFormData, value: string | AuctionType) => {
       setFormData((prev) => {
+        // Skip update if value hasn't changed
+        if (prev[field] === value) {
+          return prev;
+        }
+
         const newData = { ...prev, [field]: value };
 
         // Set appropriate default values when switching auction types
@@ -407,8 +427,8 @@ export function useAuctionValidation() {
           switch (value) {
             case AuctionType.DUTCH:
               newData.startPrice = "0.01";
-              newData.buyNowPrice = ""; // No fixed buy now price for Dutch auctions
               newData.reservePrice = "0.001";
+              newData.buyNowPrice = "0.001"; // For Dutch auctions, buyNowPrice = reservePrice (final price)
               newData.bidIncrement = "0.001"; // Price decreases by 0.001 ETH every 20 minutes (more reasonable)
               break;
             case AuctionType.ENGLISH:
@@ -423,13 +443,21 @@ export function useAuctionValidation() {
               newData.reservePrice = "";
               newData.bidIncrement = "0.001";
               break;
-            case AuctionType.TRADITIONAL:
+            case AuctionType.RESERVE:
               newData.startPrice = "0.001";
               newData.buyNowPrice = "0.01";
-              newData.reservePrice = "";
+              newData.reservePrice = "0.005"; // Reserve price required for RESERVE auctions
               newData.bidIncrement = "0.001";
               break;
           }
+        }
+
+        // For Dutch auctions, automatically sync buyNowPrice with reservePrice
+        if (
+          field === "reservePrice" &&
+          newData.auctionType === AuctionType.DUTCH
+        ) {
+          newData.buyNowPrice = value as string;
         }
 
         return newData;

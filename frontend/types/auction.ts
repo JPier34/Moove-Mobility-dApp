@@ -1,16 +1,17 @@
 export enum AuctionType {
-  TRADITIONAL = 0,
-  ENGLISH = 1,
-  DUTCH = 2,
-  SEALED_BID = 3,
+  ENGLISH = 0, // Traditional ascending bid auction
+  DUTCH = 1, // Descending price auction
+  SEALED_BID = 2, // Sealed bid auction with reveal phase
+  RESERVE = 3, // Reserve auction with hidden minimum
 }
 
 export enum AuctionStatus {
-  PENDING = 0, // Non ancora iniziata
-  ACTIVE = 1, // In corso
-  ENDED = 2, // Terminata
-  CANCELLED = 3, // Cancellata
-  CLAIMED = 4, // Vincita reclamata
+  PENDING = 0, // Created but not started
+  ACTIVE = 1, // Currently accepting bids
+  REVEAL = 2, // Sealed bid reveal phase
+  ENDED = 3, // Finished, awaiting settlement
+  SETTLED = 4, // Completed and settled
+  CANCELLED = 5, // Cancelled by seller or admin
 }
 
 export interface Auction {
@@ -32,8 +33,8 @@ export interface Auction {
   endTime: Date;
   bidIncrement: string;
   currency: string;
-  isSettled?: boolean; // Aggiunto campo per verificare se l'asta è stata settled
-  transactionHash?: string; // Aggiunto campo per l'hash della transazione di settle
+  isSettled?: boolean;
+  transactionHash?: string;
   attributes: {
     rarity?: string;
     designer?: string;

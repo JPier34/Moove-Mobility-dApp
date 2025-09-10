@@ -21,7 +21,7 @@ interface FilterOptions {
 }
 
 const AUCTION_TYPE_CONFIG = {
-  [AuctionType.TRADITIONAL]: {
+  [AuctionType.RESERVE]: {
     name: "Traditional",
     icon: "🏛️",
     description: "Classic fixed-duration auction. Highest bid wins.",

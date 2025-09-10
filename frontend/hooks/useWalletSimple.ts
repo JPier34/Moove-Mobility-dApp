@@ -63,3 +63,4 @@ export function useWalletSimple() {
     reconnectAttempts: 0,
   };
 }
+

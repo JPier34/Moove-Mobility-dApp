@@ -33,10 +33,17 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  // Extract IPFS hash from URL if it's a full URL
+  let ipfsHash = hash;
+  if (hash.includes("/ipfs/")) {
+    ipfsHash = hash.split("/ipfs/")[1];
+    console.log(`🔍 Extracted IPFS hash: ${ipfsHash} from URL: ${hash}`);
+  }
+
   // Try each gateway
   for (let i = 0; i < IPFS_GATEWAYS.length; i++) {
     const gateway = IPFS_GATEWAYS[i];
-    const url = `${gateway}${hash}`;
+    const url = `${gateway}${ipfsHash}`;
 
     try {
       console.log(
@@ -98,9 +105,11 @@ export async function GET(request: NextRequest) {
   }
 
   // Fallback: Return mock data when all gateways fail
-  console.log(`⚠️ All gateways failed, returning mock data for hash: ${hash}`);
+  console.log(
+    `⚠️ All gateways failed, returning mock data for hash: ${ipfsHash}`
+  );
   const mockData = {
-    name: `NFT #${hash.substring(0, 8)}`,
+    name: `NFT #${ipfsHash.substring(0, 8)}`,
     description:
       "NFT metadata temporarily unavailable - all IPFS gateways failed",
     image: "/images/default-nft.png",

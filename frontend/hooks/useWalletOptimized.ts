@@ -67,3 +67,4 @@ export function useWalletOptimized() {
     reconnectAttempts: 0,
   };
 }
+

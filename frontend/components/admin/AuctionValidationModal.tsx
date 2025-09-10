@@ -59,7 +59,7 @@ export default function AuctionValidationModal({
 
   const getAuctionTypeName = (type: AuctionType): string => {
     const names = {
-      [AuctionType.TRADITIONAL]: "Traditional",
+      [AuctionType.RESERVE]: "Reserve",
       [AuctionType.ENGLISH]: "English",
       [AuctionType.DUTCH]: "Dutch",
       [AuctionType.SEALED_BID]: "Sealed Bid",

@@ -80,7 +80,7 @@ export function getVehicleTypeIcon(type: VehicleType): string {
 
 export function getAuctionTypeName(type: AuctionType): string {
   const names = {
-    [AuctionType.TRADITIONAL]: "Traditional",
+    [AuctionType.RESERVE]: "Reserve",
     [AuctionType.ENGLISH]: "English",
     [AuctionType.DUTCH]: "Dutch",
     [AuctionType.SEALED_BID]: "Sealed Bid",

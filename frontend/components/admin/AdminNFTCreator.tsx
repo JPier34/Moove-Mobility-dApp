@@ -129,7 +129,7 @@ function AdminNFTCreatorContent() {
     // English and Traditional auctions need buyNowPrice
     if (
       auctionFormData.auctionType === AuctionType.ENGLISH ||
-      auctionFormData.auctionType === AuctionType.TRADITIONAL
+      auctionFormData.auctionType === AuctionType.RESERVE
     ) {
       requiredFields.push("buyNowPrice");
     }
@@ -316,12 +316,6 @@ function AdminNFTCreatorContent() {
     });
 
     // Check environment variables
-    console.log("🔧 Environment check:", {
-      hasPinataApiKey: !!process.env.NEXT_PUBLIC_PINATA_API_KEY,
-      hasPinataSecretKey: !!process.env.NEXT_PUBLIC_PINATA_SECRET_KEY,
-      hasServerPinataApiKey: !!process.env.PINATA_API_KEY,
-      hasServerPinataSecretKey: !!process.env.PINATA_SECRET_KEY,
-    });
 
     if (!isConnected || !address) {
       console.error("❌ Wallet not connected");
@@ -425,7 +419,6 @@ function AdminNFTCreatorContent() {
       console.log("✅ Metadata uploaded to IPFS:", metadataUrl);
 
       // Prepare mint parameters
-      console.log("🔧 Preparing mint parameters...");
       const mintParams = [
         address,
         metadataUrl,
@@ -433,20 +426,6 @@ function AdminNFTCreatorContent() {
       ];
 
       // Prepare auction parameters
-      console.log("🔧 Preparing auction parameters...");
-      console.log("🔍 Current auctionFormData at parameter preparation:", {
-        ...auctionFormData,
-        auctionTypeName:
-          auctionFormData.auctionType === 0
-            ? "TRADITIONAL"
-            : auctionFormData.auctionType === 1
-            ? "ENGLISH"
-            : auctionFormData.auctionType === 2
-            ? "DUTCH"
-            : auctionFormData.auctionType === 3
-            ? "SEALED_BID"
-            : "UNKNOWN",
-      });
 
       const durationInSeconds =
         auctionFormData.durationUnit === "minutes"
@@ -584,7 +563,7 @@ function AdminNFTCreatorContent() {
         } else {
           console.log("🔧 No sealed bid reserve price provided, using 0");
         }
-      } else if (auctionFormData.auctionType === AuctionType.TRADITIONAL) {
+      } else if (auctionFormData.auctionType === AuctionType.RESERVE) {
         // Traditional auctions: reservePrice is optional but must be > startPrice if provided
         console.log(
           "🔧 Traditional auction detected, processing reserve price..."
@@ -627,11 +606,12 @@ function AdminNFTCreatorContent() {
       });
 
       if (auctionFormData.auctionType === AuctionType.DUTCH) {
-        // Dutch auctions: No fixed buyNowPrice - users buy at current decreasing price
+        // Dutch auctions: buyNowPrice can now be >= startPrice (contract allows it)
+        // We'll set it to reservePrice to reflect the actual final price
         console.log(
-          "🔄 Dutch auction: No fixed buy now price - users buy at current price"
+          "🔄 Dutch auction: buyNowPrice set to reservePrice (final price)"
         );
-        buyNowPrice = 0n; // No buy now price for Dutch auctions
+        buyNowPrice = reservePrice; // For Dutch auctions, buyNowPrice = reservePrice (correct logic)
       } else if (
         auctionFormData.buyNowPrice &&
         auctionFormData.buyNowPrice.trim() !== "" &&
@@ -756,28 +736,27 @@ function AdminNFTCreatorContent() {
         const isValidDutch =
           auctionParams.reservePrice > 0n &&
           auctionParams.reservePrice < auctionParams.startPrice &&
-          auctionParams.buyNowPrice > 0n &&
-          auctionParams.buyNowPrice < auctionParams.startPrice;
+          auctionParams.buyNowPrice === auctionParams.reservePrice; // buyNowPrice should equal reservePrice for Dutch
 
         console.log("🔍 Dutch auction validation:", {
           reservePrice: ethers.formatEther(auctionParams.reservePrice),
           buyNowPrice: ethers.formatEther(auctionParams.buyNowPrice),
           reserveLessThanStart:
             auctionParams.reservePrice < auctionParams.startPrice,
-          buyNowLessThanStart:
-            auctionParams.buyNowPrice < auctionParams.startPrice,
+          buyNowEqualsReserve:
+            auctionParams.buyNowPrice === auctionParams.reservePrice,
           isValid: isValidDutch,
         });
 
         if (!isValidDutch) {
           throw new Error(
-            "Dutch auction validation failed: reservePrice and buyNowPrice must be > 0 and < startPrice"
+            "Dutch auction validation failed: reservePrice must be > 0 and < startPrice, and buyNowPrice must equal reservePrice"
           );
         }
       } else if (
         auctionFormData.auctionType === AuctionType.ENGLISH ||
         auctionFormData.auctionType === AuctionType.SEALED_BID ||
-        auctionFormData.auctionType === AuctionType.TRADITIONAL
+        auctionFormData.auctionType === AuctionType.RESERVE
       ) {
         // For other auction types, if reservePrice is provided, it must be > startPrice
         if (
@@ -868,26 +847,15 @@ function AdminNFTCreatorContent() {
     }
   };
 
-  const handleAuctionDataChange = (data: AuctionFormData) => {
-    console.log("🔄 Auction data changed:", {
-      ...data,
-      auctionTypeName:
-        data.auctionType === 0
-          ? "TRADITIONAL"
-          : data.auctionType === 1
-          ? "ENGLISH"
-          : data.auctionType === 2
-          ? "DUTCH"
-          : data.auctionType === 3
-          ? "SEALED_BID"
-          : "UNKNOWN",
-    });
-
-    // Update each field in the hook to trigger re-render
-    Object.entries(data).forEach(([key, value]) => {
-      updateField(key as keyof AuctionFormData, value);
-    });
-  };
+  const handleAuctionDataChange = React.useCallback(
+    (data: AuctionFormData) => {
+      // Update each field in the hook to trigger re-render
+      Object.entries(data).forEach(([key, value]) => {
+        updateField(key as keyof AuctionFormData, value);
+      });
+    },
+    [updateField]
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">

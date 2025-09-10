@@ -156,13 +156,40 @@ export default function AuctionModal({
         "Placing bid:",
         amount,
         "ETH for auction:",
-        auction.auctionId
+        auction.auctionId,
+        "Type:",
+        auction.auctionType
       );
 
-      // Use the hook to place the bid
-      placeBid(parseInt(auction.auctionId), parseEther(amount));
+      // Handle different auction types
+      if (auction.auctionType === AuctionType.DUTCH) {
+        // For Dutch auctions, use the commit + buy flow
+        const nonce = BigInt(Math.floor(Math.random() * 1000000000));
+        const commitment = ethers.solidityPackedKeccak256(
+          ["address", "uint256"],
+          [address, nonce]
+        );
 
-      toast.success(`Bid of ${amount} ETH placed successfully!`);
+        console.log("Committing to buy Dutch auction...");
+        await commitToBuyDutch(parseInt(auction.auctionId), commitment);
+
+        // Wait a moment for the commitment to be processed
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
+        console.log("Buying at Dutch price:", currentDutchPrice, "ETH");
+        await buyNowDutch(
+          parseInt(auction.auctionId),
+          nonce,
+          parseEther(currentDutchPrice.toString())
+        );
+
+        toast.success(`Successfully purchased for ${currentDutchPrice} ETH!`);
+      } else {
+        // For other auction types, use standard placeBid
+        placeBid(parseInt(auction.auctionId), parseEther(amount));
+        toast.success(`Bid of ${amount} ETH placed successfully!`);
+      }
+
       onClose();
     } catch (error) {
       console.error("Error placing bid:", error);
@@ -597,7 +624,7 @@ export default function AuctionModal({
                       </div>
                     )}
 
-                  {(auction.auctionType === AuctionType.TRADITIONAL ||
+                  {(auction.auctionType === AuctionType.RESERVE ||
                     auction.auctionType === AuctionType.ENGLISH) && (
                     <div className="space-y-4">
                       {/* Quick bid buttons */}
@@ -739,7 +766,7 @@ export default function AuctionModal({
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Auction Type</span>
                   <span className="font-medium">
-                    {auction.auctionType === AuctionType.TRADITIONAL
+                    {auction.auctionType === AuctionType.RESERVE
                       ? "🏛️ Traditional"
                       : auction.auctionType === AuctionType.ENGLISH
                       ? "⬆️ English"

@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from "react";
 import { Auction, AuctionType, AuctionStatus } from "../../types/auction";
-import Button from "../ui/Button";
 import { useAccount } from "wagmi";
 import { shortenAddress } from "../../utils/shortenAddress";
 import {
@@ -31,7 +30,7 @@ const categoryEmojis = {
 
 // Auction type info
 const auctionTypeInfo = {
-  [AuctionType.TRADITIONAL]: {
+  [AuctionType.RESERVE]: {
     emoji: "🏛️",
     name: "Traditional",
     color: "bg-blue-100 text-blue-800",

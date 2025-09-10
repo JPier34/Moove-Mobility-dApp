@@ -96,10 +96,12 @@ const IPFS_GATEWAYS = [
   "https://dweb.link/ipfs/",
   "https://ipfs.infura.io/ipfs/",
   "https://gateway.ipfs.io/ipfs/",
-  "https://ipfs.filebase.io/ipfs/",
   "https://nftstorage.link/ipfs/",
   "https://app.pinata.cloud/ipfs/", // Pinata Cloud direct access
   "https://gateway.pinata.cloud/ipfs/", // Pinata Gateway
+  "https://ipfs.filebase.io/ipfs/",
+  "https://gateway.optimism.io/ipfs/",
+  "https://ipfs.fleek.co/ipfs/",
 ];
 
 // 4. IPFS FILE TRACKING SYSTEM
@@ -409,21 +411,36 @@ async function fetchNFTMetadataComplete(
         ipfsMetadata?.description ||
         localMetadata?.description ||
         contractMetadata?.description ||
-        "",
+        `A unique NFT with token ID ${tokenId}`,
 
       image:
         ipfsMetadata?.image ||
         localMetadata?.image ||
         "/images/default-nft.png",
 
-      attributes:
-        ipfsMetadata?.attributes || contractMetadata?.attributes || [],
+      attributes: ipfsMetadata?.attributes ||
+        contractMetadata?.attributes || [
+          {
+            trait_type: "Token ID",
+            value: tokenId.toString(),
+          },
+          {
+            trait_type: "Type",
+            value: "Genesis Collection",
+          },
+        ],
 
-      properties:
-        ipfsMetadata?.properties || contractMetadata?.properties || {},
+      properties: ipfsMetadata?.properties ||
+        contractMetadata?.properties || {
+          tokenId: tokenId.toString(),
+          collection: "Genesis",
+        },
 
       collection: ipfsMetadata?.collection ||
-        contractMetadata?.collection || { name: "Genesis" },
+        contractMetadata?.collection || {
+          name: "Genesis Collection",
+          description: "The original collection of Moove NFTs",
+        },
     };
 
     console.log(`✅ Final metadata for NFT #${tokenId}:`, finalMetadata);
@@ -443,11 +460,26 @@ async function fetchNFTMetadataComplete(
     );
     return {
       name: `NFT #${tokenId}`,
-      description: "",
+      description: `A unique NFT with token ID ${tokenId}`,
       image: "/images/default-nft.png",
-      attributes: [],
-      properties: {},
-      collection: { name: "Genesis" },
+      attributes: [
+        {
+          trait_type: "Token ID",
+          value: tokenId.toString(),
+        },
+        {
+          trait_type: "Type",
+          value: "Genesis Collection",
+        },
+      ],
+      properties: {
+        tokenId: tokenId.toString(),
+        collection: "Genesis",
+      },
+      collection: {
+        name: "Genesis Collection",
+        description: "The original collection of Moove NFTs",
+      },
     };
   }
 }

@@ -13,7 +13,11 @@ import { toast } from "react-hot-toast";
 import { ethers } from "ethers";
 import DynamicAuctionForm from "./DynamicAuctionForm";
 import AuctionValidationModal from "./AuctionValidationModal";
-import { useAuctionValidation, AuctionFormData } from "@/hooks/useAuctionValidation";
+import {
+  useAuctionValidation,
+  AuctionFormData,
+} from "@/hooks/useAuctionValidation";
+import { useUserRoles } from "@/hooks/useContract";
 
 interface NFTFormData {
   name: string;
@@ -36,7 +40,7 @@ interface NFTFormData {
 export default function AdminNFTCreatorClean() {
   const { address } = useAccount();
   const { canMint, isMasterAdmin, isLoading } = useUserRoles(address);
-  
+
   // Secure NFT-Auction flow hook
   const {
     executeFlow: executeSecureFlow,
@@ -52,12 +56,17 @@ export default function AdminNFTCreatorClean() {
   const hasAdminAccess = isMasterWallet || canMint || isMasterAdmin;
 
   const router = useRouter();
-  const { uploadNFT, isUploading: isUploadingToIPFS, uploadProgress } = useIPFSUnified();
+  const {
+    uploadNFT,
+    isUploading: isUploadingToIPFS,
+    uploadProgress,
+  } = useIPFSUnified();
   const { validateNFT, isValidating: isValidatingNFT } = useNFTValidationAPI();
   const { isConnected } = useWalletPersistence();
 
   // Auction validation hook
-  const { formData: auctionFormData, isValid: isAuctionValid } = useAuctionValidation();
+  const { formData: auctionFormData, isValid: isAuctionValid } =
+    useAuctionValidation();
 
   // State management
   const [step, setStep] = useState<"nft" | "auction">("nft");
@@ -163,7 +172,8 @@ export default function AdminNFTCreatorClean() {
         editionNumber: 1,
         customizationOptions: {
           ...nftData.customizationOptions,
-          maxTextLength: parseInt(nftData.customizationOptions.maxTextLength) || 100,
+          maxTextLength:
+            parseInt(nftData.customizationOptions.maxTextLength) || 100,
         },
         creator: address || "",
       });
@@ -183,7 +193,10 @@ export default function AdminNFTCreatorClean() {
           { trait_type: "Rarity", value: nftData.rarity },
           { trait_type: "Category", value: "VEHICLE_DECORATION" },
           { trait_type: "Designer", value: "Moove" },
-          { trait_type: "Collection", value: nftData.isLimitedEdition ? nftData.editionName : "Genesis" },
+          {
+            trait_type: "Collection",
+            value: nftData.isLimitedEdition ? nftData.editionName : "Genesis",
+          },
           { trait_type: "Range", value: "100" },
           { trait_type: "Speed", value: "50" },
           { trait_type: "Battery", value: "80" },
@@ -219,18 +232,19 @@ export default function AdminNFTCreatorClean() {
       ];
 
       // Prepare auction parameters
-      const durationInSeconds = auctionFormData.durationUnit === "minutes" 
-        ? parseInt(auctionFormData.duration) * 60 
-        : parseInt(auctionFormData.duration) * 3600;
+      const durationInSeconds =
+        auctionFormData.durationUnit === "minutes"
+          ? parseInt(auctionFormData.duration) * 60
+          : parseInt(auctionFormData.duration) * 3600;
 
       const auctionParams = {
         auctionType: auctionFormData.auctionType,
         startPrice: ethers.parseEther(auctionFormData.startPrice),
-        reservePrice: auctionFormData.reservePrice 
-          ? ethers.parseEther(auctionFormData.reservePrice) 
+        reservePrice: auctionFormData.reservePrice
+          ? ethers.parseEther(auctionFormData.reservePrice)
           : 0n,
-        buyNowPrice: auctionFormData.buyNowPrice 
-          ? ethers.parseEther(auctionFormData.buyNowPrice) 
+        buyNowPrice: auctionFormData.buyNowPrice
+          ? ethers.parseEther(auctionFormData.buyNowPrice)
           : 0n,
         duration: durationInSeconds,
         bidIncrement: ethers.parseEther(auctionFormData.bidIncrement),
@@ -308,19 +322,35 @@ export default function AdminNFTCreatorClean() {
         {/* Progress Steps */}
         <div className="mb-8">
           <div className="flex items-center justify-center space-x-4">
-            <div className={`flex items-center ${step === "nft" ? "text-purple-600" : "text-gray-400"}`}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                step === "nft" ? "bg-purple-600 text-white" : "bg-gray-200 dark:bg-gray-700"
-              }`}>
+            <div
+              className={`flex items-center ${
+                step === "nft" ? "text-purple-600" : "text-gray-400"
+              }`}
+            >
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                  step === "nft"
+                    ? "bg-purple-600 text-white"
+                    : "bg-gray-200 dark:bg-gray-700"
+                }`}
+              >
                 1
               </div>
               <span className="ml-2 font-medium">NFT Details</span>
             </div>
             <div className="w-8 h-0.5 bg-gray-300 dark:bg-gray-600"></div>
-            <div className={`flex items-center ${step === "auction" ? "text-purple-600" : "text-gray-400"}`}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                step === "auction" ? "bg-purple-600 text-white" : "bg-gray-200 dark:bg-gray-700"
-              }`}>
+            <div
+              className={`flex items-center ${
+                step === "auction" ? "text-purple-600" : "text-gray-400"
+              }`}
+            >
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                  step === "auction"
+                    ? "bg-purple-600 text-white"
+                    : "bg-gray-200 dark:bg-gray-700"
+                }`}
+              >
                 2
               </div>
               <span className="ml-2 font-medium">Auction Settings</span>
@@ -349,7 +379,9 @@ export default function AdminNFTCreatorClean() {
                 <input
                   type="text"
                   value={nftData.name}
-                  onChange={(e) => setNftData(prev => ({ ...prev, name: e.target.value }))}
+                  onChange={(e) =>
+                    setNftData((prev) => ({ ...prev, name: e.target.value }))
+                  }
                   className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500"
                   placeholder="Enter NFT name"
                 />
@@ -362,7 +394,12 @@ export default function AdminNFTCreatorClean() {
                 </label>
                 <select
                   value={nftData.rarity}
-                  onChange={(e) => setNftData(prev => ({ ...prev, rarity: e.target.value as any }))}
+                  onChange={(e) =>
+                    setNftData((prev) => ({
+                      ...prev,
+                      rarity: e.target.value as any,
+                    }))
+                  }
                   className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500"
                 >
                   <option value="COMMON">Common</option>
@@ -381,7 +418,12 @@ export default function AdminNFTCreatorClean() {
                 </label>
                 <textarea
                   value={nftData.description}
-                  onChange={(e) => setNftData(prev => ({ ...prev, description: e.target.value }))}
+                  onChange={(e) =>
+                    setNftData((prev) => ({
+                      ...prev,
+                      description: e.target.value,
+                    }))
+                  }
                   rows={3}
                   className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500"
                   placeholder="Enter NFT description"
@@ -396,7 +438,12 @@ export default function AdminNFTCreatorClean() {
                 <input
                   type="file"
                   accept="image/*"
-                  onChange={(e) => setNftData(prev => ({ ...prev, image: e.target.files?.[0] || null }))}
+                  onChange={(e) =>
+                    setNftData((prev) => ({
+                      ...prev,
+                      image: e.target.files?.[0] || null,
+                    }))
+                  }
                   className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500"
                 />
                 {nftData.image && (
@@ -415,7 +462,12 @@ export default function AdminNFTCreatorClean() {
             <div className="flex justify-end mt-6">
               <button
                 onClick={handleNFTValidation}
-                disabled={!nftData.name || !nftData.description || !nftData.image || isValidatingNFT}
+                disabled={
+                  !nftData.name ||
+                  !nftData.description ||
+                  !nftData.image ||
+                  isValidatingNFT
+                }
                 className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
               >
                 {isValidatingNFT ? "Validating..." : "Validate & Continue"}
@@ -432,9 +484,7 @@ export default function AdminNFTCreatorClean() {
             transition={{ duration: 0.4 }}
             className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6"
           >
-            <DynamicAuctionForm
-              onDataChange={handleAuctionDataChange}
-            />
+            <DynamicAuctionForm onDataChange={handleAuctionDataChange} />
 
             {/* Action Buttons */}
             <div className="flex justify-between mt-6">
@@ -468,7 +518,10 @@ export default function AdminNFTCreatorClean() {
                   {securePhase}
                 </p>
                 <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                  <div className="bg-purple-600 h-2 rounded-full animate-pulse" style={{ width: "60%" }}></div>
+                  <div
+                    className="bg-purple-600 h-2 rounded-full animate-pulse"
+                    style={{ width: "60%" }}
+                  ></div>
                 </div>
               </div>
             </div>
@@ -491,15 +544,26 @@ export default function AdminNFTCreatorClean() {
             <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
               <div className="text-center">
                 <div className="w-12 h-12 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  <svg
+                    className="w-6 h-6 text-red-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
                   </svg>
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
                   Validation Failed
                 </h3>
                 <p className="text-gray-600 dark:text-gray-400 mb-4">
-                  {validationResult.errors?.[0]?.message || "Unknown validation error"}
+                  {validationResult.errors?.[0]?.message ||
+                    "Unknown validation error"}
                 </p>
                 <button
                   onClick={() => setShowFailureModal(false)}
