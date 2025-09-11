@@ -28,10 +28,10 @@ const actionInfo = {
 
 // Auction type emojis
 const auctionTypeEmojis = {
-  [AuctionType.TRADITIONAL]: "🏛️",
   [AuctionType.ENGLISH]: "⬆️",
   [AuctionType.DUTCH]: "⬇️",
   [AuctionType.SEALED_BID]: "🔒",
+  [AuctionType.RESERVE]: "💰",
 };
 
 export default function AuctionHistory({ history }: AuctionHistoryProps) {
@@ -175,13 +175,13 @@ export default function AuctionHistory({ history }: AuctionHistoryProps) {
                       </span>
                       <span className="text-sm text-gray-500">
                         {typeEmoji}{" "}
-                        {entry.auctionType === AuctionType.TRADITIONAL
-                          ? "Traditional"
-                          : entry.auctionType === AuctionType.ENGLISH
+                        {entry.auctionType === AuctionType.ENGLISH
                           ? "English"
                           : entry.auctionType === AuctionType.DUTCH
                           ? "Dutch"
-                          : "Sealed Bid"}
+                          : entry.auctionType === AuctionType.SEALED_BID
+                          ? "Sealed Bid"
+                          : "Reserve"}
                       </span>
                       <span className="text-sm text-gray-500">
                         {entry.date.toLocaleDateString()} alle{" "}

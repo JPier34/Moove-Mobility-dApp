@@ -59,12 +59,7 @@ async function checkAuctionStatus(auctionId: string) {
 
 export function useWonAuctionsManager() {
   const { unsettledAuctions, isLoading, refetch } = useWonAuctions();
-  const {
-    settleAuction,
-    isPending: isSettling,
-    isSuccess,
-    error,
-  } = useSettleAuction();
+  const { settleAuction, isSettling, error } = useSettleAuction();
   const {
     startRevealPhase,
     isPending: isStartingReveal,
@@ -86,20 +81,20 @@ export function useWonAuctionsManager() {
 
   // Chiudi il modal quando l'asta è stata settled con successo
   useEffect(() => {
-    if (isSuccess && showCongratulations) {
+    if (!isSettling && showCongratulations) {
       console.log(`🎉 Auction settled successfully! Closing modal...`);
       setShowCongratulations(false);
       setCurrentAuction(null);
       // Refresh dei dati per aggiornare la lista
       refetch();
     }
-  }, [isSuccess, showCongratulations, refetch]);
+  }, [isSettling, showCongratulations, refetch]);
 
   // Debug per errori di transazione
   useEffect(() => {
     if (error) {
       console.error(`❌ Settle auction error:`, error);
-      alert(`Settle auction failed: ${error.message || "Unknown error"}`);
+      alert(`Settle auction failed: ${error}`);
     }
   }, [error]);
 
@@ -194,7 +189,7 @@ export function useWonAuctionsManager() {
           `🔄 Auction ${auctionId} is ACTIVE but time-expired. Calling endAuction first...`
         );
         try {
-          const provider = new ethers.BrowserProvider(window.ethereum);
+          const provider = new ethers.BrowserProvider(window.ethereum as any);
           const signer = await provider.getSigner();
           const auctionContract = new ethers.Contract(
             contracts.MooveAuction.address,
@@ -285,13 +280,11 @@ export function useWonAuctionsManager() {
         highestBidder: contractStatus.highestBidder,
         highestBid: contractStatus.highestBid,
         endTime: new Date(contractStatus.endTime).toISOString(),
-        minBidders: contractStatus.minBidders,
-        totalBidders: contractStatus.totalBidders,
       });
 
       // Chiama settleAuction (non è async, ma triggera la transazione)
       console.log(`🔨 Calling settleAuction for auction ${auctionId}...`);
-      settleAuction(parseInt(auctionId));
+      settleAuction(auctionId);
       console.log(`✅ Settle auction ${auctionId} transaction initiated`);
 
       // Verifica lo status dopo un po' per confermare il successo
@@ -312,7 +305,7 @@ export function useWonAuctionsManager() {
         }
       }, 5000); // Aspetta 5 secondi per la conferma
 
-      // Il modal si chiuderà automaticamente quando isSuccess diventa true
+      // Il modal si chiuderà automaticamente quando isSettling diventa false
       // Non possiamo await qui perché settleAuction non restituisce una Promise
     } catch (error) {
       console.error("Error settling auction:", error);
@@ -332,13 +325,13 @@ export function useWonAuctionsManager() {
 
   // Chiudi il modal quando l'asta è stata settled con successo
   useEffect(() => {
-    if (isSuccess && showCongratulations) {
+    if (!isSettling && showCongratulations) {
       setShowCongratulations(false);
       setCurrentAuction(null);
       // Refetch per aggiornare la lista
       refetch();
     }
-  }, [isSuccess, showCongratulations, refetch]);
+  }, [isSettling, showCongratulations, refetch]);
 
   return {
     unsettledAuctions,

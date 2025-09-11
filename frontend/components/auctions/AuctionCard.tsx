@@ -9,6 +9,9 @@ import {
   useCommitToBuyDutch,
   useBuyNowDutch,
 } from "@/hooks/useAuction";
+import { useDutchAuction } from "../../hooks/useDutchAuction";
+import { useDutchPrice } from "@/hooks/useDutchPrice";
+import DutchAuctionSuccessModal from "./DutchAuctionSuccessModal";
 import { formatEther, parseEther } from "viem";
 import { ethers } from "ethers";
 import toast from "react-hot-toast";
@@ -57,27 +60,24 @@ export default function AuctionCard({
   onClick,
   showEndedState = false,
 }: AuctionCardProps) {
-  // Debug log per vedere cosa riceve la card
-  console.log("🎨 AuctionCard received auction:", {
-    id: auction.auctionId,
-    nftId: auction.nftId,
-    name: auction.nftName,
-    image: auction.nftImage,
-    category: auction.nftCategory,
-    status: auction.status,
-    seller: auction.seller,
-    startPrice: auction.startPrice,
-    currentBid: auction.currentBid,
-  });
+  // Debug log per vedere cosa riceve la card);
   const { address, isConnected } = useAccount();
   const [timeLeft, setTimeLeft] = useState("");
-  const [currentDutchPrice, setCurrentDutchPrice] = useState(
-    auction.currentBid
-  );
+  // Use the unified Dutch price hook
+  const { currentPrice: currentDutchPrice, isActive: isDutchActive } =
+    useDutchPrice(auction, 5000);
 
   // Hooks for auction interactions
   const { commitToBuyDutch } = useCommitToBuyDutch();
   const { buyNowDutch } = useBuyNowDutch();
+  const {
+    handleDutchAuction,
+    isProcessing: isDutchProcessing,
+    step: dutchStep,
+    showSuccessModal,
+    successData,
+    closeSuccessModal,
+  } = useDutchAuction();
 
   // Calculate time remaining
   useEffect(() => {
@@ -115,50 +115,7 @@ export default function AuctionCard({
     return () => clearInterval(interval);
   }, [auction.endTime]);
 
-  // Calculate Dutch auction current price
-  useEffect(() => {
-    if (
-      auction.auctionType === AuctionType.DUTCH &&
-      auction.status === AuctionStatus.ACTIVE
-    ) {
-      const updateDutchPrice = () => {
-        const now = new Date().getTime();
-        const startTime = new Date(auction.startTime).getTime();
-        const endTime = new Date(auction.endTime).getTime();
-        const elapsed = now - startTime;
-        const duration = endTime - startTime;
-
-        if (elapsed <= 0) {
-          setCurrentDutchPrice(auction.startPrice);
-          return;
-        }
-
-        if (elapsed >= duration) {
-          setCurrentDutchPrice(auction.reservePrice);
-          return;
-        }
-
-        const startPrice = parseFloat(auction.startPrice);
-        const reservePrice = parseFloat(auction.reservePrice);
-        const priceReduction =
-          ((startPrice - reservePrice) * elapsed) / duration;
-        const currentPrice = startPrice - priceReduction;
-
-        setCurrentDutchPrice(Math.max(currentPrice, reservePrice).toFixed(6));
-      };
-
-      updateDutchPrice();
-      const interval = setInterval(updateDutchPrice, 5000); // Update every 5 seconds
-      return () => clearInterval(interval);
-    }
-  }, [
-    auction.auctionType,
-    auction.startPrice,
-    auction.reservePrice,
-    auction.startTime,
-    auction.endTime,
-    auction.status,
-  ]);
+  // Dutch price calculation is now handled by useDutchPrice hook
 
   const handleQuickAction = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -170,31 +127,20 @@ export default function AuctionCard({
 
     try {
       if (auction.auctionType === AuctionType.DUTCH) {
-        // Generate a random nonce for the commitment
-        const nonce = BigInt(Math.floor(Math.random() * 1000000000));
-
-        // Create commitment hash
-        const commitment = ethers.solidityPackedKeccak256(
-          ["address", "uint256"],
-          [address, nonce]
-        );
-
-        // First commit to buy
-        console.log("Committing to buy Dutch auction...");
-        await commitToBuyDutch(parseInt(auction.auctionId), commitment);
-
-        // Wait a moment for the commitment to be processed
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-
-        // Then buy with the commitment
-        console.log("Buying at Dutch price:", currentDutchPrice, "ETH");
-        await buyNowDutch(
+        // Use the improved Dutch auction handler with success callback
+        const success = await handleDutchAuction(
           parseInt(auction.auctionId),
-          nonce,
-          parseEther(currentDutchPrice.toString())
+          parseFloat(currentDutchPrice),
+          () => {
+            // Success callback - refresh data
+            console.log(
+              "Dutch auction purchase successful, refreshing data..."
+            );
+          }
         );
-
-        toast.success(`Successfully purchased for ${currentDutchPrice} ETH!`);
+        if (!success) {
+          console.log("Dutch auction failed or was cancelled");
+        }
       } else {
         // For other auction types, just log for now
         console.log(
@@ -386,6 +332,17 @@ export default function AuctionCard({
 
         {/* Action button removed - click card to open modal */}
       </div>
+
+      {/* Dutch Auction Success Modal */}
+      {successData && (
+        <DutchAuctionSuccessModal
+          isOpen={showSuccessModal}
+          onClose={closeSuccessModal}
+          auctionId={successData.auctionId}
+          price={successData.price}
+          transactionHash={successData.transactionHash}
+        />
+      )}
     </div>
   );
 }

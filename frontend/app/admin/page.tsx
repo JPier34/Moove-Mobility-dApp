@@ -4,12 +4,24 @@ import React from "react";
 import { motion } from "framer-motion";
 import { useWalletPersistence } from "@/hooks/useWalletPersistence";
 import { useUserRoles } from "@/hooks/useContract";
+// import { useAuctionsEnhanced } from "@/hooks/enhanced-auction-utils"; // Temporarily disabled
 import AdminNFTCreator from "@/components/admin/AdminNFTCreator";
 import AdminGuard from "@/components/admin/AdminGuard";
+import AuctionTypeTester from "@/components/admin/AuctionTypeTester";
+import AuctionStatusChecker from "@/components/debug/AuctionStatusChecker";
+import NFTCollectionChecker from "@/components/debug/NFTCollectionChecker";
+// import FailedAuctionHandler from "@/components/admin/FailedAuctionHandler"; // Temporarily disabled
 
 export default function AdminPage() {
   const { address } = useWalletPersistence();
   const { isMasterAdmin, canMint } = useUserRoles(address);
+
+  // Temporarily disabled failed auction handling to prevent loops
+  // const {
+  //   isHandlingFailedAuctions,
+  //   processedFailedAuctions,
+  //   refetch: refetchAuctions,
+  // } = useAuctionsEnhanced();
 
   return (
     <AdminGuard>
@@ -38,6 +50,13 @@ export default function AdminPage() {
               Admin Access Granted
             </div>
           </motion.div>
+
+          {/* Temporarily disabled Failed Auction Handler to prevent loops */}
+          {/* <FailedAuctionHandler
+            isHandlingFailedAuctions={isHandlingFailedAuctions}
+            processedFailedAuctions={processedFailedAuctions}
+            onRefresh={refetchAuctions}
+          /> */}
 
           {/* Admin Stats */}
           <motion.div
@@ -102,6 +121,35 @@ export default function AdminPage() {
             transition={{ duration: 0.6, delay: 0.4 }}
           >
             <AdminNFTCreator />
+          </motion.div>
+
+          {/* Auction Type Tester */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.6 }}
+          >
+            <AuctionTypeTester />
+          </motion.div>
+
+          {/* Auction Status Checker */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.8 }}
+            className="mt-8"
+          >
+            <AuctionStatusChecker auctionId={8} />
+          </motion.div>
+
+          {/* NFT Collection Checker */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 1.0 }}
+            className="mt-8"
+          >
+            <NFTCollectionChecker tokenId={45} userAddress={address || ""} />
           </motion.div>
         </div>
       </div>

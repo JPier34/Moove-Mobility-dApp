@@ -21,11 +21,6 @@ interface ActiveBidsProps {
 
 // Auction type info
 const auctionTypeInfo = {
-  [AuctionType.TRADITIONAL]: {
-    emoji: "🏛️",
-    name: "Traditional",
-    color: "bg-blue-100 text-blue-800",
-  },
   [AuctionType.ENGLISH]: {
     emoji: "⬆️",
     name: "English",
@@ -40,6 +35,11 @@ const auctionTypeInfo = {
     emoji: "🔒",
     name: "Sealed",
     color: "bg-yellow-100 text-yellow-800",
+  },
+  [AuctionType.RESERVE]: {
+    emoji: "💰",
+    name: "Reserve",
+    color: "bg-orange-100 text-orange-800",
   },
 };
 

@@ -11,6 +11,10 @@ import {
   useCommitToBuyDutch,
   useBuyNowDutch,
 } from "@/hooks/useAuction";
+import { useDutchAuction } from "../../hooks/useDutchAuction";
+import { useDutchPrice } from "@/hooks/useDutchPrice";
+import { useAuctionHandler } from "@/hooks/useAuctionHandler";
+import DutchAuctionSuccessModal from "./DutchAuctionSuccessModal";
 import { formatEther, parseEther } from "viem";
 import { ethers } from "ethers";
 import toast from "react-hot-toast";
@@ -39,9 +43,9 @@ export default function AuctionModal({
     "details"
   );
   const [timeLeft, setTimeLeft] = useState("");
-  const [currentDutchPrice, setCurrentDutchPrice] = useState(
-    auction.currentBid
-  );
+  // Use the unified Dutch price hook
+  const { currentPrice: currentDutchPrice, isActive: isDutchActive } =
+    useDutchPrice(auction, 1000);
 
   // Bidding state
   const [bidAmount, setBidAmount] = useState("");
@@ -56,6 +60,21 @@ export default function AuctionModal({
   const { placeBid } = usePlaceBid();
   const { commitToBuyDutch } = useCommitToBuyDutch();
   const { buyNowDutch } = useBuyNowDutch();
+  const {
+    handleDutchAuction,
+    isProcessing: isDutchProcessing,
+    step: dutchStep,
+    showSuccessModal,
+    successData,
+    closeSuccessModal,
+  } = useDutchAuction();
+
+  const {
+    handleAuctionAction,
+    isProcessing: isHandlerProcessing,
+    error: handlerError,
+    step: handlerStep,
+  } = useAuctionHandler();
 
   // Close modal with ESC
   useEffect(() => {
@@ -110,39 +129,7 @@ export default function AuctionModal({
     return () => clearInterval(interval);
   }, [auction.endTime, isOpen]);
 
-  // Update Dutch price
-  useEffect(() => {
-    if (!isOpen || auction.auctionType !== AuctionType.DUTCH) return;
-
-    const updateDutchPrice = () => {
-      const now = new Date().getTime();
-      const startTime = new Date(auction.startTime).getTime();
-      const endTime = new Date(auction.endTime).getTime();
-      const elapsed = now - startTime;
-      const duration = endTime - startTime;
-
-      if (elapsed <= 0) {
-        setCurrentDutchPrice(auction.startPrice);
-        return;
-      }
-
-      if (elapsed >= duration) {
-        setCurrentDutchPrice(auction.reservePrice);
-        return;
-      }
-
-      const startPrice = parseFloat(auction.startPrice);
-      const reservePrice = parseFloat(auction.reservePrice);
-      const priceReduction = ((startPrice - reservePrice) * elapsed) / duration;
-      const currentPrice = startPrice - priceReduction;
-
-      setCurrentDutchPrice(Math.max(currentPrice, reservePrice).toFixed(6));
-    };
-
-    updateDutchPrice();
-    const interval = setInterval(updateDutchPrice, 1000); // Update every second for smooth price changes
-    return () => clearInterval(interval);
-  }, [auction, isOpen]);
+  // Dutch price calculation is now handled by useDutchPrice hook
 
   const handleBid = async (amount: string) => {
     if (!isConnected) {
@@ -161,36 +148,15 @@ export default function AuctionModal({
         auction.auctionType
       );
 
-      // Handle different auction types
-      if (auction.auctionType === AuctionType.DUTCH) {
-        // For Dutch auctions, use the commit + buy flow
-        const nonce = BigInt(Math.floor(Math.random() * 1000000000));
-        const commitment = ethers.solidityPackedKeccak256(
-          ["address", "uint256"],
-          [address, nonce]
-        );
+      // Use the unified auction handler for all auction types
+      const result = await handleAuctionAction(auction, "bid", amount);
 
-        console.log("Committing to buy Dutch auction...");
-        await commitToBuyDutch(parseInt(auction.auctionId), commitment);
-
-        // Wait a moment for the commitment to be processed
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-
-        console.log("Buying at Dutch price:", currentDutchPrice, "ETH");
-        await buyNowDutch(
-          parseInt(auction.auctionId),
-          nonce,
-          parseEther(currentDutchPrice.toString())
-        );
-
-        toast.success(`Successfully purchased for ${currentDutchPrice} ETH!`);
-      } else {
-        // For other auction types, use standard placeBid
-        placeBid(parseInt(auction.auctionId), parseEther(amount));
+      if (result.success) {
         toast.success(`Bid of ${amount} ETH placed successfully!`);
+        onClose();
+      } else {
+        toast.error(result.error || "Error placing bid");
       }
-
-      onClose();
     } catch (error) {
       console.error("Error placing bid:", error);
       toast.error("Error placing bid");
@@ -209,18 +175,20 @@ export default function AuctionModal({
     try {
       console.log("Submitting sealed bid for auction:", auction.auctionId);
 
-      // Create sealed bid hash
-      const bidHash = ethers.solidityPackedKeccak256(
-        ["uint256", "uint256", "address"],
-        [parseEther(sealedBidAmount), BigInt(sealedBidNonce), address]
+      // Use the unified auction handler for sealed bid
+      const result = await handleAuctionAction(
+        auction,
+        "bid",
+        sealedBidAmount,
+        sealedBidNonce
       );
 
-      // Submit sealed bid (this would need to be implemented in the hook)
-      // For now, we'll keep the simulation
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      toast.success("Sealed bid submitted successfully!");
-      onClose();
+      if (result.success) {
+        toast.success("Sealed bid submitted successfully!");
+        onClose();
+      } else {
+        toast.error(result.error || "Error submitting sealed bid");
+      }
     } catch (error) {
       console.error("Error submitting sealed bid:", error);
       toast.error("Error submitting sealed bid");
@@ -237,32 +205,18 @@ export default function AuctionModal({
 
     setIsSubmittingBid(true);
     try {
-      // Generate a random nonce for the commitment
-      const nonce = BigInt(Math.floor(Math.random() * 1000000000));
-
-      // Create commitment hash
-      const commitment = ethers.solidityPackedKeccak256(
-        ["address", "uint256"],
-        [address, nonce]
+      // Use the unified auction handler for Dutch auction
+      const result = await handleAuctionAction(
+        auction,
+        "buyNow",
+        currentDutchPrice
       );
 
-      // First commit to buy
-      console.log("Committing to buy Dutch auction...");
-      await commitToBuyDutch(parseInt(auction.auctionId), commitment);
-
-      // Wait a moment for the commitment to be processed
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // Then buy with the commitment
-      console.log("Buying at Dutch price:", currentDutchPrice, "ETH");
-      await buyNowDutch(
-        parseInt(auction.auctionId),
-        nonce,
-        ethers.parseEther(currentDutchPrice.toString())
-      );
-
-      toast.success(`Successfully purchased for ${currentDutchPrice} ETH!`);
-      onClose();
+      if (result.success) {
+        onClose();
+      } else {
+        toast.error(result.error || "Error processing purchase");
+      }
     } catch (error) {
       console.error("Error buying:", error);
       toast.error("Error processing purchase");
@@ -468,14 +422,12 @@ export default function AuctionModal({
                   <div className="space-y-3">
                     {auction.bidCount > 0 ? (
                       <div className="text-sm text-gray-500">
-                        Lo storico delle offerte è visibile qui
+                        History of bids is visible here
                       </div>
                     ) : (
                       <div className="text-center py-8">
                         <div className="text-4xl mb-2">🔇</div>
-                        <div className="text-sm text-gray-500">
-                          Ancora nessuna offerta
-                        </div>
+                        <div className="text-sm text-gray-500">No bids yet</div>
                       </div>
                     )}
                   </div>
@@ -484,7 +436,7 @@ export default function AuctionModal({
                 {activeTab === "history" && (
                   <div className="space-y-2">
                     <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                      <span className="text-sm">Asta creata</span>
+                      <span className="text-sm">Auction created</span>
                       <span className="text-sm text-gray-500">
                         {new Date(auction.startTime).toLocaleDateString()}
                       </span>
@@ -526,7 +478,7 @@ export default function AuctionModal({
                 {auction.currentBid !== "0" &&
                   auction.auctionType !== AuctionType.DUTCH && (
                     <div className="text-sm text-gray-500 mt-1">
-                      Offerta minima:{" "}
+                      Minimum bid:{" "}
                       {(
                         parseFloat(auction.currentBid) +
                         parseFloat(auction.bidIncrement)
@@ -542,12 +494,23 @@ export default function AuctionModal({
                   {auction.auctionType === AuctionType.DUTCH && (
                     <Button
                       onClick={handleDutchBuy}
-                      disabled={!isConnected || isSubmittingBid}
+                      disabled={
+                        !isConnected ||
+                        isSubmittingBid ||
+                        isDutchProcessing ||
+                        !isDutchActive
+                      }
                       className="w-full"
                       size="lg"
                     >
-                      {isSubmittingBid
-                        ? "Processing..."
+                      {isSubmittingBid || isDutchProcessing
+                        ? dutchStep === "committing"
+                          ? "Committing..."
+                          : dutchStep === "buying"
+                          ? "Buying..."
+                          : "Processing..."
+                        : !isDutchActive
+                        ? "Auction Ended"
                         : `Buy Now for ${currentDutchPrice} ETH`}
                     </Button>
                   )}
@@ -558,7 +521,7 @@ export default function AuctionModal({
                       <div className="space-y-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Offerta (ETH)
+                            Bid (ETH)
                           </label>
                           <input
                             type="number"
@@ -571,7 +534,7 @@ export default function AuctionModal({
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Nonce (Codice segreto)
+                            Nonce (Secret code)
                           </label>
                           <input
                             type="number"
@@ -581,8 +544,8 @@ export default function AuctionModal({
                             className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-moove-primary focus:border-moove-primary"
                           />
                           <div className="text-xs text-gray-500 mt-1">
-                            Ricorda questo numero - ti servirà per rivelare la
-                            tua offerta!
+                            Remember this number - it will be used to reveal
+                            your bid!
                           </div>
                         </div>
                         <Button
@@ -608,18 +571,18 @@ export default function AuctionModal({
                       AuctionStatus.PENDING && (
                       <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                         <div className="text-yellow-800 font-medium mb-2">
-                          🔓 Fase di apertura buste attiva
+                          🔓 Reveal phase active
                         </div>
                         <div className="text-yellow-700 text-sm mb-4">
-                          Se hai inviato un'offerta sigillata, devi rivelarla
-                          ora con il tuo importo originale e il nonce.
+                          If you have sent a sealed bid, you must reveal it now
+                          with your original amount and nonce.
                         </div>
                         <Button
                           variant="secondary"
                           size="sm"
                           className="w-full"
                         >
-                          Rivela la mia offerta
+                          Reveal my bid
                         </Button>
                       </div>
                     )}
@@ -630,7 +593,7 @@ export default function AuctionModal({
                       {/* Quick bid buttons */}
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-3">
-                          Offerta rapida
+                          Quick bid
                         </label>
                         <div className="grid grid-cols-2 gap-2">
                           {getQuickBidAmounts().map((bid, index) => (
@@ -660,7 +623,7 @@ export default function AuctionModal({
                       {/* Custom bid amount */}
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Offerta personalizzata (ETH)
+                          Custom bid (ETH)
                         </label>
                         <input
                           type="number"
@@ -688,7 +651,7 @@ export default function AuctionModal({
                         {isSubmittingBid ? (
                           <>
                             <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
-                            Placing Bid...
+                            Placing bid...
                           </>
                         ) : (
                           `Place Bid: ${bidAmount || "0.0000"} ETH`
@@ -722,8 +685,7 @@ export default function AuctionModal({
                     🎉 This is your auction!
                   </div>
                   <div className="text-blue-700 text-sm">
-                    Non puoi fare offerte sulla tua stessa asta. Puoi monitorare
-                    le offerte e gestire l'asta dal tuo dashboard.
+                    You can't place a bid on your own auction.
                   </div>
                 </div>
               )}
@@ -732,10 +694,10 @@ export default function AuctionModal({
               {!isConnected && auction.status === AuctionStatus.ACTIVE && (
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                   <div className="text-yellow-800 font-medium mb-2">
-                    ⚠️ Wallet non connesso
+                    ⚠️ Wallet not connected
                   </div>
                   <div className="text-yellow-700 text-sm">
-                    Connetti il tuo wallet per partecipare a questa asta.
+                    Connect your wallet to place a bid.
                   </div>
                 </div>
               )}
@@ -765,7 +727,7 @@ export default function AuctionModal({
               <div className="bg-gray-50 rounded-lg p-4 space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Auction Type</span>
-                  <span className="font-medium">
+                  <span className="font-medium text-gray-700">
                     {auction.auctionType === AuctionType.RESERVE
                       ? "🏛️ Traditional"
                       : auction.auctionType === AuctionType.ENGLISH
@@ -776,38 +738,51 @@ export default function AuctionModal({
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Prezzo di partenza</span>
-                  <span className="font-medium">{auction.startPrice} ETH</span>
+                  <span className="text-gray-500">Start Price</span>
+                  <span className="font-medium text-gray-700">
+                    {auction.startPrice} ETH
+                  </span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Prezzo riserva</span>
-                  <span className="font-medium">
+                  <span className="text-gray-500">Reserve Price</span>
+                  <span className="font-medium text-gray-700">
                     {auction.reservePrice} ETH
                   </span>
                 </div>
                 {auction.buyNowPrice && (
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Compra ora</span>
-                    <span className="font-medium">
+                    <span className="text-gray-500">Buy Now</span>
+                    <span className="font-medium text-gray-700">
                       {auction.buyNowPrice} ETH
                     </span>
                   </div>
                 )}
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Incremento offerta</span>
-                  <span className="font-medium">
+                  <span className="text-gray-500">Bid Increment</span>
+                  <span className="font-medium text-gray-700">
                     {auction.bidIncrement} ETH
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Tempo restante</span>
-                  <span className="font-medium">{timeLeft}</span>
+                  <span className="text-gray-500">Time Left</span>
+                  <span className="font-medium text-gray-700">{timeLeft}</span>
                 </div>
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Dutch Auction Success Modal */}
+      {successData && (
+        <DutchAuctionSuccessModal
+          isOpen={showSuccessModal}
+          onClose={closeSuccessModal}
+          auctionId={successData.auctionId}
+          price={successData.price}
+          transactionHash={successData.transactionHash}
+        />
+      )}
     </div>
   );
 }

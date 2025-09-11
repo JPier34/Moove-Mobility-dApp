@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 
 interface OptimizedNFTImageProps {
@@ -21,7 +21,26 @@ export default function OptimizedNFTImage({
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [isInView, setIsInView] = useState(false);
+  const [debouncedSrc, setDebouncedSrc] = useState<string>("");
   const imgRef = useRef<HTMLImageElement>(null);
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Debounce src changes to prevent excessive API calls
+  useEffect(() => {
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+
+    debounceTimeoutRef.current = setTimeout(() => {
+      setDebouncedSrc(src);
+    }, 300); // 300ms debounce
+
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+    };
+  }, [src]);
 
   // Intersection Observer for lazy loading
   useEffect(() => {
@@ -76,9 +95,11 @@ export default function OptimizedNFTImage({
     >
       {isInView && (
         <>
-          {!hasError && src && src !== "/images/default-nft.png" ? (
+          {!hasError &&
+          debouncedSrc &&
+          debouncedSrc !== "/images/default-nft.png" ? (
             <img
-              src={src}
+              src={debouncedSrc}
               alt={alt}
               className={`${className} transition-opacity duration-300 ${
                 isLoaded ? "opacity-100" : "opacity-0"
@@ -97,7 +118,9 @@ export default function OptimizedNFTImage({
           )}
 
           {/* Fallback placeholder */}
-          {(hasError || !src || src === "/images/default-nft.png") && (
+          {(hasError ||
+            !debouncedSrc ||
+            debouncedSrc === "/images/default-nft.png") && (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="w-32 h-32 bg-gradient-to-br from-white/20 to-white/5 rounded-2xl border border-white/20 flex items-center justify-center">
                 <motion.div

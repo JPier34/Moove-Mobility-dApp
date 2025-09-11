@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useAccount } from "wagmi";
 import { ethers } from "ethers";
 import { contracts } from "@/utils/contracts";
-import { useAuctionsEnhanced } from "./enhanced-auction-utils";
+// import { useAuctionsEnhanced } from "./enhanced-auction-utils"; // Temporarily disabled to prevent loops
 
 interface WonAuction {
   auctionId: string;
@@ -50,7 +50,16 @@ function generateMockTransactionHash(auctionId: string): string {
 
 export function useUserCollectionOptimized(): UserCollectionOptimized {
   const { address, isConnected } = useAccount();
-  const { auctions, isLoading: auctionsLoading } = useAuctionsEnhanced(true); // Disable auto-refresh for collection
+  // Temporarily disabled useAuctionsEnhanced to prevent loops
+  // const { auctions, isLoading: auctionsLoading } = useAuctionsEnhanced(
+  //   true,
+  //   true
+  // ); // Disable auto-refresh and failed auction handling for collection
+
+  // Mock values for now
+  const auctions: any[] = [];
+  const auctionsLoading = false;
+
   const [wonAuctions, setWonAuctions] = useState<WonAuction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -179,14 +188,20 @@ export function useUserCollectionOptimized(): UserCollectionOptimized {
     } finally {
       setIsLoading(false);
     }
-  }, [address, isConnected, auctions, getCachedData, setCachedData]);
+  }, [address, isConnected, getCachedData, setCachedData]); // Removed auctions dependency
 
-  // Only fetch when connected and address changes
+  // Simplified fetch logic - only fetch when address changes
   useEffect(() => {
-    if (!auctionsLoading && auctions.length > 0) {
-      fetchWonAuctions();
+    if (address && isConnected) {
+      // For now, just set empty array to prevent any contract calls
+      setWonAuctions([]);
+      setIsLoading(false);
+      console.log("🔍 User connected, showing empty collection for now");
+    } else {
+      setWonAuctions([]);
+      setIsLoading(false);
     }
-  }, [auctions, auctionsLoading, fetchWonAuctions]);
+  }, [address, isConnected]); // Simplified dependencies
 
   // Calculate stats
   const totalValue = useMemo(() => {

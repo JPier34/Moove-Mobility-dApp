@@ -77,18 +77,18 @@ export default function AuctionGrid({
 
   // Auction type names
   const typeNames = {
-    [AuctionType.TRADITIONAL]: "Traditional",
     [AuctionType.ENGLISH]: "English",
     [AuctionType.DUTCH]: "Dutch",
     [AuctionType.SEALED_BID]: "Sealed Bid",
+    [AuctionType.RESERVE]: "Reserve",
   };
 
   // Type emojis
   const typeEmojis = {
-    [AuctionType.TRADITIONAL]: "🏛️",
     [AuctionType.ENGLISH]: "⬆️",
     [AuctionType.DUTCH]: "⬇️",
     [AuctionType.SEALED_BID]: "🔒",
+    [AuctionType.RESERVE]: "💰",
   };
 
   return (

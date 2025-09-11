@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 
+// Cache per evitare chiamate duplicate
+const ipfsCache = new Map<string, { data: any; timestamp: number }>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minuti
+
 const IPFS_GATEWAYS = [
   // Primary: Pinata (most reliable)
   "https://gateway.pinata.cloud/ipfs/",
@@ -38,6 +42,13 @@ export async function GET(request: NextRequest) {
   if (hash.includes("/ipfs/")) {
     ipfsHash = hash.split("/ipfs/")[1];
     console.log(`🔍 Extracted IPFS hash: ${ipfsHash} from URL: ${hash}`);
+  }
+
+  // Check cache first
+  const cached = ipfsCache.get(ipfsHash);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    console.log(`📦 Returning cached data for hash: ${ipfsHash}`);
+    return NextResponse.json(cached.data);
   }
 
   // Try each gateway
@@ -87,6 +98,12 @@ export async function GET(request: NextRequest) {
           );
           continue; // Try next gateway instead of returning error
         }
+
+        // Cache the successful response
+        ipfsCache.set(ipfsHash, {
+          data: jsonData,
+          timestamp: Date.now(),
+        });
 
         return new NextResponse(JSON.stringify(jsonData), {
           status: 200,

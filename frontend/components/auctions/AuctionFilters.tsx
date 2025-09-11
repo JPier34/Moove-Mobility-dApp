@@ -102,9 +102,6 @@ export default function AuctionFilters({
             className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-moove-primary focus:border-moove-primary"
           >
             <option value="all">Tutti i tipi</option>
-            <option value={AuctionType.TRADITIONAL.toString()}>
-              🏛️ Tradizionale
-            </option>
             <option value={AuctionType.ENGLISH.toString()}>⬆️ Inglese</option>
             <option value={AuctionType.DUTCH.toString()}>⬇️ Olandese</option>
             <option value={AuctionType.SEALED_BID.toString()}>

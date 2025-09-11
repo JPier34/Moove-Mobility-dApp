@@ -13,13 +13,25 @@ export interface ActiveBid {
 
 export interface WonAuction {
   auctionId: string;
-  nftName: string;
-  nftImage: string;
-  winningBid: string;
-  endTime: Date;
-  isClaimed: boolean;
-  claimDeadline: Date;
-  auctionType: AuctionType;
+  nftId: string;
+  name: string;
+  image: string;
+  category: string;
+  status: number;
+  hasImage: boolean;
+  hasName: boolean;
+  finalBid: number;
+  bidders: number;
+  isSettled: boolean;
+  endTime?: number;
+  transactionHash?: string;
+  // Legacy fields for compatibility
+  nftName?: string;
+  nftImage?: string;
+  winningBid?: string;
+  isClaimed?: boolean;
+  claimDeadline?: Date;
+  auctionType?: AuctionType;
 }
 
 export interface OwnedNFT {

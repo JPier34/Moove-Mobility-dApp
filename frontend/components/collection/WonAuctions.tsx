@@ -3,17 +3,8 @@
 import React, { useState, useEffect } from "react";
 import Button from "../ui/Button";
 import { AuctionType } from "../../types/auction";
-
-interface WonAuction {
-  auctionId: string;
-  nftName: string;
-  nftImage: string;
-  winningBid: string;
-  endTime: Date;
-  isClaimed: boolean;
-  claimDeadline: Date;
-  auctionType: AuctionType;
-}
+import { WonAuction } from "../../types/user";
+import AuctionClaimModal from "../auctions/AuctionClaimModal";
 
 interface WonAuctionsProps {
   auctions: WonAuction[];
@@ -21,6 +12,14 @@ interface WonAuctionsProps {
 
 export default function WonAuctions({ auctions }: WonAuctionsProps) {
   const [timeLeftMap, setTimeLeftMap] = useState<Record<string, string>>({});
+  const [showClaimModal, setShowClaimModal] = useState(false);
+
+  // Debug logging
+  console.log("🖼️ WonAuctions component received auctions:", auctions);
+  console.log("🖼️ WonAuctions auctions length:", auctions.length);
+  const [selectedAuction, setSelectedAuction] = useState<WonAuction | null>(
+    null
+  );
 
   // Calculate time remaining to claim
   useEffect(() => {
@@ -28,9 +27,9 @@ export default function WonAuctions({ auctions }: WonAuctionsProps) {
       const newTimeMap: Record<string, string> = {};
 
       auctions.forEach((auction) => {
-        if (!auction.isClaimed) {
+        if (!auction.isSettled) {
           const now = new Date().getTime();
-          const deadline = new Date(auction.claimDeadline).getTime();
+          const deadline = auction.endTime || now + 7 * 24 * 60 * 60 * 1000; // 7 days default
           const difference = deadline - now;
 
           if (difference > 0) {
@@ -60,8 +59,8 @@ export default function WonAuctions({ auctions }: WonAuctionsProps) {
 
   const handleClaimNFT = (auction: WonAuction) => {
     console.log("Claiming NFT from auction:", auction.auctionId);
-    // Navigate to auction page for claiming
-    window.location.href = `/auctions?auctionId=${auction.auctionId}&action=claim`;
+    setSelectedAuction(auction);
+    setShowClaimModal(true);
   };
 
   const handleViewAuction = (auctionId: string) => {
@@ -87,8 +86,11 @@ export default function WonAuctions({ auctions }: WonAuctionsProps) {
     );
   }
 
-  const unclaimedAuctions = auctions.filter((a) => !a.isClaimed);
-  const claimedAuctions = auctions.filter((a) => a.isClaimed);
+  // Consider CANCELLED auctions as settled if they have a winner
+  const unclaimedAuctions = auctions.filter(
+    (a) => !a.isSettled && a.status !== 3
+  );
+  const claimedAuctions = auctions.filter((a) => a.isSettled || a.status === 3);
 
   return (
     <div className="space-y-6">
@@ -129,14 +131,16 @@ export default function WonAuctions({ auctions }: WonAuctionsProps) {
 
                       <div>
                         <h4 className="font-semibold text-gray-900 mb-1">
-                          {auction.nftName}
+                          {auction.name}
                         </h4>
                         <div className="text-sm text-gray-500 mb-1">
                           Asta #{auction.auctionId} • Terminata{" "}
-                          {new Date(auction.endTime).toLocaleDateString()}
+                          {auction.endTime
+                            ? new Date(auction.endTime).toLocaleDateString()
+                            : "Unknown"}
                         </div>
                         <div className="text-lg font-bold text-green-600">
-                          Vinta per {auction.winningBid} ETH
+                          Vinta per {auction.finalBid} ETH
                         </div>
                       </div>
                     </div>
@@ -236,6 +240,21 @@ export default function WonAuctions({ auctions }: WonAuctionsProps) {
             ))}
           </div>
         </div>
+      )}
+
+      {/* Claim Modal */}
+      {selectedAuction && (
+        <AuctionClaimModal
+          isOpen={showClaimModal}
+          onClose={() => {
+            setShowClaimModal(false);
+            setSelectedAuction(null);
+          }}
+          auctionId={selectedAuction.auctionId}
+          auctionName={selectedAuction.name}
+          auctionImage={selectedAuction.image}
+          finalBid={selectedAuction.finalBid}
+        />
       )}
     </div>
   );

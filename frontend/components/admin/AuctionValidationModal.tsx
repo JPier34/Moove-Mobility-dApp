@@ -2,7 +2,8 @@
 
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { AuctionFormData, AuctionType } from "@/types/auction";
+import { AuctionType } from "@/types/auction";
+import { AuctionFormData } from "@/hooks/useAuctionValidation";
 import { validateBeforeTransaction } from "@/hooks/useAuctionValidation";
 import { ethers } from "ethers";
 

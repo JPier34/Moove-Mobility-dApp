@@ -8,6 +8,8 @@ import { contracts } from "@/utils/contracts";
 import { Auction, AuctionType } from "@/types/auction";
 import { useActiveAuctions } from "./useAuction";
 import { useSmartRefresh } from "./useSmartRefresh";
+import { useAutoFailedAuctionHandler } from "./useFailedAuctionHandler";
+// import { useAutoFailedAuctionHandler } from "./useFailedAuctionHandler"; // Temporarily disabled
 
 // ============================================================================
 // SECURE NFT-AUCTION FLOW ARCHITECTURE
@@ -837,13 +839,28 @@ async function fetchAuctionFromContractCorrected(
 }
 
 // 8. ENHANCED HOOK WITH SECURE NFT ID TRACKING AND COMPREHENSIVE ERROR HANDLING
-export function useAuctionsEnhanced(disableAutoRefresh = false) {
+export function useAuctionsEnhanced(
+  disableAutoRefresh = false,
+  disableFailedAuctionHandling = false
+) {
   const { address, isConnected } = useAccount();
   const { isMasterAdmin, canMint } = useUserRoles(address);
   const [auctions, setAuctions] = useState<Auction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastFetchTime, setLastFetchTime] = useState<number>(0);
+
+  // Temporarily disabled failed auction handling to prevent loops
+  // const {
+  //   checkAndHandleFailedAuctions,
+  //   isProcessing: isHandlingFailed,
+  //   processedCount,
+  // } = useAutoFailedAuctionHandler();
+
+  // Mock values for disabled failed auction handling
+  const checkAndHandleFailedAuctions = () => {};
+  const isHandlingFailed = false;
+  const processedCount = 0;
 
   const fetchCorrectedAuctions = useCallback(async () => {
     console.log("🚀 fetchCorrectedAuctions called");
@@ -908,11 +925,11 @@ export function useAuctionsEnhanced(disableAutoRefresh = false) {
 
       // Debug: Check status distribution
       const statusCounts = {
-        pending: validAuctions.filter((a) => a.status === 0).length,
-        active: validAuctions.filter((a) => a.status === 1).length,
-        ended: validAuctions.filter((a) => a.status === 2).length,
-        cancelled: validAuctions.filter((a) => a.status === 3).length,
-        claimed: validAuctions.filter((a) => a.status === 4).length,
+        pending: validAuctions.filter((a) => a.status === 0).length, // PENDING
+        active: validAuctions.filter((a) => a.status === 1).length, // ACTIVE
+        ended: validAuctions.filter((a) => a.status === 2).length, // ENDED
+        cancelled: validAuctions.filter((a) => a.status === 3).length, // CANCELLED
+        settled: validAuctions.filter((a) => a.status === 4).length, // SETTLED/CLAIMED
       };
 
       console.log(`📊 Status distribution after processing:`, statusCounts);
@@ -964,7 +981,7 @@ export function useAuctionsEnhanced(disableAutoRefresh = false) {
           image: a.nftImage,
           category: a.nftCategory,
           status: a.status,
-          statusName: ["PENDING", "ACTIVE", "ENDED", "CANCELLED", "CLAIMED"][
+          statusName: ["PENDING", "ACTIVE", "ENDED", "CANCELLED", "SETTLED"][
             a.status
           ],
         })),
@@ -972,13 +989,28 @@ export function useAuctionsEnhanced(disableAutoRefresh = false) {
 
       setAuctions(validAuctions);
       setLastFetchTime(Date.now());
+
+      // Temporarily disabled failed auction processing to prevent loops
+      // if (
+      //   !disableFailedAuctionHandling &&
+      //   isMasterAdmin &&
+      //   validAuctions.length > 0
+      // ) {
+      //   console.log(
+      //     "🔧 Admin detected - checking for failed auctions to handle"
+      //   );
+      //   // Small delay to ensure state is updated
+      //   setTimeout(() => {
+      //     checkAndHandleFailedAuctions(validAuctions);
+      //   }, 1000);
+      // }
     } catch (err) {
       console.error("Error fetching corrected auctions:", err);
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [isMasterAdmin]); // Removed failed auction dependencies to prevent loops
 
   // Use smart refresh hook for intelligent refresh management (only if not disabled)
   useSmartRefresh({
@@ -1108,13 +1140,16 @@ export function useAuctionsEnhanced(disableAutoRefresh = false) {
     stats,
     filters,
     setFilters,
-    isLoading,
+    isLoading: isLoading || isHandlingFailed,
     error,
     refetch: fetchCorrectedAuctions,
     refreshAuctionCache,
     lastFetchTime,
     isMasterAdmin,
     canMint,
+    // Failed auction handling info
+    isHandlingFailedAuctions: isHandlingFailed,
+    processedFailedAuctions: processedCount,
   };
 }
 
@@ -1122,7 +1157,7 @@ export function useAuctionsEnhanced(disableAutoRefresh = false) {
 export function getAuctionStatusDebug(auctionId: number) {
   return {
     auctionId,
-    statusNames: ["PENDING", "ACTIVE", "ENDED", "CANCELLED", "CLAIMED"],
+    statusNames: ["PENDING", "ACTIVE", "ENDED", "CANCELLED", "SETTLED"],
   };
 }
 

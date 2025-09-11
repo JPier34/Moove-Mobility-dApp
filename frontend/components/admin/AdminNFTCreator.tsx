@@ -97,27 +97,85 @@ function AdminNFTCreatorContent() {
   const [showFailureModal, setShowFailureModal] = useState(false);
   const [showValidationModal, setShowValidationModal] = useState(false);
 
-  // Check if NFT form is valid
-  const isNFTFormValid = useMemo(() => {
-    return !!(
-      nftData.name &&
-      nftData.description &&
-      nftData.image &&
-      nftData.name.trim().length > 0 &&
-      nftData.description.trim().length > 0
-    );
+  // Get individual field validation errors
+  const getFieldErrors = useMemo(() => {
+    const errors = {
+      name: [] as string[],
+      description: [] as string[],
+      image: [] as string[],
+    };
+
+    // Name validation
+    if (nftData.name) {
+      const name = nftData.name.trim();
+
+      if (name.length < 3) {
+        errors.name.push("Nome deve essere di almeno 3 caratteri");
+      }
+      if (name.length > 50) {
+        errors.name.push("Nome deve essere di massimo 50 caratteri");
+      }
+
+      const invalidChars = /[<>:"/\\|?*]/;
+      if (invalidChars.test(name)) {
+        errors.name.push("Nome contiene caratteri non validi");
+      }
+    }
+
+    // Description validation
+    if (nftData.description) {
+      const description = nftData.description.trim();
+
+      if (description.length < 10) {
+        errors.description.push(
+          "Descrizione deve essere di almeno 10 caratteri"
+        );
+      }
+      if (description.length > 500) {
+        errors.description.push(
+          "Descrizione deve essere di massimo 500 caratteri"
+        );
+      }
+    }
+
+    // Image validation
+    if (nftData.image) {
+      const validTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+
+      if (!validTypes.includes(nftData.image.type)) {
+        errors.image.push("Tipo immagine non supportato (PNG, JPG, GIF, WEBP)");
+      }
+    }
+
+    return errors;
   }, [nftData]);
 
-  // Check if there are any validation errors (exclude info messages)
+  // Get all validation errors for the summary display
+  const getAllValidationErrors = useMemo(() => {
+    const allErrors = [
+      ...getFieldErrors.name,
+      ...getFieldErrors.description,
+      ...getFieldErrors.image,
+    ];
+    return allErrors;
+  }, [getFieldErrors]);
+
+  // Check if NFT form is valid
+  const isNFTFormValid = useMemo(() => {
+    return (
+      getAllValidationErrors.length === 0 &&
+      nftData.name &&
+      nftData.description &&
+      nftData.image
+    );
+  }, [getAllValidationErrors, nftData]);
+
+  // Check if there are any validation errors
   const hasValidationErrors = useMemo(() => {
     if (!validationResult?.errors) return false;
 
-    // Only count errors and warnings, not info messages
-    const realErrors = validationResult.errors.filter(
-      (error: any) => error.severity === "error" || error.severity === "warning"
-    );
-
-    return realErrors.length > 0;
+    // useNFTValidationAPI returns errors as strings, not objects with severity
+    return validationResult.errors.length > 0;
   }, [validationResult]);
 
   // Check if all required fields are filled
@@ -941,9 +999,49 @@ function AdminNFTCreatorContent() {
             transition={{ duration: 0.4 }}
             className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6"
           >
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
-              NFT Details
-            </h2>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                NFT Details
+              </h2>
+              {/* Form validation status indicator */}
+              <div className="flex items-center space-x-2">
+                {isNFTFormValid ? (
+                  <div className="flex items-center text-green-600 dark:text-green-400">
+                    <svg
+                      className="w-5 h-5 mr-1"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                    <span className="text-sm font-medium">Valid form</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center text-amber-600 dark:text-amber-400">
+                    <svg
+                      className="w-5 h-5 mr-1"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
+                      />
+                    </svg>
+                    <span className="text-sm font-medium">Complete fields</span>
+                  </div>
+                )}
+              </div>
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* NFT Name */}
@@ -957,9 +1055,53 @@ function AdminNFTCreatorContent() {
                   onChange={(e) =>
                     setNftData((prev) => ({ ...prev, name: e.target.value }))
                   }
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500"
+                  className={`w-full px-4 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500 ${
+                    getFieldErrors.name.length > 0
+                      ? "border-red-500 focus:border-red-500"
+                      : "border-gray-300 dark:border-gray-600"
+                  }`}
                   placeholder="Enter NFT name"
                 />
+                {/* Name validation errors */}
+                {getFieldErrors.name.length > 0 && (
+                  <div className="mt-1 space-y-1">
+                    {getFieldErrors.name.map((error, index) => (
+                      <p
+                        key={index}
+                        className="text-sm text-red-600 dark:text-red-400"
+                      >
+                        {error}
+                      </p>
+                    ))}
+                  </div>
+                )}
+                {/* Name character count and validation status */}
+                {nftData.name && (
+                  <div className="mt-1 flex items-center justify-between">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {nftData.name.trim().length}/50 characters
+                    </p>
+                    {getFieldErrors.name.length === 0 &&
+                      nftData.name.trim().length >= 3 && (
+                        <div className="flex items-center text-green-600 dark:text-green-400">
+                          <svg
+                            className="w-4 h-4 mr-1"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M5 13l4 4L19 7"
+                            />
+                          </svg>
+                          <span className="text-xs">Valid</span>
+                        </div>
+                      )}
+                  </div>
+                )}
               </div>
 
               {/* Rarity */}
@@ -1000,9 +1142,53 @@ function AdminNFTCreatorContent() {
                     }))
                   }
                   rows={3}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500"
+                  className={`w-full px-4 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500 ${
+                    getFieldErrors.description.length > 0
+                      ? "border-red-500 focus:border-red-500"
+                      : "border-gray-300 dark:border-gray-600"
+                  }`}
                   placeholder="Enter NFT description"
                 />
+                {/* Description validation errors */}
+                {getFieldErrors.description.length > 0 && (
+                  <div className="mt-1 space-y-1">
+                    {getFieldErrors.description.map((error, index) => (
+                      <p
+                        key={index}
+                        className="text-sm text-red-600 dark:text-red-400"
+                      >
+                        {error}
+                      </p>
+                    ))}
+                  </div>
+                )}
+                {/* Description character count and validation status */}
+                {nftData.description && (
+                  <div className="mt-1 flex items-center justify-between">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {nftData.description.trim().length}/500 characters
+                    </p>
+                    {getFieldErrors.description.length === 0 &&
+                      nftData.description.trim().length >= 10 && (
+                        <div className="flex items-center text-green-600 dark:text-green-400">
+                          <svg
+                            className="w-4 h-4 mr-1"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M5 13l4 4L19 7"
+                            />
+                          </svg>
+                          <span className="text-xs">Valid</span>
+                        </div>
+                      )}
+                  </div>
+                )}
               </div>
 
               {/* Image Upload */}
@@ -1014,8 +1200,26 @@ function AdminNFTCreatorContent() {
                   type="file"
                   accept="image/*"
                   onChange={handleImageUpload}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500"
+                  className={`w-full px-4 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500 ${
+                    getFieldErrors.image.length > 0
+                      ? "border-red-500 focus:border-red-500"
+                      : "border-gray-300 dark:border-gray-600"
+                  }`}
                 />
+                {/* Image validation errors */}
+                {getFieldErrors.image.length > 0 && (
+                  <div className="mt-1 space-y-1">
+                    {getFieldErrors.image.map((error, index) => (
+                      <p
+                        key={index}
+                        className="text-sm text-red-600 dark:text-red-400"
+                      >
+                        {error}
+                      </p>
+                    ))}
+                  </div>
+                )}
+                {/* Image info */}
                 {nftData.image && (
                   <div className="mt-2">
                     <img
@@ -1023,30 +1227,109 @@ function AdminNFTCreatorContent() {
                       alt="Preview"
                       className="w-32 h-32 object-cover rounded-lg"
                     />
-                    <button
-                      onClick={removeImage}
-                      className="mt-2 text-red-600 hover:text-red-700 text-sm"
-                    >
-                      Remove Image
-                    </button>
+                    <div className="mt-2 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          {nftData.image.name} (
+                          {(nftData.image.size / 1024 / 1024).toFixed(2)} MB)
+                        </p>
+                        {getFieldErrors.image.length === 0 && (
+                          <div className="flex items-center text-green-600 dark:text-green-400">
+                            <svg
+                              className="w-4 h-4 mr-1"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M5 13l4 4L19 7"
+                              />
+                            </svg>
+                            <span className="text-xs">Valid</span>
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        onClick={removeImage}
+                        className="text-red-600 hover:text-red-700 text-sm"
+                      >
+                        Remove Image
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
             </div>
 
+            {/* Summary Validation Errors Display */}
+            {getAllValidationErrors.length > 0 && (
+              <div className="mb-6">
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                  <div className="flex items-start">
+                    <svg
+                      className="w-5 h-5 text-red-600 mt-0.5 mr-2"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    <div>
+                      <h3 className="text-sm font-medium text-red-800 dark:text-red-200 mb-2">
+                        Validation Errors Summary:
+                      </h3>
+                      <ul className="text-sm text-red-700 dark:text-red-300 space-y-1">
+                        {getAllValidationErrors.map((error, index) => (
+                          <li key={index} className="flex items-start">
+                            <span className="mr-2">•</span>
+                            <span>{error}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Action Buttons */}
             <div className="flex flex-col items-end space-y-2 mt-6">
-              {/* NFT Form Validation Status */}
+              {/* Required Fields Status */}
               {(!nftData.name || !nftData.description || !nftData.image) && (
-                <div className="text-sm text-red-600 dark:text-red-400 text-right">
-                  {!nftData.name && "Name is required"}
-                  {nftData.name &&
-                    !nftData.description &&
-                    "Description is required"}
-                  {nftData.name &&
-                    nftData.description &&
-                    !nftData.image &&
-                    "Image is required"}
+                <div className="text-sm text-amber-600 dark:text-amber-400 text-right">
+                  <div className="flex items-center justify-end space-x-2">
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
+                      />
+                    </svg>
+                    <span>
+                      {!nftData.name && "Required name"}
+                      {nftData.name &&
+                        !nftData.description &&
+                        "Required description"}
+                      {nftData.name &&
+                        nftData.description &&
+                        !nftData.image &&
+                        "Required image"}
+                    </span>
+                  </div>
                 </div>
               )}
 

@@ -15,6 +15,4 @@ export const config = getDefaultConfig({
       batchSize: 1024,
     },
   },
-  // Disable some features for faster loading
-  enableRainbowKit: true,
 });

@@ -1,12 +1,20 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  useRef,
+} from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useUserCollectionOptimized } from "@/hooks/useUserCollectionOptimized";
 import { useWalletPersistence } from "@/hooks/useWalletPersistence";
 import { useWonAuctionsManager } from "@/hooks/useWonAuctionsManager";
+import { useWonAuctions } from "@/hooks/useWonAuctions";
 import CongratulationsModal from "@/components/collection/CongratulationsModal";
+import WonAuctions from "@/components/collection/WonAuctions";
 import { toast } from "react-hot-toast";
 import OptimizedNFTImage from "@/components/collection/OptimizedNFTImage";
 
@@ -496,10 +504,10 @@ function EmptyState({ onRefresh }: { onRefresh: () => void }) {
       </p>
       <div className="space-x-4">
         <Link
-          href="/marketplace"
+          href="/auctions"
           className="inline-flex items-center px-6 py-3 bg-moove-primary hover:bg-moove-primary/90 text-white font-medium rounded-lg transition-colors"
         >
-          Browse Marketplace
+          Browse Auctions
         </Link>
         <button
           onClick={onRefresh}
@@ -526,6 +534,12 @@ export default function MyCollection() {
     handleCloseCongratulationsModal,
   } = useWonAuctionsManager();
 
+  // Won auctions that need claiming
+  const {
+    unsettledAuctions: wonAuctionsToClaim,
+    isLoading: wonAuctionsLoading,
+  } = useWonAuctions();
+
   const [filters, setFilters] = useState<FilterOptions>({
     rarity: "all",
     category: "all",
@@ -536,16 +550,54 @@ export default function MyCollection() {
   const [selectedNFT, setSelectedNFT] = useState<DecorativeNFT | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // Anti-loop mechanism
+  const [isDataReady, setIsDataReady] = useState(false);
+  const [displayTimeout, setDisplayTimeout] = useState<NodeJS.Timeout | null>(
+    null
+  );
+  const lastDataRef = useRef<string>("");
+  const renderCountRef = useRef(0);
+  const maxRendersRef = useRef(10); // Maximum number of renders before stopping
+
+  // Simplified anti-loop mechanism
+  useEffect(() => {
+    renderCountRef.current += 1;
+
+    // If we've exceeded max renders, stop the loop immediately
+    if (renderCountRef.current > maxRendersRef.current) {
+      console.warn("🛑 Maximum render count exceeded, stopping loop");
+      setIsDataReady(true);
+      return;
+    }
+
+    // Simple timeout to stabilize data
+    const timeout = setTimeout(() => {
+      console.log("✅ Data ready, showing collection");
+      setIsDataReady(true);
+    }, 2000); // 2 second delay for stability
+
+    return () => {
+      clearTimeout(timeout);
+    };
+  }, [wonAuctions.length, isLoading]); // Simplified dependencies
+
+  // Reset render count when data changes significantly
+  useEffect(() => {
+    if (wonAuctions.length === 0 && !isLoading) {
+      renderCountRef.current = 0;
+    }
+  }, [wonAuctions.length, isLoading]);
+
   // Handler functions
-  const handleViewDetails = (nft: DecorativeNFT) => {
+  const handleViewDetails = useCallback((nft: DecorativeNFT) => {
     setSelectedNFT(nft);
     setIsModalOpen(true);
-  };
+  }, []);
 
-  const handleCloseModal = () => {
+  const handleCloseModal = useCallback(() => {
     setIsModalOpen(false);
     setSelectedNFT(null);
-  };
+  }, []);
 
   // Convert won auctions to decorative NFTs format
   const decorativeNFTs: DecorativeNFT[] = useMemo(() => {
@@ -597,7 +649,7 @@ export default function MyCollection() {
   const hasItems = filteredDecorative.length > 0;
 
   // Show loading state
-  if (!isInitialized || isLoading) {
+  if (!isInitialized || isLoading || !isDataReady) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-moove-50 dark:from-gray-900 dark:to-gray-800">
         <div className="container mx-auto px-4 py-8">
@@ -606,11 +658,21 @@ export default function MyCollection() {
               <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
             </div>
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-              Loading Collection...
+              {!isDataReady
+                ? "Preparing Collection..."
+                : "Loading Collection..."}
             </h2>
             <p className="text-gray-600 dark:text-gray-400">
-              Fetching your NFT collection
+              {!isDataReady
+                ? "Stabilizing data to prevent loops..."
+                : "Fetching your NFT collection"}
             </p>
+            {renderCountRef.current > 5 && (
+              <p className="text-sm text-yellow-600 dark:text-yellow-400 mt-2">
+                ⚠️ Preventing excessive re-renders ({renderCountRef.current}/
+                {maxRendersRef.current})
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -677,7 +739,7 @@ export default function MyCollection() {
           </p>
 
           {/* Collection Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-4xl mx-auto">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
             <motion.div
               className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-gray-200/50 dark:border-gray-700/50"
               whileHover={{
@@ -738,29 +800,33 @@ export default function MyCollection() {
                 👑 Legendary
               </div>
             </motion.div>
-
-            <motion.div
-              className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-gray-200/50 dark:border-gray-700/50"
-              whileHover={{
-                y: -5,
-                boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
-              }}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 }}
-            >
-              <div className="text-3xl font-bold text-orange-600 mb-2">
-                {
-                  filteredDecorative.filter((nft) => nft.category === "sticker")
-                    .length
-                }
-              </div>
-              <div className="text-gray-600 dark:text-gray-300">
-                🏷️ Stickers
-              </div>
-            </motion.div>
           </div>
         </motion.div>
+
+        {/* Won Auctions Section */}
+        {wonAuctionsToClaim.length > 0 && (
+          <motion.div
+            className="mb-8"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6 }}
+          >
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-2xl p-6 mb-6">
+              <div className="flex items-center mb-4">
+                <div className="text-2xl mr-3">🏆</div>
+                <h2 className="text-xl font-semibold text-yellow-800 dark:text-yellow-200">
+                  Aste Vinte da Reclamare
+                </h2>
+              </div>
+              <p className="text-yellow-700 dark:text-yellow-300 mb-4">
+                Hai vinto {wonAuctionsToClaim.length} asta
+                {wonAuctionsToClaim.length > 1 ? "e" : ""} che richiedono di
+                essere reclamate.
+              </p>
+              <WonAuctions auctions={wonAuctionsToClaim} />
+            </div>
+          </motion.div>
+        )}
 
         {/* Filters */}
         <FilterBar

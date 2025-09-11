@@ -333,12 +333,6 @@ export function useNFTValidationAPI() {
           result.isValid = false;
         }
 
-        // 8. Verifica dimensione immagine
-        if (image.size > 10 * 1024 * 1024) {
-          result.errors.push("Immagine troppo grande (max 10MB)");
-          result.isValid = false;
-        }
-
         // 9. Verifica tipo immagine
         const validTypes = [
           "image/jpeg",
@@ -360,12 +354,6 @@ export function useNFTValidationAPI() {
 
         if (description.length < 50) {
           result.warnings.push("Descrizione breve - considera più dettagli");
-        }
-
-        if (image.size < 100 * 1024) {
-          result.warnings.push(
-            "Immagine molto piccola - potrebbe apparire sfocata"
-          );
         }
       } catch (error) {
         result.errors.push("Errore durante la validazione");

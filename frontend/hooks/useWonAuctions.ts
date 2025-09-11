@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAccount } from "wagmi";
 import { useAuctionsEnhanced } from "./enhanced-auction-utils";
+import { useTransactionTracker } from "./useTransactionTracker";
 
 export interface WonAuction {
   auctionId: string;
@@ -38,6 +39,9 @@ export function useWonAuctions(): UseWonAuctionsReturn {
     isLoading: auctionsLoading,
     refetch: refetchAuctions,
   } = useAuctionsEnhanced();
+
+  // Usa il transaction tracker per ottenere gli hash delle transazioni
+  const { getTransactionHash, isAuctionCompleted } = useTransactionTracker();
 
   const fetchWonAuctions = useCallback(async () => {
     if (!address || auctionsLoading) {
@@ -91,15 +95,21 @@ export function useWonAuctions(): UseWonAuctionsReturn {
         // Determina se l'asta è veramente finita (status 2, 3 o tempo scaduto)
         const isEnded = auction.status === 2;
         const isSettled = auction.status === 3;
+        const isCancelled = auction.status === 3; // CANCELLED can also be won auctions
         const isTimeExpired =
           auction.status === 1 &&
           auction.endTime &&
           new Date(auction.endTime).getTime() <= Date.now();
-        const isAuctionEnded = isEnded || isSettled || isTimeExpired;
+        const isAuctionEnded =
+          isEnded || isSettled || isCancelled || isTimeExpired;
 
         console.log(
           `🎉 User won auction ${auction.auctionId} (status: ${auction.status}, ended: ${isAuctionEnded})`
         );
+
+        // Get transaction hash from transaction tracker
+        const transactionHash = getTransactionHash(auction.auctionId);
+        const isCompleted = isAuctionCompleted(auction.auctionId);
 
         const wonAuction: WonAuction = {
           auctionId: auction.auctionId,
@@ -112,29 +122,47 @@ export function useWonAuctions(): UseWonAuctionsReturn {
           hasName: !!auction.nftName,
           finalBid: parseFloat(auction.currentBid) || 0,
           bidders: auction.bidCount || 0,
-          isSettled: auction.isSettled || auction.status === 3,
+          isSettled: auction.isSettled || auction.status === 3 || isCompleted,
           endTime: auction.endTime
             ? new Date(auction.endTime).getTime()
             : undefined,
-          transactionHash: auction.transactionHash,
+          transactionHash: transactionHash || auction.transactionHash,
         };
 
         wonAuctions.push(wonAuction);
       }
 
+      // Filter to show only settled auctions or auctions with confirmed transactions
+      // Status 4 = SETTLED, Status 3 = CANCELLED (but can be completed)
+      // Also include auctions with confirmed transaction hash
+      const confirmedAuctions = wonAuctions.filter(
+        (auction) =>
+          auction.status === 4 ||
+          (auction.status === 3 && auction.isSettled) ||
+          (auction.transactionHash && isAuctionCompleted(auction.auctionId))
+      );
+
       console.log(`🏆 User won ${wonAuctions.length} auctions`);
-      setWonAuctions(wonAuctions);
+      console.log(`📊 All won auctions:`, wonAuctions);
+      console.log(`✅ Confirmed auctions:`, confirmedAuctions);
+      setWonAuctions(confirmedAuctions);
     } catch (err) {
       console.error("❌ Error fetching won auctions:", err);
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
       setIsLoading(false);
     }
-  }, [address, auctions, auctionsLoading]);
+  }, [
+    address,
+    auctions,
+    auctionsLoading,
+    getTransactionHash,
+    isAuctionCompleted,
+  ]);
 
   useEffect(() => {
     fetchWonAuctions();
-  }, [fetchWonAuctions]);
+  }, [fetchWonAuctions]); // Use fetchWonAuctions as dependency since it's now properly memoized
 
   const unsettledAuctions = wonAuctions.filter((auction) => !auction.isSettled);
 
