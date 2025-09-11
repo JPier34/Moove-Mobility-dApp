@@ -231,16 +231,16 @@ export function useEndAuction() {
   };
 }
 
-export function useSettleAuction() {
+export function useClaimNFT() {
   const { writeMooveAuction, isPending, isConfirming, isSuccess, error } =
     useWriteMooveAuction();
 
-  const settleAuction = (auctionId: number) => {
-    writeMooveAuction("settleAuction", [auctionId]);
+  const claimNFT = (auctionId: number) => {
+    writeMooveAuction("claimNFT", [auctionId]);
   };
 
   return {
-    settleAuction,
+    claimNFT,
     isPending,
     isConfirming,
     isSuccess,

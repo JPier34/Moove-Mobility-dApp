@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useWonAuctions } from "./useWonAuctions";
-import { useSettleAuction, useStartRevealPhase } from "./useAuction";
+import { useSettleAuction } from "./useUserCollection";
+import { useStartRevealPhase } from "./useAuction";
 import { ethers } from "ethers";
 import { contracts } from "../utils/contracts";
 

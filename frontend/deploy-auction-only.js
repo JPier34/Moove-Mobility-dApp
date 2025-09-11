@@ -77,3 +77,4 @@ main()
     console.error("💥 Deployment script failed:", error);
     process.exit(1);
   });
+
