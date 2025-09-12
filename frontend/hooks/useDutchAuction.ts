@@ -256,10 +256,10 @@ export const useDutchAuction = () => {
           onSuccess();
         }
 
-        // Auto-refresh after 3 seconds
+        // Auto-refresh after 8 seconds to give more time to see the success modal
         setTimeout(() => {
           window.location.reload();
-        }, 3000);
+        }, 8000);
 
         return true;
       } catch (error: any) {

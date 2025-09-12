@@ -11,12 +11,13 @@ import { AuctionType } from "@/types/auction";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { ethers } from "ethers";
-import DynamicAuctionForm from "./DynamicAuctionForm";
+// import DynamicAuctionForm from "./DynamicAuctionForm"; // DISABLED: Uses old modular system
 import AuctionValidationModal from "./AuctionValidationModal";
 import {
-  useAuctionValidation,
+  useAuctionValidationModular,
   AuctionFormData,
-} from "@/hooks/useAuctionValidation";
+} from "@/hooks/useAuctionValidationModular";
+import { useAuctionFormValidation } from "@/hooks/useAuctionFormValidation";
 import { useUserRoles } from "@/hooks/useContract";
 
 interface NFTFormData {
@@ -64,9 +65,15 @@ export default function AdminNFTCreatorClean() {
   const { validateNFT, isValidating: isValidatingNFT } = useNFTValidationAPI();
   const { isConnected } = useWalletPersistence();
 
-  // Auction validation hook
-  const { formData: auctionFormData, isValid: isAuctionValid } =
-    useAuctionValidation();
+  // Auction validation hook (MODULAR)
+  const {
+    formData: auctionFormData,
+    isValid: isAuctionValid,
+    validateForTransaction,
+  } = useAuctionValidationModular();
+
+  // Form validation hook (MODULAR)
+  const { areRequiredFieldsFilled } = useAuctionFormValidation(auctionFormData);
 
   // State management
   const [step, setStep] = useState<"nft" | "auction">("nft");
@@ -137,6 +144,8 @@ export default function AdminNFTCreatorClean() {
         return;
       }
 
+      // Clear validation result when NFT validation passes
+      setValidationResult(null);
       toast.success("NFT validation passed! Configure auction settings.");
       setStep("auction");
     } catch (error) {
@@ -499,7 +508,12 @@ export default function AdminNFTCreatorClean() {
             transition={{ duration: 0.4 }}
             className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6"
           >
-            <DynamicAuctionForm onDataChange={handleAuctionDataChange} />
+            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-yellow-700">
+                ⚠️ DynamicAuctionForm temporarily disabled - uses old modular
+                system
+              </p>
+            </div>
 
             {/* Action Buttons */}
             <div className="flex justify-between mt-6">

@@ -214,7 +214,7 @@ export default function AuctionModal({
           console.log("Dutch auction purchase successful");
           setTimeout(() => {
             onClose();
-          }, 2000); // Close after 2 seconds to let user see the success
+          }, 5000); // Close after 5 seconds to let user see the success
         }
       );
 

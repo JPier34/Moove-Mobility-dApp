@@ -701,12 +701,18 @@ function calculateAuctionStatusFixed(auctionData: any): number {
     isBeforeEnd: currentTime < endTime,
   });
 
-  // Se il contratto dice che è cancellata/claimed, rispetta quello
-  if (contractStatus === 3 || contractStatus === 4) {
+  // Se il contratto dice che è cancellata/claimed, mappa correttamente
+  if (contractStatus === 3) {
     console.log(
-      `📋 Using contract status: ${contractStatus} (CANCELLED/CLAIMED)`
+      `📋 Contract status: ${contractStatus} (CANCELLED/DESERTA) -> Frontend: CANCELLED (5)`
     );
-    return contractStatus;
+    return 5; // CANCELLED nel frontend
+  }
+  if (contractStatus === 4) {
+    console.log(
+      `📋 Contract status: ${contractStatus} (SETTLED) -> Frontend: SETTLED (4)`
+    );
+    return 4; // SETTLED nel frontend
   }
 
   // Altrimenti calcola basato sui timestamp
@@ -720,7 +726,7 @@ function calculateAuctionStatusFixed(auctionData: any): number {
     return 1; // ACTIVE
   } else {
     console.log(`🏁 Auction has ended - ENDED`);
-    return 2; // ENDED
+    return 3; // ENDED nel frontend (non 2!)
   }
 }
 

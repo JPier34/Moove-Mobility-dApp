@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import { motion } from "framer-motion";
 import { useAccount } from "wagmi";
 import { useSecureNFTAuctionFlow } from "@/hooks/useSecureNFTAuction";
@@ -12,13 +12,15 @@ import { AuctionType } from "@/types/auction";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { ethers } from "ethers";
-import DynamicAuctionForm from "./DynamicAuctionForm";
+// import DynamicAuctionForm from "./DynamicAuctionForm"; // DISABLED: Uses old modular system
 import AuctionValidationModal from "./AuctionValidationModal";
 import { ErrorBoundary, useLastError } from "./ErrorBoundary";
+// Re-enabled with simple, safe modular hooks
 import {
-  useAuctionValidation,
+  useAuctionValidationModular,
   AuctionFormData,
-} from "@/hooks/useAuctionValidation";
+} from "@/hooks/useAuctionValidationModular";
+import { useAuctionFormValidation } from "@/hooks/useAuctionFormValidation";
 
 interface NFTFormData {
   name: string;
@@ -43,7 +45,85 @@ function AdminNFTCreatorContent() {
   const { canMint, isMasterAdmin, isLoading } = useUserRoles(address);
   const { error: lastError, clearError } = useLastError();
 
-  // Secure NFT-Auction flow hook
+  // Master admin wallet - always has access
+  const MASTER_WALLET = "0x777382955f33Bb8540602E914D9b650C962EF6Cc";
+  const isMasterWallet = address?.toLowerCase() === MASTER_WALLET.toLowerCase();
+  const hasAdminAccess = isMasterWallet || canMint || isMasterAdmin;
+
+  // ALL EARLY RETURNS BEFORE ANY OTHER HOOKS
+  if (lastError) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-6 mb-6">
+            <h2 className="text-xl font-bold text-red-900 dark:text-red-300 mb-4">
+              🚨 Last Error Detected
+            </h2>
+            <div className="space-y-2 text-sm">
+              <p>
+                <strong>Time:</strong> {lastError.timestamp}
+              </p>
+              <p>
+                <strong>Error:</strong> {lastError.error.message}
+              </p>
+              <p>
+                <strong>Name:</strong> {lastError.error.name}
+              </p>
+              {lastError.error.stack && (
+                <details className="mt-2">
+                  <summary className="cursor-pointer font-medium">
+                    Stack Trace
+                  </summary>
+                  <pre className="mt-2 p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs overflow-auto">
+                    {lastError.error.stack}
+                  </pre>
+                </details>
+              )}
+            </div>
+            <div className="flex space-x-2 mt-4">
+              <button
+                onClick={clearError}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              >
+                Clear Error & Continue
+              </button>
+              <button
+                onClick={() => window.location.reload()}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+              >
+                Reload Page
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-purple-600"></div>
+      </div>
+    );
+  }
+
+  if (!hasAdminAccess) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+            Access Denied
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400">
+            You don't have permission to access this page.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // All other hooks AFTER early returns
   const {
     executeFlow: executeSecureFlow,
     isProcessing: isSecureProcessing,
@@ -51,11 +131,6 @@ function AdminNFTCreatorContent() {
     result: secureResult,
     error: secureError,
   } = useSecureNFTAuctionFlow();
-
-  // Master admin wallet - always has access
-  const MASTER_WALLET = "0x777382955f33Bb8540602E914D9b650C962EF6Cc";
-  const isMasterWallet = address?.toLowerCase() === MASTER_WALLET.toLowerCase();
-  const hasAdminAccess = isMasterWallet || canMint || isMasterAdmin;
 
   const router = useRouter();
   const {
@@ -66,15 +141,21 @@ function AdminNFTCreatorContent() {
   const { validateNFT, isValidating: isValidatingNFT } = useNFTValidationAPI();
   const { isConnected } = useWalletPersistence();
 
-  // Auction validation hook
+  // Auction validation hooks (MODULAR - SIMPLIFIED)
   const {
     formData: auctionFormData,
     isValid: isAuctionValid,
     updateField,
-  } = useAuctionValidation();
+    validateForTransaction,
+  } = useAuctionValidationModular();
 
-  // State management
+  const { areRequiredFieldsFilled, getValidationSummary } =
+    useAuctionFormValidation(auctionFormData);
+
+  // SIMPLIFIED State management for debugging
   const [step, setStep] = useState<"nft" | "auction">("nft");
+
+  // NFT Form Data State (RESTORED - was missing!)
   const [nftData, setNftData] = useState<NFTFormData>({
     name: "",
     description: "",
@@ -89,13 +170,18 @@ function AdminNFTCreatorContent() {
       allowSizeChange: false,
       allowEffectsChange: false,
       availableColors: [],
-      maxTextLength: "100",
+      maxTextLength: "50",
     },
   });
 
-  const [validationResult, setValidationResult] = useState<any>(null);
-  const [showFailureModal, setShowFailureModal] = useState(false);
+  // Modal states (RESTORED - were missing!)
   const [showValidationModal, setShowValidationModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showFailureModal, setShowFailureModal] = useState(false);
+
+  // Validation and success data states (RESTORED - were missing!)
+  const [validationResult, setValidationResult] = useState<any>(null);
+  const [successData, setSuccessData] = useState<any>(null);
 
   // Get individual field validation errors
   const getFieldErrors = useMemo(() => {
@@ -178,32 +264,7 @@ function AdminNFTCreatorContent() {
     return validationResult.errors.length > 0;
   }, [validationResult]);
 
-  // Check if all required fields are filled
-  const areRequiredFieldsFilled = useMemo(() => {
-    // Basic check for required fields based on auction type
-    const requiredFields = ["startPrice", "duration", "bidIncrement"];
-
-    // Dutch auctions don't need buyNowPrice (price decreases automatically)
-    // English and Traditional auctions need buyNowPrice
-    if (
-      auctionFormData.auctionType === AuctionType.ENGLISH ||
-      auctionFormData.auctionType === AuctionType.RESERVE
-    ) {
-      requiredFields.push("buyNowPrice");
-    }
-
-    // Check required fields
-    for (const field of requiredFields) {
-      const value = auctionFormData[field as keyof AuctionFormData];
-      if (!value || (typeof value === "string" && value.trim() === "")) {
-        return false;
-      }
-    }
-
-    return true;
-  }, [auctionFormData]);
-
-  // Overall validation state
+  // Overall validation state (MODULAR)
   const isFormCompletelyValid = useMemo(() => {
     return (
       isNFTFormValid &&
@@ -217,80 +278,6 @@ function AdminNFTCreatorContent() {
     hasValidationErrors,
     areRequiredFieldsFilled,
   ]);
-
-  // Show last error if available
-  if (lastError) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-6 mb-6">
-            <h2 className="text-xl font-bold text-red-900 dark:text-red-300 mb-4">
-              🚨 Last Error Detected
-            </h2>
-            <div className="space-y-2 text-sm">
-              <p>
-                <strong>Time:</strong> {lastError.timestamp}
-              </p>
-              <p>
-                <strong>Error:</strong> {lastError.error.message}
-              </p>
-              <p>
-                <strong>Name:</strong> {lastError.error.name}
-              </p>
-              {lastError.error.stack && (
-                <details className="mt-2">
-                  <summary className="cursor-pointer font-medium">
-                    Stack Trace
-                  </summary>
-                  <pre className="mt-2 p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs overflow-auto">
-                    {lastError.error.stack}
-                  </pre>
-                </details>
-              )}
-            </div>
-            <div className="flex space-x-2 mt-4">
-              <button
-                onClick={clearError}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-              >
-                Clear Error & Continue
-              </button>
-              <button
-                onClick={() => window.location.reload()}
-                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-              >
-                Reload Page
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Access control
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-purple-600"></div>
-      </div>
-    );
-  }
-
-  if (!hasAdminAccess) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-            Access Denied
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            You don't have permission to access this page.
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   // Image upload handler
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -338,6 +325,8 @@ function AdminNFTCreatorContent() {
         return;
       }
 
+      // Clear validation result when NFT validation passes
+      setValidationResult(null);
       toast.success("NFT validation passed! Configure auction settings.");
       setStep("auction");
     } catch (error) {
@@ -533,7 +522,7 @@ function AdminNFTCreatorContent() {
       });
 
       if (auctionFormData.auctionType === AuctionType.DUTCH) {
-        // Dutch auctions: reservePrice must be > 0 and < startPrice
+        // Dutch auctions: reservePrice is optional, but if provided must be < startPrice
         console.log("🔧 Dutch auction detected, processing reserve price...");
         if (
           auctionFormData.reservePrice &&
@@ -552,20 +541,18 @@ function AdminNFTCreatorContent() {
               ethers.formatEther(reservePrice)
             );
           } else {
-            // If user's reserve price is >= start price, use 50% of start price
-            reservePrice = startPriceWei / 2n;
+            // If user's reserve price is >= start price, set to 0 (no reserve)
+            reservePrice = 0n;
             console.warn(
-              "⚠️ User's reserve price >= start price, using 50% of start price"
+              "⚠️ User's reserve price >= start price, setting to 0 (no reserve)"
             );
           }
         } else {
-          // Set a default reserve price that's 50% of start price
-          console.log("🔧 No valid reserve price provided, using default...");
-          reservePrice = startPriceWei / 2n;
+          // No reserve price provided - allowed for Dutch auctions
           console.log(
-            "✅ Using default reserve price (50% of start):",
-            ethers.formatEther(reservePrice)
+            "🔧 No reserve price provided - allowed for Dutch auctions"
           );
+          reservePrice = 0n;
         }
       } else if (auctionFormData.auctionType === AuctionType.ENGLISH) {
         // English auctions: reservePrice is optional but must be > startPrice if provided
@@ -789,52 +776,12 @@ function AdminNFTCreatorContent() {
         bidIncrement: ethers.formatEther(auctionParams.bidIncrement),
       });
 
-      // Type-specific validation
-      if (auctionFormData.auctionType === AuctionType.DUTCH) {
-        const isValidDutch =
-          auctionParams.reservePrice > 0n &&
-          auctionParams.reservePrice < auctionParams.startPrice &&
-          auctionParams.buyNowPrice === auctionParams.reservePrice; // buyNowPrice should equal reservePrice for Dutch
-
-        console.log("🔍 Dutch auction validation:", {
-          reservePrice: ethers.formatEther(auctionParams.reservePrice),
-          buyNowPrice: ethers.formatEther(auctionParams.buyNowPrice),
-          reserveLessThanStart:
-            auctionParams.reservePrice < auctionParams.startPrice,
-          buyNowEqualsReserve:
-            auctionParams.buyNowPrice === auctionParams.reservePrice,
-          isValid: isValidDutch,
-        });
-
-        if (!isValidDutch) {
-          throw new Error(
-            "Dutch auction validation failed: reservePrice must be > 0 and < startPrice, and buyNowPrice must equal reservePrice"
-          );
-        }
-      } else if (
-        auctionFormData.auctionType === AuctionType.ENGLISH ||
-        auctionFormData.auctionType === AuctionType.SEALED_BID ||
-        auctionFormData.auctionType === AuctionType.RESERVE
-      ) {
-        // For other auction types, if reservePrice is provided, it must be > startPrice
-        if (
-          auctionParams.reservePrice > 0n &&
-          auctionParams.reservePrice <= auctionParams.startPrice
-        ) {
-          throw new Error(
-            `${auctionFormData.auctionType} auction validation failed: reservePrice must be greater than startPrice`
-          );
-        }
-
-        // For other auction types, if buyNowPrice is provided, it must be > startPrice
-        if (
-          auctionParams.buyNowPrice > 0n &&
-          auctionParams.buyNowPrice <= auctionParams.startPrice
-        ) {
-          throw new Error(
-            `${auctionFormData.auctionType} auction validation failed: buyNowPrice must be greater than startPrice`
-          );
-        }
+      // Pre-transaction validation (MODULAR)
+      const transactionValidation = validateForTransaction();
+      if (!transactionValidation.isValid) {
+        throw new Error(
+          transactionValidation.error || "Transaction validation failed"
+        );
       }
 
       // Execute secure flow
@@ -889,8 +836,14 @@ function AdminNFTCreatorContent() {
           JSON.stringify(nftCreationData)
         );
 
-        // Navigate to success page
-        router.push(`/admin/nft-success/${secureResult.nft.transactionHash}`);
+        // Show success modal first
+        setSuccessData(nftCreationData);
+        setShowSuccessModal(true);
+
+        // Navigate to success page after 3 seconds
+        setTimeout(() => {
+          router.push(`/admin/nft-success/${secureResult.nft.transactionHash}`);
+        }, 3000);
       } else {
         console.log("⚠️ No secure result, but no error either");
         toast.success("NFT and auction created! Check the auctions page.");
@@ -917,7 +870,10 @@ function AdminNFTCreatorContent() {
     (data: AuctionFormData) => {
       // Update each field in the hook to trigger re-render
       Object.entries(data).forEach(([key, value]) => {
-        updateField(key as keyof AuctionFormData, value);
+        updateField(
+          key as keyof AuctionFormData,
+          value as string | AuctionType
+        );
       });
     },
     [updateField]
@@ -1365,7 +1321,12 @@ function AdminNFTCreatorContent() {
             transition={{ duration: 0.4 }}
             className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6"
           >
-            <DynamicAuctionForm onDataChange={handleAuctionDataChange} />
+            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-yellow-700">
+                ⚠️ DynamicAuctionForm temporarily disabled - uses old modular
+                system
+              </p>
+            </div>
 
             {/* Action Buttons */}
             <div className="flex justify-between mt-6">
@@ -1473,6 +1434,74 @@ function AdminNFTCreatorContent() {
                   className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
                 >
                   Try Again
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* NFT Creation Success Modal */}
+        {showSuccessModal && successData && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 max-w-md w-full mx-4">
+              <div className="text-center">
+                <div className="w-16 h-16 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg
+                    className="w-8 h-8 text-green-600 dark:text-green-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M5 13l4 4L19 7"
+                    />
+                  </svg>
+                </div>
+
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                  🎉 NFT Created Successfully!
+                </h3>
+
+                <div className="space-y-3 text-sm text-gray-600 dark:text-gray-300 mb-6">
+                  <div className="flex justify-between">
+                    <span>Token ID:</span>
+                    <span className="font-mono font-semibold">
+                      #{successData.tokenId}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Auction ID:</span>
+                    <span className="font-mono font-semibold">
+                      #{successData.auctionId}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Transaction:</span>
+                    <span className="font-mono text-xs">
+                      {successData.transactionHash.slice(0, 8)}...
+                    </span>
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 mb-6">
+                  <p className="text-sm text-blue-800 dark:text-blue-200">
+                    Redirecting to success page in 3 seconds...
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => {
+                    setShowSuccessModal(false);
+                    router.push(
+                      `/admin/nft-success/${successData.transactionHash}`
+                    );
+                  }}
+                  className="w-full bg-purple-600 text-white py-3 px-6 rounded-lg hover:bg-purple-700 transition-colors font-semibold"
+                >
+                  View Full Details →
                 </button>
               </div>
             </div>

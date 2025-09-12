@@ -5,7 +5,11 @@ import { motion } from "framer-motion";
 import { useWalletPersistence } from "@/hooks/useWalletPersistence";
 import { useUserRoles } from "@/hooks/useContract";
 // import { useAuctionsEnhanced } from "@/hooks/enhanced-auction-utils"; // Temporarily disabled
-import AdminNFTCreator from "@/components/admin/AdminNFTCreator";
+// import AdminNFTCreator from "@/components/admin/AdminNFTCreator"; // CORROTTO - NON FUNZIONA
+// import AdminNFTCreatorMinimal from "@/components/admin/AdminNFTCreatorMinimal";
+// import AdminNFTCreatorWorking from "@/components/admin/AdminNFTCreatorWorking"; // ANCHE QUESTO DA ERRORE
+import AdminNFTCreatorUltraSimple from "@/components/admin/AdminNFTCreatorUltraSimple";
+// import AdminNFTCreatorDebug from "@/components/admin/AdminNFTCreatorDebug";
 import AdminGuard from "@/components/admin/AdminGuard";
 import AuctionTypeTester from "@/components/admin/AuctionTypeTester";
 import AuctionStatusChecker from "@/components/debug/AuctionStatusChecker";
@@ -121,7 +125,7 @@ export default function AdminPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.4 }}
           >
-            <AdminNFTCreator />
+            <AdminNFTCreatorUltraSimple />
           </motion.div>
 
           {/* Auction Type Tester */}

@@ -249,11 +249,13 @@ function validateAuctionParams(params: AuctionParams): void {
 
   // DUTCH AUCTION (tipo 1)
   if (params.auctionType === 1) {
-    // Reserve price deve essere < start price
-    if (params.reservePrice >= params.startPrice) {
-      throw new Error("Dutch auction reserve price must be < start price");
+    // Reserve price è opzionale, ma se fornito deve essere < start price
+    if (params.reservePrice > 0n && params.reservePrice >= params.startPrice) {
+      throw new Error(
+        "Dutch auction reserve price must be < start price (or 0 for no reserve)"
+      );
     }
-    // BuyNowPrice deve essere uguale a reservePrice
+    // BuyNowPrice deve essere uguale a reservePrice per Dutch auctions
     if (params.buyNowPrice !== params.reservePrice) {
       throw new Error("Dutch auction buyNowPrice must equal reservePrice");
     }

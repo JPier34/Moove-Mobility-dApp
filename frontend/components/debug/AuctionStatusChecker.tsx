@@ -76,9 +76,10 @@ export default function AuctionStatusChecker({
     const statusNames = {
       0: "PENDING",
       1: "ACTIVE",
-      2: "ENDED",
-      3: "CANCELLED",
+      2: "REVEAL", // Per sealed bid auctions
+      3: "ENDED",
       4: "SETTLED",
+      5: "CANCELLED",
     };
     return statusNames[status as keyof typeof statusNames] || "UNKNOWN";
   };
@@ -160,4 +161,3 @@ export default function AuctionStatusChecker({
     </div>
   );
 }
-

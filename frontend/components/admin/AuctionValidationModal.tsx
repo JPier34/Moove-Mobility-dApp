@@ -3,8 +3,7 @@
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AuctionType } from "@/types/auction";
-import { AuctionFormData } from "@/hooks/useAuctionValidation";
-import { validateBeforeTransaction } from "@/hooks/useAuctionValidation";
+import { AuctionFormData } from "@/hooks/useAuctionValidationModular";
 import { ethers } from "ethers";
 
 interface AuctionValidationModalProps {
@@ -40,7 +39,14 @@ export default function AuctionValidationModal({
   const runValidation = async () => {
     setIsValidating(true);
     try {
-      const result = await validateBeforeTransaction(formData, address);
+      // Simple validation for now - just check required fields
+      const isValid = !!(formData.startPrice && formData.duration);
+      const result = {
+        isValid,
+        error: isValid
+          ? undefined
+          : "Missing required fields (startPrice, duration)",
+      };
       setValidationResult(result);
     } catch (error) {
       setValidationResult({

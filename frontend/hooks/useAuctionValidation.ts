@@ -71,7 +71,7 @@ const AUCTION_TYPE_RULES = {
       },
       bidIncrement: {
         min: 0.0000001, // Very small minimum for price decrease rate
-        max: 0.01, // Maximum decrease rate (1% of start price - more reasonable)
+        max: 0.1, // Increased max to allow more flexibility (10% of start price)
         required: true,
       },
     },
