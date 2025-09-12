@@ -23,9 +23,11 @@ export function useTransactionTracker() {
   >(new Map());
 
   const addTransaction = useCallback((data: TransactionData) => {
+    console.log(`📝 Adding transaction:`, data);
     setTransactions((prev) => {
       const newMap = new Map(prev);
       newMap.set(data.hash, data);
+      console.log(`📝 Total transactions tracked:`, newMap.size);
       return newMap;
     });
   }, []);
@@ -93,6 +95,10 @@ export function useTransactionTracker() {
   const getTransactionHash = useCallback(
     (auctionId: string) => {
       const latestTx = getLatestTransactionByAuction(auctionId);
+      console.log(
+        `🔍 Looking for transaction for auction ${auctionId}:`,
+        latestTx?.hash || "Not found"
+      );
       return latestTx?.hash;
     },
     [getLatestTransactionByAuction]

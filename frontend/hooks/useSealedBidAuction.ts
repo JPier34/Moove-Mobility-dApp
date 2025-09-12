@@ -230,3 +230,4 @@ export function useSealedBidAuction(): SealedBidAuctionHandler {
     bidHash,
   };
 }
+

@@ -145,6 +145,19 @@ export function useWonAuctions(): UseWonAuctionsReturn {
       console.log(`🏆 User won ${wonAuctions.length} auctions`);
       console.log(`📊 All won auctions:`, wonAuctions);
       console.log(`✅ Confirmed auctions:`, confirmedAuctions);
+
+      // Debug transaction tracking
+      console.log(`🔍 Transaction tracking debug:`);
+      wonAuctions.forEach((auction) => {
+        const transactionHash = getTransactionHash(auction.auctionId);
+        const isCompleted = isAuctionCompleted(auction.auctionId);
+        console.log(`  Auction ${auction.auctionId}:`, {
+          transactionHash,
+          isCompleted,
+          status: auction.status,
+          isSettled: auction.isSettled,
+        });
+      });
       setWonAuctions(confirmedAuctions);
     } catch (err) {
       console.error("❌ Error fetching won auctions:", err);

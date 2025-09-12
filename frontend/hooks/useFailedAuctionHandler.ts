@@ -190,3 +190,4 @@ export function useAutoFailedAuctionHandler() {
     processedCount: processedAuctions.size,
   };
 }
+
