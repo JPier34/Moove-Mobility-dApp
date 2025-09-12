@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 
 interface OptimizedNFTImageProps {
   src: string;
   alt: string;
   className?: string;
+  containerClassName?: string;
   fallbackIcon?: string;
   category?: string;
 }
@@ -15,6 +16,7 @@ export default function OptimizedNFTImage({
   src,
   alt,
   className = "w-full h-full object-cover",
+  containerClassName = "relative h-48 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 overflow-hidden",
   fallbackIcon,
   category = "sticker",
 }: OptimizedNFTImageProps) {
@@ -89,10 +91,7 @@ export default function OptimizedNFTImage({
   };
 
   return (
-    <div
-      ref={imgRef}
-      className="relative h-48 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 overflow-hidden"
-    >
+    <div ref={imgRef} className={containerClassName}>
       {isInView && (
         <>
           {!hasError &&

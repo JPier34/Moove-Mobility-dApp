@@ -87,7 +87,7 @@ function NFTDetailsModal({ nft, isOpen, onClose }: NFTDetailsModalProps) {
 
       {/* Modal */}
       <motion.div
-        className="relative bg-white dark:bg-gray-800 rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+        className="relative bg-white dark:bg-gray-800 rounded-3xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.9, opacity: 0 }}
@@ -97,7 +97,7 @@ function NFTDetailsModal({ nft, isOpen, onClose }: NFTDetailsModalProps) {
         <div className="p-6 border-b border-gray-200/50 dark:border-gray-700/50">
           <div className="flex items-center justify-between">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-              NFT Details
+              NFT Details:
             </h2>
             <button
               onClick={onClose}
@@ -110,22 +110,21 @@ function NFTDetailsModal({ nft, isOpen, onClose }: NFTDetailsModalProps) {
 
         {/* Content */}
         <div className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Image */}
-            <div className="space-y-4">
-              <div className="aspect-square rounded-2xl overflow-hidden bg-gray-100 dark:bg-gray-700">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Image - Takes more space */}
+            <div className="lg:col-span-2 space-y-4">
+              <div className="flex justify-center items-center aspect-square rounded-2xl overflow-hidden bg-gray-100 dark:bg-gray-700">
                 <OptimizedNFTImage
                   src={nft.image}
                   alt={nft.name}
                   category={nft.category}
+                  containerClassName="relative w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 overflow-hidden"
+                  className="w-full h-full object-contain"
                 />
               </div>
 
               {/* Rarity Badge */}
               <div className="flex items-center justify-center space-x-2">
-                <div
-                  className={`w-4 h-4 rounded-full bg-gradient-to-r ${rarityConfig.gradient}`}
-                />
                 <span className="text-lg font-semibold text-gray-700 dark:text-gray-300">
                   {rarityConfig.emoji} {nft.rarity.toUpperCase()}
                 </span>

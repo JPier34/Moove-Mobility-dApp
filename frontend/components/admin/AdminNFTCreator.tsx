@@ -841,14 +841,22 @@ function AdminNFTCreatorContent() {
       console.log("🚀 Executing secure flow...");
       await executeSecureFlow(mintParams, auctionParams);
 
-      // Wait for result
-      console.log("⏳ Waiting for result...");
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Wait for processing to complete instead of fixed timeout
+      console.log("⏳ Waiting for processing to complete...");
+      let attempts = 0;
+      const maxAttempts = 50; // 5 seconds max (50 * 100ms)
+
+      while (isSecureProcessing && attempts < maxAttempts) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        attempts++;
+        console.log(`⏳ Processing check ${attempts}/${maxAttempts}...`);
+      }
 
       console.log("📊 Secure flow result:", {
         secureResult,
         secureError,
         isSecureProcessing,
+        attempts,
       });
 
       if (secureResult) {

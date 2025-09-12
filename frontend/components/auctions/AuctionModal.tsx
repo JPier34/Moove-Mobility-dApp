@@ -205,17 +205,21 @@ export default function AuctionModal({
 
     setIsSubmittingBid(true);
     try {
-      // Use the unified auction handler for Dutch auction
-      const result = await handleAuctionAction(
-        auction,
-        "buyNow",
-        currentDutchPrice
+      // Use the direct Dutch auction handler to show success modal
+      const success = await handleDutchAuction(
+        parseInt(auction.auctionId),
+        parseFloat(currentDutchPrice),
+        () => {
+          // Success callback - close the auction modal after Dutch success modal
+          console.log("Dutch auction purchase successful");
+          setTimeout(() => {
+            onClose();
+          }, 2000); // Close after 2 seconds to let user see the success
+        }
       );
 
-      if (result.success) {
-        onClose();
-      } else {
-        toast.error(result.error || "Error processing purchase");
+      if (!success) {
+        toast.error("Error processing Dutch auction purchase");
       }
     } catch (error) {
       console.error("Error buying:", error);

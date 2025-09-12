@@ -86,11 +86,13 @@ export default function WonAuctions({ auctions }: WonAuctionsProps) {
     );
   }
 
-  // Consider CANCELLED auctions as settled if they have a winner
+  // Filter auctions based on correct status logic
+  // Status 4 = SETTLED (NFT trasferito al vincitore)
+  // Status 3 = CANCELLED/DESERTA (NFT torna al seller/admin)
   const unclaimedAuctions = auctions.filter(
-    (a) => !a.isSettled && a.status !== 3
+    (a) => !a.isSettled && a.status !== 4
   );
-  const claimedAuctions = auctions.filter((a) => a.isSettled || a.status === 3);
+  const claimedAuctions = auctions.filter((a) => a.isSettled || a.status === 4);
 
   return (
     <div className="space-y-6">

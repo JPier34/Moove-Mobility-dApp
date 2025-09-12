@@ -61,9 +61,9 @@ export function useWonAuctions(): UseWonAuctionsReturn {
           auction.highestBidder &&
           auction.highestBidder.toLowerCase() === address.toLowerCase();
 
-        // Considera l'asta "ended" se status === 2 (ENDED) OPPURE status === 3 (SETTLED) OPPURE se status === 1 ma tempo scaduto
+        // Considera l'asta "ended" se status === 2 (ENDED) OPPURE status === 4 (SETTLED) OPPURE se status === 1 ma tempo scaduto
         const isEnded = auction.status === 2;
-        const isSettled = auction.status === 3;
+        const isSettled = auction.status === 4; // Solo status 4 è settled per vincitori
         const isTimeExpired =
           auction.status === 1 &&
           auction.endTime &&
@@ -92,16 +92,14 @@ export function useWonAuctions(): UseWonAuctionsReturn {
       const wonAuctions: WonAuction[] = [];
 
       for (const auction of userWonAuctions) {
-        // Determina se l'asta è veramente finita (status 2, 3 o tempo scaduto)
+        // Determina se l'asta è veramente finita (status 2, 4 o tempo scaduto)
         const isEnded = auction.status === 2;
-        const isSettled = auction.status === 3;
-        const isCancelled = auction.status === 3; // CANCELLED can also be won auctions
+        const isSettled = auction.status === 4; // Solo status 4 è settled per vincitori
         const isTimeExpired =
           auction.status === 1 &&
           auction.endTime &&
           new Date(auction.endTime).getTime() <= Date.now();
-        const isAuctionEnded =
-          isEnded || isSettled || isCancelled || isTimeExpired;
+        const isAuctionEnded = isEnded || isSettled || isTimeExpired;
 
         console.log(
           `🎉 User won auction ${auction.auctionId} (status: ${auction.status}, ended: ${isAuctionEnded})`
@@ -122,7 +120,7 @@ export function useWonAuctions(): UseWonAuctionsReturn {
           hasName: !!auction.nftName,
           finalBid: parseFloat(auction.currentBid) || 0,
           bidders: auction.bidCount || 0,
-          isSettled: auction.isSettled || auction.status === 3 || isCompleted,
+          isSettled: auction.isSettled || auction.status === 4 || isCompleted, // Solo status 4 è settled per vincitori
           endTime: auction.endTime
             ? new Date(auction.endTime).getTime()
             : undefined,
@@ -132,13 +130,13 @@ export function useWonAuctions(): UseWonAuctionsReturn {
         wonAuctions.push(wonAuction);
       }
 
-      // Filter to show only settled auctions or auctions with confirmed transactions
-      // Status 4 = SETTLED, Status 3 = CANCELLED (but can be completed)
-      // Also include auctions with confirmed transaction hash
+      // Filter to show only properly settled auctions
+      // Status 4 = SETTLED (NFT trasferito al vincitore)
+      // Status 3 = CANCELLED/DESERTA (NFT torna al seller/admin)
+      // Solo includere aste con status 4 per vincitori, status 3 per seller
       const confirmedAuctions = wonAuctions.filter(
         (auction) =>
-          auction.status === 4 ||
-          (auction.status === 3 && auction.isSettled) ||
+          auction.status === 4 || // Solo aste completamente settled per vincitori
           (auction.transactionHash && isAuctionCompleted(auction.auctionId))
       );
 

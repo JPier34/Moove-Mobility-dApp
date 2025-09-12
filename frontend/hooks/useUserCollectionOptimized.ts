@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useAccount } from "wagmi";
 import { ethers } from "ethers";
 import { contracts } from "@/utils/contracts";
-// import { useAuctionsEnhanced } from "./enhanced-auction-utils"; // Temporarily disabled to prevent loops
+import { useAuctionsEnhanced } from "./enhanced-auction-utils";
 
 interface WonAuction {
   auctionId: string;
@@ -50,15 +50,11 @@ function generateMockTransactionHash(auctionId: string): string {
 
 export function useUserCollectionOptimized(): UserCollectionOptimized {
   const { address, isConnected } = useAccount();
-  // Temporarily disabled useAuctionsEnhanced to prevent loops
-  // const { auctions, isLoading: auctionsLoading } = useAuctionsEnhanced(
-  //   true,
-  //   true
-  // ); // Disable auto-refresh and failed auction handling for collection
-
-  // Mock values for now
-  const auctions: any[] = [];
-  const auctionsLoading = false;
+  // Re-enabled useAuctionsEnhanced to fetch auction data
+  const { auctions, isLoading: auctionsLoading } = useAuctionsEnhanced(
+    true, // Disable auto-refresh to prevent loops
+    true // Disable failed auction handling for collection
+  );
 
   const [wonAuctions, setWonAuctions] = useState<WonAuction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -115,30 +111,61 @@ export function useUserCollectionOptimized(): UserCollectionOptimized {
       setIsLoading(true);
       setError(null);
 
-      // Get all ended auctions where user is the winner AND settled
-      const endedAuctions = auctions.filter((auction) => auction.status === 2); // ENDED
-      console.log(`🔍 Found ${endedAuctions.length} ended auctions`);
+      // Get all auctions to check for winners and settled status
+      console.log(
+        `🔍 Checking ${auctions.length} total auctions for user collection`
+      );
+      console.log(
+        `📊 All auctions data:`,
+        auctions.map((a) => ({
+          auctionId: a.auctionId,
+          tokenId: a.nftId,
+          name: a.nftName,
+          status: a.status,
+          highestBidder: a.highestBidder,
+          isSettled: a.isSettled,
+        }))
+      );
 
       const userWonAuctions: WonAuction[] = [];
 
-      for (const auction of endedAuctions) {
+      for (const auction of auctions) {
         try {
           // Check if user is the winner using highestBidder from auction data
           const winner = auction.highestBidder;
-          console.log(`🏆 Auction ${auction.auctionId} winner:`, winner);
+          console.log(
+            `🏆 Auction ${auction.auctionId} (tokenId: ${auction.nftId}) winner:`,
+            winner
+          );
+
+          // Special debug for auction 10 (American Bobtail)
+          if (auction.auctionId === "10" || auction.nftId === "45") {
+            console.log(`🔍 SPECIAL DEBUG - Auction 10 (American Bobtail):`, {
+              auctionId: auction.auctionId,
+              tokenId: auction.nftId,
+              name: auction.nftName,
+              status: auction.status,
+              highestBidder: auction.highestBidder,
+              isSettled: auction.isSettled,
+              userAddress: address,
+              isUserWinner:
+                winner && winner.toLowerCase() === address.toLowerCase(),
+            });
+          }
 
           if (winner && winner.toLowerCase() === address.toLowerCase()) {
             // Check if auction is settled (NFT transferred to winner)
-            // Use isSettled as primary indicator, status === 3 as secondary
-            const isSettled = auction.isSettled || auction.status === 3;
+            // Status 4 = SETTLED (NFT trasferito al vincitore)
+            // Status 3 = CANCELLED/DESERTA (NFT torna al seller/admin)
+            const isWinnerSettled = auction.status === 4; // Solo status 4 per vincitori
             console.log(
-              `📦 Auction ${auction.auctionId} settled:`,
-              isSettled,
+              `📦 Auction ${auction.auctionId} winner settled:`,
+              isWinnerSettled,
               `(status: ${auction.status}, isSettled: ${auction.isSettled})`
             );
 
-            // Only show settled auctions in My Collection
-            if (isSettled) {
+            // Only show settled auctions in My Collection for winners
+            if (isWinnerSettled) {
               console.log(
                 `✅ User won and settled auction ${auction.auctionId}`
               );
@@ -167,6 +194,36 @@ export function useUserCollectionOptimized(): UserCollectionOptimized {
 
               userWonAuctions.push(wonAuction);
             }
+          } else {
+            // Check if user is the seller/admin and auction went deserted (status 3)
+            const isSeller =
+              auction.seller &&
+              auction.seller.toLowerCase() === address.toLowerCase();
+            const isDesertedAuction = auction.status === 3; // CANCELLED/DESERTA
+
+            if (isSeller && isDesertedAuction) {
+              console.log(
+                `🏠 User is seller of deserted auction ${auction.auctionId} - NFT returned to seller`
+              );
+
+              const wonAuction: WonAuction = {
+                auctionId: auction.auctionId,
+                tokenId: auction.nftId,
+                nftName: auction.nftName || `NFT #${auction.nftId}`,
+                nftImage: auction.nftImage || "/images/default-nft.png",
+                nftCategory: auction.nftCategory || "sticker",
+                nftRarity: auction.attributes?.rarity || "common",
+                finalBid: parseFloat(auction.currentBid),
+                bidders: auction.bidCount || 0,
+                endTime: new Date(auction.endTime).getTime(),
+                isClaimed: true, // NFT è tornato al seller
+                transactionHash:
+                  auction.transactionHash ||
+                  generateMockTransactionHash(auction.auctionId),
+              };
+
+              userWonAuctions.push(wonAuction);
+            }
           }
         } catch (auctionError) {
           console.error(
@@ -188,20 +245,34 @@ export function useUserCollectionOptimized(): UserCollectionOptimized {
     } finally {
       setIsLoading(false);
     }
-  }, [address, isConnected, getCachedData, setCachedData]); // Removed auctions dependency
+  }, [
+    address,
+    isConnected,
+    auctions,
+    auctionsLoading,
+    getCachedData,
+    setCachedData,
+  ]);
 
-  // Simplified fetch logic - only fetch when address changes
+  // Fetch won auctions when auctions data is available
   useEffect(() => {
-    if (address && isConnected) {
-      // For now, just set empty array to prevent any contract calls
+    if (address && isConnected && !auctionsLoading && auctions.length > 0) {
+      console.log("🔍 Auctions data available, fetching won auctions");
+      fetchWonAuctions();
+    } else if (
+      address &&
+      isConnected &&
+      !auctionsLoading &&
+      auctions.length === 0
+    ) {
+      console.log("🔍 No auctions found, setting empty collection");
       setWonAuctions([]);
       setIsLoading(false);
-      console.log("🔍 User connected, showing empty collection for now");
-    } else {
+    } else if (!address || !isConnected) {
       setWonAuctions([]);
       setIsLoading(false);
     }
-  }, [address, isConnected]); // Simplified dependencies
+  }, [address, isConnected, auctions, auctionsLoading, fetchWonAuctions]); // Simplified dependencies
 
   // Calculate stats
   const totalValue = useMemo(() => {
