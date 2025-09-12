@@ -79,6 +79,92 @@ function AdminNFTCreatorUltraSimpleContent() {
   const [reservePrice, setReservePrice] = React.useState("");
   const [buyNowPrice, setBuyNowPrice] = React.useState("");
 
+  // STATI DI VALIDAZIONE
+  const [nftValidated, setNftValidated] = React.useState(false);
+  const [auctionValidated, setAuctionValidated] = React.useState(false);
+  const [priceErrors, setPriceErrors] = React.useState<string[]>([]);
+
+  // FUNZIONI DI VALIDAZIONE
+  const validateNFT = React.useCallback(() => {
+    const isValid =
+      nftName.length >= 3 && nftDescription.length >= 10 && nftImage !== null;
+    setNftValidated(isValid);
+    return isValid;
+  }, [nftName, nftDescription, nftImage]);
+
+  const validatePriceConcordance = React.useCallback(() => {
+    const errors: string[] = [];
+    const startPriceNum = parseFloat(startPrice) || 0;
+    const reservePriceNum = parseFloat(reservePrice) || 0;
+    const buyNowPriceNum = parseFloat(buyNowPrice) || 0;
+    const bidIncrementNum = parseFloat(bidIncrement) || 0;
+
+    // Controlli comuni
+    if (startPriceNum <= 0) {
+      errors.push("Start Price must be greater than 0");
+    }
+
+    // Controlli specifici per tipo auction
+    switch (auctionType) {
+      case AuctionType.ENGLISH:
+        if (reservePrice && reservePriceNum > startPriceNum) {
+          errors.push(
+            "Reserve Price cannot be higher than Start Price for English auctions"
+          );
+        }
+        if (buyNowPrice && buyNowPriceNum <= startPriceNum) {
+          errors.push("Buy Now Price must be higher than Start Price");
+        }
+        break;
+
+      case AuctionType.DUTCH:
+        if (!bidIncrement || bidIncrementNum <= 0) {
+          errors.push(
+            "Price Decrease Rate is required and must be greater than 0 for Dutch auctions"
+          );
+        }
+        if (reservePrice && reservePriceNum >= startPriceNum) {
+          errors.push(
+            "Reserve Price must be lower than Start Price for Dutch auctions"
+          );
+        }
+        if (bidIncrementNum >= startPriceNum) {
+          errors.push(
+            "Price Decrease Rate cannot be equal or higher than Start Price"
+          );
+        }
+        break;
+
+      case AuctionType.SEALED_BID:
+        if (bidIncrement && bidIncrementNum > startPriceNum) {
+          errors.push("Minimum Bid cannot be higher than Start Price");
+        }
+        break;
+
+      case AuctionType.RESERVE:
+        if (reservePrice && reservePriceNum > startPriceNum) {
+          errors.push(
+            "Reserve Price should not exceed Start Price for Reserve auctions"
+          );
+        }
+        break;
+    }
+
+    setPriceErrors(errors);
+    const isValid = errors.length === 0;
+    setAuctionValidated(isValid);
+    return isValid;
+  }, [auctionType, startPrice, reservePrice, buyNowPrice, bidIncrement]);
+
+  // Auto-validazione quando cambiano i valori
+  React.useEffect(() => {
+    validateNFT();
+  }, [validateNFT]);
+
+  React.useEffect(() => {
+    validatePriceConcordance();
+  }, [validatePriceConcordance]);
+
   const handleSubmit = () => {
     console.log("Creating NFT and Auction:", {
       // NFT Data
@@ -115,9 +201,28 @@ function AdminNFTCreatorUltraSimpleContent() {
           <div className="space-y-6">
             {/* NFT Section */}
             <div className="border-b border-gray-200 dark:border-gray-700 pb-6">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                NFT Details
-              </h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  NFT Details
+                </h2>
+                <div className="flex items-center space-x-2">
+                  {nftValidated ? (
+                    <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+                      ✅ NFT Validated
+                    </span>
+                  ) : (
+                    <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">
+                      ⏳ Validation Pending
+                    </span>
+                  )}
+                  <button
+                    onClick={() => validateNFT()}
+                    className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition-colors"
+                  >
+                    Check NFT
+                  </button>
+                </div>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -184,9 +289,49 @@ function AdminNFTCreatorUltraSimpleContent() {
 
             {/* Auction Section */}
             <div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                Auction Details
-              </h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Auction Details
+                </h2>
+                <div className="flex items-center space-x-2">
+                  {auctionValidated ? (
+                    <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+                      ✅ Prices Valid
+                    </span>
+                  ) : priceErrors.length > 0 ? (
+                    <span className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs font-medium">
+                      ❌ Price Errors
+                    </span>
+                  ) : (
+                    <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">
+                      ⏳ Checking Prices
+                    </span>
+                  )}
+                  <button
+                    onClick={() => validatePriceConcordance()}
+                    className="px-3 py-1 bg-purple-600 text-white rounded text-xs hover:bg-purple-700 transition-colors"
+                  >
+                    Check Prices
+                  </button>
+                </div>
+              </div>
+
+              {/* Price Errors Display */}
+              {priceErrors.length > 0 && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <h4 className="text-sm font-semibold text-red-800 mb-2">
+                    💰 Price Validation Errors:
+                  </h4>
+                  <ul className="text-sm text-red-700 space-y-1">
+                    {priceErrors.map((error, index) => (
+                      <li key={index} className="flex items-start">
+                        <span className="text-red-500 mr-1">•</span>
+                        {error}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
               {/* Auction Type Info */}
               {auctionType !== AuctionType.ENGLISH && (
@@ -340,15 +485,21 @@ function AdminNFTCreatorUltraSimpleContent() {
               <button
                 onClick={handleSubmit}
                 disabled={
-                  !nftName ||
-                  !nftDescription ||
+                  !nftValidated ||
+                  !auctionValidated ||
                   !startPrice ||
                   !duration ||
-                  (auctionType === AuctionType.DUTCH && !bidIncrement)
+                  priceErrors.length > 0
                 }
                 className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
               >
-                Create NFT & Auction
+                {!nftValidated
+                  ? "⏳ Validate NFT First"
+                  : !auctionValidated || priceErrors.length > 0
+                  ? "⏳ Fix Price Errors"
+                  : !startPrice || !duration
+                  ? "⏳ Complete Required Fields"
+                  : "✅ Create NFT & Auction"}
               </button>
             </div>
 
@@ -365,14 +516,16 @@ function AdminNFTCreatorUltraSimpleContent() {
                   <strong>Can Mint:</strong> {canMint ? "✅" : "❌"}
                 </p>
                 <p>
-                  <strong>Form Valid:</strong>{" "}
-                  {nftName &&
-                  nftDescription &&
-                  startPrice &&
-                  duration &&
-                  (auctionType !== AuctionType.DUTCH || bidIncrement)
-                    ? "✅"
-                    : "❌"}
+                  <strong>NFT Validation:</strong>{" "}
+                  {nftValidated ? "✅ Valid" : "❌ Invalid"}
+                </p>
+                <p>
+                  <strong>Price Validation:</strong>{" "}
+                  {auctionValidated
+                    ? "✅ Valid"
+                    : priceErrors.length > 0
+                    ? "❌ Errors"
+                    : "⏳ Pending"}
                 </p>
                 <p>
                   <strong>Auction Type:</strong>{" "}
@@ -386,10 +539,20 @@ function AdminNFTCreatorUltraSimpleContent() {
                     ? "💎 Reserve"
                     : "Unknown"}
                 </p>
-                {auctionType === AuctionType.DUTCH && !bidIncrement && (
-                  <p className="text-red-600">
-                    <strong>⚠️ Missing:</strong> Price Decrease Rate (required
-                    for Dutch)
+                <p>
+                  <strong>Ready to Submit:</strong>{" "}
+                  {nftValidated &&
+                  auctionValidated &&
+                  startPrice &&
+                  duration &&
+                  priceErrors.length === 0
+                    ? "✅ Yes"
+                    : "❌ No"}
+                </p>
+                {priceErrors.length > 0 && (
+                  <p className="text-red-600 text-xs">
+                    <strong>⚠️ {priceErrors.length} price error(s)</strong> -
+                    Check above for details
                   </p>
                 )}
                 <p>
