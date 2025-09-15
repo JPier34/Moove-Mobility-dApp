@@ -74,6 +74,43 @@ function AdminNFTCreatorUltraSimpleContent() {
   // Form validation hook (MODULAR)
   const { areRequiredFieldsFilled } = useAuctionFormValidation(auctionFormData);
 
+  // Auto-adjust prices when auction type changes
+  const handleAuctionTypeChange = (newType: AuctionType) => {
+    updateField("auctionType", newType);
+
+    // Set appropriate default values based on auction type
+    switch (newType) {
+      case AuctionType.DUTCH:
+        // Dutch auction: start high, end low
+        updateField("startPrice", "0.01");
+        updateField("reservePrice", "0.001");
+        updateField("buyNowPrice", "0.001"); // Same as reserve (final price)
+        updateField("bidIncrement", "0.001"); // Price decrease rate
+        break;
+      case AuctionType.ENGLISH:
+        // English auction: start low, go high
+        updateField("startPrice", "0.001");
+        updateField("reservePrice", ""); // Optional
+        updateField("buyNowPrice", "0.01"); // Higher than start
+        updateField("bidIncrement", "0.001");
+        break;
+      case AuctionType.SEALED_BID:
+        // Sealed bid: similar to English
+        updateField("startPrice", "0.001");
+        updateField("reservePrice", ""); // Optional
+        updateField("buyNowPrice", ""); // Not typically used
+        updateField("bidIncrement", "0.001");
+        break;
+      case AuctionType.RESERVE:
+        // Reserve auction: reserve required
+        updateField("startPrice", "0.001");
+        updateField("reservePrice", "0.005"); // Required, higher than start
+        updateField("buyNowPrice", "0.01"); // Higher than reserve
+        updateField("bidIncrement", "0.001");
+        break;
+    }
+  };
+
   // State management
   const [step, setStep] = useState<"nft" | "auction">("nft");
   const [nftData, setNftData] = useState<NFTFormData>({
@@ -105,6 +142,118 @@ function AdminNFTCreatorUltraSimpleContent() {
     [AuctionType.DUTCH]: { emoji: "⬇️", name: "Dutch" },
     [AuctionType.SEALED_BID]: { emoji: "🔒", name: "Sealed Bid" },
   };
+
+  // Price validation rules for each auction type
+  const getPriceValidationErrors = useMemo(() => {
+    const errors: string[] = [];
+    const startPrice = parseFloat(auctionFormData.startPrice);
+    const reservePrice = parseFloat(auctionFormData.reservePrice);
+    const buyNowPrice = parseFloat(auctionFormData.buyNowPrice);
+    const bidIncrement = parseFloat(auctionFormData.bidIncrement);
+
+    // Skip validation if basic fields are empty
+    if (!auctionFormData.startPrice || !auctionFormData.bidIncrement) {
+      return errors;
+    }
+
+    // Basic validations for all auction types
+    if (isNaN(startPrice) || startPrice <= 0) {
+      errors.push("Start price must be a positive number");
+    }
+    if (isNaN(bidIncrement) || bidIncrement <= 0) {
+      errors.push("Bid increment must be a positive number");
+    }
+
+    // Auction type specific validations
+    switch (auctionFormData.auctionType) {
+      case AuctionType.DUTCH:
+        // Dutch auction: price decreases from start to reserve
+        if (auctionFormData.reservePrice && !isNaN(reservePrice)) {
+          if (reservePrice >= startPrice) {
+            errors.push(
+              "Dutch auction: Reserve price must be LESS than start price (price decreases)"
+            );
+          }
+        }
+        // For Dutch auctions, buyNowPrice should equal reservePrice (final price)
+        if (
+          auctionFormData.buyNowPrice &&
+          !isNaN(buyNowPrice) &&
+          auctionFormData.reservePrice &&
+          !isNaN(reservePrice)
+        ) {
+          if (Math.abs(buyNowPrice - reservePrice) > 0.000001) {
+            errors.push(
+              "Dutch auction: Buy Now price should equal Reserve price (final price)"
+            );
+          }
+        }
+        break;
+
+      case AuctionType.ENGLISH:
+        // English auction: price increases from start, reserve is minimum
+        if (auctionFormData.reservePrice && !isNaN(reservePrice)) {
+          if (reservePrice < startPrice) {
+            errors.push(
+              "English auction: Reserve price must be GREATER than or equal to start price"
+            );
+          }
+        }
+        if (auctionFormData.buyNowPrice && !isNaN(buyNowPrice)) {
+          if (buyNowPrice < startPrice) {
+            errors.push(
+              "English auction: Buy Now price must be GREATER than or equal to start price"
+            );
+          }
+        }
+        break;
+
+      case AuctionType.SEALED_BID:
+        // Sealed bid: similar to English but no incremental bidding
+        if (auctionFormData.reservePrice && !isNaN(reservePrice)) {
+          if (reservePrice < startPrice) {
+            errors.push(
+              "Sealed Bid auction: Reserve price must be GREATER than or equal to start price"
+            );
+          }
+        }
+        break;
+
+      case AuctionType.RESERVE:
+        // Reserve auction: reserve price is required and must be >= start price
+        if (!auctionFormData.reservePrice || isNaN(reservePrice)) {
+          errors.push("Reserve auction: Reserve price is REQUIRED");
+        } else if (reservePrice < startPrice) {
+          errors.push(
+            "Reserve auction: Reserve price must be GREATER than or equal to start price"
+          );
+        }
+        if (auctionFormData.buyNowPrice && !isNaN(buyNowPrice)) {
+          if (buyNowPrice < Math.max(startPrice, reservePrice)) {
+            errors.push(
+              "Reserve auction: Buy Now price must be greater than reserve price"
+            );
+          }
+        }
+        break;
+    }
+
+    // Bid increment should not exceed start price
+    if (
+      !isNaN(startPrice) &&
+      !isNaN(bidIncrement) &&
+      bidIncrement >= startPrice
+    ) {
+      errors.push("Bid increment cannot exceed start price");
+    }
+
+    return errors;
+  }, [auctionFormData]);
+
+  // Check if auction form is valid (including price concordance)
+  const isAuctionFormValid = useMemo(() => {
+    return areRequiredFieldsFilled && getPriceValidationErrors.length === 0;
+  }, [areRequiredFieldsFilled, getPriceValidationErrors]);
 
   // NFT Validation Logic
   const getNFTValidationErrors = useMemo(() => {
@@ -653,7 +802,9 @@ function AdminNFTCreatorUltraSimpleContent() {
                   <select
                     value={auctionFormData.auctionType}
                     onChange={(e) =>
-                      updateField("auctionType", parseInt(e.target.value))
+                      handleAuctionTypeChange(
+                        parseInt(e.target.value) as AuctionType
+                      )
                     }
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500"
                   >
@@ -724,7 +875,9 @@ function AdminNFTCreatorUltraSimpleContent() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Bid Increment (ETH) *
+                    {auctionFormData.auctionType === AuctionType.DUTCH
+                      ? "Price Decrease Rate (ETH) *"
+                      : "Bid Increment (ETH) *"}
                   </label>
                   <input
                     type="number"
@@ -736,6 +889,15 @@ function AdminNFTCreatorUltraSimpleContent() {
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500"
                     placeholder="0.0001"
                   />
+                  <p className="text-xs text-gray-500 mt-1">
+                    {auctionFormData.auctionType === AuctionType.DUTCH &&
+                      "🔻 How much price decreases per time interval"}
+                    {(auctionFormData.auctionType === AuctionType.ENGLISH ||
+                      auctionFormData.auctionType === AuctionType.RESERVE) &&
+                      "📈 Minimum amount each bid must increase"}
+                    {auctionFormData.auctionType === AuctionType.SEALED_BID &&
+                      "🔒 Not used in sealed bid auctions"}
+                  </p>
                 </div>
               </div>
 
@@ -809,12 +971,23 @@ function AdminNFTCreatorUltraSimpleContent() {
               </div>
 
               {/* Validation Errors */}
-              {!areRequiredFieldsFilled && (
+              {(!areRequiredFieldsFilled ||
+                getPriceValidationErrors.length > 0) && (
                 <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
-                  <p className="text-red-700 dark:text-red-400 text-sm">
-                    ⚠️ Please fill in all required fields: Start Price,
-                    Duration, and Bid Increment
-                  </p>
+                  {!areRequiredFieldsFilled && (
+                    <p className="text-red-700 dark:text-red-400 text-sm mb-2">
+                      ⚠️ Please fill in all required fields: Start Price,
+                      Duration, and Bid Increment
+                    </p>
+                  )}
+                  {getPriceValidationErrors.map((error, index) => (
+                    <p
+                      key={index}
+                      className="text-red-700 dark:text-red-400 text-sm mb-1"
+                    >
+                      💰 {error}
+                    </p>
+                  ))}
                 </div>
               )}
             </div>
@@ -829,7 +1002,7 @@ function AdminNFTCreatorUltraSimpleContent() {
               </button>
               <button
                 onClick={() => setShowValidationModal(true)}
-                disabled={!areRequiredFieldsFilled || isSecureProcessing}
+                disabled={!isAuctionFormValid || isSecureProcessing}
                 className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
               >
                 {isSecureProcessing ? "Creating..." : "Create NFT & Auction"}
