@@ -10,12 +10,14 @@ interface AuctionGridProps {
   auctions: Auction[];
   isLoading?: boolean;
   showEndedState?: boolean;
+  onRefresh?: () => void;
 }
 
 export default function AuctionGrid({
   auctions,
   isLoading = false,
   showEndedState = false,
+  onRefresh,
 }: AuctionGridProps) {
   const [selectedAuction, setSelectedAuction] = useState<Auction | null>(null);
 
@@ -140,6 +142,7 @@ export default function AuctionGrid({
           auction={selectedAuction}
           isOpen={!!selectedAuction}
           onClose={() => setSelectedAuction(null)}
+          onRefresh={onRefresh}
         />
       )}
     </>

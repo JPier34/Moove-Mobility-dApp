@@ -35,7 +35,8 @@ export function useEnglishAuction(): EnglishAuctionHandler {
   >("idle");
 
   const { placeBid, isPending: isBidding, error: bidError } = usePlaceBid();
-  const { extendAuction, isExtending } = useExtendAuction();
+  // Removed manual extension - let smart contract handle auto-extension
+  // const { extendAuction, isExtending } = useExtendAuction();
 
   // Default extension settings (can be overridden)
   const DEFAULT_EXTENSION_THRESHOLD_MINUTES = 5;
@@ -159,36 +160,14 @@ export function useEnglishAuction(): EnglishAuctionHandler {
 
         console.log("✅ Bid placed successfully");
 
-        // If we need to extend the auction, do it now (after successful bid)
+        // Show success message - let the smart contract handle auto-extension
         if (shouldExtend) {
-          try {
-            console.log(
-              `⏰ Extending auction ${auctionId} by ${extensionDuration} minutes...`
-            );
-            const extensionSuccess = await extendAuction(
-              auctionId,
-              extensionDuration
-            );
-
-            if (extensionSuccess) {
-              console.log(`✅ Auction ${auctionId} extended successfully`);
-              toast.success(
-                `Bid placed! Auction extended by ${extensionDuration} minutes due to late bid`
-              );
-            } else {
-              console.warn(
-                `⚠️ Failed to extend auction ${auctionId}, but bid was successful`
-              );
-              toast.success(
-                `Bid of ${bidAmount} ETH placed successfully! (Extension failed)`
-              );
-            }
-          } catch (extensionError) {
-            console.error("❌ Extension error:", extensionError);
-            toast.success(
-              `Bid of ${bidAmount} ETH placed successfully! (Extension failed)`
-            );
-          }
+          console.log(
+            `⏰ Bid placed in last ${extensionThreshold} minutes - smart contract should auto-extend`
+          );
+          toast.success(
+            `Bid placed! Auction will auto-extend by ${extensionDuration} minutes due to late bid`
+          );
         } else {
           toast.success(`Bid of ${bidAmount} ETH placed successfully!`);
         }
@@ -231,7 +210,7 @@ export function useEnglishAuction(): EnglishAuctionHandler {
       placeBid,
       isBidding,
       bidError,
-      extendAuction,
+      // Removed extendAuction dependency
       DEFAULT_EXTENSION_THRESHOLD_MINUTES,
       DEFAULT_EXTENSION_DURATION_MINUTES,
     ]
@@ -329,7 +308,7 @@ export function useEnglishAuction(): EnglishAuctionHandler {
       placeBid,
       isBidding,
       bidError,
-      extendAuction,
+      // Removed extendAuction dependency
       DEFAULT_EXTENSION_THRESHOLD_MINUTES,
       DEFAULT_EXTENSION_DURATION_MINUTES,
     ]

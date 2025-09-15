@@ -374,6 +374,8 @@ export default function AuctionsPage() {
     error,
     isMasterAdmin,
     canMint,
+    refetch,
+    refreshAuctionCache,
   } = useAuctions();
 
   // Show loading state
@@ -445,7 +447,7 @@ export default function AuctionsPage() {
                   status: a.status,
                 }))
               )}
-              <AuctionGrid auctions={activeAuctions} />
+              <AuctionGrid auctions={activeAuctions} onRefresh={refetch} />
             </>
           ) : (
             <motion.div
@@ -478,7 +480,11 @@ export default function AuctionsPage() {
           />
 
           {endedAuctions.length > 0 ? (
-            <AuctionGrid auctions={endedAuctions} showEndedState={true} />
+            <AuctionGrid
+              auctions={endedAuctions}
+              showEndedState={true}
+              onRefresh={refetch}
+            />
           ) : (
             <motion.div
               className="text-center py-12 bg-white dark:bg-gray-800 rounded-2xl"

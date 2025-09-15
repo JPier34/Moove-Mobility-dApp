@@ -52,11 +52,28 @@ export function useAuctionHandler(): AuctionHandler {
         switch (auction.auctionType) {
           case AuctionType.ENGLISH:
             if (action === "bid" && amount) {
+              const endTimeUnix = Math.floor(auction.endTime.getTime() / 1000);
+              const currentTimeUnix = Math.floor(Date.now() / 1000);
+              const timeUntilEnd = endTimeUnix - currentTimeUnix;
+
+              console.log("🎯 English Auction Extension Debug:", {
+                auctionId: auction.auctionId,
+                endTime: auction.endTime,
+                endTimeUnix,
+                currentTimeUnix,
+                timeUntilEndSeconds: timeUntilEnd,
+                timeUntilEndMinutes: Math.floor(timeUntilEnd / 60),
+                extensionThresholdMinutes:
+                  auction.extensionThresholdMinutes || 5,
+                extensionDurationMinutes:
+                  auction.extensionDurationMinutes || 10,
+              });
+
               const auctionData = {
                 startPrice: auction.startPrice,
                 currentBid: auction.currentBid,
                 bidIncrement: auction.bidIncrement,
-                endTime: auction.endTime, // Add endTime for extension logic
+                endTime: endTimeUnix.toString(), // Convert Date to Unix timestamp string
                 // Extension settings (these should come from auction metadata or form)
                 extensionThresholdMinutes:
                   auction.extensionThresholdMinutes || 5,

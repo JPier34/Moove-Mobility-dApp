@@ -5,6 +5,7 @@ import { Auction, AuctionType, AuctionStatus } from "../../types/auction";
 import Button from "../ui/Button";
 import { shortenAddress } from "../../utils/shortenAddress";
 import { useAccount } from "wagmi";
+import { useModalLock } from "@/hooks/useModalLock";
 import {
   usePlaceBid,
   useCurrentDutchPrice,
@@ -23,6 +24,7 @@ interface AuctionModalProps {
   auction: Auction;
   isOpen: boolean;
   onClose: () => void;
+  onRefresh?: () => void;
 }
 
 // Category emojis
@@ -37,11 +39,10 @@ export default function AuctionModal({
   auction,
   isOpen,
   onClose,
+  onRefresh,
 }: AuctionModalProps) {
   const { address, isConnected } = useAccount();
-  const [activeTab, setActiveTab] = useState<"details" | "bids" | "history">(
-    "details"
-  );
+  const [activeTab, setActiveTab] = useState<"details">("details");
   const [timeLeft, setTimeLeft] = useState("");
   // Use the unified Dutch price hook
   const { currentPrice: currentDutchPrice, isActive: isDutchActive } =
@@ -51,6 +52,8 @@ export default function AuctionModal({
   const [bidAmount, setBidAmount] = useState("");
   const [customBidAmount, setCustomBidAmount] = useState("");
   const [isSubmittingBid, setIsSubmittingBid] = useState(false);
+  const [isRefreshingAuction, setIsRefreshingAuction] = useState(false);
+  const [lastBidAmount, setLastBidAmount] = useState<string | null>(null);
 
   // Sealed bid state
   const [sealedBidAmount, setSealedBidAmount] = useState("");
@@ -76,22 +79,21 @@ export default function AuctionModal({
     step: handlerStep,
   } = useAuctionHandler();
 
-  // Close modal with ESC
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
+  // Simple modal lock during transactions
+  const { lockedOnClose, isLocked } = useModalLock({
+    isLocked: isSubmittingBid || isHandlerProcessing,
+    onClose,
+  });
 
+  // Simple body scroll management
+  useEffect(() => {
     if (isOpen) {
-      document.addEventListener("keydown", handleEscape);
       document.body.style.overflow = "hidden";
     }
-
     return () => {
-      document.removeEventListener("keydown", handleEscape);
       document.body.style.overflow = "unset";
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   // Calculate time remaining
   useEffect(() => {
@@ -131,13 +133,49 @@ export default function AuctionModal({
 
   // Dutch price calculation is now handled by useDutchPrice hook
 
+  // Function to refresh only this specific auction data
+  const refreshAuctionData = async () => {
+    if (!onRefresh) return;
+
+    setIsRefreshingAuction(true);
+    try {
+      console.log(`🔄 Refreshing auction ${auction.auctionId} data...`);
+      await onRefresh();
+      console.log(`✅ Auction ${auction.auctionId} data refreshed`);
+    } catch (error) {
+      console.error("❌ Error refreshing auction data:", error);
+    } finally {
+      setIsRefreshingAuction(false);
+    }
+  };
+
   const handleBid = async (amount: string) => {
     if (!isConnected) {
       toast.error("Connect wallet to place bid");
       return;
     }
 
+    // Validate bid amount vs Buy Now price
+    const bidAmount = parseFloat(amount);
+    const buyNowPrice = parseFloat(auction.buyNowPrice || "0");
+
+    if (buyNowPrice > 0 && bidAmount >= buyNowPrice) {
+      toast.error(
+        `Your bid (${amount} ETH) should be less than Buy Now price (${auction.buyNowPrice} ETH). Use Buy Now instead!`
+      );
+      return;
+    }
+
+    // Prevent modal from closing during MetaMask interaction
+    console.log("🔒 Preventing modal close during bid process");
     setIsSubmittingBid(true);
+
+    // Show initial message
+    toast.success(
+      `🚀 Sending bid of ${amount} ETH... Please confirm in MetaMask`,
+      { duration: 3000 }
+    );
+
     try {
       console.log(
         "Placing bid:",
@@ -152,9 +190,45 @@ export default function AuctionModal({
       const result = await handleAuctionAction(auction, "bid", amount);
 
       if (result.success) {
-        toast.success(`Bid of ${amount} ETH placed successfully!`);
-        onClose();
+        console.log("✅ Bid transaction CONFIRMED on blockchain!");
+        setLastBidAmount(amount);
+        setBidAmount(""); // Clear the bid field
+
+        // Show success message - transaction is already confirmed
+        toast.success(
+          `🎉 Bid of ${amount} ETH confirmed! Updating auction data...`,
+          { duration: 2000 }
+        );
+
+        // Transaction is already confirmed, refresh immediately
+        console.log("🔄 Transaction confirmed, refreshing auction data...");
+
+        // Store original bid to verify changes
+        const originalCurrentBid = auction.currentBid;
+        console.log("📊 Original current bid:", originalCurrentBid);
+        console.log("📊 Expected new bid:", amount);
+
+        // Single refresh attempt - no retry needed since we're not waiting for confirmation
+        try {
+          await refreshAuctionData();
+          console.log("✅ Auction data refresh completed");
+
+          // Show success message - bid is submitted and will update when confirmed
+          toast.success(`✅ Your bid of ${amount} ETH is being processed!`, {
+            duration: 4000,
+          });
+        } catch (error) {
+          console.error("❌ Failed to refresh auction data:", error);
+          // Fallback message
+          toast.success(
+            `✅ Bid submitted! Data will update when blockchain confirms the transaction.`,
+            {
+              duration: 5000,
+            }
+          );
+        }
       } else {
+        console.error("❌ Bid transaction failed:", result.error);
         toast.error(result.error || "Error placing bid");
       }
     } catch (error) {
@@ -184,8 +258,20 @@ export default function AuctionModal({
       );
 
       if (result.success) {
-        toast.success("Sealed bid submitted successfully!");
-        onClose();
+        setSealedBidAmount("");
+        setSealedBidNonce("");
+
+        toast.success(
+          "Sealed bid submitted successfully! Refreshing auction data...",
+          { duration: 3000 }
+        );
+
+        // Refresh auction data without closing modal
+        await refreshAuctionData();
+
+        toast.success("✅ Your sealed bid is now registered!", {
+          duration: 4000,
+        });
       } else {
         toast.error(result.error || "Error submitting sealed bid");
       }
@@ -231,24 +317,33 @@ export default function AuctionModal({
 
   // Quick bid amounts - first bid can be startPrice, subsequent bids need increment
   const getQuickBidAmounts = () => {
-    const currentBid = parseFloat(auction.currentBid);
-    const increment = parseFloat(auction.bidIncrement);
-    const startPrice = parseFloat(auction.startPrice);
+    const currentBidStr = auction.currentBid || "0";
+    const currentBid = parseFloat(currentBidStr);
+    const increment = parseFloat(auction.bidIncrement) || 0.001;
+    const startPrice = parseFloat(auction.startPrice) || 0.001;
+
+    console.log("🎯 Quick bid calculation:", {
+      currentBidStr,
+      currentBid,
+      increment,
+      startPrice,
+      isFirstBid: currentBid === 0 || isNaN(currentBid),
+    });
 
     // If no bids yet, first bid can be startPrice
-    if (currentBid === 0) {
+    if (currentBid === 0 || isNaN(currentBid)) {
       return [
         {
-          label: `${startPrice} ETH`,
-          amount: startPrice.toFixed(4),
+          label: `${startPrice.toFixed(6)} ETH`,
+          amount: startPrice.toFixed(6),
         },
         {
-          label: `+${increment} ETH`,
-          amount: (startPrice + increment).toFixed(4),
+          label: `+${increment.toFixed(6)} ETH`,
+          amount: (startPrice + increment).toFixed(6),
         },
         {
-          label: `+${(increment * 2).toFixed(4)} ETH`,
-          amount: (startPrice + increment * 2).toFixed(4),
+          label: `+${(increment * 2).toFixed(6)} ETH`,
+          amount: (startPrice + increment * 2).toFixed(6),
         },
         { label: "Custom", amount: "custom" },
       ];
@@ -257,16 +352,16 @@ export default function AuctionModal({
     // If bids exist, need to add increment
     return [
       {
-        label: `+${increment} ETH`,
-        amount: (currentBid + increment).toFixed(4),
+        label: `+${increment.toFixed(6)} ETH`,
+        amount: (currentBid + increment).toFixed(6),
       },
       {
-        label: `+${(increment * 2).toFixed(4)} ETH`,
-        amount: (currentBid + increment * 2).toFixed(4),
+        label: `+${(increment * 2).toFixed(6)} ETH`,
+        amount: (currentBid + increment * 2).toFixed(6),
       },
       {
-        label: `+${(increment * 5).toFixed(4)} ETH`,
-        amount: (currentBid + increment * 5).toFixed(4),
+        label: `+${(increment * 5).toFixed(6)} ETH`,
+        amount: (currentBid + increment * 5).toFixed(6),
       },
       { label: "Custom", amount: "custom" },
     ];
@@ -282,17 +377,30 @@ export default function AuctionModal({
       {/* Overlay */}
       <div
         className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
-        onClick={onClose}
+        onClick={lockedOnClose}
       />
 
       {/* Modal */}
       <div className="flex min-h-full items-center justify-center p-4">
         <div
-          className="relative bg-white rounded-xl shadow-xl max-w-5xl w-full max-h-[90vh] overflow-hidden"
+          className={`relative bg-white rounded-xl shadow-xl max-w-5xl w-full max-h-[90vh] overflow-hidden ${
+            isLocked ? "ring-4 ring-blue-500 ring-opacity-50" : ""
+          }`}
           onClick={(e) => e.stopPropagation()}
         >
+          {/* Transaction in progress overlay */}
+          {isLocked && (
+            <div className="absolute top-0 left-0 right-0 bg-blue-600 text-white px-4 py-2 text-center text-sm font-medium z-10">
+              🔒 Transaction in progress - Modal locked to prevent accidental
+              closure
+            </div>
+          )}
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-gray-200">
+          <div
+            className={`flex items-center justify-between p-6 border-b border-gray-200 ${
+              isLocked ? "pt-14" : ""
+            }`}
+          >
             <div>
               <h2 className="text-2xl font-bold text-gray-900">
                 {auction.nftName}
@@ -307,8 +415,16 @@ export default function AuctionModal({
               </div>
             </div>
             <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
+              onClick={lockedOnClose}
+              disabled={isLocked}
+              className={`transition-colors ${
+                isLocked
+                  ? "text-gray-300 cursor-not-allowed"
+                  : "text-gray-400 hover:text-gray-600"
+              }`}
+              title={
+                isLocked ? "Cannot close during transaction" : "Close modal"
+              }
             >
               <svg
                 className="w-6 h-6"
@@ -360,93 +476,97 @@ export default function AuctionModal({
                 )}
               </div>
 
-              {/* Tabs */}
+              {/* NFT Details */}
               <div>
-                <div className="flex border-b border-gray-200 mb-4">
-                  {[
-                    { id: "details", label: "Details" },
-                    { id: "bids", label: `Bids (${auction.bidCount})` },
-                    { id: "history", label: "History" },
-                  ].map((tab) => (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveTab(tab.id as any)}
-                      className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                        activeTab === tab.id
-                          ? "border-moove-primary text-moove-primary"
-                          : "border-transparent text-gray-500 hover:text-gray-700"
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
+                {/* NFT Title and Description */}
+                <div className="mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                    {auction.nftName}
+                  </h2>
+                  <p className="text-gray-600 mb-4">
+                    {auction.attributes.special ||
+                      auction.attributes.traits ||
+                      "Unique NFT for vehicle access"}
+                  </p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-500">
+                      Auction ID: #{auction.auctionId}
+                    </span>
+                    <span className="text-sm text-gray-500">
+                      NFT ID: #{auction.nftId}
+                    </span>
+                  </div>
                 </div>
 
-                {/* Tab content */}
-                {activeTab === "details" && (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      {Object.entries(auction.attributes).map(
-                        ([key, value]) => (
-                          <div key={key} className="bg-gray-50 rounded-lg p-3">
-                            <div className="text-sm text-gray-500 mb-1">
-                              {key.charAt(0).toUpperCase() + key.slice(1)}
-                            </div>
-                            <div className="font-medium text-gray-900">
-                              {value}
-                            </div>
-                          </div>
-                        )
+                {/* Details content */}
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    {Object.entries(auction.attributes).map(([key, value]) => (
+                      <div key={key} className="bg-gray-50 rounded-lg p-3">
+                        <div className="text-sm text-gray-500 mb-1">
+                          {key.charAt(0).toUpperCase() + key.slice(1)}
+                        </div>
+                        <div className="font-medium text-gray-900">{value}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Seller info */}
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <div className="text-sm text-gray-500 mb-1">Venditore</div>
+                    <div className="flex items-center space-x-2">
+                      <div className="w-8 h-8 bg-moove-primary rounded-full flex items-center justify-center text-white text-sm">
+                        {auction.seller.slice(2, 4).toUpperCase()}
+                      </div>
+                      <span className="font-mono text-gray-900">
+                        {auction.seller}
+                      </span>
+                      {isOwner && (
+                        <span className="px-2 py-1 bg-moove-100 text-moove-700 rounded-full text-xs">
+                          Tu
+                        </span>
                       )}
                     </div>
+                  </div>
 
-                    {/* Seller info */}
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <div className="text-sm text-gray-500 mb-1">
-                        Venditore
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <div className="w-8 h-8 bg-moove-primary rounded-full flex items-center justify-center text-white text-sm">
-                          {auction.seller.slice(2, 4).toUpperCase()}
+                  {/* Success banner for recent bid */}
+                  {lastBidAmount && (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4 mt-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <div className="text-green-600">
+                            {isRefreshingAuction ? (
+                              <div className="animate-spin rounded-full h-4 w-4 border-2 border-green-600 border-t-transparent"></div>
+                            ) : (
+                              "✅"
+                            )}
+                          </div>
+                          <div>
+                            <div className="text-green-800 font-medium text-sm">
+                              {isRefreshingAuction
+                                ? "Processing your bid..."
+                                : "Bid placed successfully!"}
+                            </div>
+                            <div className="text-green-700 text-xs">
+                              Your bid of {lastBidAmount} ETH is{" "}
+                              {isRefreshingAuction
+                                ? "being processed"
+                                : "now active"}
+                            </div>
+                          </div>
                         </div>
-                        <span className="font-mono text-gray-900">
-                          {auction.seller}
-                        </span>
-                        {isOwner && (
-                          <span className="px-2 py-1 bg-moove-100 text-moove-700 rounded-full text-xs">
-                            Tu
-                          </span>
+                        {!isRefreshingAuction && (
+                          <button
+                            onClick={() => setLastBidAmount(null)}
+                            className="text-green-600 hover:text-green-800 text-sm"
+                          >
+                            ✕
+                          </button>
                         )}
                       </div>
                     </div>
-                  </div>
-                )}
-
-                {activeTab === "bids" && (
-                  <div className="space-y-3">
-                    {auction.bidCount > 0 ? (
-                      <div className="text-sm text-gray-500">
-                        History of bids is visible here
-                      </div>
-                    ) : (
-                      <div className="text-center py-8">
-                        <div className="text-4xl mb-2">🔇</div>
-                        <div className="text-sm text-gray-500">No bids yet</div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {activeTab === "history" && (
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                      <span className="text-sm">Auction created</span>
-                      <span className="text-sm text-gray-500">
-                        {new Date(auction.startTime).toLocaleDateString()}
-                      </span>
-                    </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </div>
 
@@ -478,6 +598,9 @@ export default function AuctionModal({
                   <span className="text-xl text-gray-600">
                     {auction.currency}
                   </span>
+                  {isRefreshingAuction && (
+                    <div className="animate-spin rounded-full h-6 w-6 border-2 border-moove-primary border-t-transparent ml-2"></div>
+                  )}
                 </div>
                 {auction.currentBid !== "0" &&
                   auction.auctionType !== AuctionType.DUTCH && (
@@ -608,9 +731,20 @@ export default function AuctionModal({
                               onClick={() => {
                                 if (bid.amount === "custom") {
                                   // Focus custom input
+                                  const customInput = document.querySelector(
+                                    'input[placeholder="Enter custom amount"]'
+                                  ) as HTMLInputElement;
+                                  customInput?.focus();
                                   return;
                                 }
+                                // Set the amount in the custom bid field
+                                console.log("🚀 Quick bid clicked:", {
+                                  label: bid.label,
+                                  amount: bid.amount,
+                                  currentBidAmount: bidAmount,
+                                });
                                 setBidAmount(bid.amount);
+                                console.log("✅ BidAmount set to:", bid.amount);
                               }}
                               className={
                                 bidAmount === bid.amount
@@ -632,23 +766,76 @@ export default function AuctionModal({
                         <input
                           type="number"
                           step="0.0001"
-                          placeholder={(
-                            parseFloat(auction.currentBid) +
-                            parseFloat(auction.bidIncrement)
-                          ).toFixed(4)}
-                          value={customBidAmount}
+                          placeholder="Enter custom amount"
+                          value={bidAmount}
                           onChange={(e) => {
-                            setCustomBidAmount(e.target.value);
                             setBidAmount(e.target.value);
                           }}
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-moove-primary focus:border-moove-primary"
                         />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Minimum:{" "}
+                          {(() => {
+                            const currentBid = parseFloat(
+                              auction.currentBid || "0"
+                            );
+                            const startPrice = parseFloat(
+                              auction.startPrice || "0"
+                            );
+                            const bidIncrement = parseFloat(
+                              auction.bidIncrement || "0"
+                            );
+
+                            console.log("🎯 Minimum bid calculation:", {
+                              currentBidStr: auction.currentBid,
+                              currentBid,
+                              startPrice,
+                              bidIncrement,
+                              isFirstBid: currentBid === 0 || isNaN(currentBid),
+                            });
+
+                            if (currentBid === 0 || isNaN(currentBid)) {
+                              return startPrice.toFixed(6);
+                            } else {
+                              return (currentBid + bidIncrement).toFixed(6);
+                            }
+                          })()}{" "}
+                          ETH
+                        </p>
+                        {/* Buy Now warning */}
+                        {(() => {
+                          const currentBidAmount = parseFloat(bidAmount || "0");
+                          const buyNowPrice = parseFloat(
+                            auction.buyNowPrice || "0"
+                          );
+
+                          if (
+                            buyNowPrice > 0 &&
+                            currentBidAmount >= buyNowPrice
+                          ) {
+                            return (
+                              <p className="text-xs text-red-600 mt-1 font-medium">
+                                ⚠️ Your bid ({currentBidAmount.toFixed(6)} ETH)
+                                is ≥ Buy Now price ({buyNowPrice.toFixed(6)}{" "}
+                                ETH). Use Buy Now instead!
+                              </p>
+                            );
+                          }
+                          return null;
+                        })()}
                       </div>
 
                       {/* Bid button */}
                       <Button
                         onClick={() => handleBid(bidAmount)}
-                        disabled={!isConnected || isSubmittingBid || !bidAmount}
+                        disabled={
+                          !isConnected ||
+                          isSubmittingBid ||
+                          !bidAmount ||
+                          (!!auction.buyNowPrice &&
+                            parseFloat(bidAmount || "0") >=
+                              parseFloat(auction.buyNowPrice))
+                        }
                         className="w-full"
                         size="lg"
                       >

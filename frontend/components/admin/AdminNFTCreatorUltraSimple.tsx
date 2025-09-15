@@ -465,6 +465,7 @@ function AdminNFTCreatorUltraSimpleContent() {
       };
 
       // Upload metadata to IPFS
+      console.log("📤 Uploading NFT metadata to IPFS:", nftMetadata);
       const metadataBlob = new Blob([JSON.stringify(nftMetadata, null, 2)], {
         type: "application/json",
       });
@@ -478,11 +479,34 @@ function AdminNFTCreatorUltraSimpleContent() {
       });
 
       if (!metadataResponse.ok) {
-        throw new Error("Failed to upload metadata to IPFS");
+        const errorText = await metadataResponse.text();
+        console.error("❌ Metadata upload failed:", {
+          status: metadataResponse.status,
+          statusText: metadataResponse.statusText,
+          error: errorText,
+        });
+        throw new Error(
+          `Failed to upload metadata to IPFS: ${metadataResponse.status} - ${errorText}`
+        );
       }
 
       const metadataResult = await metadataResponse.json();
-      const metadataUrl = `https://ipfs.io/ipfs/${metadataResult.IpfsHash}`;
+      console.log("✅ Metadata upload result:", metadataResult);
+
+      // Check for hash in different possible field names
+      const ipfsHash =
+        metadataResult.IpfsHash || metadataResult.hash || metadataResult.Hash;
+
+      if (!ipfsHash) {
+        console.error(
+          "❌ No IPFS hash returned from metadata upload:",
+          metadataResult
+        );
+        throw new Error("Invalid metadata upload response - no IPFS hash");
+      }
+
+      const metadataUrl = `https://ipfs.io/ipfs/${ipfsHash}`;
+      console.log("🔗 Final metadata URL:", metadataUrl);
 
       // Prepare mint parameters
       const mintParams = [
@@ -531,7 +555,10 @@ function AdminNFTCreatorUltraSimpleContent() {
         attempts,
       });
 
+      console.log("🎯 SecureResult received:", secureResult);
+
       if (secureResult) {
+        console.log("✅ SecureResult is truthy, proceeding with success flow");
         toast.success("NFT and auction created successfully!");
 
         // Clear cache
@@ -560,12 +587,25 @@ function AdminNFTCreatorUltraSimpleContent() {
           JSON.stringify(nftCreationData)
         );
 
-        // Navigate to success page
-        router.push(`/admin/nft-success/${secureResult.nft.transactionHash}`);
+        const successUrl = `/admin/nft-success/${secureResult.nft.transactionHash}`;
+        console.log("🎯 Navigating to success page:", successUrl);
+
+        // Try router.push first, fallback to window.location
+        try {
+          router.push(successUrl);
+          console.log("✅ Router.push executed successfully");
+        } catch (error) {
+          console.error("❌ Router.push failed, using window.location:", error);
+          window.location.href = successUrl;
+        }
       } else {
-        toast.success("NFT and auction created! Check the auctions page.");
+        console.log("❌ SecureResult is falsy, using fallback redirect");
+        toast.success(
+          "NFT and auction created! Redirecting to auctions page..."
+        );
         setTimeout(() => {
-          window.location.href = "/auctions";
+          console.log("🎯 Executing fallback redirect to /auctions");
+          router.push("/auctions");
         }, 2000);
       }
     } catch (error) {

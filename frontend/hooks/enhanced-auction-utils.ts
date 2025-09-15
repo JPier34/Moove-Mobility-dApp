@@ -320,6 +320,11 @@ async function fetchNFTMetadataComplete(
 ): Promise<any> {
   console.log(`🔍 Starting complete metadata fetch for NFT #${tokenId}`);
 
+  // Special debug for NFT #47
+  if (tokenId === 47) {
+    console.log("🔍 [SPECIAL DEBUG] Starting NFT #47 metadata fetch...");
+  }
+
   try {
     // Strategy 1: Try tokenURI from contract
     let tokenURI = null;
@@ -454,6 +459,24 @@ async function fetchNFTMetadataComplete(
       finalName: finalMetadata.name,
       finalImage: finalMetadata.image,
     });
+
+    // Special debug for NFT #47
+    if (tokenId === 47) {
+      console.log("🔍 [SPECIAL DEBUG] NFT #47 Final Metadata:", {
+        finalName: finalMetadata.name,
+        finalImage: finalMetadata.image,
+        finalDescription: finalMetadata.description,
+        attributesCount: finalMetadata.attributes?.length || 0,
+        isUsingFallback: finalMetadata.name === `NFT #${tokenId}`,
+        isDefaultImage: finalMetadata.image === "/images/default-nft.png",
+        sources: {
+          tokenURI,
+          hasIpfsMetadata: !!ipfsMetadata,
+          hasLocalMetadata: !!localMetadata,
+          hasContractMetadata: !!contractMetadata,
+        },
+      });
+    }
     return finalMetadata;
   } catch (error) {
     console.error(
@@ -519,6 +542,10 @@ async function buildAuctionWithCompleteData(
   nftContract: ethers.Contract,
   auctionContract?: ethers.Contract
 ): Promise<Auction | null> {
+  console.log(
+    `🏗️ [BUILD] Starting buildAuctionWithCompleteData for auction ${auctionId}`
+  );
+
   try {
     // Validate auction data first
     const validation = validateAuctionData(auctionData);
@@ -536,7 +563,23 @@ async function buildAuctionWithCompleteData(
     console.log(
       `🔍 [Auction ${auctionId}] Starting metadata fetch for token ${tokenId}`
     );
+
+    // Special debug for NFT #47
+    if (tokenId === 47) {
+      console.log(
+        "🔍 [SPECIAL DEBUG] About to call fetchNFTMetadataComplete for NFT #47"
+      );
+    }
+
     const metadata = await fetchNFTMetadataComplete(nftContract, tokenId);
+
+    // Special debug for NFT #47
+    if (tokenId === 47) {
+      console.log(
+        "🔍 [SPECIAL DEBUG] fetchNFTMetadataComplete returned for NFT #47:",
+        metadata
+      );
+    }
     console.log(`📊 [Auction ${auctionId}] Metadata received:`, {
       name: metadata.name,
       image: metadata.image,
@@ -649,6 +692,11 @@ async function buildAuctionWithCompleteData(
       currency: "ETH",
       isSettled: auctionData.isSettled || false, // Campo isSettled dal contratto
       transactionHash: undefined, // Non disponibile direttamente dal contratto
+      // English auction extension settings (defaults)
+      extensionThresholdMinutes:
+        Number(auctionData.auctionType) === 0 ? 5 : undefined, // Only for English auctions
+      extensionDurationMinutes:
+        Number(auctionData.auctionType) === 0 ? 10 : undefined, // Only for English auctions
       attributes: {
         rarity:
           metadata.attributes?.find(
@@ -664,11 +712,34 @@ async function buildAuctionWithCompleteData(
 
     console.log(`✅ [Auction ${auctionId}] Successfully built auction:`, {
       id: auction.auctionId,
+      nftId: auction.nftId,
       name: auction.nftName,
       image: auction.nftImage,
       category: auction.nftCategory,
       status: auction.status,
+      auctionType: auction.auctionType,
+      // Log English auction specific properties
+      ...(auction.auctionType === 0 && {
+        extensionThresholdMinutes: auction.extensionThresholdMinutes,
+        extensionDurationMinutes: auction.extensionDurationMinutes,
+      }),
     });
+
+    // Special debug for NFT #47
+    if (tokenId === 47) {
+      console.log("🔍 [SPECIAL DEBUG] NFT #47 Details:", {
+        tokenId,
+        auctionId,
+        nftName: auction.nftName,
+        nftImage: auction.nftImage,
+        nftCategory: auction.nftCategory,
+        metadataName: metadata.name,
+        metadataImage: metadata.image,
+        attributes: metadata.attributes,
+        isDefaultImage: auction.nftImage === "/images/default-nft.png",
+        isDefaultName: auction.nftName === `NFT #${tokenId}`,
+      });
+    }
 
     return auction;
   } catch (error) {
@@ -765,6 +836,13 @@ async function fetchAuctionFromContractCorrected(
 ): Promise<Auction | null> {
   try {
     console.log(`🔍 Fetching auction ${auctionId} with complete metadata...`);
+
+    // Special debug for auction #12
+    if (auctionId === 12) {
+      console.log(
+        "🔍 [SPECIAL DEBUG] Starting fetch for auction #12 (NFT #47)"
+      );
+    }
 
     if (typeof window === "undefined" || !window.ethereum) {
       console.warn("⚠️ No ethereum provider available");
