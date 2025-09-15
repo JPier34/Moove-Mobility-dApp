@@ -53,8 +53,32 @@ export function AuctionNotificationsProvider({
       console.log("🔔 AuctionNotificationsProvider - User connected:", address);
       console.log("🔔 Unsettled auctions:", unsettledAuctions.length);
       console.log("🔔 Show congratulations:", showCongratulations);
+
+      // Debug specifico per aste #12 e #13
+      if (unsettledAuctions.length > 0) {
+        console.log(
+          "🔔 Unsettled auctions details:",
+          unsettledAuctions.map((a) => ({
+            auctionId: a.auctionId,
+            status: a.status,
+            name: a.name,
+            isSettled: a.isSettled,
+          }))
+        );
+      }
+
+      // Controlla se ci sono aste #12 o #13
+      const auction12 = unsettledAuctions.find((a) => a.auctionId === "12");
+      const auction13 = unsettledAuctions.find((a) => a.auctionId === "13");
+
+      if (auction12) {
+        console.log("🔔 Found auction #12 in unsettled:", auction12);
+      }
+      if (auction13) {
+        console.log("🔔 Found auction #13 in unsettled:", auction13);
+      }
     }
-  }, [isConnected, address, unsettledAuctions.length, showCongratulations]);
+  }, [isConnected, address, unsettledAuctions, showCongratulations]);
 
   // Gestisci la chiusura del modal
   const handleCloseModal = () => {

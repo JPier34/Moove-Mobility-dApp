@@ -418,9 +418,12 @@ export default function AuctionCard({
                       ).toFixed(6)} ETH`
                     : `Min bid: ${auction.startPrice} ETH`}
                 </span>
-                <span className="text-purple-600">
-                  Reserve: {auction.reservePrice} ETH
-                </span>
+                {/* Only show reserve price for Reserve auctions */}
+                {auction.auctionType === AuctionType.RESERVE && (
+                  <span className="text-purple-600">
+                    Reserve: {auction.reservePrice} ETH
+                  </span>
+                )}
               </div>
               {/* Buy Now price if available */}
               {auction.buyNowPrice && parseFloat(auction.buyNowPrice) > 0 && (

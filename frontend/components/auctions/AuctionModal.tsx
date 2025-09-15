@@ -15,6 +15,7 @@ import {
 import { useDutchAuction } from "../../hooks/useDutchAuction";
 import { useDutchPrice } from "@/hooks/useDutchPrice";
 import { useAuctionHandler } from "@/hooks/useAuctionHandler";
+import { useSealedBidAuction } from "@/hooks/useSealedBidAuction";
 import DutchAuctionSuccessModal from "./DutchAuctionSuccessModal";
 import { formatEther, parseEther } from "viem";
 import { ethers } from "ethers";
@@ -57,7 +58,6 @@ export default function AuctionModal({
 
   // Sealed bid state
   const [sealedBidAmount, setSealedBidAmount] = useState("");
-  const [sealedBidNonce, setSealedBidNonce] = useState("");
 
   // Hooks for auction interactions
   const { placeBid } = usePlaceBid();
@@ -79,6 +79,12 @@ export default function AuctionModal({
     step: handlerStep,
   } = useAuctionHandler();
 
+  const sealedBidAuction = useSealedBidAuction();
+
+  // Check if user has already submitted a sealed bid
+  const [hasSubmittedSealedBid, setHasSubmittedSealedBid] = useState(false);
+  const [sealedBidStatus, setSealedBidStatus] = useState<string>("");
+
   // Simple modal lock during transactions
   const { lockedOnClose, isLocked } = useModalLock({
     isLocked: isSubmittingBid || isHandlerProcessing,
@@ -94,6 +100,39 @@ export default function AuctionModal({
       document.body.style.overflow = "unset";
     };
   }, [isOpen]);
+
+  // Check sealed bid status when auction changes
+  useEffect(() => {
+    const checkSealedBidStatus = async () => {
+      if (auction.auctionType === AuctionType.SEALED_BID && address) {
+        try {
+          // Check if user has already submitted a sealed bid
+          const bidData = localStorage.getItem(
+            `sealed_bid_${auction.auctionId}_${address}`
+          );
+          if (bidData) {
+            const parsedData = JSON.parse(bidData);
+            setHasSubmittedSealedBid(true);
+            setSealedBidStatus(
+              parsedData.status === "committed" ? "committed" : "revealed"
+            );
+          } else {
+            setHasSubmittedSealedBid(false);
+            setSealedBidStatus("");
+          }
+        } catch (error) {
+          console.error("Error checking sealed bid status:", error);
+          setHasSubmittedSealedBid(false);
+          setSealedBidStatus("");
+        }
+      } else {
+        setHasSubmittedSealedBid(false);
+        setSealedBidStatus("");
+      }
+    };
+
+    checkSealedBidStatus();
+  }, [auction.auctionId, auction.auctionType, address]);
 
   // Calculate time remaining
   useEffect(() => {
@@ -240,8 +279,8 @@ export default function AuctionModal({
   };
 
   const handleSealedBid = async () => {
-    if (!sealedBidAmount || !sealedBidNonce) {
-      toast.error("Please enter both bid amount and nonce");
+    if (!sealedBidAmount) {
+      toast.error("Please enter bid amount");
       return;
     }
 
@@ -249,17 +288,17 @@ export default function AuctionModal({
     try {
       console.log("Submitting sealed bid for auction:", auction.auctionId);
 
-      // Use the unified auction handler for sealed bid
-      const result = await handleAuctionAction(
-        auction,
-        "bid",
+      // Use the new sealed bid handler with automatic nonce
+      const success = await sealedBidAuction.submitSealedBid(
+        parseInt(auction.auctionId),
         sealedBidAmount,
-        sealedBidNonce
+        auction.startPrice // Pass minimum price for validation
       );
 
-      if (result.success) {
+      if (success) {
         setSealedBidAmount("");
-        setSealedBidNonce("");
+        setHasSubmittedSealedBid(true);
+        setSealedBidStatus("committed");
 
         toast.success(
           "Sealed bid submitted successfully! Refreshing auction data...",
@@ -273,7 +312,7 @@ export default function AuctionModal({
           duration: 4000,
         });
       } else {
-        toast.error(result.error || "Error submitting sealed bid");
+        toast.error("Error submitting sealed bid");
       }
     } catch (error) {
       console.error("Error submitting sealed bid:", error);
@@ -321,14 +360,6 @@ export default function AuctionModal({
     const currentBid = parseFloat(currentBidStr);
     const increment = parseFloat(auction.bidIncrement) || 0.001;
     const startPrice = parseFloat(auction.startPrice) || 0.001;
-
-    console.log("🎯 Quick bid calculation:", {
-      currentBidStr,
-      currentBid,
-      increment,
-      startPrice,
-      isFirstBid: currentBid === 0 || isNaN(currentBid),
-    });
 
     // If no bids yet, first bid can be startPrice
     if (currentBid === 0 || isNaN(currentBid)) {
@@ -646,50 +677,67 @@ export default function AuctionModal({
                     (auction.status as AuctionStatus) ===
                       AuctionStatus.ACTIVE && (
                       <div className="space-y-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Bid (ETH)
-                          </label>
-                          <input
-                            type="number"
-                            step="0.0001"
-                            placeholder="0.0000"
-                            value={sealedBidAmount}
-                            onChange={(e) => setSealedBidAmount(e.target.value)}
-                            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-moove-primary focus:border-moove-primary"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Nonce (Secret code)
-                          </label>
-                          <input
-                            type="number"
-                            placeholder="123456"
-                            value={sealedBidNonce}
-                            onChange={(e) => setSealedBidNonce(e.target.value)}
-                            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-moove-primary focus:border-moove-primary"
-                          />
-                          <div className="text-xs text-gray-500 mt-1">
-                            Remember this number - it will be used to reveal
-                            your bid!
+                        {hasSubmittedSealedBid ? (
+                          /* User has already submitted a sealed bid */
+                          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                            <div className="text-green-800 font-medium mb-2">
+                              ✅ Sealed Bid Submitted
+                            </div>
+                            <div className="text-green-700 text-sm mb-2">
+                              You have already submitted a sealed bid for this
+                              auction.
+                            </div>
+                            <div className="text-green-600 text-xs">
+                              Status:{" "}
+                              <span className="font-semibold">
+                                {sealedBidStatus}
+                              </span>
+                            </div>
+                            <div className="text-green-600 text-xs mt-1">
+                              Wait for the reveal phase to see the results.
+                            </div>
                           </div>
-                        </div>
-                        <Button
-                          onClick={handleSealedBid}
-                          disabled={
-                            !isConnected ||
-                            isSubmittingBid ||
-                            !sealedBidAmount ||
-                            !sealedBidNonce
-                          }
-                          className="w-full"
-                          size="lg"
-                        >
-                          {isSubmittingBid
-                            ? "Submitting..."
-                            : "Submit Sealed Bid"}
-                        </Button>
+                        ) : (
+                          /* User can still submit a sealed bid */
+                          <>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Bid (ETH)
+                              </label>
+                              <input
+                                type="number"
+                                step="0.0001"
+                                placeholder="0.0000"
+                                value={sealedBidAmount}
+                                onChange={(e) =>
+                                  setSealedBidAmount(e.target.value)
+                                }
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-moove-primary focus:border-moove-primary"
+                              />
+                            </div>
+                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                              <div className="text-sm text-blue-800">
+                                🔒 <strong>Sealed Bid:</strong> Your bid amount
+                                will be hidden until the reveal phase. A secure
+                                nonce will be generated automatically.
+                              </div>
+                            </div>
+                            <Button
+                              onClick={handleSealedBid}
+                              disabled={
+                                !isConnected ||
+                                isSubmittingBid ||
+                                !sealedBidAmount
+                              }
+                              className="w-full"
+                              size="lg"
+                            >
+                              {isSubmittingBid
+                                ? "Submitting..."
+                                : "Submit Sealed Bid"}
+                            </Button>
+                          </>
+                        )}
                       </div>
                     )}
 
@@ -785,14 +833,6 @@ export default function AuctionModal({
                             const bidIncrement = parseFloat(
                               auction.bidIncrement || "0"
                             );
-
-                            console.log("🎯 Minimum bid calculation:", {
-                              currentBidStr: auction.currentBid,
-                              currentBid,
-                              startPrice,
-                              bidIncrement,
-                              isFirstBid: currentBid === 0 || isNaN(currentBid),
-                            });
 
                             if (currentBid === 0 || isNaN(currentBid)) {
                               return startPrice.toFixed(6);
@@ -934,12 +974,15 @@ export default function AuctionModal({
                     {auction.startPrice} ETH
                   </span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Reserve Price</span>
-                  <span className="font-medium text-gray-700">
-                    {auction.reservePrice} ETH
-                  </span>
-                </div>
+                {/* Only show reserve price for Reserve auctions */}
+                {auction.auctionType === AuctionType.RESERVE && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Reserve Price</span>
+                    <span className="font-medium text-gray-700">
+                      {auction.reservePrice} ETH
+                    </span>
+                  </div>
+                )}
                 {auction.buyNowPrice && (
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-500">Buy Now</span>

@@ -77,6 +77,18 @@ export function useWonAuctions(): UseWonAuctionsReturn {
         `🔍 Found ${userWonAuctions.length} auctions where user is highest bidder`
       );
 
+      // Debug: mostra le aste filtrate
+      console.log(
+        `🔍 User won auctions:`,
+        userWonAuctions.map((a) => ({
+          id: a.auctionId,
+          status: a.status,
+          name: a.nftName,
+          highestBidder: a.highestBidder,
+          seller: a.seller,
+        }))
+      );
+
       // Debug: mostra tutte le aste per capire il problema
       console.log(
         `📊 All auctions status:`,
@@ -88,6 +100,50 @@ export function useWonAuctions(): UseWonAuctionsReturn {
           highestBidder: a.highestBidder,
         }))
       );
+
+      // Debug specifico per aste #12 e #13
+      const auction12 = auctions.find((a) => a.auctionId === "12");
+      const auction13 = auctions.find((a) => a.auctionId === "13");
+
+      if (auction12) {
+        console.log(`🔍 Auction #12 details:`, {
+          id: auction12.auctionId,
+          status: auction12.status,
+          name: auction12.nftName,
+          seller: auction12.seller,
+          highestBidder: auction12.highestBidder,
+          userAddress: address,
+          isUserWinner:
+            auction12.highestBidder &&
+            auction12.highestBidder.toLowerCase() === address.toLowerCase(),
+          isUserSeller:
+            auction12.seller &&
+            auction12.seller.toLowerCase() === address.toLowerCase(),
+          endTime: auction12.endTime
+            ? new Date(auction12.endTime).toISOString()
+            : "undefined",
+        });
+      }
+
+      if (auction13) {
+        console.log(`🔍 Auction #13 details:`, {
+          id: auction13.auctionId,
+          status: auction13.status,
+          name: auction13.nftName,
+          seller: auction13.seller,
+          highestBidder: auction13.highestBidder,
+          userAddress: address,
+          isUserWinner:
+            auction13.highestBidder &&
+            auction13.highestBidder.toLowerCase() === address.toLowerCase(),
+          isUserSeller:
+            auction13.seller &&
+            auction13.seller.toLowerCase() === address.toLowerCase(),
+          endTime: auction13.endTime
+            ? new Date(auction13.endTime).toISOString()
+            : "undefined",
+        });
+      }
 
       const wonAuctions: WonAuction[] = [];
 
@@ -130,13 +186,13 @@ export function useWonAuctions(): UseWonAuctionsReturn {
         wonAuctions.push(wonAuction);
       }
 
-      // Filter to show only properly settled auctions
-      // Status 4 = SETTLED (NFT trasferito al vincitore)
-      // Status 3 = CANCELLED/DESERTA (NFT torna al seller/admin)
-      // Solo includere aste con status 4 per vincitori, status 3 per seller
+      // Filter to show auctions ready for settlement
+      // Status 3 = ENDED (pronto per settlement)
+      // Status 4 = SETTLED (già completato)
       const confirmedAuctions = wonAuctions.filter(
         (auction) =>
-          auction.status === 4 || // Solo aste completamente settled per vincitori
+          auction.status === 3 || // Asta ENDED, pronta per settlement
+          auction.status === 4 || // Asta già SETTLED
           (auction.transactionHash && isAuctionCompleted(auction.auctionId))
       );
 

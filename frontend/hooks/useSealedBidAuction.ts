@@ -5,12 +5,18 @@ import { useAccount } from "wagmi";
 import { parseEther, formatEther } from "viem";
 import { ethers } from "ethers";
 import { toast } from "react-hot-toast";
+import {
+  generateSealedBidNonce,
+  generateSealedBidCommit,
+  saveSealedBidData,
+  validateSealedBidAmount,
+} from "@/utils/sealedBidUtils";
 
 export interface SealedBidAuctionHandler {
   submitSealedBid: (
     auctionId: number,
     bidAmount: string,
-    nonce: string
+    minimumPrice?: string
   ) => Promise<boolean>;
   revealBid: (
     auctionId: number,
@@ -36,7 +42,7 @@ export function useSealedBidAuction(): SealedBidAuctionHandler {
     async (
       auctionId: number,
       bidAmount: string,
-      nonce: string
+      minimumPrice?: string
     ): Promise<boolean> => {
       if (!isConnected || !address) {
         setError("Wallet not connected");
@@ -55,23 +61,30 @@ export function useSealedBidAuction(): SealedBidAuctionHandler {
       setStep("submitting");
 
       try {
+        // Validate bid amount against minimum price
+        if (minimumPrice) {
+          const validation = validateSealedBidAmount(bidAmount, minimumPrice);
+          if (!validation.isValid) {
+            throw new Error(validation.error);
+          }
+        }
+
+        // Generate nonce automatically
+        const nonce = generateSealedBidNonce();
+        console.log(
+          "🎲 Generated nonce for sealed bid:",
+          nonce.slice(0, 10) + "..."
+        );
+
         // Validate inputs
         const bidAmountWei = parseEther(bidAmount);
-        const nonceBigInt = BigInt(nonce);
 
         if (bidAmountWei <= 0n) {
           throw new Error("Bid amount must be greater than 0");
         }
 
-        if (nonceBigInt <= 0n) {
-          throw new Error("Nonce must be greater than 0");
-        }
-
-        // Create sealed bid hash
-        const bidHash = ethers.solidityPackedKeccak256(
-          ["uint256", "uint256", "address"],
-          [bidAmountWei, nonceBigInt, address]
-        );
+        // Create sealed bid hash using the utility function
+        const bidHash = generateSealedBidCommit(bidAmount, nonce, address);
 
         setBidHash(bidHash);
 
@@ -85,6 +98,15 @@ export function useSealedBidAuction(): SealedBidAuctionHandler {
         // TODO: Implement actual contract call when available
         // For now, simulate the transaction
         await new Promise((resolve) => setTimeout(resolve, 2000));
+
+        // Save bid data for reveal phase
+        saveSealedBidData(
+          auctionId.toString(),
+          address,
+          bidAmount,
+          nonce,
+          bidHash
+        );
 
         console.log("✅ Sealed bid submitted successfully");
         setStep("success");
@@ -230,6 +252,3 @@ export function useSealedBidAuction(): SealedBidAuctionHandler {
     bidHash,
   };
 }
-
-
-
