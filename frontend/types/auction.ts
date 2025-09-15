@@ -35,6 +35,9 @@ export interface Auction {
   currency: string;
   isSettled?: boolean;
   transactionHash?: string;
+  // English auction extension settings
+  extensionThresholdMinutes?: number;
+  extensionDurationMinutes?: number;
   attributes: {
     rarity?: string;
     designer?: string;

@@ -15,6 +15,9 @@ export interface AuctionFormData {
   bidIncrement: string;
   reservePrice: string;
   buyNowPrice: string;
+  // English auction extension settings
+  extensionThresholdMinutes: string;
+  extensionDurationMinutes: string;
 }
 
 export interface ValidationResult {
@@ -31,6 +34,9 @@ const DEFAULT_FORM_DATA: AuctionFormData = {
   bidIncrement: "",
   reservePrice: "",
   buyNowPrice: "",
+  // English auction extension defaults
+  extensionThresholdMinutes: "5",
+  extensionDurationMinutes: "10",
 };
 
 export function useAuctionValidationModular() {
@@ -61,5 +67,3 @@ export function useAuctionValidationModular() {
     validateForTransaction,
   };
 }
-
-

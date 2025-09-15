@@ -56,6 +56,12 @@ export function useAuctionHandler(): AuctionHandler {
                 startPrice: auction.startPrice,
                 currentBid: auction.currentBid,
                 bidIncrement: auction.bidIncrement,
+                endTime: auction.endTime, // Add endTime for extension logic
+                // Extension settings (these should come from auction metadata or form)
+                extensionThresholdMinutes:
+                  auction.extensionThresholdMinutes || 5,
+                extensionDurationMinutes:
+                  auction.extensionDurationMinutes || 10,
               };
               const success = await englishAuction.placeBid(
                 parseInt(auction.auctionId),

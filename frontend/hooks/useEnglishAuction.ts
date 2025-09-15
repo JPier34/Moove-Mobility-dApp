@@ -5,6 +5,7 @@ import { useAccount } from "wagmi";
 import { usePlaceBid } from "./useAuction";
 import { parseEther, formatEther } from "viem";
 import { toast } from "react-hot-toast";
+import { useExtendAuction } from "./useExtendAuction";
 
 export interface EnglishAuctionHandler {
   placeBid: (
@@ -14,6 +15,9 @@ export interface EnglishAuctionHandler {
       startPrice: string;
       currentBid: string;
       bidIncrement: string;
+      endTime?: string; // Add endTime for extension logic
+      extensionThresholdMinutes?: number; // Configurable threshold
+      extensionDurationMinutes?: number; // Configurable duration
     }
   ) => Promise<boolean>;
   buyNow: (auctionId: number, buyNowPrice: string) => Promise<boolean>;
@@ -31,6 +35,11 @@ export function useEnglishAuction(): EnglishAuctionHandler {
   >("idle");
 
   const { placeBid, isPending: isBidding, error: bidError } = usePlaceBid();
+  const { extendAuction, isExtending } = useExtendAuction();
+
+  // Default extension settings (can be overridden)
+  const DEFAULT_EXTENSION_THRESHOLD_MINUTES = 5;
+  const DEFAULT_EXTENSION_DURATION_MINUTES = 10;
 
   const placeBidWithValidation = useCallback(
     async (
@@ -40,6 +49,9 @@ export function useEnglishAuction(): EnglishAuctionHandler {
         startPrice: string;
         currentBid: string;
         bidIncrement: string;
+        endTime?: string;
+        extensionThresholdMinutes?: number;
+        extensionDurationMinutes?: number;
       }
     ): Promise<boolean> => {
       if (!isConnected || !address) {
@@ -94,7 +106,34 @@ export function useEnglishAuction(): EnglishAuctionHandler {
           `🏆 Placing bid for English auction ${auctionId}: ${bidAmount} ETH`
         );
 
-        // Place the bid
+        // Check if we need to extend the auction (English auction specific)
+        let shouldExtend = false;
+        const extensionThreshold =
+          auctionData?.extensionThresholdMinutes ||
+          DEFAULT_EXTENSION_THRESHOLD_MINUTES;
+        const extensionDuration =
+          auctionData?.extensionDurationMinutes ||
+          DEFAULT_EXTENSION_DURATION_MINUTES;
+
+        if (auctionData?.endTime) {
+          const currentTime = Math.floor(Date.now() / 1000);
+          const endTime = parseInt(auctionData.endTime);
+          const timeUntilEnd = endTime - currentTime;
+          const thresholdSeconds = extensionThreshold * 60;
+
+          if (timeUntilEnd > 0 && timeUntilEnd <= thresholdSeconds) {
+            shouldExtend = true;
+            console.log(
+              `⏰ Bid placed in last ${extensionThreshold} minutes (${Math.floor(
+                timeUntilEnd / 60
+              )}m ${
+                timeUntilEnd % 60
+              }s remaining) - will extend auction by ${extensionDuration} minutes`
+            );
+          }
+        }
+
+        // Place the bid first
         await new Promise<void>((resolve, reject) => {
           const timeout = setTimeout(() => {
             reject(new Error("Bid transaction timeout"));
@@ -119,9 +158,42 @@ export function useEnglishAuction(): EnglishAuctionHandler {
         });
 
         console.log("✅ Bid placed successfully");
-        setStep("success");
-        toast.success(`Bid of ${bidAmount} ETH placed successfully!`);
 
+        // If we need to extend the auction, do it now (after successful bid)
+        if (shouldExtend) {
+          try {
+            console.log(
+              `⏰ Extending auction ${auctionId} by ${extensionDuration} minutes...`
+            );
+            const extensionSuccess = await extendAuction(
+              auctionId,
+              extensionDuration
+            );
+
+            if (extensionSuccess) {
+              console.log(`✅ Auction ${auctionId} extended successfully`);
+              toast.success(
+                `Bid placed! Auction extended by ${extensionDuration} minutes due to late bid`
+              );
+            } else {
+              console.warn(
+                `⚠️ Failed to extend auction ${auctionId}, but bid was successful`
+              );
+              toast.success(
+                `Bid of ${bidAmount} ETH placed successfully! (Extension failed)`
+              );
+            }
+          } catch (extensionError) {
+            console.error("❌ Extension error:", extensionError);
+            toast.success(
+              `Bid of ${bidAmount} ETH placed successfully! (Extension failed)`
+            );
+          }
+        } else {
+          toast.success(`Bid of ${bidAmount} ETH placed successfully!`);
+        }
+
+        setStep("success");
         return true;
       } catch (error) {
         console.error("❌ English auction bid failed:", error);
@@ -152,7 +224,17 @@ export function useEnglishAuction(): EnglishAuctionHandler {
         }, 3000);
       }
     },
-    [isConnected, address, isProcessing, placeBid, isBidding, bidError]
+    [
+      isConnected,
+      address,
+      isProcessing,
+      placeBid,
+      isBidding,
+      bidError,
+      extendAuction,
+      DEFAULT_EXTENSION_THRESHOLD_MINUTES,
+      DEFAULT_EXTENSION_DURATION_MINUTES,
+    ]
   );
 
   const buyNow = useCallback(
@@ -240,7 +322,17 @@ export function useEnglishAuction(): EnglishAuctionHandler {
         }, 3000);
       }
     },
-    [isConnected, address, isProcessing, placeBid, isBidding, bidError]
+    [
+      isConnected,
+      address,
+      isProcessing,
+      placeBid,
+      isBidding,
+      bidError,
+      extendAuction,
+      DEFAULT_EXTENSION_THRESHOLD_MINUTES,
+      DEFAULT_EXTENSION_DURATION_MINUTES,
+    ]
   );
 
   return {

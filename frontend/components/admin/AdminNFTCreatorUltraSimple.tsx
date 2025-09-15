@@ -84,20 +84,23 @@ function AdminNFTCreatorUltraSimpleContent() {
         // Dutch auction: start high, end low
         updateField("startPrice", "0.01");
         updateField("reservePrice", "0.001");
-        updateField("buyNowPrice", "0.001"); // Same as reserve (final price)
+        updateField("buyNowPrice", ""); // Not used in Dutch auctions
         updateField("bidIncrement", "0.001"); // Price decrease rate
         break;
       case AuctionType.ENGLISH:
-        // English auction: start low, go high
+        // English auction: start low, go high - NO reserve needed (start price is the minimum)
         updateField("startPrice", "0.001");
-        updateField("reservePrice", ""); // Optional
+        updateField("reservePrice", ""); // Not used - start price is the minimum
         updateField("buyNowPrice", "0.01"); // Higher than start
         updateField("bidIncrement", "0.001");
+        // Set extension defaults
+        updateField("extensionThresholdMinutes", "5");
+        updateField("extensionDurationMinutes", "10");
         break;
       case AuctionType.SEALED_BID:
-        // Sealed bid: similar to English
+        // Sealed bid: similar to English - NO reserve needed
         updateField("startPrice", "0.001");
-        updateField("reservePrice", ""); // Optional
+        updateField("reservePrice", ""); // Not used - start price is the minimum
         updateField("buyNowPrice", ""); // Not typically used
         updateField("bidIncrement", "0.001");
         break;
@@ -152,7 +155,13 @@ function AdminNFTCreatorUltraSimpleContent() {
     const bidIncrement = parseFloat(auctionFormData.bidIncrement);
 
     // Skip validation if basic fields are empty
-    if (!auctionFormData.startPrice || !auctionFormData.bidIncrement) {
+    // Note: bidIncrement is not required for Sealed Bid auctions
+    const bidIncrementRequired =
+      auctionFormData.auctionType !== AuctionType.SEALED_BID;
+    if (
+      !auctionFormData.startPrice ||
+      (bidIncrementRequired && !auctionFormData.bidIncrement)
+    ) {
       return errors;
     }
 
@@ -160,8 +169,11 @@ function AdminNFTCreatorUltraSimpleContent() {
     if (isNaN(startPrice) || startPrice <= 0) {
       errors.push("Start price must be a positive number");
     }
-    if (isNaN(bidIncrement) || bidIncrement <= 0) {
-      errors.push("Bid increment must be a positive number");
+    // Bid increment validation (not required for Sealed Bid)
+    if (auctionFormData.auctionType !== AuctionType.SEALED_BID) {
+      if (isNaN(bidIncrement) || bidIncrement <= 0) {
+        errors.push("Bid increment must be a positive number");
+      }
     }
 
     // Auction type specific validations
@@ -191,14 +203,7 @@ function AdminNFTCreatorUltraSimpleContent() {
         break;
 
       case AuctionType.ENGLISH:
-        // English auction: price increases from start, reserve is minimum
-        if (auctionFormData.reservePrice && !isNaN(reservePrice)) {
-          if (reservePrice < startPrice) {
-            errors.push(
-              "English auction: Reserve price must be GREATER than or equal to start price"
-            );
-          }
-        }
+        // English auction: start price IS the minimum, no reserve needed
         if (auctionFormData.buyNowPrice && !isNaN(buyNowPrice)) {
           if (buyNowPrice < startPrice) {
             errors.push(
@@ -206,17 +211,12 @@ function AdminNFTCreatorUltraSimpleContent() {
             );
           }
         }
+        // Note: Reserve price not used in English auctions - start price is the minimum
         break;
 
       case AuctionType.SEALED_BID:
-        // Sealed bid: similar to English but no incremental bidding
-        if (auctionFormData.reservePrice && !isNaN(reservePrice)) {
-          if (reservePrice < startPrice) {
-            errors.push(
-              "Sealed Bid auction: Reserve price must be GREATER than or equal to start price"
-            );
-          }
-        }
+        // Sealed bid: start price IS the minimum, no reserve needed
+        // Note: Reserve price not used in Sealed Bid auctions - start price is the minimum
         break;
 
       case AuctionType.RESERVE:
@@ -238,13 +238,16 @@ function AdminNFTCreatorUltraSimpleContent() {
         break;
     }
 
-    // Bid increment should not exceed start price
+    // Bid increment should be reasonable compared to start price
     if (
+      auctionFormData.auctionType !== AuctionType.SEALED_BID &&
       !isNaN(startPrice) &&
       !isNaN(bidIncrement) &&
-      bidIncrement >= startPrice
+      bidIncrement > startPrice
     ) {
-      errors.push("Bid increment cannot exceed start price");
+      errors.push(
+        "Bid increment should not exceed start price (consider a smaller increment)"
+      );
     }
 
     return errors;
@@ -886,58 +889,156 @@ function AdminNFTCreatorUltraSimpleContent() {
                     onChange={(e) =>
                       updateField("bidIncrement", e.target.value)
                     }
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500"
-                    placeholder="0.0001"
+                    disabled={
+                      auctionFormData.auctionType === AuctionType.SEALED_BID
+                    }
+                    className={`w-full px-4 py-2 border rounded-lg text-gray-900 dark:text-white focus:border-purple-500 ${
+                      auctionFormData.auctionType === AuctionType.SEALED_BID
+                        ? "bg-gray-100 dark:bg-gray-600 border-gray-300 dark:border-gray-600 cursor-not-allowed opacity-50"
+                        : "bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600"
+                    }`}
+                    placeholder={
+                      auctionFormData.auctionType === AuctionType.SEALED_BID
+                        ? "Not applicable"
+                        : "0.0001"
+                    }
                   />
                   <p className="text-xs text-gray-500 mt-1">
                     {auctionFormData.auctionType === AuctionType.DUTCH &&
-                      "🔻 How much price decreases per time interval"}
+                      "🔻 How much price decreases every 20 minutes"}
                     {(auctionFormData.auctionType === AuctionType.ENGLISH ||
                       auctionFormData.auctionType === AuctionType.RESERVE) &&
                       "📈 Minimum amount each bid must increase"}
-                    {auctionFormData.auctionType === AuctionType.SEALED_BID &&
-                      "🔒 Not used in sealed bid auctions"}
                   </p>
+                  {auctionFormData.auctionType === AuctionType.SEALED_BID && (
+                    <p className="text-xs text-orange-600 mt-1">
+                      🔒 Sealed bid auctions don't use bid increments - bidders
+                      submit any amount
+                    </p>
+                  )}
                 </div>
               </div>
 
               {/* Optional Fields */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Reserve Price (ETH)
-                    <span className="text-sm text-gray-500 ml-1">
-                      (Optional)
-                    </span>
-                  </label>
-                  <input
-                    type="number"
-                    step="0.000001"
-                    value={auctionFormData.reservePrice}
-                    onChange={(e) =>
-                      updateField("reservePrice", e.target.value)
-                    }
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500"
-                    placeholder="0.01"
-                  />
-                </div>
+                {/* Reserve Price - Only show for Dutch and Reserve auctions */}
+                {(auctionFormData.auctionType === AuctionType.DUTCH ||
+                  auctionFormData.auctionType === AuctionType.RESERVE) && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Reserve Price (ETH)
+                      {auctionFormData.auctionType === AuctionType.RESERVE ? (
+                        <span className="text-sm text-red-500 ml-1">
+                          (Required)
+                        </span>
+                      ) : (
+                        <span className="text-sm text-gray-500 ml-1">
+                          (Optional)
+                        </span>
+                      )}
+                    </label>
+                    <input
+                      type="number"
+                      step="0.000001"
+                      value={auctionFormData.reservePrice}
+                      onChange={(e) =>
+                        updateField("reservePrice", e.target.value)
+                      }
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500"
+                      placeholder={
+                        auctionFormData.auctionType === AuctionType.DUTCH
+                          ? "0.001 (final price)"
+                          : "0.01 (minimum price)"
+                      }
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      {auctionFormData.auctionType === AuctionType.DUTCH &&
+                        "🔻 Final price when auction ends (must be < start price)"}
+                      {auctionFormData.auctionType === AuctionType.RESERVE &&
+                        "🏛️ Required minimum price (must be ≥ start price)"}
+                    </p>
+                  </div>
+                )}
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Buy Now Price (ETH)
-                    <span className="text-sm text-gray-500 ml-1">
-                      (Optional)
-                    </span>
-                  </label>
-                  <input
-                    type="number"
-                    step="0.000001"
-                    value={auctionFormData.buyNowPrice}
-                    onChange={(e) => updateField("buyNowPrice", e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500"
-                    placeholder="0.1"
-                  />
-                </div>
+                {/* Buy Now Price - Only show for English and Reserve auctions */}
+                {(auctionFormData.auctionType === AuctionType.ENGLISH ||
+                  auctionFormData.auctionType === AuctionType.RESERVE) && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Buy Now Price (ETH)
+                      <span className="text-sm text-gray-500 ml-1">
+                        (Optional)
+                      </span>
+                    </label>
+                    <input
+                      type="number"
+                      step="0.000001"
+                      value={auctionFormData.buyNowPrice}
+                      onChange={(e) =>
+                        updateField("buyNowPrice", e.target.value)
+                      }
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500"
+                      placeholder="0.1"
+                    />
+                  </div>
+                )}
+
+                {/* English Auction Extension Settings - Only show for English auctions */}
+                {auctionFormData.auctionType === AuctionType.ENGLISH && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Extension Threshold (minutes)
+                        <span className="text-sm text-gray-500 ml-1">
+                          (Auto-extend trigger)
+                        </span>
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="60"
+                        value={auctionFormData.extensionThresholdMinutes}
+                        onChange={(e) =>
+                          updateField(
+                            "extensionThresholdMinutes",
+                            e.target.value
+                          )
+                        }
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500"
+                        placeholder="5"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        ⏰ Extend auction if bid is placed in the last X minutes
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Extension Duration (minutes)
+                        <span className="text-sm text-gray-500 ml-1">
+                          (How much to extend)
+                        </span>
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="120"
+                        value={auctionFormData.extensionDurationMinutes}
+                        onChange={(e) =>
+                          updateField(
+                            "extensionDurationMinutes",
+                            e.target.value
+                          )
+                        }
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500"
+                        placeholder="10"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        ⏱️ Add X minutes to auction when late bid is placed
+                      </p>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Auction Type Info */}
@@ -960,15 +1061,35 @@ function AdminNFTCreatorUltraSimpleContent() {
                 </h4>
                 <p className="text-sm text-blue-700 dark:text-blue-400">
                   {auctionFormData.auctionType === AuctionType.ENGLISH &&
-                    "Bidders compete by placing increasingly higher bids. The highest bidder wins when the auction ends."}
+                    `Bidders compete by placing increasingly higher bids. The auction automatically extends by ${
+                      auctionFormData.extensionDurationMinutes || 10
+                    } minutes when bids are placed in the last ${
+                      auctionFormData.extensionThresholdMinutes || 5
+                    } minutes.`}
                   {auctionFormData.auctionType === AuctionType.DUTCH &&
-                    "The price starts high and decreases over time until someone accepts the current price."}
+                    "The price starts high and decreases every 20 minutes by the specified rate until someone buys at the current price or it reaches the reserve price."}
                   {auctionFormData.auctionType === AuctionType.SEALED_BID &&
                     "Bidders submit secret bids without knowing others' bids. The highest bid wins after a reveal phase."}
                   {auctionFormData.auctionType === AuctionType.RESERVE &&
                     "Like an English auction, but with a minimum price that must be met for the item to sell."}
                 </p>
               </div>
+
+              {/* English Auction Timer Info */}
+              {auctionFormData.auctionType === AuctionType.ENGLISH && (
+                <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 mb-4">
+                  <p className="text-green-800 dark:text-green-300 text-sm font-medium mb-1">
+                    ✅ English Auction Auto-Extension
+                  </p>
+                  <p className="text-green-700 dark:text-green-400 text-xs">
+                    Auction automatically extends by{" "}
+                    {auctionFormData.extensionDurationMinutes || 10} minutes
+                    when bids are placed in the last{" "}
+                    {auctionFormData.extensionThresholdMinutes || 5} minutes -
+                    ensuring fair bidding as per original specifications.
+                  </p>
+                </div>
+              )}
 
               {/* Validation Errors */}
               {(!areRequiredFieldsFilled ||

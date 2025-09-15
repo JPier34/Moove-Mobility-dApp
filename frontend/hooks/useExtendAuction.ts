@@ -1,0 +1,95 @@
+"use client";
+
+import { useState, useCallback } from "react";
+import { useAccount } from "wagmi";
+import { useWriteContract } from "wagmi";
+import { toast } from "react-hot-toast";
+import { MOOVE_AUCTION_ADDRESS } from "../lib/contracts";
+import MooveAuctionABI from "../src/abis/MooveAuction.json";
+
+export interface ExtendAuctionHandler {
+  extendAuction: (
+    auctionId: number,
+    additionalTimeMinutes: number
+  ) => Promise<boolean>;
+  isExtending: boolean;
+  error: string | null;
+}
+
+export function useExtendAuction(): ExtendAuctionHandler {
+  const { address, isConnected } = useAccount();
+  const [isExtending, setIsExtending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const { writeContractAsync } = useWriteContract();
+
+  const extendAuction = useCallback(
+    async (
+      auctionId: number,
+      additionalTimeMinutes: number
+    ): Promise<boolean> => {
+      if (!isConnected || !address) {
+        setError("Wallet not connected");
+        toast.error("Connect wallet to extend auction");
+        return false;
+      }
+
+      if (isExtending) {
+        console.warn("Extension already in progress");
+        return false;
+      }
+
+      setIsExtending(true);
+      setError(null);
+
+      try {
+        const additionalTimeSeconds = additionalTimeMinutes * 60; // Convert to seconds
+
+        console.log(
+          `⏰ Extending auction ${auctionId} by ${additionalTimeMinutes} minutes (${additionalTimeSeconds} seconds)`
+        );
+
+        // Call the extendAuction function on the smart contract
+        const result = await writeContractAsync({
+          address: MOOVE_AUCTION_ADDRESS,
+          abi: MooveAuctionABI.abi,
+          functionName: "extendAuction",
+          args: [auctionId, additionalTimeSeconds],
+        });
+
+        console.log("✅ Auction extended successfully:", result);
+
+        // Don't show toast here - let the calling function handle user feedback
+        // since extension should be transparent to the user during bidding
+
+        return true;
+      } catch (error) {
+        console.error("❌ Auction extension failed:", error);
+        const errorMessage =
+          error instanceof Error ? error.message : "Unknown error";
+        setError(errorMessage);
+
+        // Only show error toast, not success
+        if (errorMessage.includes("timeout")) {
+          toast.error("Extension timeout - auction may still be extended");
+        } else if (errorMessage.includes("user rejected")) {
+          // User rejected - this shouldn't happen in auto-extension
+          console.warn("User rejected auction extension transaction");
+        } else {
+          toast.error(`Failed to extend auction: ${errorMessage}`);
+        }
+
+        return false;
+      } finally {
+        setIsExtending(false);
+      }
+    },
+    [address, isConnected, writeContractAsync, isExtending]
+  );
+
+  return {
+    extendAuction,
+    isExtending,
+    error,
+  };
+}
