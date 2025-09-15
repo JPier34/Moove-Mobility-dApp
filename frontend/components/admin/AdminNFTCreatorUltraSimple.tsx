@@ -1,23 +1,181 @@
 "use client";
 
-import React from "react";
+import React, { useState, useMemo } from "react";
+import { motion } from "framer-motion";
 import { useAccount } from "wagmi";
+import { useSecureNFTAuctionFlow } from "@/hooks/useSecureNFTAuction";
+import { useIPFSUnified } from "@/hooks/useIPFSUnified";
+import { useNFTValidationAPI } from "@/hooks/useNFTValidationAPI";
+import { useWalletPersistence } from "@/hooks/useWalletPersistence";
+import { AuctionType } from "@/types/auction";
+import { useRouter } from "next/navigation";
+import { toast } from "react-hot-toast";
+import { ethers } from "ethers";
+// import DynamicAuctionForm from "./DynamicAuctionForm"; // DISABLED: Uses old modular system
+import AuctionValidationModal from "./AuctionValidationModal";
+import {
+  useAuctionValidationModular,
+  AuctionFormData,
+} from "@/hooks/useAuctionValidationModular";
+import { useAuctionFormValidation } from "@/hooks/useAuctionFormValidation";
 import { useUserRoles } from "@/hooks/useContract";
 import { ErrorBoundary, useLastError } from "./ErrorBoundary";
-import { useRouter } from "next/navigation";
-import { AuctionType } from "@/types/auction";
+
+interface NFTFormData {
+  name: string;
+  description: string;
+  rarity: "COMMON" | "UNCOMMON" | "RARE" | "EPIC" | "LEGENDARY" | "MYTHIC";
+  image: File | null;
+  isLimitedEdition: boolean;
+  editionSize: string;
+  editionName: string;
+  customizationOptions: {
+    allowColorChange: boolean;
+    allowTextChange: boolean;
+    allowSizeChange: boolean;
+    allowEffectsChange: boolean;
+    availableColors: string[];
+    maxTextLength: string;
+  };
+}
 
 function AdminNFTCreatorUltraSimpleContent() {
+  // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
   const { address } = useAccount();
   const { canMint, isMasterAdmin, isLoading } = useUserRoles(address);
   const { error: lastError, clearError } = useLastError();
+
+  // Secure NFT-Auction flow hook
+  const {
+    executeFlow: executeSecureFlow,
+    isProcessing: isSecureProcessing,
+    currentPhase: securePhase,
+    result: secureResult,
+    error: secureError,
+  } = useSecureNFTAuctionFlow();
+
+  const router = useRouter();
+  const {
+    uploadNFT,
+    isUploading: isUploadingToIPFS,
+    uploadProgress,
+  } = useIPFSUnified();
+  const { validateNFT, isValidating: isValidatingNFT } = useNFTValidationAPI();
+  const { isConnected } = useWalletPersistence();
+
+  // Auction validation hook (MODULAR)
+  const {
+    formData: auctionFormData,
+    isValid: isAuctionValid,
+    updateField,
+    validateForTransaction,
+  } = useAuctionValidationModular();
+
+  // Form validation hook (MODULAR)
+  const { areRequiredFieldsFilled } = useAuctionFormValidation(auctionFormData);
+
+  // State management
+  const [step, setStep] = useState<"nft" | "auction">("nft");
+  const [nftData, setNftData] = useState<NFTFormData>({
+    name: "",
+    description: "",
+    rarity: "COMMON",
+    image: null,
+    isLimitedEdition: false,
+    editionSize: "1",
+    editionName: "",
+    customizationOptions: {
+      allowColorChange: false,
+      allowTextChange: false,
+      allowSizeChange: false,
+      allowEffectsChange: false,
+      availableColors: [],
+      maxTextLength: "100",
+    },
+  });
+
+  const [validationResult, setValidationResult] = useState<any>(null);
+  const [showFailureModal, setShowFailureModal] = useState(false);
+  const [showValidationModal, setShowValidationModal] = useState(false);
+
+  // Auction type info with emojis (consistent with AuctionCard.tsx)
+  const auctionTypeInfo = {
+    [AuctionType.RESERVE]: { emoji: "🏛️", name: "Reserve" },
+    [AuctionType.ENGLISH]: { emoji: "⬆️", name: "English" },
+    [AuctionType.DUTCH]: { emoji: "⬇️", name: "Dutch" },
+    [AuctionType.SEALED_BID]: { emoji: "🔒", name: "Sealed Bid" },
+  };
+
+  // NFT Validation Logic
+  const getNFTValidationErrors = useMemo(() => {
+    const errors = {
+      name: [] as string[],
+      description: [] as string[],
+      image: [] as string[],
+    };
+
+    // Name validation
+    if (nftData.name) {
+      const name = nftData.name.trim();
+      if (name.length < 3) {
+        errors.name.push("At least 3 characters");
+      }
+      if (name.length > 50) {
+        errors.name.push("Maximum 50 characters");
+      }
+      const invalidChars = /[<>:"/\\|?*]/;
+      if (invalidChars.test(name)) {
+        errors.name.push("Invalid characters");
+      }
+    }
+
+    // Description validation
+    if (nftData.description) {
+      const description = nftData.description.trim();
+      if (description.length < 10) {
+        errors.description.push("At least 10 characters");
+      }
+      if (description.length > 500) {
+        errors.description.push("Maximum 500 characters");
+      }
+    }
+
+    // Image validation
+    if (nftData.image) {
+      const validTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+      if (!validTypes.includes(nftData.image.type)) {
+        errors.image.push("Unsupported image type (PNG, JPG, GIF, WEBP)");
+      }
+      const maxSize = 10 * 1024 * 1024; // 10MB
+      if (nftData.image.size > maxSize) {
+        errors.image.push("Image too large (max 10MB)");
+      }
+    }
+
+    return errors;
+  }, [nftData]);
+
+  // Check if NFT form is valid
+  const isNFTFormValid = useMemo(() => {
+    const allErrors = [
+      ...getNFTValidationErrors.name,
+      ...getNFTValidationErrors.description,
+      ...getNFTValidationErrors.image,
+    ];
+    return (
+      allErrors.length === 0 &&
+      nftData.name.trim().length >= 3 &&
+      nftData.description.trim().length >= 10 &&
+      nftData.image !== null
+    );
+  }, [getNFTValidationErrors, nftData]);
 
   // Master admin wallet - always has access
   const MASTER_WALLET = "0x777382955f33Bb8540602E914D9b650C962EF6Cc";
   const isMasterWallet = address?.toLowerCase() === MASTER_WALLET.toLowerCase();
   const hasAdminAccess = isMasterWallet || canMint || isMasterAdmin;
 
-  // ALL EARLY RETURNS BEFORE ANY OTHER HOOKS
+  // CONDITIONAL RETURNS AFTER ALL HOOKS
   if (lastError) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
@@ -64,504 +222,692 @@ function AdminNFTCreatorUltraSimpleContent() {
     );
   }
 
-  // HOOK ROUTER (STEP 1 EXPANSION)
-  const router = useRouter();
-
-  // STATI SEMPLICI (ESPANSIONE GRADUALE - STEP 2)
-  const [nftName, setNftName] = React.useState("");
-  const [nftDescription, setNftDescription] = React.useState("");
-  const [nftRarity, setNftRarity] = React.useState("COMMON");
-  const [nftImage, setNftImage] = React.useState<File | null>(null);
-  const [auctionType, setAuctionType] = React.useState(AuctionType.ENGLISH);
-  const [startPrice, setStartPrice] = React.useState("");
-  const [duration, setDuration] = React.useState("");
-  const [bidIncrement, setBidIncrement] = React.useState("");
-  const [reservePrice, setReservePrice] = React.useState("");
-  const [buyNowPrice, setBuyNowPrice] = React.useState("");
-
-  // STATI DI VALIDAZIONE
-  const [nftValidated, setNftValidated] = React.useState(false);
-  const [auctionValidated, setAuctionValidated] = React.useState(false);
-  const [priceErrors, setPriceErrors] = React.useState<string[]>([]);
-
-  // FUNZIONI DI VALIDAZIONE
-  const validateNFT = React.useCallback(() => {
-    const isValid =
-      nftName.length >= 3 && nftDescription.length >= 10 && nftImage !== null;
-    setNftValidated(isValid);
-    return isValid;
-  }, [nftName, nftDescription, nftImage]);
-
-  const validatePriceConcordance = React.useCallback(() => {
-    const errors: string[] = [];
-    const startPriceNum = parseFloat(startPrice) || 0;
-    const reservePriceNum = parseFloat(reservePrice) || 0;
-    const buyNowPriceNum = parseFloat(buyNowPrice) || 0;
-    const bidIncrementNum = parseFloat(bidIncrement) || 0;
-
-    // Controlli comuni
-    if (startPriceNum <= 0) {
-      errors.push("Start Price must be greater than 0");
+  // NFT validation handler
+  const handleNFTValidation = async () => {
+    if (!nftData.image) {
+      toast.error("Please upload an image first.");
+      return;
     }
 
-    // Controlli specifici per tipo auction
-    switch (auctionType) {
-      case AuctionType.ENGLISH:
-        if (reservePrice && reservePriceNum > startPriceNum) {
-          errors.push(
-            "Reserve Price cannot be higher than Start Price for English auctions"
-          );
-        }
-        if (buyNowPrice && buyNowPriceNum <= startPriceNum) {
-          errors.push("Buy Now Price must be higher than Start Price");
-        }
-        break;
+    try {
+      const realTimeValidation = await validateNFT(
+        nftData.name,
+        nftData.description,
+        nftData.image,
+        nftData.rarity
+      );
 
-      case AuctionType.DUTCH:
-        if (!bidIncrement || bidIncrementNum <= 0) {
-          errors.push(
-            "Price Decrease Rate is required and must be greater than 0 for Dutch auctions"
-          );
-        }
-        if (reservePrice && reservePriceNum >= startPriceNum) {
-          errors.push(
-            "Reserve Price must be lower than Start Price for Dutch auctions"
-          );
-        }
-        if (bidIncrementNum >= startPriceNum) {
-          errors.push(
-            "Price Decrease Rate cannot be equal or higher than Start Price"
-          );
-        }
-        break;
+      if (!realTimeValidation.isValid) {
+        setValidationResult(realTimeValidation);
+        setShowFailureModal(true);
+        return;
+      }
 
-      case AuctionType.SEALED_BID:
-        if (bidIncrement && bidIncrementNum > startPriceNum) {
-          errors.push("Minimum Bid cannot be higher than Start Price");
-        }
-        break;
+      // Clear validation result when NFT validation passes
+      setValidationResult(null);
+      toast.success("NFT validation passed! Configure auction settings.");
+      setStep("auction");
+    } catch (error) {
+      toast.error("Validation failed. Please try again.");
+    }
+  };
 
-      case AuctionType.RESERVE:
-        if (reservePrice && reservePriceNum > startPriceNum) {
-          errors.push(
-            "Reserve Price should not exceed Start Price for Reserve auctions"
-          );
-        }
-        break;
+  // Secure creation handler
+  const handleSecureCreation = async () => {
+    if (!isConnected || !address) {
+      toast.error("Wallet not connected. Please connect and try again.");
+      return;
     }
 
-    setPriceErrors(errors);
-    const isValid = errors.length === 0;
-    setAuctionValidated(isValid);
-    return isValid;
-  }, [auctionType, startPrice, reservePrice, buyNowPrice, bidIncrement]);
+    if (!isAuctionValid) {
+      toast.error("Please fix auction validation errors before proceeding.");
+      return;
+    }
 
-  // Auto-validazione quando cambiano i valori
-  React.useEffect(() => {
-    validateNFT();
-  }, [validateNFT]);
+    try {
+      // Upload image to IPFS
+      if (!nftData.image) {
+        toast.error("Please upload an image first");
+        return;
+      }
 
-  React.useEffect(() => {
-    validatePriceConcordance();
-  }, [validatePriceConcordance]);
+      const ipfsResult = await uploadNFT(nftData.image, {
+        name: nftData.name,
+        description: nftData.description,
+        rarity: nftData.rarity,
+        isLimitedEdition: nftData.isLimitedEdition,
+        editionSize: parseInt(nftData.editionSize) || 1,
+        editionNumber: 1,
+        customizationOptions: {
+          ...nftData.customizationOptions,
+          maxTextLength:
+            parseInt(nftData.customizationOptions.maxTextLength) || 100,
+        },
+        creator: address || "",
+      });
 
-  const handleSubmit = () => {
-    console.log("Creating NFT and Auction:", {
-      // NFT Data
-      nftName,
-      nftDescription,
-      nftRarity,
-      nftImage: nftImage ? nftImage.name : null,
-      // Auction Data
-      auctionType,
-      startPrice,
-      duration: `${duration} hours`,
-      bidIncrement,
-      reservePrice,
-      buyNowPrice,
-    });
-    alert(
-      "NFT and Auction creation would happen here!\nCheck console for full data."
-    );
+      if (!ipfsResult.imageUrl) {
+        toast.error("Failed to upload image to IPFS");
+        return;
+      }
 
-    // TEST: Prova a navigare dopo 2 secondi
-    setTimeout(() => {
-      router.push("/auctions");
-    }, 2000);
+      // Create NFT metadata
+      const nftMetadata = {
+        name: nftData.name,
+        description: nftData.description,
+        image: ipfsResult.imageUrl,
+        external_url: `https://moove-mobility.com/nft/${Date.now()}`,
+        attributes: [
+          { trait_type: "Rarity", value: nftData.rarity },
+          { trait_type: "Category", value: "VEHICLE_DECORATION" },
+          { trait_type: "Designer", value: "Moove" },
+          {
+            trait_type: "Collection",
+            value: nftData.isLimitedEdition ? nftData.editionName : "Genesis",
+          },
+          { trait_type: "Range", value: "100" },
+          { trait_type: "Speed", value: "50" },
+          { trait_type: "Battery", value: "80" },
+          { trait_type: "Condition", value: "New" },
+        ],
+      };
+
+      // Upload metadata to IPFS
+      const metadataBlob = new Blob([JSON.stringify(nftMetadata, null, 2)], {
+        type: "application/json",
+      });
+
+      const metadataFormData = new FormData();
+      metadataFormData.append("file", metadataBlob, "metadata.json");
+
+      const metadataResponse = await fetch("/api/upload-ipfs", {
+        method: "POST",
+        body: metadataFormData,
+      });
+
+      if (!metadataResponse.ok) {
+        throw new Error("Failed to upload metadata to IPFS");
+      }
+
+      const metadataResult = await metadataResponse.json();
+      const metadataUrl = `https://ipfs.io/ipfs/${metadataResult.IpfsHash}`;
+
+      // Prepare mint parameters
+      const mintParams = [
+        address,
+        metadataUrl,
+        nftData.isLimitedEdition ? parseInt(nftData.editionSize) : 1,
+      ];
+
+      // Prepare auction parameters
+      const durationInSeconds =
+        auctionFormData.durationUnit === "minutes"
+          ? parseInt(auctionFormData.duration) * 60
+          : parseInt(auctionFormData.duration) * 3600;
+
+      const auctionParams = {
+        auctionType: auctionFormData.auctionType,
+        startPrice: ethers.parseEther(auctionFormData.startPrice),
+        reservePrice: auctionFormData.reservePrice
+          ? ethers.parseEther(auctionFormData.reservePrice)
+          : 0n,
+        buyNowPrice: auctionFormData.buyNowPrice
+          ? ethers.parseEther(auctionFormData.buyNowPrice)
+          : 0n,
+        duration: durationInSeconds,
+        bidIncrement: ethers.parseEther(auctionFormData.bidIncrement),
+      };
+
+      // Execute secure flow
+      await executeSecureFlow(mintParams, auctionParams);
+
+      // Wait for processing to complete instead of fixed timeout
+      console.log("⏳ Waiting for processing to complete...");
+      let attempts = 0;
+      const maxAttempts = 50; // 5 seconds max (50 * 100ms)
+
+      while (isSecureProcessing && attempts < maxAttempts) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        attempts++;
+        console.log(`⏳ Processing check ${attempts}/${maxAttempts}...`);
+      }
+
+      console.log("📊 Secure flow result:", {
+        secureResult,
+        secureError,
+        isSecureProcessing,
+        attempts,
+      });
+
+      if (secureResult) {
+        toast.success("NFT and auction created successfully!");
+
+        // Clear cache
+        Object.keys(localStorage).forEach((key) => {
+          if (key.startsWith("auction_")) {
+            localStorage.removeItem(key);
+          }
+        });
+
+        // Save creation data
+        const nftCreationData = {
+          id: `nft_${Date.now()}`,
+          nftName: nftData.name,
+          nftDescription: nftData.description,
+          nftImage: ipfsResult.imageUrl,
+          tokenId: secureResult.nft.tokenId.toString(),
+          transactionHash: secureResult.nft.transactionHash,
+          creationDate: new Date().toISOString(),
+          auctionId: secureResult.auction.auctionId.toString(),
+          status: "confirmed",
+          ipfsHash: ipfsResult.imageUrl,
+        };
+
+        localStorage.setItem(
+          `nft_creation_${secureResult.nft.transactionHash}`,
+          JSON.stringify(nftCreationData)
+        );
+
+        // Navigate to success page
+        router.push(`/admin/nft-success/${secureResult.nft.transactionHash}`);
+      } else {
+        toast.success("NFT and auction created! Check the auctions page.");
+        setTimeout(() => {
+          window.location.href = "/auctions";
+        }, 2000);
+      }
+    } catch (error) {
+      toast.error(
+        `Creation failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    }
+  };
+
+  const handleAuctionDataChange = (data: AuctionFormData) => {
+    // Data is automatically managed by the hook
   };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
-            🎯 Create NFT & Auction (Step by Step)
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+            Create NFT & Auction (Ultra Simple)
           </h1>
+          <p className="text-gray-600 dark:text-gray-400">
+            Create a new NFT and configure its auction settings
+          </p>
+        </div>
 
-          <div className="space-y-6">
-            {/* NFT Section */}
-            <div className="border-b border-gray-200 dark:border-gray-700 pb-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  NFT Details
-                </h2>
-                <div className="flex items-center space-x-2">
-                  {nftValidated ? (
-                    <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
-                      ✅ NFT Validated
-                    </span>
-                  ) : (
-                    <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">
-                      ⏳ Validation Pending
-                    </span>
-                  )}
-                  <button
-                    onClick={() => validateNFT()}
-                    className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition-colors"
-                  >
-                    Check NFT
-                  </button>
+        {/* Progress Steps */}
+        <div className="mb-8">
+          <div className="flex items-center justify-center space-x-4">
+            <div
+              className={`flex items-center ${
+                step === "nft" ? "text-purple-600" : "text-gray-400"
+              }`}
+            >
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                  step === "nft"
+                    ? "bg-purple-600 text-white"
+                    : "bg-gray-200 dark:bg-gray-700"
+                }`}
+              >
+                1
+              </div>
+              <span className="ml-2 font-medium">NFT Details</span>
+            </div>
+            <div className="w-8 h-0.5 bg-gray-300 dark:bg-gray-600"></div>
+            <div
+              className={`flex items-center ${
+                step === "auction" ? "text-purple-600" : "text-gray-400"
+              }`}
+            >
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                  step === "auction"
+                    ? "bg-purple-600 text-white"
+                    : "bg-gray-200 dark:bg-gray-700"
+                }`}
+              >
+                2
+              </div>
+              <span className="ml-2 font-medium">Auction Settings</span>
+            </div>
+          </div>
+        </div>
+
+        {/* NFT Form Step */}
+        {step === "nft" && (
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.4 }}
+            className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6"
+          >
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
+              NFT Details
+            </h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* NFT Name */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  NFT Name *
+                </label>
+                <input
+                  type="text"
+                  value={nftData.name}
+                  onChange={(e) =>
+                    setNftData((prev) => ({ ...prev, name: e.target.value }))
+                  }
+                  className={`w-full px-4 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500 ${
+                    getNFTValidationErrors.name.length > 0
+                      ? "border-red-500 dark:border-red-400"
+                      : "border-gray-300 dark:border-gray-600"
+                  }`}
+                  placeholder="Enter NFT name (min 3 chars)"
+                />
+                {getNFTValidationErrors.name.map((error, index) => (
+                  <p key={index} className="text-red-500 text-xs mt-1">
+                    {error}
+                  </p>
+                ))}
+              </div>
+
+              {/* Rarity */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Rarity *
+                </label>
+                <select
+                  value={nftData.rarity}
+                  onChange={(e) =>
+                    setNftData((prev) => ({
+                      ...prev,
+                      rarity: e.target.value as any,
+                    }))
+                  }
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500"
+                >
+                  <option value="COMMON">Common</option>
+                  <option value="UNCOMMON">Uncommon</option>
+                  <option value="RARE">Rare</option>
+                  <option value="EPIC">Epic</option>
+                  <option value="LEGENDARY">Legendary</option>
+                  <option value="MYTHIC">Mythic</option>
+                </select>
+              </div>
+
+              {/* Description */}
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Description *
+                </label>
+                <textarea
+                  value={nftData.description}
+                  onChange={(e) =>
+                    setNftData((prev) => ({
+                      ...prev,
+                      description: e.target.value,
+                    }))
+                  }
+                  rows={3}
+                  className={`w-full px-4 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500 ${
+                    getNFTValidationErrors.description.length > 0
+                      ? "border-red-500 dark:border-red-400"
+                      : "border-gray-300 dark:border-gray-600"
+                  }`}
+                  placeholder="Enter NFT description (min 10 chars)"
+                />
+                <div className="flex justify-between items-center mt-1">
+                  <div>
+                    {getNFTValidationErrors.description.map((error, index) => (
+                      <p key={index} className="text-red-500 text-xs">
+                        {error}
+                      </p>
+                    ))}
+                  </div>
+                  <span className="text-xs text-gray-500">
+                    {nftData.description.length}/500
+                  </span>
                 </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    NFT Name
-                  </label>
-                  <input
-                    type="text"
-                    value={nftName}
-                    onChange={(e) => setNftName(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    placeholder="Enter NFT name"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Rarity
-                  </label>
-                  <select
-                    value={nftRarity}
-                    onChange={(e) => setNftRarity(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  >
-                    <option value="COMMON">Common</option>
-                    <option value="UNCOMMON">Uncommon</option>
-                    <option value="RARE">Rare</option>
-                    <option value="EPIC">Epic</option>
-                    <option value="LEGENDARY">Legendary</option>
-                    <option value="MYTHIC">Mythic</option>
-                  </select>
-                </div>
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Description
-                  </label>
-                  <textarea
-                    value={nftDescription}
-                    onChange={(e) => setNftDescription(e.target.value)}
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    placeholder="Enter description"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Image
-                  </label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setNftImage(e.target.files?.[0] || null)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  />
-                  {nftImage && (
-                    <p className="text-green-500 text-xs mt-1">
-                      ✅ {nftImage.name}
+              {/* Image Upload */}
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Image *
+                </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) =>
+                    setNftData((prev) => ({
+                      ...prev,
+                      image: e.target.files?.[0] || null,
+                    }))
+                  }
+                  className={`w-full px-4 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500 ${
+                    getNFTValidationErrors.image.length > 0
+                      ? "border-red-500 dark:border-red-400"
+                      : "border-gray-300 dark:border-gray-600"
+                  }`}
+                />
+                {getNFTValidationErrors.image.map((error, index) => (
+                  <p key={index} className="text-red-500 text-xs mt-1">
+                    {error}
+                  </p>
+                ))}
+                {nftData.image && (
+                  <div className="mt-2">
+                    <img
+                      src={URL.createObjectURL(nftData.image)}
+                      alt="Preview"
+                      className="w-32 h-32 object-cover rounded-lg"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Size: {(nftData.image.size / 1024 / 1024).toFixed(2)} MB
                     </p>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Auction Section */}
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  Auction Details
-                </h2>
-                <div className="flex items-center space-x-2">
-                  {auctionValidated ? (
-                    <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
-                      ✅ Prices Valid
-                    </span>
-                  ) : priceErrors.length > 0 ? (
-                    <span className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs font-medium">
-                      ❌ Price Errors
-                    </span>
-                  ) : (
-                    <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">
-                      ⏳ Checking Prices
-                    </span>
-                  )}
-                  <button
-                    onClick={() => validatePriceConcordance()}
-                    className="px-3 py-1 bg-purple-600 text-white rounded text-xs hover:bg-purple-700 transition-colors"
-                  >
-                    Check Prices
-                  </button>
-                </div>
-              </div>
+            {/* Action Buttons */}
+            <div className="flex justify-end mt-6">
+              <button
+                onClick={handleNFTValidation}
+                disabled={!isNFTFormValid || isValidatingNFT}
+                className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+              >
+                {isValidatingNFT ? "Validating..." : "Validate & Continue"}
+              </button>
+            </div>
+          </motion.div>
+        )}
 
-              {/* Price Errors Display */}
-              {priceErrors.length > 0 && (
-                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                  <h4 className="text-sm font-semibold text-red-800 mb-2">
-                    💰 Price Validation Errors:
-                  </h4>
-                  <ul className="text-sm text-red-700 space-y-1">
-                    {priceErrors.map((error, index) => (
-                      <li key={index} className="flex items-start">
-                        <span className="text-red-500 mr-1">•</span>
-                        {error}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+        {/* Auction Form Step */}
+        {step === "auction" && (
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.4 }}
+            className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6"
+          >
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
+              Auction Settings
+            </h2>
 
-              {/* Auction Type Info */}
-              {auctionType !== AuctionType.ENGLISH && (
-                <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg">
-                  <p className="text-sm text-blue-700 dark:text-blue-300">
-                    {auctionType === AuctionType.DUTCH && (
-                      <>
-                        <strong>🔥 Dutch Auction:</strong> Price starts high and
-                        decreases over time. First bidder wins at current price.
-                        <span className="text-red-600 font-medium">
-                          {" "}
-                          Price Decrease Rate is required.
-                        </span>
-                      </>
-                    )}
-                    {auctionType === AuctionType.SEALED_BID && (
-                      <>
-                        <strong>🔒 Sealed Bid:</strong> Bidders submit hidden
-                        bids. Highest bid wins after reveal phase.
-                      </>
-                    )}
-                    {auctionType === AuctionType.RESERVE && (
-                      <>
-                        <strong>💎 Reserve Auction:</strong> Like English
-                        auction but with a hidden minimum price (reserve).
-                      </>
-                    )}
-                  </p>
-                </div>
-              )}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-6">
+              {/* Auction Type and Start Price */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Auction Type
+                    Auction Type *
                   </label>
                   <select
-                    value={auctionType}
+                    value={auctionFormData.auctionType}
                     onChange={(e) =>
-                      setAuctionType(Number(e.target.value) as AuctionType)
+                      updateField("auctionType", parseInt(e.target.value))
                     }
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500"
                   >
                     <option value={AuctionType.ENGLISH}>
-                      🔥 English Auction
+                      {auctionTypeInfo[AuctionType.ENGLISH].emoji} English
+                      Auction
                     </option>
-                    <option value={AuctionType.DUTCH}>⬇️ Dutch Auction</option>
+                    <option value={AuctionType.DUTCH}>
+                      {auctionTypeInfo[AuctionType.DUTCH].emoji} Dutch Auction
+                    </option>
                     <option value={AuctionType.SEALED_BID}>
-                      🔒 Sealed Bid Auction
+                      {auctionTypeInfo[AuctionType.SEALED_BID].emoji} Sealed Bid
+                      Auction
                     </option>
                     <option value={AuctionType.RESERVE}>
-                      💎 Reserve Auction
+                      {auctionTypeInfo[AuctionType.RESERVE].emoji} Reserve
+                      Auction
                     </option>
                   </select>
                 </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Start Price (ETH)
+                    Start Price (ETH) *
                   </label>
                   <input
                     type="number"
                     step="0.000001"
-                    value={startPrice}
-                    onChange={(e) => setStartPrice(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    value={auctionFormData.startPrice}
+                    onChange={(e) => updateField("startPrice", e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500"
                     placeholder="0.001"
                   />
                 </div>
+              </div>
+
+              {/* Duration and Bid Increment */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Duration (hours)
+                    Duration *
                   </label>
                   <input
                     type="number"
                     min="1"
-                    value={duration}
-                    onChange={(e) => setDuration(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    value={auctionFormData.duration}
+                    onChange={(e) => updateField("duration", e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500"
                     placeholder="24"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Minimum: 1 hour</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Unit
+                  </label>
+                  <select
+                    value={auctionFormData.durationUnit}
+                    onChange={(e) =>
+                      updateField("durationUnit", e.target.value)
+                    }
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500"
+                  >
+                    <option value="hours">Hours</option>
+                    <option value="minutes">Minutes</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Bid Increment (ETH) *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.000001"
+                    value={auctionFormData.bidIncrement}
+                    onChange={(e) =>
+                      updateField("bidIncrement", e.target.value)
+                    }
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500"
+                    placeholder="0.0001"
+                  />
                 </div>
               </div>
 
-              {/* Advanced Fields */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+              {/* Optional Fields */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    {auctionType === AuctionType.DUTCH
-                      ? "Price Decrease Rate (ETH) *"
-                      : auctionType === AuctionType.SEALED_BID
-                      ? "Minimum Bid (ETH)"
-                      : "Bid Increment (ETH)"}
-                    {auctionType === AuctionType.DUTCH && (
-                      <span className="text-red-500 ml-1">*Required</span>
-                    )}
+                    Reserve Price (ETH)
+                    <span className="text-sm text-gray-500 ml-1">
+                      (Optional)
+                    </span>
                   </label>
                   <input
                     type="number"
                     step="0.000001"
-                    value={bidIncrement}
-                    onChange={(e) => setBidIncrement(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    placeholder={
-                      auctionType === AuctionType.DUTCH
-                        ? "0.000001 (Required)"
-                        : auctionType === AuctionType.SEALED_BID
-                        ? "0.001 (Optional)"
-                        : "0.0001 (Optional)"
+                    value={auctionFormData.reservePrice}
+                    onChange={(e) =>
+                      updateField("reservePrice", e.target.value)
                     }
-                    required={auctionType === AuctionType.DUTCH}
-                  />
-                  {auctionType === AuctionType.SEALED_BID && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      Minimum bid amount for sealed bid auction
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Reserve Price (ETH){" "}
-                    <span className="text-gray-400">(Optional)</span>
-                  </label>
-                  <input
-                    type="number"
-                    step="0.000001"
-                    value={reservePrice}
-                    onChange={(e) => setReservePrice(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    placeholder="0.001"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Buy Now Price (ETH){" "}
-                    <span className="text-gray-400">(Optional)</span>
-                  </label>
-                  <input
-                    type="number"
-                    step="0.000001"
-                    value={buyNowPrice}
-                    onChange={(e) => setBuyNowPrice(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500"
                     placeholder="0.01"
                   />
                 </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Buy Now Price (ETH)
+                    <span className="text-sm text-gray-500 ml-1">
+                      (Optional)
+                    </span>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.000001"
+                    value={auctionFormData.buyNowPrice}
+                    onChange={(e) => updateField("buyNowPrice", e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500"
+                    placeholder="0.1"
+                  />
+                </div>
               </div>
+
+              {/* Auction Type Info */}
+              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                <h4 className="font-medium text-blue-900 dark:text-blue-300 mb-2">
+                  {auctionFormData.auctionType === AuctionType.ENGLISH &&
+                    `${
+                      auctionTypeInfo[AuctionType.ENGLISH].emoji
+                    } English Auction`}
+                  {auctionFormData.auctionType === AuctionType.DUTCH &&
+                    `${auctionTypeInfo[AuctionType.DUTCH].emoji} Dutch Auction`}
+                  {auctionFormData.auctionType === AuctionType.SEALED_BID &&
+                    `${
+                      auctionTypeInfo[AuctionType.SEALED_BID].emoji
+                    } Sealed Bid Auction`}
+                  {auctionFormData.auctionType === AuctionType.RESERVE &&
+                    `${
+                      auctionTypeInfo[AuctionType.RESERVE].emoji
+                    } Reserve Auction`}
+                </h4>
+                <p className="text-sm text-blue-700 dark:text-blue-400">
+                  {auctionFormData.auctionType === AuctionType.ENGLISH &&
+                    "Bidders compete by placing increasingly higher bids. The highest bidder wins when the auction ends."}
+                  {auctionFormData.auctionType === AuctionType.DUTCH &&
+                    "The price starts high and decreases over time until someone accepts the current price."}
+                  {auctionFormData.auctionType === AuctionType.SEALED_BID &&
+                    "Bidders submit secret bids without knowing others' bids. The highest bid wins after a reveal phase."}
+                  {auctionFormData.auctionType === AuctionType.RESERVE &&
+                    "Like an English auction, but with a minimum price that must be met for the item to sell."}
+                </p>
+              </div>
+
+              {/* Validation Errors */}
+              {!areRequiredFieldsFilled && (
+                <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                  <p className="text-red-700 dark:text-red-400 text-sm">
+                    ⚠️ Please fill in all required fields: Start Price,
+                    Duration, and Bid Increment
+                  </p>
+                </div>
+              )}
             </div>
 
-            {/* Submit Button */}
-            <div className="flex justify-end pt-6">
+            {/* Action Buttons */}
+            <div className="flex justify-between mt-6">
               <button
-                onClick={handleSubmit}
-                disabled={
-                  !nftValidated ||
-                  !auctionValidated ||
-                  !startPrice ||
-                  !duration ||
-                  priceErrors.length > 0
-                }
-                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                onClick={() => setStep("nft")}
+                className="px-6 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
               >
-                {!nftValidated
-                  ? "⏳ Validate NFT First"
-                  : !auctionValidated || priceErrors.length > 0
-                  ? "⏳ Fix Price Errors"
-                  : !startPrice || !duration
-                  ? "⏳ Complete Required Fields"
-                  : "✅ Create NFT & Auction"}
+                Back to NFT
+              </button>
+              <button
+                onClick={() => setShowValidationModal(true)}
+                disabled={!areRequiredFieldsFilled || isSecureProcessing}
+                className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+              >
+                {isSecureProcessing ? "Creating..." : "Create NFT & Auction"}
               </button>
             </div>
+          </motion.div>
+        )}
 
-            {/* Status Info */}
-            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-              <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-300 mb-2">
-                📊 Status
-              </h3>
-              <div className="text-xs text-blue-700 dark:text-blue-400 space-y-1">
-                <p>
-                  <strong>Connected:</strong> {address ? "✅" : "❌"}
+        {/* Processing Status */}
+        {isSecureProcessing && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                  Creating NFT & Auction
+                </h3>
+                <p className="text-gray-600 dark:text-gray-400 mb-4">
+                  {securePhase}
                 </p>
-                <p>
-                  <strong>Can Mint:</strong> {canMint ? "✅" : "❌"}
-                </p>
-                <p>
-                  <strong>NFT Validation:</strong>{" "}
-                  {nftValidated ? "✅ Valid" : "❌ Invalid"}
-                </p>
-                <p>
-                  <strong>Price Validation:</strong>{" "}
-                  {auctionValidated
-                    ? "✅ Valid"
-                    : priceErrors.length > 0
-                    ? "❌ Errors"
-                    : "⏳ Pending"}
-                </p>
-                <p>
-                  <strong>Auction Type:</strong>{" "}
-                  {auctionType === AuctionType.ENGLISH
-                    ? "🔥 English"
-                    : auctionType === AuctionType.DUTCH
-                    ? "⬇️ Dutch"
-                    : auctionType === AuctionType.SEALED_BID
-                    ? "🔒 Sealed Bid"
-                    : auctionType === AuctionType.RESERVE
-                    ? "💎 Reserve"
-                    : "Unknown"}
-                </p>
-                <p>
-                  <strong>Ready to Submit:</strong>{" "}
-                  {nftValidated &&
-                  auctionValidated &&
-                  startPrice &&
-                  duration &&
-                  priceErrors.length === 0
-                    ? "✅ Yes"
-                    : "❌ No"}
-                </p>
-                {priceErrors.length > 0 && (
-                  <p className="text-red-600 text-xs">
-                    <strong>⚠️ {priceErrors.length} price error(s)</strong> -
-                    Check above for details
-                  </p>
-                )}
-                <p>
-                  <strong>Address:</strong> {address || "Not connected"}
-                </p>
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                  <div
+                    className="bg-purple-600 h-2 rounded-full animate-pulse"
+                    style={{ width: "60%" }}
+                  ></div>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
+
+        {/* Validation Modal */}
+        <AuctionValidationModal
+          isOpen={showValidationModal}
+          onClose={() => setShowValidationModal(false)}
+          onConfirm={handleSecureCreation}
+          formData={auctionFormData}
+          address={address || ""}
+          isProcessing={isSecureProcessing}
+        />
+
+        {/* Failure Modal */}
+        {showFailureModal && validationResult && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
+              <div className="text-center">
+                <div className="w-12 h-12 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg
+                    className="w-6 h-6 text-red-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                  Validation Failed
+                </h3>
+                <p className="text-gray-600 dark:text-gray-400 mb-4">
+                  {validationResult.errors?.[0]?.message ||
+                    "Unknown validation error"}
+                </p>
+                <button
+                  onClick={() => setShowFailureModal(false)}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                >
+                  Try Again
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

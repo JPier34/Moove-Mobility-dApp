@@ -32,3 +32,5 @@ export function useAuctionFormValidation(auctionFormData: AuctionFormData) {
     getValidationSummary,
   };
 }
+
+
