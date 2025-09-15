@@ -35,8 +35,7 @@ export function useEnglishAuction(): EnglishAuctionHandler {
   >("idle");
 
   const { placeBid, isPending: isBidding, error: bidError } = usePlaceBid();
-  // Removed manual extension - let smart contract handle auto-extension
-  // const { extendAuction, isExtending } = useExtendAuction();
+  // Auto-extension is now handled by smart contract - no manual extension needed
 
   // Default extension settings (can be overridden)
   const DEFAULT_EXTENSION_THRESHOLD_MINUTES = 5;
@@ -160,10 +159,10 @@ export function useEnglishAuction(): EnglishAuctionHandler {
 
         console.log("✅ Bid placed successfully");
 
-        // Show success message - let the smart contract handle auto-extension
+        // Show success message with auto-extension info
         if (shouldExtend) {
           console.log(
-            `⏰ Bid placed in last ${extensionThreshold} minutes - smart contract should auto-extend`
+            `⏰ Bid placed in last ${extensionThreshold} minutes - smart contract will auto-extend`
           );
           toast.success(
             `Bid placed! Auction will auto-extend by ${extensionDuration} minutes due to late bid`

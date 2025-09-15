@@ -11,9 +11,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useUserCollectionOptimized } from "@/hooks/useUserCollectionOptimized";
 import { useWalletPersistence } from "@/hooks/useWalletPersistence";
-import { useWonAuctionsManager } from "@/hooks/useWonAuctionsManager";
 import { useWonAuctions } from "@/hooks/useWonAuctions";
-import CongratulationsModal from "@/components/collection/CongratulationsModal";
 import WonAuctions from "@/components/collection/WonAuctions";
 import { toast } from "react-hot-toast";
 import OptimizedNFTImage from "@/components/collection/OptimizedNFTImage";
@@ -524,14 +522,7 @@ export default function MyCollection() {
   const { wonAuctions, isLoading, error, refetch, totalValue, totalItems } =
     useUserCollectionOptimized();
   const { isConnected, address, isInitialized } = useWalletPersistence();
-  const {
-    currentAuction,
-    showCongratulations,
-    isSettling,
-    error: settleError,
-    handleSettleAuction,
-    handleCloseCongratulationsModal,
-  } = useWonAuctionsManager();
+  // Congratulations modal is now handled globally by AuctionNotificationsProvider
 
   // Won auctions that need claiming
   const {
@@ -876,14 +867,7 @@ export default function MyCollection() {
           onClose={handleCloseModal}
         />
 
-        {/* Congratulations Modal */}
-        <CongratulationsModal
-          auction={currentAuction}
-          isOpen={showCongratulations}
-          onClose={handleCloseCongratulationsModal}
-          onSettle={handleSettleAuction}
-          isSettling={isSettling}
-        />
+        {/* Congratulations Modal is now handled globally by AuctionNotificationsProvider */}
       </div>
     </div>
   );

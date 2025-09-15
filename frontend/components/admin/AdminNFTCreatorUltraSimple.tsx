@@ -102,7 +102,7 @@ function AdminNFTCreatorUltraSimpleContent() {
         updateField("startPrice", "0.001");
         updateField("reservePrice", ""); // Not used - start price is the minimum
         updateField("buyNowPrice", ""); // Not typically used
-        updateField("bidIncrement", "0.001");
+        updateField("bidIncrement", "0"); // Sealed bid doesn't use bid increment
         break;
       case AuctionType.RESERVE:
         // Reserve auction: reserve required

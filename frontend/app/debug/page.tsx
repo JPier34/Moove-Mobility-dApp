@@ -6,6 +6,7 @@ import AuctionStatusChecker from "@/components/debug/AuctionStatusChecker";
 import TransactionTrackerDebug from "@/components/debug/TransactionTrackerDebug";
 import NFTCollectionChecker from "@/components/debug/NFTCollectionChecker";
 import EnglishAuctionTester from "@/components/debug/EnglishAuctionTester";
+import RoleChecker from "@/components/debug/RoleChecker";
 // ModularValidationTester COMPLETELY REMOVED - was causing build errors
 
 export default function DebugPage() {
@@ -22,6 +23,11 @@ export default function DebugPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Role Checker - NEW */}
+          <div className="lg:col-span-2">
+            <RoleChecker />
+          </div>
+
           {/* Modular Validation Tester - DISABLED */}
           <div className="lg:col-span-2">
             <div className="p-6 bg-yellow-50 border border-yellow-200 rounded-lg">

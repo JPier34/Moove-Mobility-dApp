@@ -61,8 +61,8 @@ export function useWonAuctions(): UseWonAuctionsReturn {
           auction.highestBidder &&
           auction.highestBidder.toLowerCase() === address.toLowerCase();
 
-        // Considera l'asta "ended" se status === 2 (ENDED) OPPURE status === 4 (SETTLED) OPPURE se status === 1 ma tempo scaduto
-        const isEnded = auction.status === 2;
+        // Considera l'asta "ended" se status === 3 (ENDED) OPPURE status === 4 (SETTLED) OPPURE se status === 1 ma tempo scaduto
+        const isEnded = auction.status === 3;
         const isSettled = auction.status === 4; // Solo status 4 è settled per vincitori
         const isTimeExpired =
           auction.status === 1 &&
@@ -92,8 +92,8 @@ export function useWonAuctions(): UseWonAuctionsReturn {
       const wonAuctions: WonAuction[] = [];
 
       for (const auction of userWonAuctions) {
-        // Determina se l'asta è veramente finita (status 2, 4 o tempo scaduto)
-        const isEnded = auction.status === 2;
+        // Determina se l'asta è veramente finita (status 3, 4 o tempo scaduto)
+        const isEnded = auction.status === 3;
         const isSettled = auction.status === 4; // Solo status 4 è settled per vincitori
         const isTimeExpired =
           auction.status === 1 &&
@@ -115,7 +115,7 @@ export function useWonAuctions(): UseWonAuctionsReturn {
           name: auction.nftName || `NFT #${auction.nftId}`,
           image: auction.nftImage || "/images/default-nft.png",
           category: auction.nftCategory || "sticker",
-          status: isAuctionEnded ? 2 : auction.status, // Forza status 2 se tempo scaduto
+          status: isAuctionEnded ? 3 : auction.status, // Forza status 3 se tempo scaduto
           hasImage: !!auction.nftImage,
           hasName: !!auction.nftName,
           finalBid: parseFloat(auction.currentBid) || 0,

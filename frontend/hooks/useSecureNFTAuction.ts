@@ -235,12 +235,25 @@ function validateAuctionParams(params: AuctionParams): void {
     throw new Error("Duration cannot exceed 30 days");
   }
 
-  // Validazione bid increment
-  if (params.bidIncrement <= 0n) {
-    throw new Error("Bid increment must be greater than 0");
-  }
-  if (params.bidIncrement > params.startPrice) {
-    throw new Error("Bid increment cannot exceed start price");
+  // Validazione bid increment (solo per tipi di asta che lo usano)
+  console.log(
+    "🔍 [VALIDATION DEBUG] Auction type:",
+    params.auctionType,
+    "Bid increment:",
+    params.bidIncrement
+  );
+  if (params.auctionType !== 2) {
+    // Non SEALED_BID (2)
+    if (params.bidIncrement <= 0n) {
+      throw new Error("Bid increment must be greater than 0");
+    }
+    if (params.bidIncrement > params.startPrice) {
+      throw new Error("Bid increment cannot exceed start price");
+    }
+  } else {
+    console.log(
+      "✅ [VALIDATION DEBUG] Skipping bidIncrement validation for SEALED_BID auction"
+    );
   }
 
   // ========================================

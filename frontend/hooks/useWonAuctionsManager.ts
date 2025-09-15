@@ -217,7 +217,7 @@ export function useWonAuctionsManager() {
           const updatedStatus = await checkAuctionStatus(auctionId);
           console.log(`📊 Updated auction status:`, updatedStatus);
 
-          if (updatedStatus.status !== 2) {
+          if (updatedStatus.status !== 3) {
             console.error(
               `❌ Auction ${auctionId} is still not ENDED after endAuction. Status: ${updatedStatus.status}`
             );
@@ -241,7 +241,7 @@ export function useWonAuctionsManager() {
         }
       } else if (contractStatus.status === 2) {
         console.log(
-          `✅ Auction ${auctionId} is already ENDED. Checking auction type...`
+          `🔍 Auction ${auctionId} is in REVEAL phase. Checking auction type...`
         );
 
         // Check if this is a sealed bid auction (auctionType === 1)
@@ -256,9 +256,18 @@ export function useWonAuctionsManager() {
 
           // Wait for reveal phase to complete
           await new Promise((resolve) => setTimeout(resolve, 3000));
+          
+          // After reveal phase, the auction should be ready for settlement
+          console.log(`✅ Sealed bid auction ${auctionId} reveal phase completed. Ready for settlement.`);
         } else {
-          console.log(`📋 Public auction detected. Skipping reveal phase...`);
+          console.log(`❌ Non-sealed bid auction in REVEAL phase. This shouldn't happen.`);
+          alert(`Auction ${auctionId} is in an invalid state. Please contact support.`);
+          return;
         }
+      } else if (contractStatus.status === 3) {
+        console.log(
+          `✅ Auction ${auctionId} is already ENDED. Ready for settlement.`
+        );
       } else {
         console.error(
           `❌ Auction ${auctionId} has invalid status: ${contractStatus.status}`

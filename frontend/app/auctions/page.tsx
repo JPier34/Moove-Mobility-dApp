@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import AuctionGrid from "@/components/auctions/AuctionGrid";
 import { AuctionType } from "@/types/auction";
 import { useAuctionsEnhanced as useAuctions } from "@/hooks/enhanced-auction-utils";
+import { useAuctionExtensionEvents } from "@/hooks/useAuctionExtensionEvents";
 
 // ============= TYPES =============
 

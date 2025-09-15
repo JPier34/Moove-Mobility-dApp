@@ -6,6 +6,10 @@ import { useWriteContract } from "wagmi";
 import { toast } from "react-hot-toast";
 import { CONTRACT_ADDRESSES } from "../lib/contracts";
 import MooveAuctionABI from "../src/abis/MooveAuction.json";
+import { useHasRole } from "./useContract"; // Import role check hook
+
+const AUCTION_MANAGER_ROLE =
+  "0x2e1a7d4d13322e7b96f9a57413e1525c250fb7a9021cf91d1540d5b69f16a49f";
 
 export interface ExtendAuctionHandler {
   extendAuction: (
@@ -14,12 +18,20 @@ export interface ExtendAuctionHandler {
   ) => Promise<boolean>;
   isExtending: boolean;
   error: string | null;
+  hasAuctionManagerRole: boolean;
+  isCheckingRole: boolean;
 }
 
 export function useExtendAuction(): ExtendAuctionHandler {
   const { address, isConnected } = useAccount();
   const [isExtending, setIsExtending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Check if user has AUCTION_MANAGER_ROLE
+  const { data: hasAuctionManagerRole, isLoading: isCheckingRole } = useHasRole(
+    AUCTION_MANAGER_ROLE,
+    address
+  );
 
   const { writeContractAsync } = useWriteContract();
 
@@ -31,6 +43,18 @@ export function useExtendAuction(): ExtendAuctionHandler {
       if (!isConnected || !address) {
         setError("Wallet not connected");
         toast.error("Connect wallet to extend auction");
+        return false;
+      }
+
+      // Check if user has permission to extend auctions
+      if (!hasAuctionManagerRole) {
+        const errorMsg =
+          "Insufficient permissions: AUCTION_MANAGER_ROLE required to extend auctions";
+        setError(errorMsg);
+        console.error("❌ Permission denied:", errorMsg);
+        toast.error(
+          "Permission denied: Cannot extend auctions with current wallet"
+        );
         return false;
       }
 
@@ -84,12 +108,20 @@ export function useExtendAuction(): ExtendAuctionHandler {
         setIsExtending(false);
       }
     },
-    [address, isConnected, writeContractAsync, isExtending]
+    [
+      address,
+      isConnected,
+      writeContractAsync,
+      isExtending,
+      hasAuctionManagerRole,
+    ]
   );
 
   return {
     extendAuction,
     isExtending,
     error,
+    hasAuctionManagerRole: hasAuctionManagerRole || false,
+    isCheckingRole: isCheckingRole || false,
   };
 }

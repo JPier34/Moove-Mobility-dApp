@@ -602,15 +602,32 @@ async function buildAuctionWithCompleteData(
       }
     }
 
-    // Use status directly from contract, but correct it if auction has ended
+    // Use status directly from contract, but correct it based on auction type
     let status = Number(auctionData.status);
+    const auctionType = Number(auctionData.auctionType);
     const startTime = Number(auctionData.startTime);
     const endTime = Number(auctionData.endTime);
     const currentTime = Math.floor(Date.now() / 1000);
 
+    // CRITICAL FIX: REVEAL status should ONLY be for SEALED_BID auctions
+    if (status === 2 && auctionType !== 2) {
+      // AuctionType.SEALED_BID = 2
+      // For non-sealed bid auctions, status 2 should be ENDED (3 in frontend)
+      status = 3; // ENDED
+      console.log(
+        `🔧 [Auction ${auctionId}] Correcting invalid REVEAL status for ${
+          auctionType === 0
+            ? "English"
+            : auctionType === 1
+            ? "Dutch"
+            : "Reserve"
+        } auction -> ENDED`
+      );
+    }
+
     // If auction is ACTIVE but endTime has passed, mark it as ENDED
     if (status === 1 && currentTime >= endTime) {
-      status = 2; // ENDED
+      status = 3; // ENDED (changed from 2 to 3)
       console.log(
         `🕐 [Auction ${auctionId}] Auto-correcting status: ACTIVE -> ENDED (time expired)`
       );
@@ -635,7 +652,7 @@ async function buildAuctionWithCompleteData(
         endTime: new Date(endTime * 1000).toISOString(),
         metadataSource:
           metadata.name === `NFT #${tokenId}` ? "FALLBACK" : "IPFS/LOCAL",
-        isEnded: status === 2,
+        isEnded: status === 3, // ENDED is now 3
         willBeEnded: currentTime >= endTime,
       }
     );
@@ -1011,8 +1028,8 @@ export function useAuctionsEnhanced(
       const statusCounts = {
         pending: validAuctions.filter((a) => a.status === 0).length, // PENDING
         active: validAuctions.filter((a) => a.status === 1).length, // ACTIVE
-        ended: validAuctions.filter((a) => a.status === 2).length, // ENDED
-        cancelled: validAuctions.filter((a) => a.status === 3).length, // CANCELLED
+        ended: validAuctions.filter((a) => a.status === 3).length, // ENDED
+        cancelled: validAuctions.filter((a) => a.status === 5).length, // CANCELLED
         settled: validAuctions.filter((a) => a.status === 4).length, // SETTLED/CLAIMED
       };
 
@@ -1034,7 +1051,7 @@ export function useAuctionsEnhanced(
         ).length,
         ended: validAuctions.filter(
           (a) =>
-            a.status === 2 &&
+            a.status === 3 &&
             a.nftImage &&
             a.nftImage !== "/images/default-nft.png"
         ).length,
@@ -1113,7 +1130,7 @@ export function useAuctionsEnhanced(
     return isActive && isNotExpired;
   });
   const endedAuctions = auctions.filter((auction) => {
-    const isEnded = auction.status === 2;
+    const isEnded = auction.status === 3;
     const isTimeExpired =
       auction.status === 1 &&
       auction.endTime &&

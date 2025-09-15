@@ -84,7 +84,7 @@ export default function CongratulationsModal({
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4 }}
               >
-                {auction.status === 2
+                {auction.status === 3
                   ? `You won auction #${auction.auctionId}`
                   : `You're leading auction #${auction.auctionId}`}
               </motion.p>
@@ -124,7 +124,7 @@ export default function CongratulationsModal({
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.6 }}
               >
-                {auction.status === 2
+                {auction.status === 3
                   ? 'Click "Settle Auction" to transfer the NFT to your wallet and add it to your collection.'
                   : "Wait for the auction to end, then you can settle it to claim your NFT."}
               </motion.p>
@@ -144,7 +144,7 @@ export default function CongratulationsModal({
                 </button>
                 <button
                   onClick={() => onSettle(auction.auctionId)}
-                  disabled={isSettling || auction.status !== 2}
+                  disabled={isSettling || auction.status !== 3}
                   className="flex-1 px-6 py-3 bg-white hover:bg-white/90 text-gray-900 font-medium rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
                 >
                   {isSettling ? (
@@ -160,7 +160,7 @@ export default function CongratulationsModal({
                       />
                       <span>Settling...</span>
                     </>
-                  ) : auction.status === 2 ? (
+                  ) : auction.status === 3 ? (
                     <>
                       <Sparkles size={16} />
                       <span>Settle Auction</span>

@@ -21,7 +21,7 @@ async function main() {
     const MooveAuction = await ethers.getContractFactory("MooveAuction");
 
     // Usa l'indirizzo del MooveAccessControl appena deployato
-    const accessControlAddress = "0xa3144249d2D4384D80d954f000a9530d8c747F4a";
+    const accessControlAddress = "0x7e83b5E99F217Da22EB33D3CC800c68B88d54165";
 
     const mooveAuction = await MooveAuction.deploy(accessControlAddress);
     await mooveAuction.waitForDeployment();
@@ -77,7 +77,3 @@ main()
     console.error("💥 Deployment script failed:", error);
     process.exit(1);
   });
-
-
-
-
