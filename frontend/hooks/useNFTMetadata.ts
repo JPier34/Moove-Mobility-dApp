@@ -102,7 +102,7 @@ export function useNFTMetadata(tokenId: number) {
       setError(null);
 
       try {
-        const fetchedMetadata = await fetchMetadataFromIPFS(tokenURI);
+        const fetchedMetadata = await fetchMetadataFromIPFS(tokenURI as string);
 
         if (fetchedMetadata) {
           setMetadata(fetchedMetadata);

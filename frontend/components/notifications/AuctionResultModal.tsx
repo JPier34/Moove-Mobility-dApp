@@ -30,10 +30,10 @@ export default function AuctionResultModal({
     // You could add a toast notification here
   };
 
-  const openInExplorer = (hash: string) => {
+  /* const openInExplorer = (hash: string) => {
     const explorerUrl = `https://sepolia.etherscan.io/tx/${hash}`;
     window.open(explorerUrl, "_blank");
-  };
+  }; */
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]">
@@ -131,13 +131,13 @@ export default function AuctionResultModal({
                 >
                   <Copy className="h-4 w-4" />
                 </button>
-                <button
+                {/* <button
                   onClick={() => openInExplorer(result.hash!)}
                   className="p-1 text-blue-600 hover:text-blue-800"
                   title="View on Etherscan"
                 >
                   <ExternalLink className="h-4 w-4" />
-                </button>
+                </button> */}
               </div>
             </div>
           )}

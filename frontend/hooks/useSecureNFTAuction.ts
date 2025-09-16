@@ -26,6 +26,8 @@ interface AuctionParams {
   buyNowPrice: bigint;
   duration: number;
   bidIncrement: bigint;
+  extensionThreshold: number;
+  extensionDuration: number;
 }
 
 interface FlowResult {
@@ -228,8 +230,8 @@ function validateAuctionParams(params: AuctionParams): void {
   }
 
   // Validazione durata
-  if (params.duration < 3600) {
-    throw new Error("Duration must be at least 1 hour");
+  if (params.duration < 60) {
+    throw new Error("Duration must be at least 1 minute");
   }
   if (params.duration > 30 * 24 * 3600) {
     throw new Error("Duration cannot exceed 30 days");
@@ -364,7 +366,9 @@ async function secureAuctionCreation(
       params.reservePrice,
       params.buyNowPrice,
       params.duration,
-      params.bidIncrement
+      params.bidIncrement,
+      params.extensionThreshold,
+      params.extensionDuration
     );
 
     console.log("📡 Auction creation transaction sent:", tx.hash);

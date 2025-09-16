@@ -31,14 +31,15 @@ export function useAuctionExtensionEvents() {
       console.log("🔄 AuctionExtended events received:", logs);
 
       logs.forEach((log) => {
-        const { auctionId, bidder, extensionDuration, newEndTime, reason } =
-          log.args as {
-            auctionId: bigint;
-            bidder: string;
-            extensionDuration: bigint;
-            newEndTime: bigint;
-            reason: string;
-          };
+        const { auctionId, bidder, extensionDuration, newEndTime, reason } = (
+          log as any
+        ).args as {
+          auctionId: bigint;
+          bidder: string;
+          extensionDuration: bigint;
+          newEndTime: bigint;
+          reason: string;
+        };
 
         const extensionEvent: AuctionExtensionEvent = {
           auctionId: Number(auctionId),
@@ -46,7 +47,7 @@ export function useAuctionExtensionEvents() {
           extensionDuration: Number(extensionDuration),
           newEndTime: Number(newEndTime),
           reason,
-          transactionHash: log.transactionHash,
+          transactionHash: log.transactionHash || "",
           blockNumber: Number(log.blockNumber),
           timestamp: new Date(),
         };
@@ -148,4 +149,3 @@ export function useAuctionExtensionInfo(auctionId: number) {
     error,
   };
 }
-

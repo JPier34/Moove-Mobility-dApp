@@ -8,6 +8,7 @@ import {
 } from "wagmi";
 import { contracts } from "@/utils/contracts";
 import { useAuctionsEnhanced } from "./enhanced-auction-utils";
+import { ethers } from "ethers";
 
 interface WonAuction {
   auctionId: string;
@@ -142,8 +143,20 @@ export function useSettleAuction() {
   const [transactionHash, setTransactionHash] = useState<string | null>(null);
   const [currentAuctionId, setCurrentAuctionId] = useState<string | null>(null);
 
-  const { writeContract, isPending: isWriting } = useWriteContract({
-    onSuccess: (hash) => {
+  const {
+    writeContract,
+    data: hash,
+    isPending: isWriting,
+    error: writeError,
+  } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess: isConfirmed } =
+    useWaitForTransactionReceipt({
+      hash: transactionHash as `0x${string}`,
+    });
+
+  // Handle transaction hash when it's available
+  useEffect(() => {
+    if (hash) {
       console.log(`🏆 Settle transaction sent:`, hash);
       setTransactionHash(hash);
 
@@ -153,17 +166,17 @@ export function useSettleAuction() {
         detail: { type: "transaction_sent", hash, auctionId },
       });
       window.dispatchEvent(event);
-    },
-    onError: (err) => {
-      console.error(`❌ Error sending settle transaction:`, err);
-      setError(err.message);
+    }
+  }, [hash]);
+
+  // Handle write errors
+  useEffect(() => {
+    if (writeError) {
+      console.error(`❌ Error sending settle transaction:`, writeError);
+      setError(writeError.message || "Failed to send transaction");
       setIsSettling(false);
-    },
-  });
-  const { isLoading: isConfirming, isSuccess: isConfirmed } =
-    useWaitForTransactionReceipt({
-      hash: transactionHash as `0x${string}`,
-    });
+    }
+  }, [writeError]);
 
   const settleAuction = useCallback(
     (auctionId: string) => {

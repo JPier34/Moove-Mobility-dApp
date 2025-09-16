@@ -121,7 +121,7 @@ export function useExtendAuction(): ExtendAuctionHandler {
     extendAuction,
     isExtending,
     error,
-    hasAuctionManagerRole: hasAuctionManagerRole || false,
-    isCheckingRole: isCheckingRole || false,
+    hasAuctionManagerRole: Boolean(hasAuctionManagerRole),
+    isCheckingRole: Boolean(isCheckingRole),
   };
 }

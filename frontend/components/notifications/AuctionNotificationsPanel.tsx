@@ -139,7 +139,7 @@ export default function AuctionNotificationsPanel({
 
                       <div className="flex items-center justify-between text-sm text-gray-600">
                         <span className="font-medium text-green-600">
-                          {auction.finalBid.toFixed(4)} ETH
+                          {auction.finalBid.toFixed(6)} ETH
                         </span>
                         <span
                           className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(

@@ -50,13 +50,13 @@ export function AuctionNotificationsProvider({
 }: AuctionNotificationsProviderProps) {
   const { address, isConnected } = useAccount();
 
-  // ID univoco per tracciare le istanze del provider
+  // ID unique to track the provider instances
   const providerId = React.useMemo(
     () => Math.random().toString(36).substr(2, 9),
     []
   );
 
-  // Use original simple modal management
+  // Use original simple modal management (no complex event system)
   const {
     unsettledAuctions,
     currentAuction,
@@ -66,7 +66,7 @@ export function AuctionNotificationsProvider({
     handleCloseCongratulationsModal,
   } = useWonAuctionsManager();
 
-  // Simple transaction tracking (no complex event system)
+  // Simple transaction tracking
   const [transactionHash, setTransactionHash] = useState<string | null>(null);
   const [isWaitingForConfirmation, setIsWaitingForConfirmation] =
     useState(false);

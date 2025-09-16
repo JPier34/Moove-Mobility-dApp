@@ -5,6 +5,7 @@ import Button from "../ui/Button";
 import { AuctionType } from "../../types/auction";
 import { WonAuction } from "../../types/user";
 import AuctionClaimModal from "../auctions/AuctionClaimModal";
+import TransferNFTModal from "../TransferNFTModal";
 
 interface WonAuctionsProps {
   auctions: WonAuction[];
@@ -13,13 +14,16 @@ interface WonAuctionsProps {
 export default function WonAuctions({ auctions }: WonAuctionsProps) {
   const [timeLeftMap, setTimeLeftMap] = useState<Record<string, string>>({});
   const [showClaimModal, setShowClaimModal] = useState(false);
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [selectedAuction, setSelectedAuction] = useState<WonAuction | null>(
+    null
+  );
+  const [selectedTransferNFT, setSelectedTransferNFT] =
+    useState<WonAuction | null>(null);
 
   // Debug logging
   console.log("🖼️ WonAuctions component received auctions:", auctions);
   console.log("🖼️ WonAuctions auctions length:", auctions.length);
-  const [selectedAuction, setSelectedAuction] = useState<WonAuction | null>(
-    null
-  );
 
   // Calculate time remaining to claim
   useEffect(() => {
@@ -73,14 +77,14 @@ export default function WonAuctions({ auctions }: WonAuctionsProps) {
       <div className="text-center py-12">
         <div className="text-6xl mb-4">🏆</div>
         <h3 className="text-xl font-semibold text-gray-900 mb-2">
-          Nessuna asta vinta
+          No auctions won
         </h3>
         <p className="text-gray-600 max-w-md mx-auto mb-6">
-          Non hai ancora vinto nessuna asta. Continua a partecipare per vincere
-          NFT esclusivi!
+          You haven't won any auctions yet. Continue to participate to win
+          exclusive NFTs!
         </p>
         <Button onClick={() => (window.location.href = "/auctions")}>
-          Partecipa alle Aste
+          Participate in Auctions
         </Button>
       </div>
     );
@@ -100,11 +104,11 @@ export default function WonAuctions({ auctions }: WonAuctionsProps) {
       {unclaimedAuctions.length > 0 && (
         <div>
           <div className="flex items-center space-x-2 mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">
-              🎯 Da reclamare ({unclaimedAuctions.length})
+            <h3 className="text-lg font-semibold text-yellow-500">
+              🎯 To claim ({unclaimedAuctions.length})
             </h3>
             <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded-full text-xs font-medium animate-pulse">
-              Azione richiesta
+              Action required
             </span>
           </div>
 
@@ -136,13 +140,13 @@ export default function WonAuctions({ auctions }: WonAuctionsProps) {
                           {auction.name}
                         </h4>
                         <div className="text-sm text-gray-500 mb-1">
-                          Asta #{auction.auctionId} • Terminata{" "}
+                          Auction #{auction.auctionId} • Ended{" "}
                           {auction.endTime
                             ? new Date(auction.endTime).toLocaleDateString()
                             : "Unknown"}
                         </div>
                         <div className="text-lg font-bold text-green-600">
-                          Vinta per {auction.finalBid} ETH
+                          Won for {auction.finalBid} ETH
                         </div>
                       </div>
                     </div>
@@ -162,7 +166,7 @@ export default function WonAuctions({ auctions }: WonAuctionsProps) {
                           onClick={() => handleClaimNFT(auction)}
                           className="w-full"
                         >
-                          🎁 Reclama NFT
+                          🎁 Claim NFT
                         </Button>
 
                         <Button
@@ -171,7 +175,7 @@ export default function WonAuctions({ auctions }: WonAuctionsProps) {
                           onClick={() => handleViewAuction(auction.auctionId)}
                           className="w-full"
                         >
-                          Visualizza Asta
+                          View Auction
                         </Button>
                       </div>
                     </div>
@@ -181,8 +185,8 @@ export default function WonAuctions({ auctions }: WonAuctionsProps) {
                   {isUrgent && (
                     <div className="mt-3 p-3 bg-red-100 border border-red-200 rounded-lg">
                       <div className="text-red-800 text-sm font-medium flex items-center">
-                        🚨 Tempo quasi scaduto! Reclama il tuo NFT prima che
-                        scada.
+                        🚨 Time almost expired! Claim your NFT before it
+                        expires.
                       </div>
                     </div>
                   )}
@@ -197,7 +201,7 @@ export default function WonAuctions({ auctions }: WonAuctionsProps) {
       {claimedAuctions.length > 0 && (
         <div>
           <h3 className="text-lg font-semibold text-gray-900 mb-4">
-            ✅ Già reclamati ({claimedAuctions.length})
+            ✅ Already claimed ({claimedAuctions.length})
           </h3>
 
           <div className="space-y-4">
@@ -218,23 +222,33 @@ export default function WonAuctions({ auctions }: WonAuctionsProps) {
                         {auction.nftName}
                       </h4>
                       <div className="text-sm text-gray-500 mb-1">
-                        Asta #{auction.auctionId} • Vinta per{" "}
+                        Auction #{auction.auctionId} • Won for{" "}
                         {auction.winningBid} ETH
                       </div>
                       <div className="text-xs text-green-600 font-medium">
-                        NFT reclamato con successo
+                        NFT claimed successfully
                       </div>
                     </div>
                   </div>
 
-                  {/* Right side - View action */}
-                  <div>
+                  {/* Right side - Actions */}
+                  <div className="flex space-x-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setSelectedTransferNFT(auction);
+                        setShowTransferModal(true);
+                      }}
+                    >
+                      Transfer
+                    </Button>
                     <Button
                       size="sm"
                       variant="outline"
                       onClick={() => handleViewAuction(auction.auctionId)}
                     >
-                      Visualizza Storico
+                      View History
                     </Button>
                   </div>
                 </div>
@@ -258,6 +272,20 @@ export default function WonAuctions({ auctions }: WonAuctionsProps) {
           finalBid={selectedAuction.finalBid}
         />
       )}
+
+      {/* Transfer Modal */}
+      <TransferNFTModal
+        nft={selectedTransferNFT}
+        isOpen={showTransferModal}
+        onClose={() => {
+          setShowTransferModal(false);
+          setSelectedTransferNFT(null);
+        }}
+        onSuccess={() => {
+          // Refresh the auctions list after successful transfer
+          console.log("NFT transferred successfully, refreshing list...");
+        }}
+      />
     </div>
   );
 }

@@ -13,7 +13,7 @@ export const contracts = {
     abi: (MooveNFTABI as any).abi,
   },
   MooveAuction: {
-    address: "0xC2c1433FdF833640d0987625680DBe6Bc73416D8",
+    address: "0x7D06E101bD77668f3B55eE9c30dccEe4b01B3F22", // Updated with new deployment (1 minute duration)
     abi: (MooveAuctionABI as any).abi,
   },
   MooveRentalPass: {

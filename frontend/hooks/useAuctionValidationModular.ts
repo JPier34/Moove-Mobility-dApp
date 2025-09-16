@@ -18,6 +18,8 @@ export interface AuctionFormData {
   // English auction extension settings
   extensionThresholdMinutes: string;
   extensionDurationMinutes: string;
+  // Test mode
+  testMode?: boolean;
 }
 
 export interface ValidationResult {

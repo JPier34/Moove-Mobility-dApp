@@ -257,6 +257,10 @@ export default function AdminNFTCreatorClean() {
           : 0n,
         duration: durationInSeconds,
         bidIncrement: ethers.parseEther(auctionFormData.bidIncrement),
+        extensionThreshold:
+          parseInt(auctionFormData.extensionThresholdMinutes || "5") * 60, // Convert to seconds
+        extensionDuration:
+          parseInt(auctionFormData.extensionDurationMinutes || "10") * 60, // Convert to seconds
       };
 
       // Execute secure flow

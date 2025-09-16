@@ -52,7 +52,7 @@ const AUCTION_TYPE_RULES = {
       buyNowPrice: { required: false },
     },
     durationRules: {
-      min: 3600, // 1 hour in seconds
+      min: 60, // 1 minute in seconds (for testing)
       max: 30 * 24 * 3600, // 30 days in seconds
     },
   },
@@ -76,7 +76,7 @@ const AUCTION_TYPE_RULES = {
       },
     },
     durationRules: {
-      min: 3600, // 1 hour in seconds
+      min: 60, // 1 minute in seconds (for testing)
       max: 30 * 24 * 3600, // 30 days in seconds
     },
   },
@@ -96,7 +96,7 @@ const AUCTION_TYPE_RULES = {
       buyNowPrice: { required: false },
     },
     durationRules: {
-      min: 3600, // 1 hour in seconds
+      min: 60, // 1 minute in seconds (for testing)
       max: 30 * 24 * 3600, // 30 days in seconds
     },
   },
@@ -121,7 +121,7 @@ const AUCTION_TYPE_RULES = {
       },
     },
     durationRules: {
-      min: 3600, // 1 hour in seconds
+      min: 60, // 1 minute in seconds (for testing)
       max: 30 * 24 * 3600, // 30 days in seconds
     },
   },

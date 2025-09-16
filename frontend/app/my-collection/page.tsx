@@ -15,6 +15,8 @@ import { useWonAuctions } from "@/hooks/useWonAuctions";
 import WonAuctions from "@/components/collection/WonAuctions";
 import { toast } from "react-hot-toast";
 import OptimizedNFTImage from "@/components/collection/OptimizedNFTImage";
+import TransferNFTModal from "@/components/TransferNFTModal";
+import { WonAuction } from "@/types/user";
 
 // ============= TYPES =============
 interface DecorativeNFT {
@@ -39,6 +41,7 @@ interface NFTDetailsModalProps {
   nft: DecorativeNFT | null;
   isOpen: boolean;
   onClose: () => void;
+  onTransferNFT?: (nft: DecorativeNFT) => void;
 }
 
 interface FilterOptions {
@@ -65,7 +68,12 @@ const RARITY_CONFIG = {
 
 // ============= COMPONENTS =============
 
-function NFTDetailsModal({ nft, isOpen, onClose }: NFTDetailsModalProps) {
+function NFTDetailsModal({
+  nft,
+  isOpen,
+  onClose,
+  onTransferNFT,
+}: NFTDetailsModalProps) {
   if (!nft || !isOpen) return null;
 
   const rarityConfig = RARITY_CONFIG[nft.rarity];
@@ -227,6 +235,12 @@ function NFTDetailsModal({ nft, isOpen, onClose }: NFTDetailsModalProps) {
         {/* Actions */}
         <div className="p-6 border-t border-gray-200/50 dark:border-gray-700/50">
           <div className="flex space-x-3">
+            <button
+              onClick={() => onTransferNFT?.(nft)}
+              className="flex-1 px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white font-medium rounded-xl transition-colors"
+            >
+              Transfer NFT
+            </button>
             <button
               onClick={onClose}
               className="flex-1 px-6 py-3 bg-moove-primary hover:bg-moove-primary/90 text-white font-medium rounded-xl transition-colors"
@@ -540,6 +554,11 @@ export default function MyCollection() {
   const [selectedNFT, setSelectedNFT] = useState<DecorativeNFT | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // Transfer modal state
+  const [selectedTransferNFT, setSelectedTransferNFT] =
+    useState<WonAuction | null>(null);
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+
   // Anti-loop mechanism
   const [isDataReady, setIsDataReady] = useState(false);
   const [displayTimeout, setDisplayTimeout] = useState<NodeJS.Timeout | null>(
@@ -588,6 +607,44 @@ export default function MyCollection() {
     setIsModalOpen(false);
     setSelectedNFT(null);
   }, []);
+
+  // Transfer handler functions
+  const handleTransferNFT = useCallback((nft: DecorativeNFT) => {
+    // Convert DecorativeNFT to WonAuction for the transfer modal
+    const wonAuction: WonAuction = {
+      auctionId: nft.auctionWon?.auctionId || nft.id,
+      nftId: nft.tokenId,
+      name: nft.name,
+      image: nft.image,
+      category: nft.category,
+      finalBid: nft.price,
+      bidders: nft.auctionWon?.bidders || 0,
+      endTime: nft.purchaseDate.getTime(),
+      transactionHash: nft.transactionHash,
+      status: 4, // SETTLED
+      isSettled: true,
+      hasImage: true,
+      hasName: true,
+      // Legacy fields for compatibility
+      nftName: nft.name,
+      nftImage: nft.image,
+      isClaimed: true,
+    };
+
+    setSelectedTransferNFT(wonAuction);
+    setIsTransferModalOpen(true);
+  }, []);
+
+  const handleCloseTransferModal = useCallback(() => {
+    setIsTransferModalOpen(false);
+    setSelectedTransferNFT(null);
+  }, []);
+
+  const handleTransferSuccess = useCallback(() => {
+    // Refresh the collection after successful transfer
+    refetch();
+    toast.success("NFT transferred successfully!");
+  }, [refetch]);
 
   // Convert won auctions to decorative NFTs format
   const decorativeNFTs: DecorativeNFT[] = useMemo(() => {
@@ -805,13 +862,13 @@ export default function MyCollection() {
               <div className="flex items-center mb-4">
                 <div className="text-2xl mr-3">🏆</div>
                 <h2 className="text-xl font-semibold text-yellow-800 dark:text-yellow-200">
-                  Aste Vinte da Reclamare
+                  Auctions to Claim
                 </h2>
               </div>
               <p className="text-yellow-700 dark:text-yellow-300 mb-4">
-                Hai vinto {wonAuctionsToClaim.length} asta
-                {wonAuctionsToClaim.length > 1 ? "e" : ""} che richiedono di
-                essere reclamate.
+                You have won {wonAuctionsToClaim.length} auction
+                {wonAuctionsToClaim.length > 1 ? "e" : ""} that need to be
+                claimed.
               </p>
               <WonAuctions auctions={wonAuctionsToClaim} />
             </div>
@@ -865,6 +922,15 @@ export default function MyCollection() {
           nft={selectedNFT}
           isOpen={isModalOpen}
           onClose={handleCloseModal}
+          onTransferNFT={handleTransferNFT}
+        />
+
+        {/* Transfer NFT Modal */}
+        <TransferNFTModal
+          nft={selectedTransferNFT}
+          isOpen={isTransferModalOpen}
+          onClose={handleCloseTransferModal}
+          onSuccess={handleTransferSuccess}
         />
 
         {/* Congratulations Modal is now handled globally by AuctionNotificationsProvider */}

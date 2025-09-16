@@ -742,6 +742,10 @@ function AdminNFTCreatorContent() {
         buyNowPrice: buyNowPrice,
         duration: durationInSeconds,
         bidIncrement: bidIncrementWei,
+        extensionThreshold:
+          parseInt(auctionFormData.extensionThresholdMinutes || "5") * 60, // Convert to seconds
+        extensionDuration:
+          parseInt(auctionFormData.extensionDurationMinutes || "10") * 60, // Convert to seconds
       };
 
       console.log("📋 Parameters prepared:", {

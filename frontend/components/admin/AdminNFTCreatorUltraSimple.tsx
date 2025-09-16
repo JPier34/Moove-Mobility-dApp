@@ -532,6 +532,10 @@ function AdminNFTCreatorUltraSimpleContent() {
           : 0n,
         duration: durationInSeconds,
         bidIncrement: ethers.parseEther(auctionFormData.bidIncrement),
+        extensionThreshold:
+          parseInt(auctionFormData.extensionThresholdMinutes || "5") * 60, // Convert to seconds
+        extensionDuration:
+          parseInt(auctionFormData.extensionDurationMinutes || "10") * 60, // Convert to seconds
       };
 
       // Execute secure flow
@@ -882,6 +886,33 @@ function AdminNFTCreatorUltraSimpleContent() {
                     placeholder="0.001"
                   />
                 </div>
+              </div>
+
+              {/* Test Mode Toggle */}
+              <div className="mb-6">
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={auctionFormData.testMode || false}
+                    onChange={(e) => {
+                      updateField("testMode", e.target.checked);
+                      if (e.target.checked) {
+                        // Set test mode values
+                        updateField("duration", "2");
+                        updateField("durationUnit", "minutes");
+                        updateField("startPrice", "0.001");
+                        updateField("bidIncrement", "0.0001");
+                      }
+                    }}
+                    className="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500 dark:focus:ring-purple-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                  />
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    🧪 Test Mode (2 minutes, low prices)
+                  </span>
+                </label>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Automatically sets short duration and low prices for testing
+                </p>
               </div>
 
               {/* Duration and Bid Increment */}

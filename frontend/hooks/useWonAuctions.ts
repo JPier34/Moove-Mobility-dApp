@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useAccount, useWatchContractEvent } from "wagmi";
-import { useIncrementalAuctions } from "./useIncrementalAuctions";
+import { useAuctionsEnhanced } from "./enhanced-auction-utils";
 import { contracts } from "../utils/contracts";
 
 export interface WonAuction {
@@ -66,12 +66,12 @@ export function useWonAuctions(): UseWonAuctionsReturn {
     },
   });
 
-  // Use incremental auctions hook for better performance
+  // Use enhanced auctions hook to get all auction data
   const {
     auctions,
     isLoading: auctionsLoading,
     refetch: refetchAuctions,
-  } = useIncrementalAuctions();
+  } = useAuctionsEnhanced();
 
   // Transaction tracker not needed for status 3 auctions
 
@@ -273,8 +273,8 @@ export function useWonAuctions(): UseWonAuctionsReturn {
           auctionType: auction.auctionType,
           currentBid: parseFloat(auction.currentBid) || 0,
           startingPrice: parseFloat(auction.startPrice) || 0,
-          highestBidder: auction.highestBidder,
-          seller: auction.seller,
+          highestBidder: auction.highestBidder || undefined,
+          seller: auction.seller || undefined,
         };
 
         wonAuctions.push(wonAuction);

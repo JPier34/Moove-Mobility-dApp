@@ -50,11 +50,8 @@ function generateMockTransactionHash(auctionId: string): string {
 
 export function useUserCollectionOptimized(): UserCollectionOptimized {
   const { address, isConnected } = useAccount();
-  // Re-enabled useAuctionsEnhanced to fetch auction data
-  const { auctions, isLoading: auctionsLoading } = useAuctionsEnhanced(
-    true, // Disable auto-refresh to prevent loops
-    true // Disable failed auction handling for collection
-  );
+  // Use enhanced auctions hook to fetch auction data
+  const { auctions, isLoading: auctionsLoading } = useAuctionsEnhanced();
 
   const [wonAuctions, setWonAuctions] = useState<WonAuction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -236,6 +233,47 @@ export function useUserCollectionOptimized(): UserCollectionOptimized {
       console.log(
         `🏆 User won ${userWonAuctions.length} auctions:`,
         userWonAuctions
+      );
+
+      // Debug: Check all auctions with status 4
+      const settledAuctions = auctions.filter((a) => a.status === 4);
+      console.log(
+        `🔍 All settled auctions (status 4):`,
+        settledAuctions.map((a) => ({
+          auctionId: a.auctionId,
+          nftId: a.nftId,
+          name: a.nftName,
+          status: a.status,
+          highestBidder: a.highestBidder,
+          seller: a.seller,
+          userAddress: address,
+        }))
+      );
+
+      // Debug: Check all auctions where user is winner (any status)
+      const userWonAnyStatus = auctions.filter(
+        (a) =>
+          a.highestBidder &&
+          a.highestBidder.toLowerCase() === address.toLowerCase()
+      );
+      console.log(
+        `🏆 All auctions where user is winner (any status):`,
+        userWonAnyStatus.map((a) => ({
+          auctionId: a.auctionId,
+          nftId: a.nftId,
+          name: a.nftName,
+          status: a.status,
+          statusName: [
+            "PENDING",
+            "ACTIVE",
+            "REVEAL",
+            "ENDED",
+            "SETTLED",
+            "CANCELLED",
+          ][a.status],
+          highestBidder: a.highestBidder,
+          isSettled: a.isSettled,
+        }))
       );
       setWonAuctions(userWonAuctions);
       setCachedData(userWonAuctions);
