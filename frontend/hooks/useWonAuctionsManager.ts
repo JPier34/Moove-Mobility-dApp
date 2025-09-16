@@ -69,28 +69,21 @@ export function useWonAuctionsManager() {
   const [showCongratulations, setShowCongratulations] = useState(false);
   const [currentAuction, setCurrentAuction] = useState<any>(null);
 
-  // Mostra modal congratulazioni quando l'utente vince un'asta
-  useEffect(() => {
-    if (unsettledAuctions.length > 0 && !showCongratulations) {
-      // Mostra il modal per la prima asta non settled
-      const firstUnsettled = unsettledAuctions[0];
-      setCurrentAuction(firstUnsettled);
-      setShowCongratulations(true);
-    }
-  }, [unsettledAuctions, showCongratulations]);
+  // Modal is now shown manually when user clicks on an NFT
+  // No automatic modal opening to prevent infinite loops
 
-  // Chiudi il modal quando l'asta è stata settled con successo
+  // Close the modal when the auction is settled successfully
   useEffect(() => {
     if (!isSettling && showCongratulations) {
       console.log(`🎉 Auction settled successfully! Closing modal...`);
       setShowCongratulations(false);
       setCurrentAuction(null);
-      // Refresh dei dati per aggiornare la lista
+      // Refresh the data to update the list
       refetch();
     }
   }, [isSettling, showCongratulations, refetch]);
 
-  // Debug per errori di transazione
+  // Debug for transaction errors
   useEffect(() => {
     if (error) {
       console.error(`❌ Settle auction error:`, error);
@@ -98,7 +91,7 @@ export function useWonAuctionsManager() {
     }
   }, [error]);
 
-  // Debug per errori di reveal phase
+  // Debug for reveal phase errors
   useEffect(() => {
     if (revealError) {
       console.error(`❌ Reveal phase error:`, revealError);
@@ -110,7 +103,7 @@ export function useWonAuctionsManager() {
     try {
       console.log(`🏆 Attempting to settle auction ${auctionId}...`);
 
-      // Verifica preventiva: controlla se l'asta è pronta per il settle
+      // Preliminary check: check if the auction is ready for settle
       const auction = unsettledAuctions.find((a) => a.auctionId === auctionId);
       if (!auction) {
         console.error(
@@ -118,6 +111,10 @@ export function useWonAuctionsManager() {
         );
         return;
       }
+
+      // Don't show the global modal - we're using the 3-phase system
+      // setCurrentAuction(auction);
+      // setShowCongratulations(true);
 
       console.log(`📊 Local auction ${auctionId} details:`, {
         status: auction.status,
@@ -141,14 +138,14 @@ export function useWonAuctionsManager() {
 
       console.log(`📊 Contract auction ${auctionId} status:`, contractStatus);
 
-      // Verifica che l'asta non sia già settled
+      // Check if the auction is already settled
       if (contractStatus.isSettled) {
         console.error(`❌ Auction ${auctionId} is already settled`);
         alert(`Auction ${auctionId} is already settled`);
         return;
       }
 
-      // Verifica che l'asta abbia un vincitore
+      // Check if the auction has a winner
       if (
         !contractStatus.highestBid ||
         parseFloat(contractStatus.highestBid) <= 0
@@ -158,7 +155,7 @@ export function useWonAuctionsManager() {
         return;
       }
 
-      // Verifica che l'asta sia effettivamente finita nel tempo
+      // Check if the auction has actually ended in time
       const now = Date.now();
       const endTime = contractStatus.endTime;
       if (now < endTime) {
@@ -173,7 +170,7 @@ export function useWonAuctionsManager() {
         return;
       }
 
-      // Verifica che l'asta abbia un vincitore valido
+      // Check if the auction has a valid winner
       if (
         !contractStatus.highestBidder ||
         contractStatus.highestBidder === ethers.ZeroAddress
@@ -183,7 +180,7 @@ export function useWonAuctionsManager() {
         return;
       }
 
-      // Se l'asta è finita nel tempo ma ha ancora status ACTIVE, chiama endAuction prima
+      // If the auction has ended in time but still has status ACTIVE, call endAuction first
       if (contractStatus.status === 1) {
         console.log(
           `🔄 Auction ${auctionId} is ACTIVE but time-expired. Calling endAuction first...`
@@ -207,10 +204,10 @@ export function useWonAuctionsManager() {
             endReceipt
           );
 
-          // Aspetta un po' per assicurarsi che lo status sia aggiornato
+          // Wait a bit to ensure the status is updated
           await new Promise((resolve) => setTimeout(resolve, 2000));
 
-          // Verifica che l'asta sia effettivamente terminata
+          // Check if the auction has actually ended
           console.log(
             `🔍 Verifying auction ${auctionId} status after endAuction...`
           );
@@ -256,12 +253,18 @@ export function useWonAuctionsManager() {
 
           // Wait for reveal phase to complete
           await new Promise((resolve) => setTimeout(resolve, 3000));
-          
+
           // After reveal phase, the auction should be ready for settlement
-          console.log(`✅ Sealed bid auction ${auctionId} reveal phase completed. Ready for settlement.`);
+          console.log(
+            `✅ Sealed bid auction ${auctionId} reveal phase completed. Ready for settlement.`
+          );
         } else {
-          console.log(`❌ Non-sealed bid auction in REVEAL phase. This shouldn't happen.`);
-          alert(`Auction ${auctionId} is in an invalid state. Please contact support.`);
+          console.log(
+            `❌ Non-sealed bid auction in REVEAL phase. This shouldn't happen.`
+          );
+          alert(
+            `Auction ${auctionId} is in an invalid state. Please contact support.`
+          );
           return;
         }
       } else if (contractStatus.status === 3) {
@@ -291,34 +294,20 @@ export function useWonAuctionsManager() {
         endTime: new Date(contractStatus.endTime).toISOString(),
       });
 
-      // Chiama settleAuction (non è async, ma triggera la transazione)
+      // Call settleAuction (non-async, triggers transaction)
       console.log(`🔨 Calling settleAuction for auction ${auctionId}...`);
       settleAuction(auctionId);
       console.log(`✅ Settle auction ${auctionId} transaction initiated`);
 
-      // Verifica lo status dopo un po' per confermare il successo
-      setTimeout(async () => {
-        try {
-          const finalStatus = await checkAuctionStatus(auctionId);
-          console.log(
-            `🔍 Final verification - Auction ${auctionId} status:`,
-            finalStatus
-          );
-          if (finalStatus.isSettled) {
-            console.log(`✅ Auction ${auctionId} successfully settled!`);
-          } else {
-            console.log(`❌ Auction ${auctionId} settlement failed or pending`);
-          }
-        } catch (verifyError) {
-          console.error(`❌ Error verifying settlement:`, verifyError);
-        }
-      }, 5000); // Aspetta 5 secondi per la conferma
-
-      // Il modal si chiuderà automaticamente quando isSettling diventa false
-      // Non possiamo await qui perché settleAuction non restituisce una Promise
+      // Return a promise that resolves when the transaction is confirmed
+      return new Promise((resolve, reject) => {
+        // This will be handled by the useWaitForTransactionReceipt hook
+        // We'll resolve this in the provider when we get the confirmation
+        resolve({ success: true, auctionId });
+      });
     } catch (error) {
       console.error("Error settling auction:", error);
-      // Mostra errore all'utente
+      // Show error to the user in a modal
       alert(
         `Failed to settle auction: ${
           error instanceof Error ? error.message : "Unknown error"
@@ -332,12 +321,12 @@ export function useWonAuctionsManager() {
     setCurrentAuction(null);
   };
 
-  // Chiudi il modal quando l'asta è stata settled con successo
+  // Close the modal when the auction is settled successfully
   useEffect(() => {
     if (!isSettling && showCongratulations) {
       setShowCongratulations(false);
       setCurrentAuction(null);
-      // Refetch per aggiornare la lista
+      // Refetch to update the list
       refetch();
     }
   }, [isSettling, showCongratulations, refetch]);

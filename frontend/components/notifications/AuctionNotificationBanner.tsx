@@ -1,9 +1,10 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Trophy, X, Bell } from "lucide-react";
 import { useAuctionNotifications } from "@/providers/AuctionNotificationsProvider";
+import AuctionNotificationsPanel from "./AuctionNotificationsPanel";
 
 interface AuctionNotificationBannerProps {
   className?: string;
@@ -17,7 +18,12 @@ export default function AuctionNotificationBanner({
     unsettledCount,
     showNotifications,
     setShowNotifications,
+    unsettledAuctions,
+    handleSettleAuction,
+    isSettling,
   } = useAuctionNotifications();
+
+  const [showPanel, setShowPanel] = useState(false);
 
   // Non mostrare se non ci sono aste non settled o se le notifiche sono disabilitate
   if (!hasUnsettledAuctions || !showNotifications) {
@@ -31,13 +37,17 @@ export default function AuctionNotificationBanner({
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -50 }}
         transition={{ type: "spring", duration: 0.5 }}
+        onClick={() => {
+          // Apri il pannello notifiche
+          setShowPanel(true);
+        }}
         className={`
-          fixed top-4 left-1/2 transform -translate-x-1/2 z-40
-          bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500
-          text-white rounded-xl shadow-2xl border-2 border-white/20
-          backdrop-blur-sm
-          ${className}
-        `}
+                 fixed top-20 left-1/2 transform -translate-x-1/2 z-[9999]
+                 bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500
+                 text-white rounded-xl shadow-2xl border-2 border-white/20
+                 backdrop-blur-sm cursor-pointer hover:scale-105 transition-transform
+                 ${className}
+               `}
       >
         <div className="flex items-center space-x-3 px-6 py-4">
           {/* Icon */}
@@ -52,11 +62,16 @@ export default function AuctionNotificationBanner({
               <span className="font-bold text-lg">
                 🎉 You won {unsettledCount} auction
                 {unsettledCount > 1 ? "s" : ""}!
+                {unsettledCount > 1 && (
+                  <span className="text-sm ml-2">
+                    ({unsettledCount - 1} more in queue)
+                  </span>
+                )}
               </span>
             </div>
             <p className="text-sm text-white/90 mt-1">
-              Click to claim your NFT{unsettledCount > 1 ? "s" : ""} and add to
-              your collection
+              Click to view your NFT{unsettledCount > 1 ? "s" : ""} and claim
+              them
             </p>
           </div>
 
@@ -73,6 +88,15 @@ export default function AuctionNotificationBanner({
         {/* Pulse effect */}
         <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 opacity-20 animate-pulse" />
       </motion.div>
+
+      {/* Notifications Panel */}
+      <AuctionNotificationsPanel
+        unsettledAuctions={unsettledAuctions}
+        isOpen={showPanel}
+        onClose={() => setShowPanel(false)}
+        onSettleAuction={handleSettleAuction}
+        isSettling={isSettling}
+      />
     </AnimatePresence>
   );
 }

@@ -1,8 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useAccount } from "wagmi";
-import { ethers } from "ethers";
+import {
+  useAccount,
+  useWriteContract,
+  useWaitForTransactionReceipt,
+} from "wagmi";
 import { contracts } from "@/utils/contracts";
 import { useAuctionsEnhanced } from "./enhanced-auction-utils";
 
@@ -132,53 +135,111 @@ export function useUserCollection(): UserCollection {
   };
 }
 
-// Hook to settle a won auction (corrected)
+// Hook to settle a won auction using Wagmi
 export function useSettleAuction() {
   const [isSettling, setIsSettling] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [transactionHash, setTransactionHash] = useState<string | null>(null);
+  const [currentAuctionId, setCurrentAuctionId] = useState<string | null>(null);
 
-  const settleAuction = useCallback(async (auctionId: string) => {
-    if (typeof window === "undefined" || !window.ethereum) {
-      throw new Error("No ethereum provider available");
+  const { writeContract, isPending: isWriting } = useWriteContract({
+    onSuccess: (hash) => {
+      console.log(`🏆 Settle transaction sent:`, hash);
+      setTransactionHash(hash);
+
+      // Emit event for the provider
+      const auctionId = (window as any).currentSettlingAuctionId;
+      const event = new CustomEvent("settleAuctionEvent", {
+        detail: { type: "transaction_sent", hash, auctionId },
+      });
+      window.dispatchEvent(event);
+    },
+    onError: (err) => {
+      console.error(`❌ Error sending settle transaction:`, err);
+      setError(err.message);
+      setIsSettling(false);
+    },
+  });
+  const { isLoading: isConfirming, isSuccess: isConfirmed } =
+    useWaitForTransactionReceipt({
+      hash: transactionHash as `0x${string}`,
+    });
+
+  const settleAuction = useCallback(
+    (auctionId: string) => {
+      // Prevent multiple calls for the same auction
+      if (isSettling || currentAuctionId === auctionId) {
+        console.log(
+          `⏭️ Skipping settle call for auction ${auctionId} - already processing`
+        );
+        return;
+      }
+
+      try {
+        setIsSettling(true);
+        setError(null);
+        setTransactionHash(null);
+        setCurrentAuctionId(auctionId);
+
+        console.log(`🏆 Settling auction ${auctionId} using Wagmi...`);
+
+        // Store auctionId for events
+        (window as any).currentSettlingAuctionId = auctionId;
+
+        // Write the contract (non-async)
+        writeContract({
+          address: contracts.MooveAuction.address as `0x${string}`,
+          abi: contracts.MooveAuction.abi,
+          functionName: "settleAuction",
+          args: [auctionId],
+        });
+      } catch (err) {
+        console.error(`❌ Error settling auction ${auctionId}:`, err);
+        setError(err instanceof Error ? err.message : "Unknown error");
+        setIsSettling(false);
+        setCurrentAuctionId(null);
+        throw err;
+      }
+    },
+    [writeContract, isSettling, currentAuctionId]
+  );
+
+  // Handle transaction confirmation
+  useEffect(() => {
+    if (transactionHash && isConfirmed) {
+      console.log(`✅ Auction settled successfully! Hash:`, transactionHash);
+      setIsSettling(false);
+
+      // Emit event for the provider
+      const auctionId = (window as any).currentSettlingAuctionId;
+      const event = new CustomEvent("settleAuctionEvent", {
+        detail: {
+          type: "transaction_confirmed",
+          hash: transactionHash,
+          auctionId,
+        },
+      });
+      window.dispatchEvent(event);
     }
+  }, [transactionHash, isConfirmed]);
 
-    try {
-      setIsSettling(true);
-      setError(null);
-
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const signer = await provider.getSigner();
-
-      const auctionContract = new ethers.Contract(
-        contracts.MooveAuction.address,
-        contracts.MooveAuction.abi,
-        signer
+  // Handle confirmation errors
+  useEffect(() => {
+    if (transactionHash && !isConfirming && !isConfirmed) {
+      console.error(
+        `❌ Transaction confirmation failed for hash:`,
+        transactionHash
       );
-
-      console.log(`🏆 Settling auction ${auctionId}...`);
-      const tx = await auctionContract.settleAuction(auctionId);
-      console.log(`🏆 Settle transaction sent:`, tx.hash);
-
-      const receipt = await tx.wait();
-      console.log(`✅ Auction ${auctionId} settled successfully:`, receipt);
-
-      return {
-        success: true,
-        transactionHash: tx.hash,
-        receipt,
-      };
-    } catch (err) {
-      console.error(`❌ Error settling auction ${auctionId}:`, err);
-      setError(err instanceof Error ? err.message : "Unknown error");
-      throw err;
-    } finally {
+      setError("Transaction confirmation failed");
       setIsSettling(false);
     }
-  }, []);
+  }, [transactionHash, isConfirming, isConfirmed]);
 
   return {
     settleAuction,
-    isSettling,
+    isSettling: isSettling || isWriting || isConfirming,
     error,
+    transactionHash,
+    isConfirmed,
   };
 }

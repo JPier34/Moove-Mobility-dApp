@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
-import { useAccount } from "wagmi";
-import { useAuctionsEnhanced } from "./enhanced-auction-utils";
-import { useTransactionTracker } from "./useTransactionTracker";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { useAccount, useWatchContractEvent } from "wagmi";
+import { useIncrementalAuctions } from "./useIncrementalAuctions";
+import { contracts } from "../utils/contracts";
 
 export interface WonAuction {
   auctionId: string;
@@ -15,8 +15,24 @@ export interface WonAuction {
   finalBid: number;
   bidders: number;
   isSettled: boolean;
-  endTime?: number; // Aggiunto campo endTime
+  endTime?: number;
   transactionHash?: string;
+  // Enhanced metadata
+  description?: string;
+  attributes?: Array<{
+    trait_type: string;
+    value: string | number;
+  }>;
+  collection?: {
+    name: string;
+    description: string;
+  };
+  // Additional fields for modal display
+  auctionType?: number;
+  currentBid?: number;
+  startingPrice?: number;
+  highestBidder?: string;
+  seller?: string;
 }
 
 export interface UseWonAuctionsReturn {
@@ -32,28 +48,142 @@ export function useWonAuctions(): UseWonAuctionsReturn {
   const [wonAuctions, setWonAuctions] = useState<WonAuction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [hasLoaded, setHasLoaded] = useState(false);
 
-  // Usa useAuctionsEnhanced per ottenere tutte le aste
+  // Watch for auction settlement events
+  useWatchContractEvent({
+    address: contracts.MooveAuction.address as `0x${string}`,
+    abi: contracts.MooveAuction.abi,
+    eventName: "AuctionSettled",
+    onLogs: (logs) => {
+      console.log("🎉 AuctionSettled event detected:", logs);
+      // Refetch won auctions when an auction is settled
+      if (hasLoaded) {
+        setTimeout(() => {
+          setHasLoaded(false); // Reset flag to allow refetch
+        }, 1000);
+      }
+    },
+  });
+
+  // Use incremental auctions hook for better performance
   const {
     auctions,
     isLoading: auctionsLoading,
     refetch: refetchAuctions,
-  } = useAuctionsEnhanced();
+  } = useIncrementalAuctions();
 
-  // Usa il transaction tracker per ottenere gli hash delle transazioni
-  const { getTransactionHash, isAuctionCompleted } = useTransactionTracker();
+  // Transaction tracker not needed for status 3 auctions
+
+  // Helper function to fetch NFT metadata using IPFS
+  const fetchNFTMetadata = useCallback(async (tokenId: number) => {
+    try {
+      if (typeof window === "undefined" || !window.ethereum) {
+        throw new Error("No ethereum provider available");
+      }
+
+      const { ethers } = await import("ethers");
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const nftContract = new ethers.Contract(
+        contracts.MooveNFT.address,
+        contracts.MooveNFT.abi,
+        provider
+      );
+
+      // Get tokenURI from contract
+      const tokenURI = await nftContract.tokenURI(tokenId);
+      if (!tokenURI) {
+        throw new Error("No tokenURI found");
+      }
+
+      // Convert ipfs:// to HTTP gateway URL
+      const IPFS_GATEWAY =
+        process.env.NEXT_PUBLIC_IPFS_GATEWAY || "https://ipfs.io/ipfs/";
+      const httpUrl = tokenURI.startsWith("ipfs://")
+        ? `${IPFS_GATEWAY}${tokenURI.slice(7)}`
+        : tokenURI;
+
+      const response = await fetch(httpUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch metadata: ${response.statusText}`);
+      }
+
+      const ipfsMetadata = await response.json();
+
+      // Convert image IPFS URL if needed
+      let imageUrl = ipfsMetadata.image || "/images/default-nft.svg";
+      if (imageUrl.startsWith("ipfs://")) {
+        imageUrl = `${IPFS_GATEWAY}${imageUrl.slice(7)}`;
+      }
+
+      return {
+        name: ipfsMetadata.name || `NFT #${tokenId}`,
+        description:
+          ipfsMetadata.description || `A unique NFT with token ID ${tokenId}`,
+        image: imageUrl,
+        attributes: ipfsMetadata.attributes || [
+          {
+            trait_type: "Token ID",
+            value: tokenId.toString(),
+          },
+          {
+            trait_type: "Type",
+            value: "Genesis Collection",
+          },
+        ],
+        properties: ipfsMetadata.properties || {
+          tokenId: tokenId.toString(),
+          collection: "Genesis",
+        },
+        collection: ipfsMetadata.collection || {
+          name: "Genesis Collection",
+          description: "The original collection of Moove NFTs",
+        },
+      };
+    } catch (error) {
+      console.error(`❌ Failed to fetch metadata for NFT #${tokenId}:`, error);
+      return {
+        name: `NFT #${tokenId}`,
+        description: `A unique NFT with token ID ${tokenId}`,
+        image: "/images/default-nft.svg",
+        attributes: [
+          {
+            trait_type: "Token ID",
+            value: tokenId.toString(),
+          },
+          {
+            trait_type: "Type",
+            value: "Genesis Collection",
+          },
+        ],
+        collection: {
+          name: "Genesis Collection",
+          description: "The original collection of Moove NFTs",
+        },
+      };
+    }
+  }, []);
 
   const fetchWonAuctions = useCallback(async () => {
     if (!address || auctionsLoading) {
       return;
     }
 
+    // Temporarily disable hasLoaded check to see debug logs
+    // if (hasLoaded) {
+    //   return;
+    // }
+
+    console.log(`🚀 fetchWonAuctions called with:`, {
+      address,
+      auctionsLoading,
+      auctionsLength: auctions.length,
+      hasLoaded,
+    });
+
     try {
       setIsLoading(true);
       setError(null);
-
-      console.log(`🏆 Fetching won auctions for user: ${address}`);
-      console.log(`📊 Total auctions to check: ${auctions.length}`);
 
       // Filtra le aste dove l'utente ha vinto (sia attive che finite)
       const userWonAuctions = auctions.filter((auction) => {
@@ -73,77 +203,19 @@ export function useWonAuctions(): UseWonAuctionsReturn {
         return isUserWinner && isAuctionEnded;
       });
 
-      console.log(
-        `🔍 Found ${userWonAuctions.length} auctions where user is highest bidder`
-      );
-
-      // Debug: mostra le aste filtrate
-      console.log(
-        `🔍 User won auctions:`,
-        userWonAuctions.map((a) => ({
-          id: a.auctionId,
-          status: a.status,
-          name: a.nftName,
+      // Debug logging to understand the filtering
+      console.log(`🔍 Debug auction filtering:`, {
+        totalAuctions: auctions.length,
+        userAddress: address,
+        userWonAuctions: userWonAuctions.length,
+        sampleAuctions: auctions.slice(0, 3).map((a) => ({
+          auctionId: a.auctionId,
           highestBidder: a.highestBidder,
-          seller: a.seller,
-        }))
-      );
-
-      // Debug: mostra tutte le aste per capire il problema
-      console.log(
-        `📊 All auctions status:`,
-        auctions.map((a) => ({
-          id: a.auctionId,
           status: a.status,
-          name: a.nftName,
-          endTime: a.endTime ? new Date(a.endTime).toISOString() : "undefined",
-          highestBidder: a.highestBidder,
-        }))
-      );
-
-      // Debug specifico per aste #12 e #13
-      const auction12 = auctions.find((a) => a.auctionId === "12");
-      const auction13 = auctions.find((a) => a.auctionId === "13");
-
-      if (auction12) {
-        console.log(`🔍 Auction #12 details:`, {
-          id: auction12.auctionId,
-          status: auction12.status,
-          name: auction12.nftName,
-          seller: auction12.seller,
-          highestBidder: auction12.highestBidder,
-          userAddress: address,
           isUserWinner:
-            auction12.highestBidder &&
-            auction12.highestBidder.toLowerCase() === address.toLowerCase(),
-          isUserSeller:
-            auction12.seller &&
-            auction12.seller.toLowerCase() === address.toLowerCase(),
-          endTime: auction12.endTime
-            ? new Date(auction12.endTime).toISOString()
-            : "undefined",
-        });
-      }
-
-      if (auction13) {
-        console.log(`🔍 Auction #13 details:`, {
-          id: auction13.auctionId,
-          status: auction13.status,
-          name: auction13.nftName,
-          seller: auction13.seller,
-          highestBidder: auction13.highestBidder,
-          userAddress: address,
-          isUserWinner:
-            auction13.highestBidder &&
-            auction13.highestBidder.toLowerCase() === address.toLowerCase(),
-          isUserSeller:
-            auction13.seller &&
-            auction13.seller.toLowerCase() === address.toLowerCase(),
-          endTime: auction13.endTime
-            ? new Date(auction13.endTime).toISOString()
-            : "undefined",
-        });
-      }
+            a.highestBidder?.toLowerCase() === address?.toLowerCase(),
+        })),
+      });
 
       const wonAuctions: WonAuction[] = [];
 
@@ -157,62 +229,80 @@ export function useWonAuctions(): UseWonAuctionsReturn {
           new Date(auction.endTime).getTime() <= Date.now();
         const isAuctionEnded = isEnded || isSettled || isTimeExpired;
 
-        console.log(
-          `🎉 User won auction ${auction.auctionId} (status: ${auction.status}, ended: ${isAuctionEnded})`
-        );
+        // Transaction hash not needed for status 3 auctions - they're ready for settlement
+        const txHash = undefined;
+        const isCompleted = false;
 
-        // Get transaction hash from transaction tracker
-        const transactionHash = getTransactionHash(auction.auctionId);
-        const isCompleted = isAuctionCompleted(auction.auctionId);
+        // Fetch NFT metadata
+        const tokenId = parseInt(auction.nftId?.toString() || "0");
+        let nftMetadata = null;
+
+        if (tokenId > 0) {
+          try {
+            nftMetadata = await fetchNFTMetadata(tokenId);
+          } catch (error) {
+            console.warn(
+              `⚠️ Failed to fetch metadata for NFT #${tokenId}:`,
+              error
+            );
+          }
+        }
 
         const wonAuction: WonAuction = {
           auctionId: auction.auctionId,
           nftId: auction.nftId?.toString() || "0",
-          name: auction.nftName || `NFT #${auction.nftId}`,
-          image: auction.nftImage || "/images/default-nft.png",
+          name: nftMetadata?.name || auction.nftName || `NFT #${auction.nftId}`,
+          image:
+            nftMetadata?.image || auction.nftImage || "/images/default-nft.svg",
           category: auction.nftCategory || "sticker",
           status: isAuctionEnded ? 3 : auction.status, // Forza status 3 se tempo scaduto
-          hasImage: !!auction.nftImage,
-          hasName: !!auction.nftName,
+          hasImage: !!(nftMetadata?.image || auction.nftImage),
+          hasName: !!(nftMetadata?.name || auction.nftName),
           finalBid: parseFloat(auction.currentBid) || 0,
           bidders: auction.bidCount || 0,
           isSettled: auction.isSettled || auction.status === 4 || isCompleted, // Solo status 4 è settled per vincitori
           endTime: auction.endTime
             ? new Date(auction.endTime).getTime()
             : undefined,
-          transactionHash: transactionHash || auction.transactionHash,
+          transactionHash: txHash,
+          // Enhanced metadata
+          description: nftMetadata?.description,
+          attributes: nftMetadata?.attributes,
+          collection: nftMetadata?.collection,
+          // Additional fields for modal display
+          auctionType: auction.auctionType,
+          currentBid: parseFloat(auction.currentBid) || 0,
+          startingPrice: parseFloat(auction.startPrice) || 0,
+          highestBidder: auction.highestBidder,
+          seller: auction.seller,
         };
 
         wonAuctions.push(wonAuction);
       }
 
-      // Filter to show auctions ready for settlement
-      // Status 3 = ENDED (pronto per settlement)
-      // Status 4 = SETTLED (già completato)
+      // Filter to show only unsettled auctions
+      // Only show auctions that are ready for settlement (status 3) and not yet settled
       const confirmedAuctions = wonAuctions.filter(
         (auction) =>
-          auction.status === 3 || // Asta ENDED, pronta per settlement
-          auction.status === 4 || // Asta già SETTLED
-          (auction.transactionHash && isAuctionCompleted(auction.auctionId))
+          auction.status === 3 && // Only ENDED auctions
+          !auction.isSettled // Not yet settled
+        // Removed transaction tracker dependency - we don't need it for status 3 auctions
       );
 
-      console.log(`🏆 User won ${wonAuctions.length} auctions`);
-      console.log(`📊 All won auctions:`, wonAuctions);
-      console.log(`✅ Confirmed auctions:`, confirmedAuctions);
-
-      // Debug transaction tracking
-      console.log(`🔍 Transaction tracking debug:`);
-      wonAuctions.forEach((auction) => {
-        const transactionHash = getTransactionHash(auction.auctionId);
-        const isCompleted = isAuctionCompleted(auction.auctionId);
-        console.log(`  Auction ${auction.auctionId}:`, {
-          transactionHash,
-          isCompleted,
-          status: auction.status,
-          isSettled: auction.isSettled,
-        });
+      // Debug logging for final filter
+      console.log(`🔍 Final filter debug:`, {
+        wonAuctions: wonAuctions.length,
+        confirmedAuctions: confirmedAuctions.length,
+        sampleWonAuctions: wonAuctions.slice(0, 3).map((a) => ({
+          auctionId: a.auctionId,
+          status: a.status,
+          isSettled: a.isSettled,
+          passesFilter: a.status === 3 && !a.isSettled,
+        })),
       });
+
       setWonAuctions(confirmedAuctions);
+      setHasLoaded(true);
     } catch (err) {
       console.error("❌ Error fetching won auctions:", err);
       setError(err instanceof Error ? err.message : "Unknown error");
@@ -223,21 +313,41 @@ export function useWonAuctions(): UseWonAuctionsReturn {
     address,
     auctions,
     auctionsLoading,
-    getTransactionHash,
-    isAuctionCompleted,
+    hasLoaded,
+    // Removed transaction tracker dependencies - not needed for status 3 auctions
   ]);
 
   useEffect(() => {
     fetchWonAuctions();
   }, [fetchWonAuctions]); // Use fetchWonAuctions as dependency since it's now properly memoized
 
-  const unsettledAuctions = wonAuctions.filter((auction) => !auction.isSettled);
+  // Intelligent polling for auto-update (fallback)
+  useEffect(() => {
+    if (!hasLoaded || wonAuctions.length === 0) return;
+
+    const interval = setInterval(() => {
+      console.log("🔄 Auto-refreshing won auctions...");
+      setHasLoaded(false); // Reset flag to allow refetch
+    }, 30000); // Check every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [hasLoaded, wonAuctions.length]);
+
+  const unsettledAuctions = useMemo(
+    () => wonAuctions.filter((auction) => !auction.isSettled),
+    [wonAuctions]
+  );
+
+  const refetch = useCallback(() => {
+    setHasLoaded(false);
+    fetchWonAuctions();
+  }, [fetchWonAuctions]);
 
   return {
     wonAuctions,
     unsettledAuctions,
     isLoading,
     error,
-    refetch: fetchWonAuctions,
+    refetch,
   };
 }

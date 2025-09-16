@@ -1116,7 +1116,7 @@ export function useAuctionsEnhanced(
   // Use smart refresh hook for intelligent refresh management (only if not disabled)
   useSmartRefresh({
     refreshFunction: fetchCorrectedAuctions,
-    intervalMs: 120000, // 2 minutes
+    intervalMs: 300000, // 5 minutes - ridotto frequenza per ottimizzare performance
     pauseOnModal: true,
     pauseOnHidden: true,
     disabled: disableAutoRefresh,
@@ -1139,44 +1139,14 @@ export function useAuctionsEnhanced(
   });
   const pendingAuctions = auctions.filter((auction) => auction.status === 0);
 
-  console.log(
-    `🔍 All auctions details:`,
-    auctions.map((a) => ({
-      id: a.auctionId,
-      name: a.nftName,
-      nftId: a.nftId,
-      status: a.status,
-      currentTime: new Date(),
-      startTime: a.startTime,
-      endTime: a.endTime,
-    }))
-  );
-
-  console.log(
-    `🔍 Ended auctions details:`,
-    endedAuctions.map((a) => ({
-      id: a.auctionId,
-      nftId: a.nftId,
-      name: a.nftName,
-      image: a.nftImage,
-      category: a.nftCategory,
-      status: a.status,
-      hasImage: !!a.nftImage && a.nftImage !== "/images/default-nft.png",
-      hasName: !!a.nftName && a.nftName !== `NFT #${a.nftId}`,
-    }))
-  );
-
-  // Debug: Check if ended auctions have IPFS data
+  // Debug logging removed to prevent excessive re-renders
+  // Only log warnings for critical issues
   const endedWithIPFS = endedAuctions.filter(
     (a) =>
       a.nftImage &&
       a.nftImage !== "/images/default-nft.png" &&
       a.nftName &&
       a.nftName !== `NFT #${a.nftId}`
-  );
-
-  console.log(
-    `🔍 Ended auctions with IPFS data: ${endedWithIPFS.length}/${endedAuctions.length}`
   );
 
   if (endedAuctions.length > 0 && endedWithIPFS.length === 0) {

@@ -3,6 +3,12 @@
     "id": "hooks\\useIPFSUnified.ts -> @/utils/pinata",
     "files": []
   },
+  "hooks\\useWonAuctions.ts -> ethers": {
+    "id": "hooks\\useWonAuctions.ts -> ethers",
+    "files": [
+      "static/chunks/_app-pages-browser_node_modules_ethers_lib_esm_index_js.js"
+    ]
+  },
   "node_modules\\@base-org\\account\\dist\\interface\\builder\\core\\wagmiConnector.js -> @base-org/account": {
     "id": "node_modules\\@base-org\\account\\dist\\interface\\builder\\core\\wagmiConnector.js -> @base-org/account",
     "files": []

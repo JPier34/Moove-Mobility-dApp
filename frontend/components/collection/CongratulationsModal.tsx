@@ -3,6 +3,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Trophy, Gift, Sparkles } from "lucide-react";
 import { WonAuction } from "@/hooks/useWonAuctions";
+import { useEffect } from "react";
 
 interface CongratulationsModalProps {
   auction: WonAuction | null;
@@ -10,6 +11,9 @@ interface CongratulationsModalProps {
   onClose: () => void;
   onSettle: (auctionId: string) => void;
   isSettling: boolean;
+  transactionHash?: string | null;
+  isWaitingForConfirmation?: boolean;
+  onSettlementComplete?: () => void;
 }
 
 export default function CongratulationsModal({
@@ -18,14 +22,20 @@ export default function CongratulationsModal({
   onClose,
   onSettle,
   isSettling,
+  transactionHash,
+  isWaitingForConfirmation,
+  onSettlementComplete,
 }: CongratulationsModalProps) {
   if (!auction) return null;
+
+  // Don't auto-close the modal - let the parent component handle it
+  // The modal should stay open until the transaction is confirmed
 
   return (
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -36,7 +46,9 @@ export default function CongratulationsModal({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={onClose}
+            onClick={
+              isSettling || isWaitingForConfirmation ? undefined : onClose
+            }
           />
 
           {/* Modal */}
@@ -49,8 +61,15 @@ export default function CongratulationsModal({
           >
             {/* Close Button */}
             <button
-              onClick={onClose}
-              className="absolute top-4 right-4 text-white/80 hover:text-white transition-colors"
+              onClick={
+                isSettling || isWaitingForConfirmation ? undefined : onClose
+              }
+              disabled={isSettling || isWaitingForConfirmation}
+              className={`absolute top-4 right-4 transition-colors ${
+                isSettling || isWaitingForConfirmation
+                  ? "text-white/40 cursor-not-allowed"
+                  : "text-white/80 hover:text-white"
+              }`}
             >
               <X size={24} />
             </button>
@@ -129,6 +148,31 @@ export default function CongratulationsModal({
                   : "Wait for the auction to end, then you can settle it to claim your NFT."}
               </motion.p>
 
+              {/* Transaction Status */}
+              {transactionHash && (
+                <motion.div
+                  className="mb-6 p-4 bg-white/10 rounded-xl border border-white/20"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.7 }}
+                >
+                  <div className="flex items-center space-x-2 mb-2">
+                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                    <span className="text-sm font-medium text-white">
+                      Transaction Submitted
+                    </span>
+                  </div>
+                  <p className="text-xs text-white/70 font-mono break-all">
+                    {transactionHash}
+                  </p>
+                  {isWaitingForConfirmation && (
+                    <p className="text-xs text-yellow-300 mt-2">
+                      ⏳ Waiting for confirmation...
+                    </p>
+                  )}
+                </motion.div>
+              )}
+
               {/* Action Buttons */}
               <motion.div
                 className="flex space-x-3"
@@ -144,7 +188,11 @@ export default function CongratulationsModal({
                 </button>
                 <button
                   onClick={() => onSettle(auction.auctionId)}
-                  disabled={isSettling || auction.status !== 3}
+                  disabled={
+                    isSettling ||
+                    isWaitingForConfirmation ||
+                    auction.status !== 3
+                  }
                   className="flex-1 px-6 py-3 bg-white hover:bg-white/90 text-gray-900 font-medium rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
                 >
                   {isSettling ? (
@@ -159,6 +207,19 @@ export default function CongratulationsModal({
                         }}
                       />
                       <span>Settling...</span>
+                    </>
+                  ) : isWaitingForConfirmation ? (
+                    <>
+                      <motion.div
+                        className="w-4 h-4 border-2 border-white border-t-transparent rounded-full"
+                        animate={{ rotate: 360 }}
+                        transition={{
+                          duration: 1,
+                          repeat: Infinity,
+                          ease: "linear",
+                        }}
+                      />
+                      <span>Confirming Transaction...</span>
                     </>
                   ) : auction.status === 3 ? (
                     <>

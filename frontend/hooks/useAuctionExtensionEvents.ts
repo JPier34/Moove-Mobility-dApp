@@ -148,3 +148,4 @@ export function useAuctionExtensionInfo(auctionId: number) {
     error,
   };
 }
+
