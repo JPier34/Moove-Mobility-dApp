@@ -11,12 +11,15 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useUserCollectionOptimized } from "@/hooks/useUserCollectionOptimized";
 import { useWalletPersistence } from "@/hooks/useWalletPersistence";
-import { useWonAuctions } from "@/hooks/useWonAuctions";
+import { useUserNFTCollection } from "@/hooks/useUserNFTCollection";
 import WonAuctions from "@/components/collection/WonAuctions";
 import { toast } from "react-hot-toast";
 import OptimizedNFTImage from "@/components/collection/OptimizedNFTImage";
 import TransferNFTModal from "@/components/TransferNFTModal";
 import { WonAuction } from "@/types/user";
+import { nftEvents, NFTTransferEvent } from "@/utils/nftEvents";
+import { useNFTOwnershipCheck } from "@/hooks/useNFTOwnershipCheck";
+import { useOwnershipFilter } from "@/components/OwnershipFilter";
 
 // ============= TYPES =============
 interface DecorativeNFT {
@@ -183,7 +186,7 @@ function NFTDetailsModal({
                     Final Bid
                   </span>
                   <span className="font-bold text-moove-primary">
-                    {nft.price.toFixed(4)} ETH
+                    {nft.price.toFixed(7)} ETH
                   </span>
                 </div>
               </div>
@@ -448,10 +451,10 @@ function DecorativeNFTCard({
               Final Bid
             </div>
             <div className="text-lg font-bold text-moove-primary">
-              {nft.price.toFixed(4)} ETH
+              {nft.price.toFixed(7)} ETH
             </div>
           </div>
-          {nft.auctionWon && (
+          {/* {nft.auctionWon && (
             <div className="text-right">
               <div className="text-sm text-gray-500 dark:text-gray-400">
                 Bidders
@@ -460,7 +463,7 @@ function DecorativeNFTCard({
                 {nft.auctionWon.bidders}
               </div>
             </div>
-          )}
+          )} */}
         </div>
 
         {/* Auction Info */}
@@ -538,11 +541,13 @@ export default function MyCollection() {
   const { isConnected, address, isInitialized } = useWalletPersistence();
   // Congratulations modal is now handled globally by AuctionNotificationsProvider
 
-  // Won auctions that need claiming
+  // User's NFT collection (all owned NFTs, regardless of how they were obtained)
   const {
-    unsettledAuctions: wonAuctionsToClaim,
-    isLoading: wonAuctionsLoading,
-  } = useWonAuctions();
+    userNFTs: userNFTCollection,
+    isLoading: userNFTsLoading,
+    error: userNFTsError,
+    refetch: refetchUserNFTs,
+  } = useUserNFTCollection();
 
   const [filters, setFilters] = useState<FilterOptions>({
     rarity: "all",
@@ -597,6 +602,67 @@ export default function MyCollection() {
     }
   }, [wonAuctions.length, isLoading]);
 
+  // Listener for NFT transfer events
+  useEffect(() => {
+    const handleNFTTransfer = (event: CustomEvent<NFTTransferEvent>) => {
+      const { tokenId, from, to, transactionHash } = event.detail;
+
+      console.log(`📡 Received NFT transfer event:`, {
+        tokenId,
+        from,
+        to,
+        transactionHash,
+        currentUser: address,
+      });
+
+      // If the NFT was transferred from the current user
+      if (from.toLowerCase() === address?.toLowerCase()) {
+        console.log(`🔄 NFT ${tokenId} transferred away from current user`);
+
+        // Show notification
+        toast.success(`NFT ${tokenId} transferred successfully!`, {
+          duration: 3000,
+        });
+
+        // Refresh forced after a short delay to synchronize with blockchain
+        setTimeout(() => {
+          console.log(`🔄 Refreshing collection after NFT transfer`);
+          window.location.reload();
+        }, 1000);
+      }
+
+      // If the NFT was received by the current user
+      if (to.toLowerCase() === address?.toLowerCase()) {
+        console.log(`🎉 NFT ${tokenId} received by current user`);
+
+        // Show notification
+        toast.success(`You received NFT ${tokenId}!`, {
+          duration: 3000,
+        });
+
+        // Refresh forced to show the new NFT
+        setTimeout(() => {
+          console.log(`🔄 Refreshing collection after receiving NFT`);
+          window.location.reload();
+        }, 1000);
+      }
+    };
+
+    // Add listener
+    nftEvents.addEventListener(
+      "nftTransfer",
+      handleNFTTransfer as EventListener
+    );
+
+    // Cleanup
+    return () => {
+      nftEvents.removeEventListener(
+        "nftTransfer",
+        handleNFTTransfer as EventListener
+      );
+    };
+  }, [address]);
+
   // Handler functions
   const handleViewDetails = useCallback((nft: DecorativeNFT) => {
     setSelectedNFT(nft);
@@ -642,35 +708,34 @@ export default function MyCollection() {
 
   const handleTransferSuccess = useCallback(() => {
     // Refresh the collection after successful transfer
-    refetch();
+    refetchUserNFTs();
     toast.success("NFT transferred successfully!");
-  }, [refetch]);
+  }, [refetchUserNFTs]);
 
-  // Convert won auctions to decorative NFTs format
+  // Convert user NFT collection to decorative NFTs format
   const decorativeNFTs: DecorativeNFT[] = useMemo(() => {
-    return wonAuctions.map((auction) => ({
-      id: `auction-${auction.auctionId}`,
-      tokenId: auction.tokenId,
-      name: auction.nftName,
-      description: `Won from auction #${auction.auctionId}`,
-      image: auction.nftImage,
-      category: auction.nftCategory as "sticker" | "avatar" | "badge" | "skin",
-      rarity:
-        (auction.nftRarity?.toLowerCase() as
-          | "common"
-          | "rare"
-          | "epic"
-          | "legendary") || "common",
-      purchaseDate: new Date(auction.endTime),
-      price: auction.finalBid,
-      transactionHash: auction.transactionHash || "",
-      auctionWon: {
-        auctionId: auction.auctionId,
-        finalBid: auction.finalBid,
-        bidders: auction.bidders,
-      },
+    return userNFTCollection.map((nft) => ({
+      id: `nft-${nft.tokenId}`,
+      tokenId: nft.tokenId,
+      name: nft.name,
+      description: nft.description,
+      image: nft.image,
+      category: nft.category as "sticker" | "avatar" | "badge" | "skin",
+      rarity: "common", // Default rarity, can be enhanced later
+      purchaseDate:
+        nft.isFromAuction && nft.endTime ? new Date(nft.endTime) : new Date(),
+      price:
+        nft.isFromAuction && nft.currentBid ? Number(nft.currentBid) / 1e18 : 0,
+      transactionHash: "",
+      auctionWon: nft.isFromAuction
+        ? {
+            auctionId: nft.auctionId || "",
+            finalBid: nft.currentBid ? Number(nft.currentBid) / 1e18 : 0,
+            bidders: 0, // Can be enhanced later
+          }
+        : undefined,
     }));
-  }, [wonAuctions]);
+  }, [userNFTCollection]);
 
   // Filter items based on current filters
   const filteredDecorative = useMemo(() => {
@@ -696,7 +761,7 @@ export default function MyCollection() {
   const hasItems = filteredDecorative.length > 0;
 
   // Show loading state
-  if (!isInitialized || isLoading || !isDataReady) {
+  if (!isInitialized || userNFTsLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-moove-50 dark:from-gray-900 dark:to-gray-800">
         <div className="container mx-auto px-4 py-8">
@@ -705,21 +770,11 @@ export default function MyCollection() {
               <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
             </div>
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-              {!isDataReady
-                ? "Preparing Collection..."
-                : "Loading Collection..."}
+              Loading Collection...
             </h2>
             <p className="text-gray-600 dark:text-gray-400">
-              {!isDataReady
-                ? "Stabilizing data to prevent loops..."
-                : "Fetching your NFT collection"}
+              Fetching your NFT collection and verifying ownership...
             </p>
-            {renderCountRef.current > 5 && (
-              <p className="text-sm text-yellow-600 dark:text-yellow-400 mt-2">
-                ⚠️ Preventing excessive re-renders ({renderCountRef.current}/
-                {maxRendersRef.current})
-              </p>
-            )}
           </div>
         </div>
       </div>
@@ -851,7 +906,24 @@ export default function MyCollection() {
         </motion.div>
 
         {/* Won Auctions Section */}
-        {wonAuctionsToClaim.length > 0 && (
+        {userNFTsLoading ? (
+          <motion.div
+            className="mb-8"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6 }}
+          >
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-6">
+              <div className="flex items-center justify-center">
+                <div className="text-sm text-yellow-700 dark:text-yellow-300">
+                  Loading NFT collection and verifying ownership...
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        ) : userNFTCollection.filter(
+            (nft) => nft.isFromAuction && nft.status === 3
+          ).length > 0 ? (
           <motion.div
             className="mb-8"
             initial={{ opacity: 0, y: 20 }}
@@ -866,14 +938,27 @@ export default function MyCollection() {
                 </h2>
               </div>
               <p className="text-yellow-700 dark:text-yellow-300 mb-4">
-                You have won {wonAuctionsToClaim.length} auction
-                {wonAuctionsToClaim.length > 1 ? "e" : ""} that need to be
-                claimed.
+                You have won{" "}
+                {
+                  userNFTCollection.filter(
+                    (nft) => nft.isFromAuction && nft.status === 3
+                  ).length
+                }{" "}
+                auction
+                {userNFTCollection.filter(
+                  (nft) => nft.isFromAuction && nft.status === 3
+                ).length > 1
+                  ? "e"
+                  : ""}{" "}
+                that need to be claimed.
               </p>
-              <WonAuctions auctions={wonAuctionsToClaim} />
+              <div className="text-sm text-yellow-600 dark:text-yellow-400">
+                Use the notification bell in the top-right corner to claim your
+                auctions.
+              </div>
             </div>
           </motion.div>
-        )}
+        ) : null}
 
         {/* Filters */}
         <FilterBar
@@ -883,15 +968,15 @@ export default function MyCollection() {
         />
 
         {/* Error State */}
-        {error && (
+        {userNFTsError && (
           <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-8">
             <div className="flex items-center">
               <span className="text-red-500 mr-2">⚠️</span>
               <span className="text-red-700 dark:text-red-400">
-                Error loading collection: {error}
+                Error loading collection: {userNFTsError}
               </span>
               <button
-                onClick={refetch}
+                onClick={refetchUserNFTs}
                 className="ml-auto text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 font-medium"
               >
                 Retry
@@ -914,7 +999,7 @@ export default function MyCollection() {
             </AnimatePresence>
           </div>
         ) : (
-          <EmptyState onRefresh={refetch} />
+          <EmptyState onRefresh={refetchUserNFTs} />
         )}
 
         {/* NFT Details Modal */}

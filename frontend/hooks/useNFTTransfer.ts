@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useAccount } from "wagmi";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   useWriteMooveNFT,
   useReadMooveNFT,
@@ -9,6 +10,7 @@ import {
 } from "./useContract";
 import { contracts } from "@/utils/contracts";
 import { ethers } from "ethers";
+import { nftEvents } from "@/utils/nftEvents";
 
 export interface TransferState {
   status: "idle" | "validating" | "pending" | "success" | "error";
@@ -24,6 +26,7 @@ export interface TransferResult {
 
 export function useNFTTransfer() {
   const { address } = useAccount();
+  const queryClient = useQueryClient();
   const { writeMooveNFT, isPending, error, hash, isSuccess } =
     useWriteMooveNFT();
   const [transferState, setTransferState] = useState<TransferState>({
@@ -322,6 +325,45 @@ export function useNFTTransfer() {
     setTransferState({ status: "idle" });
     setCurrentTokenId(null);
   }, []);
+
+  // Invalidazione cache quando il trasferimento ha successo
+  useEffect(() => {
+    if (isSuccess && hash && currentTokenId) {
+      console.log(`🔄 Invalidating cache for NFT transfer: ${currentTokenId}`);
+
+      // Invalida tutte le query relative agli NFT dell'utente
+      queryClient.invalidateQueries({
+        queryKey: ["userCollection", address],
+      });
+
+      // Invalida le query specifiche per questo NFT
+      queryClient.invalidateQueries({
+        queryKey: ["nftOwner", currentTokenId],
+      });
+
+      // Invalida le query di ownership
+      queryClient.invalidateQueries({
+        queryKey: ["ownerOf", currentTokenId],
+      });
+
+      // Invalida le query di auction per questo NFT
+      queryClient.invalidateQueries({
+        queryKey: ["getAuction", currentTokenId],
+      });
+
+      // Invalida le query generali degli NFT
+      queryClient.invalidateQueries({
+        queryKey: ["nftMetadata"],
+      });
+
+      console.log(`✅ Cache invalidated for NFT ${currentTokenId}`);
+
+      // Emetti evento di trasferimento per notificare altri componenti
+      if (address) {
+        nftEvents.emitTransfer(currentTokenId, address, "unknown", hash);
+      }
+    }
+  }, [isSuccess, hash, currentTokenId, queryClient, address]);
 
   // Aggiorna stato basato su Wagmi
   const currentState = isPending

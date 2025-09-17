@@ -70,10 +70,7 @@ export default function DebugPage() {
 
           {/* NFT Collection Checker */}
           <div className="lg:col-span-2 text-black">
-            <NFTCollectionChecker
-              tokenId={1}
-              userAddress="0x777382955f33Bb8540602E914D9b650C962EF6Cc"
-            />
+            <NFTCollectionChecker />
           </div>
         </div>
 

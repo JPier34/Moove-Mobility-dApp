@@ -8,7 +8,7 @@ import AuctionNotificationsDebug from "@/components/debug/AuctionNotificationsDe
 import AuctionConfirmationModal from "@/components/notifications/AuctionConfirmationModal";
 import AuctionResultModal from "@/components/notifications/AuctionResultModal";
 import { useAccount } from "wagmi";
-import { WonAuction } from "@/hooks/useWonAuctions";
+import { WonAuction } from "@/hooks/useWonAuctionsForClaim";
 
 // ============= CONTEXT =============
 

@@ -6,6 +6,7 @@ import { WonAuction } from "@/types/user";
 import { useNFTTransfer } from "@/hooks/useNFTTransfer";
 import Button from "./ui/Button";
 import { toast } from "react-hot-toast";
+import { nftEvents } from "@/utils/nftEvents";
 
 interface TransferNFTModalProps {
   nft: WonAuction | null;
@@ -45,20 +46,36 @@ export default function TransferNFTModal({
     }
   }, [isOpen, resetTransferState]);
 
-  // Gestione successo trasferimento
+  // Gestione successo trasferimento con refresh forzato
   useEffect(() => {
-    if (isSuccess && transferState.transactionHash) {
+    if (isSuccess && transferState.transactionHash && nft) {
+      console.log(`🎉 NFT transfer successful: ${nft.nftId}`);
+
+      // Toast di successo
       toast.success("NFT transferred successfully!", {
         duration: 5000,
       });
 
       // Notifica al destinatario (placeholder)
       console.log(
-        `📧 Notification sent to ${recipientAddress}: You received NFT ${nft?.nftId}`
+        `📧 Notification sent to ${recipientAddress}: You received NFT ${nft.nftId}`
       );
 
-      onSuccess?.();
-      onClose();
+      // Emetti evento per notificare altri componenti
+      nftEvents.emitTransfer(
+        nft.nftId,
+        "current_user", // Il mittente sarà aggiornato dal hook
+        recipientAddress,
+        transferState.transactionHash
+      );
+
+      // Refresh forzato della pagina dopo un breve delay
+      setTimeout(() => {
+        console.log(`🔄 Refreshing page after NFT transfer`);
+        onSuccess?.();
+        onClose();
+        window.location.reload();
+      }, 2000);
     }
   }, [
     isSuccess,

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useAccount, useWatchContractEvent } from "wagmi";
 import { useAuctionsEnhanced } from "./enhanced-auction-utils";
 import { contracts } from "../utils/contracts";
+import { ethers } from "ethers";
 
 export interface WonAuction {
   auctionId: string;
@@ -41,6 +42,108 @@ export interface UseWonAuctionsReturn {
   isLoading: boolean;
   error: string | null;
   refetch: () => void;
+}
+
+// Function to check the current ownership of an NFT
+async function checkNFTOwnershipReal(
+  tokenId: string,
+  userAddress: string | undefined
+): Promise<boolean> {
+  if (!userAddress || typeof window === "undefined" || !window.ethereum) {
+    return false;
+  }
+
+  try {
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    const nftContract = new ethers.Contract(
+      contracts.MooveNFT.address,
+      contracts.MooveNFT.abi,
+      provider
+    );
+
+    const owner = await nftContract.ownerOf(tokenId);
+    const isOwner = owner.toLowerCase() === userAddress.toLowerCase();
+
+    console.log(`🔍 Real ownership check for token ${tokenId}:`, {
+      owner,
+      userAddress,
+      isOwner,
+    });
+
+    return isOwner;
+  } catch (error) {
+    console.error(
+      `❌ Error in real ownership check for token ${tokenId}:`,
+      error
+    );
+    return false;
+  }
+}
+
+// Funzione per filtrare le aste in base all'ownership attuale
+async function filterAuctionsByOwnership(
+  auctions: any[],
+  address: string | undefined
+): Promise<any[]> {
+  if (!address) return [];
+
+  const filtered: any[] = [];
+
+  for (const auction of auctions) {
+    const isUserWinner =
+      auction.highestBidder &&
+      auction.highestBidder.toLowerCase() === address.toLowerCase();
+
+    // Considera l'asta "ended" se status === 3 (ENDED) OPPURE status === 4 (SETTLED) OPPURE se status === 1 ma tempo scaduto
+    const isEnded = auction.status === 3;
+    const isSettled = auction.status === 4;
+    const isTimeExpired =
+      auction.status === 1 &&
+      auction.endTime &&
+      new Date(auction.endTime).getTime() <= Date.now();
+    const isAuctionEnded = isEnded || isSettled || isTimeExpired;
+
+    if (!isUserWinner || !isAuctionEnded) {
+      continue; // Skip se non è vincitore o asta non finita
+    }
+
+    // Per aste SETTLED (status 4), verifica l'ownership attuale dell'NFT
+    if (isSettled && auction.nftId) {
+      console.log(
+        `🔍 Checking ownership for settled auction ${auction.auctionId} (token ${auction.nftId})`
+      );
+
+      try {
+        const isStillOwner = await checkNFTOwnershipReal(
+          auction.nftId,
+          address
+        );
+        if (isStillOwner) {
+          console.log(`✅ Token ${auction.nftId} is still owned by user`);
+          filtered.push(auction);
+        } else {
+          console.log(`❌ Token ${auction.nftId} has been transferred away`);
+        }
+      } catch (error) {
+        console.error(
+          `❌ Error checking ownership for token ${auction.nftId}:`,
+          error
+        );
+        // If there's an error, exclude the NFT for safety
+      }
+    } else {
+      // For other statuses (ENDED, TIME_EXPIRED), include always
+      console.log(
+        `✅ Including auction ${auction.auctionId} (status ${auction.status})`
+      );
+      filtered.push(auction);
+    }
+  }
+
+  console.log(
+    `✅ Filtered auctions by ownership: ${filtered.length}/${auctions.length} auctions still owned by user`
+  );
+  return filtered;
 }
 
 export function useWonAuctions(): UseWonAuctionsReturn {
@@ -185,23 +288,11 @@ export function useWonAuctions(): UseWonAuctionsReturn {
       setIsLoading(true);
       setError(null);
 
-      // Filtra le aste dove l'utente ha vinto (sia attive che finite)
-      const userWonAuctions = auctions.filter((auction) => {
-        const isUserWinner =
-          auction.highestBidder &&
-          auction.highestBidder.toLowerCase() === address.toLowerCase();
-
-        // Considera l'asta "ended" se status === 3 (ENDED) OPPURE status === 4 (SETTLED) OPPURE se status === 1 ma tempo scaduto
-        const isEnded = auction.status === 3;
-        const isSettled = auction.status === 4; // Solo status 4 è settled per vincitori
-        const isTimeExpired =
-          auction.status === 1 &&
-          auction.endTime &&
-          new Date(auction.endTime).getTime() <= Date.now();
-        const isAuctionEnded = isEnded || isSettled || isTimeExpired;
-
-        return isUserWinner && isAuctionEnded;
-      });
+      // Filter auctions where the user has won (active and finished)
+      const userWonAuctions = await filterAuctionsByOwnership(
+        auctions,
+        address
+      );
 
       // Debug logging to understand the filtering
       console.log(`🔍 Debug auction filtering:`, {
@@ -220,7 +311,7 @@ export function useWonAuctions(): UseWonAuctionsReturn {
       const wonAuctions: WonAuction[] = [];
 
       for (const auction of userWonAuctions) {
-        // Determina se l'asta è veramente finita (status 3, 4 o tempo scaduto)
+        // Determine if the auction is really finished (status 3, 4 or time expired)
         const isEnded = auction.status === 3;
         const isSettled = auction.status === 4; // Solo status 4 è settled per vincitori
         const isTimeExpired =
@@ -255,12 +346,12 @@ export function useWonAuctions(): UseWonAuctionsReturn {
           image:
             nftMetadata?.image || auction.nftImage || "/images/default-nft.svg",
           category: auction.nftCategory || "sticker",
-          status: isAuctionEnded ? 3 : auction.status, // Forza status 3 se tempo scaduto
+          status: isAuctionEnded ? 3 : auction.status, // Force status 3 if time expired
           hasImage: !!(nftMetadata?.image || auction.nftImage),
           hasName: !!(nftMetadata?.name || auction.nftName),
           finalBid: parseFloat(auction.currentBid) || 0,
           bidders: auction.bidCount || 0,
-          isSettled: auction.isSettled || auction.status === 4 || isCompleted, // Solo status 4 è settled per vincitori
+          isSettled: auction.isSettled || auction.status === 4 || isCompleted, // Only status 4 is settled for winners
           endTime: auction.endTime
             ? new Date(auction.endTime).getTime()
             : undefined,

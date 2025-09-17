@@ -24,8 +24,17 @@ export default function OptimizedNFTImage({
   const [hasError, setHasError] = useState(false);
   const [isInView, setIsInView] = useState(false);
   const [debouncedSrc, setDebouncedSrc] = useState<string>("");
+  const [currentGatewayIndex, setCurrentGatewayIndex] = useState(0);
   const imgRef = useRef<HTMLImageElement>(null);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Multiple IPFS gateways for fallback
+  const ipfsGateways = [
+    "https://ipfs.io/ipfs/",
+    "https://gateway.pinata.cloud/ipfs/",
+    "https://cloudflare-ipfs.com/ipfs/",
+    "https://dweb.link/ipfs/",
+  ];
 
   // Debounce src changes to prevent excessive API calls
   useEffect(() => {
@@ -34,7 +43,11 @@ export default function OptimizedNFTImage({
     }
 
     debounceTimeoutRef.current = setTimeout(() => {
+      console.log(`🖼️ Loading NFT image: ${src}`);
       setDebouncedSrc(src);
+      setCurrentGatewayIndex(0); // Reset to first gateway
+      setIsLoaded(false);
+      setHasError(false);
     }, 300); // 300ms debounce
 
     return () => {
@@ -63,14 +76,39 @@ export default function OptimizedNFTImage({
     return () => observer.disconnect();
   }, []);
 
+  // Function to get the current gateway URL
+  const getCurrentGatewayUrl = (originalSrc: string) => {
+    if (!originalSrc || !originalSrc.includes("ipfs://")) {
+      return originalSrc;
+    }
+
+    const cid = originalSrc.replace("ipfs://", "");
+    const currentGateway = ipfsGateways[currentGatewayIndex];
+    return `${currentGateway}${cid}`;
+  };
+
   const handleLoad = () => {
+    console.log(`✅ Image loaded successfully: ${debouncedSrc}`);
     setIsLoaded(true);
     setHasError(false);
   };
 
   const handleError = () => {
-    setHasError(true);
-    setIsLoaded(false);
+    console.log(
+      `❌ Image failed to load: ${debouncedSrc} (gateway ${currentGatewayIndex})`
+    );
+
+    // Try next gateway if available
+    if (currentGatewayIndex < ipfsGateways.length - 1) {
+      console.log(`🔄 Trying next gateway: ${currentGatewayIndex + 1}`);
+      setCurrentGatewayIndex(currentGatewayIndex + 1);
+      setHasError(false);
+      setIsLoaded(false);
+    } else {
+      console.log(`❌ All gateways failed for: ${src}`);
+      setHasError(true);
+      setIsLoaded(false);
+    }
   };
 
   const getFallbackIcon = () => {
@@ -98,7 +136,7 @@ export default function OptimizedNFTImage({
           debouncedSrc &&
           debouncedSrc !== "/images/default-nft.png" ? (
             <img
-              src={debouncedSrc}
+              src={getCurrentGatewayUrl(debouncedSrc)}
               alt={alt}
               className={`${className} transition-opacity duration-300 ${
                 isLoaded ? "opacity-100" : "opacity-0"

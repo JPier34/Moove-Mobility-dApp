@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useWonAuctions } from "./useWonAuctions";
+import { useWonAuctionsForClaim } from "./useWonAuctionsForClaim";
 import { useSettleAuction } from "./useUserCollection";
 import { useStartRevealPhase } from "./useAuction";
 import { ethers } from "ethers";
@@ -58,7 +58,7 @@ async function checkAuctionStatus(auctionId: string) {
 }
 
 export function useWonAuctionsManager() {
-  const { unsettledAuctions, isLoading, refetch } = useWonAuctions();
+  const { unsettledAuctions, isLoading, refetch } = useWonAuctionsForClaim();
   const { settleAuction, isSettling, error } = useSettleAuction();
   const {
     startRevealPhase,
