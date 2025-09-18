@@ -6,19 +6,67 @@ import LocationIndicator from "@/components/layout/LocationIndicator";
 import { useTheme } from "@/providers/ThemeProvider";
 import Link from "next/link";
 import { useUserRoles } from "@/hooks/useContract";
-import { useWalletPersistence } from "@/hooks/useWalletPersistence";
+import { useAccount } from "wagmi";
+import { useNavigationLoading } from "@/hooks/useNavigationLoading";
+import LoadingSpinner from "@/components/ui/LoadingSpinner";
 
 export default function Header() {
   const { resolvedTheme, toggleTheme } = useTheme();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const [lastScrollY, setLastScrollY] = useState(0);
-  const { address, isConnected } = useWalletPersistence();
+  const { address, isConnected } = useAccount();
   const {
     isMasterAdmin,
     canMint,
     isLoading: rolesLoading,
   } = useUserRoles(address);
+
+  // Navigation loading state
+  const { isNavigating, currentPath, navigateWithLoading, resetLoading } =
+    useNavigationLoading();
+
+  // Debug wallet state in header - using Wagmi's built-in persistence
+  useEffect(() => {
+    const wagmiStore =
+      typeof window !== "undefined"
+        ? localStorage.getItem("wagmi.store")
+        : null;
+    const oldWalletState =
+      typeof window !== "undefined"
+        ? localStorage.getItem("wagmi.wallet.state")
+        : null;
+    const oldWallet =
+      typeof window !== "undefined"
+        ? localStorage.getItem("wagmi.wallet")
+        : null;
+
+    console.log(`🔍 Header wallet state (Wagmi):`, {
+      address: address
+        ? `${address.slice(0, 6)}...${address.slice(-4)}`
+        : "null",
+      isConnected,
+      path: window.location.pathname,
+      timestamp: new Date().toISOString(),
+      wagmiStore: wagmiStore ? "EXISTS" : "MISSING",
+      oldWalletState: oldWalletState ? "EXISTS (SHOULD BE CLEANED)" : "MISSING",
+      oldWallet: oldWallet ? "EXISTS (SHOULD BE CLEANED)" : "MISSING",
+    });
+  }, [address, isConnected]);
+
+  // Reset loading when path changes
+  useEffect(() => {
+    const handleRouteChange = () => {
+      resetLoading();
+    };
+
+    // Listen for route changes
+    window.addEventListener("popstate", handleRouteChange);
+
+    return () => {
+      window.removeEventListener("popstate", handleRouteChange);
+    };
+  }, [resetLoading]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -79,28 +127,43 @@ export default function Header() {
           {/* Desktop Navigation */}
           <nav className="hidden lg:flex items-center md:space-x-5">
             {navItems.map((link) => (
-              <Link
+              <button
                 key={link.href}
-                href={link.href}
-                className="text-gray-600 dark:text-gray-300 hover:text-moove-primary dark:hover:text-moove-primary transition-colors"
+                onClick={() => navigateWithLoading(link.href)}
+                disabled={isNavigating}
+                className={`flex items-center space-x-2 text-gray-600 dark:text-gray-300 hover:text-moove-primary dark:hover:text-moove-primary transition-colors ${
+                  isNavigating && currentPath === link.href ? "opacity-70" : ""
+                }`}
               >
-                {link.label}
-              </Link>
+                {isNavigating && currentPath === link.href ? (
+                  <LoadingSpinner size="sm" />
+                ) : null}
+                <span>{link.label}</span>
+              </button>
             ))}
 
             {/* Admin Section - Only visible to admins */}
             {hasAdminAccess && (
               <div className="flex items-center space-x-2 ml-4 pl-4 border-l border-gray-300 dark:border-gray-600">
                 {adminItems.map((link) => (
-                  <Link
+                  <button
                     key={link.href}
-                    href={link.href}
-                    className="flex items-center space-x-1 text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors font-medium"
+                    onClick={() => navigateWithLoading(link.href)}
+                    disabled={isNavigating}
+                    className={`flex items-center space-x-1 text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors font-medium ${
+                      isNavigating && currentPath === link.href
+                        ? "opacity-70"
+                        : ""
+                    }`}
                     title="Admin Panel"
                   >
-                    <span>{link.icon}</span>
+                    {isNavigating && currentPath === link.href ? (
+                      <LoadingSpinner size="sm" />
+                    ) : (
+                      <span>{link.icon}</span>
+                    )}
                     <span>{link.label}</span>
-                  </Link>
+                  </button>
                 ))}
               </div>
             )}
@@ -246,14 +309,24 @@ export default function Header() {
               </div>
 
               {navItems.map((link) => (
-                <Link
+                <button
                   key={link.href}
-                  href={link.href}
-                  className="text-gray-600 dark:text-gray-300 hover:text-moove-primary dark:hover:text-moove-primary transition-colors px-2"
-                  onClick={() => setIsMobileMenuOpen(false)}
+                  onClick={() => {
+                    navigateWithLoading(link.href);
+                    setIsMobileMenuOpen(false);
+                  }}
+                  disabled={isNavigating}
+                  className={`flex items-center space-x-2 text-gray-600 dark:text-gray-300 hover:text-moove-primary dark:hover:text-moove-primary transition-colors px-2 ${
+                    isNavigating && currentPath === link.href
+                      ? "opacity-70"
+                      : ""
+                  }`}
                 >
-                  {link.label}
-                </Link>
+                  {isNavigating && currentPath === link.href ? (
+                    <LoadingSpinner size="sm" />
+                  ) : null}
+                  <span>{link.label}</span>
+                </button>
               ))}
 
               {/* Mobile Admin Section - Only visible to admins */}
@@ -263,15 +336,26 @@ export default function Header() {
                     Admin Access:
                   </div>
                   {adminItems.map((link) => (
-                    <Link
+                    <button
                       key={link.href}
-                      href={link.href}
-                      className="flex items-center space-x-2 text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors px-2 font-medium"
-                      onClick={() => setIsMobileMenuOpen(false)}
+                      onClick={() => {
+                        navigateWithLoading(link.href);
+                        setIsMobileMenuOpen(false);
+                      }}
+                      disabled={isNavigating}
+                      className={`flex items-center space-x-2 text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors px-2 font-medium ${
+                        isNavigating && currentPath === link.href
+                          ? "opacity-70"
+                          : ""
+                      }`}
                     >
-                      <span>{link.icon}</span>
+                      {isNavigating && currentPath === link.href ? (
+                        <LoadingSpinner size="sm" />
+                      ) : (
+                        <span>{link.icon}</span>
+                      )}
                       <span>{link.label}</span>
-                    </Link>
+                    </button>
                   ))}
                 </div>
               )}

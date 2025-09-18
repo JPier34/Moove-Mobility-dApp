@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { useWalletPersistence } from "@/hooks/useWalletPersistence";
+import { useAccount } from "wagmi";
 import { useRentalPassContract } from "@/hooks/useRentalPassContract";
 import { VehicleType, EUROPEAN_CITIES } from "@/config/cities";
 import { useLocationAndCity } from "@/hooks/useLocationAndCity";
@@ -169,7 +169,7 @@ function EnhancedLocationStatusHeader({
 function MarketplaceContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { isConnected } = useWalletPersistence();
+  const { isConnected } = useAccount();
   const { navigateWithLoading } = useRouteLoading();
 
   // Persistence hook
@@ -486,18 +486,6 @@ function MarketplaceContent() {
               )}
             </div>
           </motion.div>
-        )}
-
-        {/* Test button for loading spinner */}
-        {process.env.NODE_ENV === "development" && isConnected && (
-          <div className="text-center mt-8">
-            <button
-              onClick={() => navigateWithLoading("/book/bike")}
-              className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors"
-            >
-              Test Loading Spinner
-            </button>
-          </div>
         )}
 
         {/* Real-time Updates Indicator */}

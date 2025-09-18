@@ -1,10 +1,10 @@
 "use client";
 
-import { useWalletPersistence } from "@/hooks/useWalletPersistence";
+import { useAccount } from "wagmi";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 
 export default function WalletTest() {
-  const { forceReconnect, isConnected, address } = useWalletPersistence();
+  const { isConnected, address } = useAccount();
 
   if (process.env.NODE_ENV !== "development") {
     return null;
@@ -25,16 +25,14 @@ export default function WalletTest() {
           )}
         </ConnectButton.Custom>
 
-        <button
-          onClick={forceReconnect}
-          className="block w-full bg-yellow-600 hover:bg-yellow-700 px-2 py-1 rounded text-xs"
-        >
-          Force Reconnect
-        </button>
-
         <div className="text-xs opacity-75">
           Status: {isConnected ? "Connected" : "Disconnected"}
         </div>
+        {address && (
+          <div className="text-xs opacity-75 break-all">
+            Address: {address.slice(0, 6)}...{address.slice(-4)}
+          </div>
+        )}
       </div>
     </div>
   );

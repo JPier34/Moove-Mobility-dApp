@@ -8,7 +8,6 @@ import { useSecureNFTAuctionFlow } from "@/hooks/useSecureNFTAuction";
 import { useRouter } from "next/navigation";
 import { useIPFSUnified } from "@/hooks/useIPFSUnified";
 import { useNFTValidationAPI } from "@/hooks/useNFTValidationAPI";
-import { useWalletPersistence } from "@/hooks/useWalletPersistence";
 import { useAuctionValidationModular } from "@/hooks/useAuctionValidationModular";
 import { useAuctionFormValidation } from "@/hooks/useAuctionFormValidation";
 import { AuctionType } from "@/types/auction";

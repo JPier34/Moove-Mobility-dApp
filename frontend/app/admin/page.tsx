@@ -2,7 +2,7 @@
 
 import React from "react";
 import { motion } from "framer-motion";
-import { useWalletPersistence } from "@/hooks/useWalletPersistence";
+import { useAccount } from "wagmi";
 import { useUserRoles } from "@/hooks/useContract";
 // import { useAuctionsEnhanced } from "@/hooks/enhanced-auction-utils"; // Temporarily disabled
 // import AdminNFTCreator from "@/components/admin/AdminNFTCreator"; // CORROTTO - NON FUNZIONA
@@ -18,7 +18,7 @@ import TransactionTrackerDebug from "@/components/debug/TransactionTrackerDebug"
 // import FailedAuctionHandler from "@/components/admin/FailedAuctionHandler"; // Temporarily disabled
 
 export default function AdminPage() {
-  const { address } = useWalletPersistence();
+  const { address } = useAccount();
   const { isMasterAdmin, canMint } = useUserRoles(address);
 
   // Temporarily disabled failed auction handling to prevent loops

@@ -9,8 +9,9 @@ import React, {
 } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import { useUserNFTCollection } from "@/hooks/useUserNFTCollection";
+import { useOptimizedNFTCollection } from "@/hooks/useOptimizedNFTCollection";
 import { useAccount } from "wagmi";
+// Removed wallet debug - using Wagmi's built-in persistence
 import { toast } from "react-hot-toast";
 import OptimizedNFTImage from "@/components/collection/OptimizedNFTImage";
 import TransferNFTModal from "@/components/TransferNFTModal";
@@ -534,13 +535,17 @@ function EmptyState({ onRefresh }: { onRefresh: () => void }) {
 export default function MyCollection() {
   const { address, isConnected } = useAccount();
 
-  // User's NFT collection (all owned NFTs, regardless of how they were obtained)
+  // Removed wallet debug - using Wagmi's built-in persistence
+
+  // User's NFT collection (optimized with Wagmi + TanStack Query)
   const {
     userNFTs: userNFTCollection,
     isLoading: userNFTsLoading,
     error: userNFTsError,
     refetch: refetchUserNFTs,
-  } = useUserNFTCollection();
+    totalItems,
+    totalValue,
+  } = useOptimizedNFTCollection();
 
   const [filters, setFilters] = useState<FilterOptions>({
     rarity: "all",
@@ -548,13 +553,7 @@ export default function MyCollection() {
     priceRange: "all",
   });
 
-  // Calculate stats from user NFT collection
-  const totalItems = userNFTCollection?.length || 0;
-  const totalValue =
-    userNFTCollection?.reduce((sum, nft) => {
-      const price = nft.currentBid ? Number(nft.currentBid) / 1e18 : 0;
-      return sum + price;
-    }, 0) || 0;
+  // Stats are now calculated in the hook
 
   // Modal state
   const [selectedNFT, setSelectedNFT] = useState<DecorativeNFT | null>(null);

@@ -6,7 +6,6 @@ import { useAccount } from "wagmi";
 import { useSecureNFTAuctionFlow } from "@/hooks/useSecureNFTAuction";
 import { useIPFSUnified } from "@/hooks/useIPFSUnified";
 import { useNFTValidationAPI } from "@/hooks/useNFTValidationAPI";
-import { useWalletPersistence } from "@/hooks/useWalletPersistence";
 import { AuctionType } from "@/types/auction";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
@@ -61,7 +60,7 @@ function AdminNFTCreatorUltraSimpleContent() {
     uploadProgress,
   } = useIPFSUnified();
   const { validateNFT, isValidating: isValidatingNFT } = useNFTValidationAPI();
-  const { isConnected } = useWalletPersistence();
+  const { isConnected } = useAccount();
 
   // Auction validation hook (MODULAR)
   const {

@@ -1,9 +1,9 @@
 "use client";
 
-import { useWalletPersistence } from "@/hooks/useWalletPersistence";
+import { useAccount } from "wagmi";
 
 export default function WalletDebug() {
-  const walletState = useWalletPersistence();
+  const walletState = useAccount();
 
   if (process.env.NODE_ENV !== "development") {
     return null;
@@ -17,7 +17,7 @@ export default function WalletDebug() {
         Address:{" "}
         {walletState.address ? `${walletState.address.slice(0, 6)}...` : "None"}
       </div>
-      <div>Initialized: {walletState.isInitialized ? "✅" : "❌"}</div>
+      <div>Initialized: {walletState.isConnected ? "✅" : "❌"}</div>
       <div>Connecting: {walletState.isConnecting ? "🔄" : "⏸️"}</div>
       <div className="mt-2 text-xs opacity-75">
         <div>
@@ -30,6 +30,38 @@ export default function WalletDebug() {
           Ethereum:{" "}
           {typeof window !== "undefined" && window.ethereum ? "✅" : "❌"}
         </div>
+        <div>
+          Wallet State:{" "}
+          {typeof window !== "undefined" &&
+          localStorage.getItem("wagmi.wallet.state")
+            ? "✅"
+            : "❌"}
+        </div>
+      </div>
+
+      {/* Debug controls */}
+      <div className="mt-2 space-y-1">
+        <button
+          onClick={() => {
+            const saved = localStorage.getItem("wagmi.wallet.state");
+            console.log(
+              "💾 Saved wallet state:",
+              saved ? JSON.parse(saved) : "None"
+            );
+          }}
+          className="w-full px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600"
+        >
+          Check State
+        </button>
+        <button
+          onClick={() => {
+            localStorage.removeItem("wagmi.wallet.state");
+            console.log("🧹 Cleared saved state");
+          }}
+          className="w-full px-2 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600"
+        >
+          Clear State
+        </button>
       </div>
     </div>
   );

@@ -3,10 +3,10 @@
 import { useEffect, useCallback } from "react";
 import { useDisconnect } from "wagmi";
 import { usePathname } from "next/navigation";
-import { useWalletPersistence } from "./useWalletPersistence";
+import { useAccount } from "wagmi";
 
 export function useWalletRouting() {
-  const { isConnected, address } = useWalletPersistence();
+  const { isConnected, address } = useAccount();
   const { disconnect } = useDisconnect();
   const pathname = usePathname();
 

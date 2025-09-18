@@ -8,7 +8,6 @@ import { useSecureNFTAuctionFlow } from "@/hooks/useSecureNFTAuction";
 import { useRouter } from "next/navigation";
 import { useIPFSUnified } from "@/hooks/useIPFSUnified";
 import { useNFTValidationAPI } from "@/hooks/useNFTValidationAPI";
-import { useWalletPersistence } from "@/hooks/useWalletPersistence";
 // Re-enabled modular hooks imports with simple, safe implementation
 import { useAuctionValidationModular } from "@/hooks/useAuctionValidationModular";
 import { useAuctionFormValidation } from "@/hooks/useAuctionFormValidation";
@@ -103,7 +102,7 @@ function AdminNFTCreatorMinimalContent() {
     uploadProgress,
   } = useIPFSUnified();
   const { validateNFT, isValidating: isValidatingNFT } = useNFTValidationAPI();
-  const { isConnected } = useWalletPersistence();
+  const { isConnected } = useAccount();
 
   // RE-ENABLED: Simple, safe modular hooks
   const {

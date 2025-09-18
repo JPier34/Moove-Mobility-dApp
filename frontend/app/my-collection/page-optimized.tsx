@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useUserCollectionOptimized } from "@/hooks/useUserCollectionOptimized";
-import { useWalletPersistence } from "@/hooks/useWalletPersistence";
+import { useAccount } from "wagmi";
 import { toast } from "react-hot-toast";
 import OptimizedNFTImage from "@/components/collection/OptimizedNFTImage";
 
@@ -298,7 +298,7 @@ function EmptyState({ onRefresh }: { onRefresh: () => void }) {
 export default function MyCollection() {
   const { wonAuctions, isLoading, error, refetch, totalValue, totalItems } =
     useUserCollectionOptimized();
-  const { isConnected, address, isInitialized } = useWalletPersistence();
+  const { isConnected, address } = useAccount();
 
   const [filters, setFilters] = useState<FilterOptions>({
     rarity: "all",
@@ -357,7 +357,7 @@ export default function MyCollection() {
   const hasItems = filteredDecorative.length > 0;
 
   // Show loading state
-  if (!isInitialized || isLoading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-moove-50 dark:from-gray-900 dark:to-gray-800">
         <div className="container mx-auto px-4 py-8">
