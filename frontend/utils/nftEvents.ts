@@ -128,3 +128,4 @@ export interface AuctionCreatedEvent {
   transactionHash?: string;
   timestamp: number;
 }
+

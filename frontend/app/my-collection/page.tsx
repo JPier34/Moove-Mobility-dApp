@@ -9,17 +9,13 @@ import React, {
 } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import { useUserCollectionOptimized } from "@/hooks/useUserCollectionOptimized";
-import { useWalletPersistence } from "@/hooks/useWalletPersistence";
 import { useUserNFTCollection } from "@/hooks/useUserNFTCollection";
-import WonAuctions from "@/components/collection/WonAuctions";
+import { useAccount } from "wagmi";
 import { toast } from "react-hot-toast";
 import OptimizedNFTImage from "@/components/collection/OptimizedNFTImage";
 import TransferNFTModal from "@/components/TransferNFTModal";
-import { WonAuction } from "@/types/user";
 import { nftEvents, NFTTransferEvent } from "@/utils/nftEvents";
-import { useNFTOwnershipCheck } from "@/hooks/useNFTOwnershipCheck";
-import { useOwnershipFilter } from "@/components/OwnershipFilter";
+import { WonAuction } from "@/types/user";
 
 // ============= TYPES =============
 interface DecorativeNFT {
@@ -536,10 +532,7 @@ function EmptyState({ onRefresh }: { onRefresh: () => void }) {
 
 // ============= MAIN COMPONENT =============
 export default function MyCollection() {
-  const { wonAuctions, isLoading, error, refetch, totalValue, totalItems } =
-    useUserCollectionOptimized();
-  const { isConnected, address, isInitialized } = useWalletPersistence();
-  // Congratulations modal is now handled globally by AuctionNotificationsProvider
+  const { address, isConnected } = useAccount();
 
   // User's NFT collection (all owned NFTs, regardless of how they were obtained)
   const {
@@ -554,6 +547,14 @@ export default function MyCollection() {
     category: "all",
     priceRange: "all",
   });
+
+  // Calculate stats from user NFT collection
+  const totalItems = userNFTCollection?.length || 0;
+  const totalValue =
+    userNFTCollection?.reduce((sum, nft) => {
+      const price = nft.currentBid ? Number(nft.currentBid) / 1e18 : 0;
+      return sum + price;
+    }, 0) || 0;
 
   // Modal state
   const [selectedNFT, setSelectedNFT] = useState<DecorativeNFT | null>(null);
@@ -593,14 +594,14 @@ export default function MyCollection() {
     return () => {
       clearTimeout(timeout);
     };
-  }, [wonAuctions.length, isLoading]); // Simplified dependencies
+  }, [userNFTCollection?.length, userNFTsLoading]); // Simplified dependencies
 
   // Reset render count when data changes significantly
   useEffect(() => {
-    if (wonAuctions.length === 0 && !isLoading) {
+    if ((userNFTCollection?.length || 0) === 0 && !userNFTsLoading) {
       renderCountRef.current = 0;
     }
-  }, [wonAuctions.length, isLoading]);
+  }, [userNFTCollection?.length, userNFTsLoading]);
 
   // Listener for NFT transfer events
   useEffect(() => {
@@ -761,7 +762,7 @@ export default function MyCollection() {
   const hasItems = filteredDecorative.length > 0;
 
   // Show loading state
-  if (!isInitialized || userNFTsLoading) {
+  if (!isConnected || userNFTsLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-moove-50 dark:from-gray-900 dark:to-gray-800">
         <div className="container mx-auto px-4 py-8">
