@@ -73,6 +73,22 @@ export default function SimplifiedAppProvider({
       }, 100);
       return;
     }
+    
+    // Additional cleanup: clear any corrupted wagmi data
+    const wagmiStore = localStorage.getItem('wagmi.store');
+    if (wagmiStore) {
+      try {
+        const store = JSON.parse(wagmiStore);
+        // If store is corrupted or empty, clear it
+        if (!store || !store.state) {
+          console.log("🧹 Clearing corrupted wagmi store data");
+          localStorage.removeItem('wagmi.store');
+        }
+      } catch (error) {
+        console.log("🧹 Clearing corrupted wagmi store data");
+        localStorage.removeItem('wagmi.store');
+      }
+    }
 
     const client = getQueryClient();
     console.log("📊 QueryClient config:", {

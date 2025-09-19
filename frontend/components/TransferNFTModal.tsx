@@ -148,7 +148,7 @@ export default function TransferNFTModal({
     resetTransferState();
   };
 
-  // Debug ownership
+  /*   // Debug ownership
   const handleDebugOwnership = async () => {
     if (!nft) return;
 
@@ -181,7 +181,7 @@ export default function TransferNFTModal({
       console.error("Debug error:", error);
       toast.error("Debug failed. Check console for details.");
     }
-  };
+  }; */
 
   if (!nft) return null;
 
@@ -398,16 +398,15 @@ export default function TransferNFTModal({
 
               {/* Actions */}
               <div className="space-y-3">
-                {/* Debug button */}
-                <div className="flex justify-center">
+                {/* <div className="flex justify-center">
                   <button
                     onClick={handleDebugOwnership}
                     className="px-4 py-2 text-xs bg-yellow-100 hover:bg-yellow-200 text-yellow-800 rounded-lg transition-colors"
                     disabled={isPending}
                   >
                     🔍 Debug Ownership
-                  </button>
-                </div>
+                  </button> 
+                </div> */}
 
                 <div className="flex space-x-3">
                   {!showConfirmation ? (

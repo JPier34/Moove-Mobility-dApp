@@ -9,6 +9,7 @@ import { useUserRoles } from "@/hooks/useContract";
 import { useAccount } from "wagmi";
 import { useNavigationLoading } from "@/hooks/useNavigationLoading";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
+import { useAutoReconnect } from "@/hooks/useAutoReconnect";
 
 export default function Header() {
   const { resolvedTheme, toggleTheme } = useTheme();
@@ -25,6 +26,9 @@ export default function Header() {
   // Navigation loading state
   const { isNavigating, currentPath, navigateWithLoading, resetLoading } =
     useNavigationLoading();
+
+  // Auto-reconnect wallet if not connected
+  const { hasAttemptedReconnect, isAttemptingReconnect } = useAutoReconnect();
 
   // Debug wallet state in header - using Wagmi's built-in persistence
   useEffect(() => {
@@ -51,6 +55,8 @@ export default function Header() {
       wagmiStore: wagmiStore ? "EXISTS" : "MISSING",
       oldWalletState: oldWalletState ? "EXISTS (SHOULD BE CLEANED)" : "MISSING",
       oldWallet: oldWallet ? "EXISTS (SHOULD BE CLEANED)" : "MISSING",
+      hasAttemptedReconnect,
+      isAttemptingReconnect,
     });
   }, [address, isConnected]);
 
@@ -184,6 +190,28 @@ export default function Header() {
             >
               {resolvedTheme === "dark" ? "☀️" : "🌙"}
             </button>
+
+            {/* Wallet Status Debug */}
+            {process.env.NODE_ENV === "development" && (
+              <div className="mr-4 text-xs space-y-1">
+                <div
+                  className={`px-2 py-1 rounded ${
+                    isConnected
+                      ? "bg-green-100 text-green-800"
+                      : "bg-red-100 text-red-800"
+                  }`}
+                >
+                  {isConnected
+                    ? `✅ ${address?.slice(0, 6)}...`
+                    : "❌ Disconnected"}
+                </div>
+                {isAttemptingReconnect && (
+                  <div className="px-2 py-1 rounded bg-yellow-100 text-yellow-800">
+                    🔄 Auto-reconnecting...
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Custom Connect Button for Wagmi v2 */}
             <ConnectButton.Custom>

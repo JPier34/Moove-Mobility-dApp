@@ -129,3 +129,4 @@ export interface AuctionCreatedEvent {
   timestamp: number;
 }
 
+

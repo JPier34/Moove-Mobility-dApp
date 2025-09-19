@@ -110,3 +110,4 @@ export function useInfiniteNFTScroll(options: LazyLoadingOptions = {}) {
 
   return lazyLoading;
 }
+

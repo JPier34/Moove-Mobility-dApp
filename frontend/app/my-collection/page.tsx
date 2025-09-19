@@ -9,12 +9,13 @@ import React, {
 } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import { useOptimizedNFTCollection } from "@/hooks/useOptimizedNFTCollection";
+import { useSuperOptimizedNFTCollection } from "@/hooks/useSuperOptimizedNFTCollection";
 import { useAccount } from "wagmi";
 // Removed wallet debug - using Wagmi's built-in persistence
 import { toast } from "react-hot-toast";
 import OptimizedNFTImage from "@/components/collection/OptimizedNFTImage";
 import TransferNFTModal from "@/components/TransferNFTModal";
+import CacheStats from "@/components/CacheStats";
 import { nftEvents, NFTTransferEvent } from "@/utils/nftEvents";
 import { WonAuction } from "@/types/user";
 
@@ -123,7 +124,6 @@ function NFTDetailsModal({
                 <OptimizedNFTImage
                   src={nft.image}
                   alt={nft.name}
-                  category={nft.category}
                   containerClassName="relative w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 overflow-hidden"
                   className="w-full h-full object-contain"
                 />
@@ -152,16 +152,6 @@ function NFTDetailsModal({
               <div className="space-y-3">
                 <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
                   <span className="text-gray-600 dark:text-gray-400">
-                    Category
-                  </span>
-                  <span className="font-medium text-gray-900 dark:text-white">
-                    {nft.category.charAt(0).toUpperCase() +
-                      nft.category.slice(1)}
-                  </span>
-                </div>
-
-                <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
-                  <span className="text-gray-600 dark:text-gray-400">
                     Token ID
                   </span>
                   <span className="font-mono text-sm text-gray-900 dark:text-white">
@@ -183,7 +173,7 @@ function NFTDetailsModal({
                     Final Bid
                   </span>
                   <span className="font-bold text-moove-primary">
-                    {nft.price.toFixed(7)} ETH
+                    {nft.price} ETH
                   </span>
                 </div>
               </div>
@@ -219,7 +209,8 @@ function NFTDetailsModal({
                 </div>
               )}
 
-              {/* Transaction Hash */}
+              {/* 
+           
               <div className="bg-gray-50 dark:bg-gray-700 rounded-xl p-4">
                 <h4 className="font-semibold text-gray-900 dark:text-white mb-2">
                   Transaction Hash
@@ -227,7 +218,7 @@ function NFTDetailsModal({
                 <p className="font-mono text-xs text-gray-600 dark:text-gray-400 break-all">
                   {nft.transactionHash}
                 </p>
-              </div>
+              </div>  */}
             </div>
           </div>
         </div>
@@ -448,7 +439,7 @@ function DecorativeNFTCard({
               Final Bid
             </div>
             <div className="text-lg font-bold text-moove-primary">
-              {nft.price.toFixed(7)} ETH
+              {nft.price} ETH
             </div>
           </div>
           {/* {nft.auctionWon && (
@@ -545,7 +536,8 @@ export default function MyCollection() {
     refetch: refetchUserNFTs,
     totalItems,
     totalValue,
-  } = useOptimizedNFTCollection();
+    cacheStats,
+  } = useSuperOptimizedNFTCollection();
 
   const [filters, setFilters] = useState<FilterOptions>({
     rarity: "all",
@@ -724,13 +716,30 @@ export default function MyCollection() {
       rarity: "common", // Default rarity, can be enhanced later
       purchaseDate:
         nft.isFromAuction && nft.endTime ? new Date(nft.endTime) : new Date(),
-      price:
-        nft.isFromAuction && nft.currentBid ? Number(nft.currentBid) / 1e18 : 0,
+      price: Number(
+        (nft.currentBid
+          ? Number(nft.currentBid) / 1e18
+          : nft.startingPrice
+          ? Number(nft.startingPrice) / 1e18
+          : 0.001
+        )
+          .toString()
+          .replace(/\.?0+$/, "")
+      ), // Remove trailing zeros
       transactionHash: "",
       auctionWon: nft.isFromAuction
         ? {
             auctionId: nft.auctionId || "",
-            finalBid: nft.currentBid ? Number(nft.currentBid) / 1e18 : 0,
+            finalBid: Number(
+              (nft.currentBid
+                ? Number(nft.currentBid) / 1e18
+                : nft.startingPrice
+                ? Number(nft.startingPrice) / 1e18
+                : 0.001
+              )
+                .toString()
+                .replace(/\.?0+$/, "")
+            ), // Remove trailing zeros
             bidders: 0, // Can be enhanced later
           }
         : undefined,
@@ -922,7 +931,7 @@ export default function MyCollection() {
             </div>
           </motion.div>
         ) : userNFTCollection.filter(
-            (nft) => nft.isFromAuction && nft.status === 3
+            (nft) => nft.isFromAuction && nft.status === "3"
           ).length > 0 ? (
           <motion.div
             className="mb-8"
@@ -941,12 +950,12 @@ export default function MyCollection() {
                 You have won{" "}
                 {
                   userNFTCollection.filter(
-                    (nft) => nft.isFromAuction && nft.status === 3
+                    (nft) => nft.isFromAuction && nft.status === "3"
                   ).length
                 }{" "}
                 auction
                 {userNFTCollection.filter(
-                  (nft) => nft.isFromAuction && nft.status === 3
+                  (nft) => nft.isFromAuction && nft.status === "3"
                 ).length > 1
                   ? "e"
                   : ""}{" "}
@@ -1017,6 +1026,9 @@ export default function MyCollection() {
           onClose={handleCloseTransferModal}
           onSuccess={handleTransferSuccess}
         />
+
+        {/* Cache Performance Stats */}
+        {cacheStats && <CacheStats stats={cacheStats} />}
 
         {/* Congratulations Modal is now handled globally by AuctionNotificationsProvider */}
       </div>

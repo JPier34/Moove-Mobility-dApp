@@ -19,7 +19,7 @@ export function useNFTOwnershipCheck(tokenId: string | null) {
     data: owner,
     isLoading: isLoadingOwner,
     error: ownerError,
-  } = useReadMooveNFT("ownerOf", tokenId ? [BigInt(tokenId)] : undefined, {
+  } = useReadMooveNFT("ownerOf", tokenId ? [BigInt(tokenId)] : [BigInt(1)], {
     enabled: !!tokenId && !!address,
   });
 

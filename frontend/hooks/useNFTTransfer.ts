@@ -34,24 +34,24 @@ export function useNFTTransfer() {
   });
   const [currentTokenId, setCurrentTokenId] = useState<string | null>(null);
 
-  // Hook per verificare ownership dell'NFT corrente
+  // Hook per verificare ownership dell'NFT corrente - solo quando abbiamo un tokenId valido
   const {
     data: nftOwner,
     isLoading: isLoadingOwner,
     error: ownerError,
   } = useReadMooveNFT(
     "ownerOf",
-    currentTokenId ? [BigInt(currentTokenId)] : undefined,
+    currentTokenId ? [BigInt(currentTokenId)] : [BigInt(1)], // Usa tokenId 1 come placeholder quando disabled
     { enabled: !!currentTokenId }
   );
 
-  // Hook per verificare il totalSupply
-  const { data: totalSupply } = useReadMooveNFT("totalSupply", []);
+  // Hook per verificare il totalSupply - RIMOSSO perché non esiste nell'ABI
+  // const { data: totalSupply } = useReadMooveNFT("totalSupply", []);
 
   // Hook per verificare se l'NFT è in un'asta (usando getAuction)
   const { data: auctionData } = useReadMooveAuction(
     "getAuction",
-    currentTokenId ? [BigInt(currentTokenId)] : undefined,
+    currentTokenId ? [BigInt(currentTokenId)] : [BigInt(1)], // Usa tokenId 1 come placeholder quando disabled
     { enabled: !!currentTokenId }
   );
 
@@ -62,7 +62,6 @@ export function useNFTTransfer() {
     isLoadingOwner,
     ownerError,
     enabled: !!currentTokenId,
-    totalSupply: totalSupply?.toString(),
     auctionData: auctionData ? "NFT is in auction" : "NFT not in auction",
   });
 
@@ -147,17 +146,8 @@ export function useNFTTransfer() {
           isLoadingOwner,
           ownerError,
           tokenIdBigInt: BigInt(tokenId),
-          totalSupply: totalSupply?.toString(),
           auctionData: auctionData ? "NFT is in auction" : "NFT not in auction",
         });
-
-        // Verifica se il tokenId è valido rispetto al totalSupply
-        if (totalSupply && BigInt(tokenId) >= BigInt(totalSupply.toString())) {
-          console.error(
-            `❌ Token ${tokenId} doesn't exist. Total supply: ${totalSupply}`
-          );
-          return false;
-        }
 
         // Se c'è un errore, l'NFT potrebbe non esistere
         if (ownerError) {
@@ -185,7 +175,7 @@ export function useNFTTransfer() {
         return false;
       }
     },
-    [address, nftOwner, isLoadingOwner, ownerError, totalSupply, auctionData]
+    [address, nftOwner, isLoadingOwner, ownerError, auctionData]
   );
 
   // Simulazione trasferimento (dry-run)
