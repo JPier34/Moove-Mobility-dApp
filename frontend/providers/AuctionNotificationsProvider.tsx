@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { useWonAuctionsManager } from "@/hooks/useWonAuctionsManager";
 import CongratulationsModal from "@/components/collection/CongratulationsModal";
-import NotificationBadge from "@/components/notifications/NotificationBadge";
+import UnifiedNotificationBadge from "@/components/notifications/UnifiedNotificationBadge";
 import AuctionNotificationsDebug from "@/components/debug/AuctionNotificationsDebug";
 import AuctionConfirmationModal from "@/components/notifications/AuctionConfirmationModal";
 import AuctionResultModal from "@/components/notifications/AuctionResultModal";
@@ -245,8 +245,7 @@ export function AuctionNotificationsProvider({
     <AuctionNotificationsContext.Provider value={contextValue}>
       {children}
 
-      {/* Notification Badge */}
-      <NotificationBadge />
+      {/* Unified Notification Badge - Moved to SimplifiedAppProvider */}
 
       {/* Debug component (development only) */}
       <AuctionNotificationsDebug />

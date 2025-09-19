@@ -5,25 +5,14 @@ const ipfsCache = new Map<string, { data: any; timestamp: number }>();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minuti
 
 const IPFS_GATEWAYS = [
-  // Primary: Pinata (most reliable)
-  "https://gateway.pinata.cloud/ipfs/",
-  "https://app.pinata.cloud/ipfs/",
-
-  // Secondary: Public gateways
+  // Primary: Most reliable gateways only
   "https://ipfs.io/ipfs/",
+  "https://gateway.pinata.cloud/ipfs/",
   "https://cloudflare-ipfs.com/ipfs/",
-  "https://gateway.ipfs.io/ipfs/",
 
-  // Tertiary: Alternative gateways
+  // Secondary: Alternative gateways
   "https://dweb.link/ipfs/",
-  "https://ipfs.infura.io/ipfs/",
-  "https://ipfs.fleek.co/ipfs/",
-  "https://nftstorage.link/ipfs/",
-  "https://ipfs.filebase.io/ipfs/",
-
-  // Fallback: Direct IPFS gateways
-  "https://ipfs-gateway.cloud/ipfs/",
-  "https://gateway.optimism.io/ipfs/",
+  "https://gateway.ipfs.io/ipfs/",
 ];
 
 export async function GET(request: NextRequest) {
@@ -68,8 +57,8 @@ export async function GET(request: NextRequest) {
           "User-Agent":
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         },
-        // Add timeout
-        signal: AbortSignal.timeout(10000),
+        // Reduce timeout to 5 seconds for faster fallback
+        signal: AbortSignal.timeout(5000),
       });
 
       if (response.ok) {
@@ -87,33 +76,52 @@ export async function GET(request: NextRequest) {
           continue;
         }
 
-        // Try to parse as JSON first
-        let jsonData;
-        try {
-          jsonData = JSON.parse(data);
-          console.log(`✅ Successfully parsed JSON from ${gateway}`);
-        } catch (parseError) {
-          console.log(
-            `⚠️ Response is not JSON from ${gateway}, trying next gateway...`
-          );
-          continue; // Try next gateway instead of returning error
+        // Check content type to determine if it's JSON or binary
+        const contentType = response.headers.get("content-type") || "";
+
+        if (contentType.includes("application/json")) {
+          // Try to parse as JSON for metadata
+          let jsonData;
+          try {
+            jsonData = JSON.parse(data);
+            console.log(`✅ Successfully parsed JSON from ${gateway}`);
+
+            // Cache the successful response
+            ipfsCache.set(ipfsHash, {
+              data: jsonData,
+              timestamp: Date.now(),
+            });
+
+            return new NextResponse(JSON.stringify(jsonData), {
+              status: 200,
+              headers: {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods":
+                  "GET, POST, PUT, DELETE, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type, Authorization",
+              },
+            });
+          } catch (parseError) {
+            console.log(
+              `⚠️ Failed to parse JSON from ${gateway}, trying next gateway...`
+            );
+            continue;
+          }
+        } else {
+          // For images and other binary content, return the raw data
+          console.log(`✅ Successfully fetched binary content from ${gateway}`);
+
+          return new NextResponse(data, {
+            status: 200,
+            headers: {
+              "Content-Type": contentType || "application/octet-stream",
+              "Access-Control-Allow-Origin": "*",
+              "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+              "Access-Control-Allow-Headers": "Content-Type, Authorization",
+            },
+          });
         }
-
-        // Cache the successful response
-        ipfsCache.set(ipfsHash, {
-          data: jsonData,
-          timestamp: Date.now(),
-        });
-
-        return new NextResponse(JSON.stringify(jsonData), {
-          status: 200,
-          headers: {
-            "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type, Authorization",
-          },
-        });
       }
     } catch (error) {
       console.log(`❌ Gateway ${i + 1} failed:`, error);

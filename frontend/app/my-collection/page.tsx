@@ -10,11 +10,12 @@ import React, {
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useSuperOptimizedNFTCollection } from "@/hooks/useSuperOptimizedNFTCollection";
+import { useWonAuctions } from "@/hooks/useWonAuctions";
 import { useAccount } from "wagmi";
 // Removed wallet debug - using Wagmi's built-in persistence
 import { toast } from "react-hot-toast";
 import OptimizedNFTImage from "@/components/collection/OptimizedNFTImage";
-import TransferNFTModal from "@/components/TransferNFTModal";
+import TransferNFTModalV2 from "@/components/TransferNFTModalV2";
 import CacheStats from "@/components/CacheStats";
 import { nftEvents, NFTTransferEvent } from "@/utils/nftEvents";
 import { WonAuction } from "@/types/user";
@@ -528,6 +529,22 @@ export default function MyCollection() {
 
   // Removed wallet debug - using Wagmi's built-in persistence
 
+  // Use won auctions hook for real auction data
+  const {
+    allWonAuctions,
+    isLoading: isLoadingAuctions,
+    error: auctionError,
+    refetch: refetchAuctions,
+  } = useWonAuctions();
+
+  // Debug: Log auction data
+  console.log("🔍 DEBUG: useWonAuctions result:", {
+    allWonAuctions,
+    isLoadingAuctions,
+    auctionError,
+    allWonAuctionsLength: allWonAuctions?.length || 0,
+  });
+
   // User's NFT collection (optimized with Wagmi + TanStack Query)
   const {
     userNFTs: userNFTCollection,
@@ -704,47 +721,45 @@ export default function MyCollection() {
     toast.success("NFT transferred successfully!");
   }, [refetchUserNFTs]);
 
-  // Convert user NFT collection to decorative NFTs format
+  // Convert user NFT collection to decorative NFTs format using real auction data
   const decorativeNFTs: DecorativeNFT[] = useMemo(() => {
-    return userNFTCollection.map((nft) => ({
-      id: `nft-${nft.tokenId}`,
-      tokenId: nft.tokenId,
-      name: nft.name,
-      description: nft.description,
-      image: nft.image,
-      category: nft.category as "sticker" | "avatar" | "badge" | "skin",
-      rarity: "common", // Default rarity, can be enhanced later
-      purchaseDate:
-        nft.isFromAuction && nft.endTime ? new Date(nft.endTime) : new Date(),
-      price: Number(
-        (nft.currentBid
-          ? Number(nft.currentBid) / 1e18
-          : nft.startingPrice
-          ? Number(nft.startingPrice) / 1e18
-          : 0.001
-        )
-          .toString()
-          .replace(/\.?0+$/, "")
-      ), // Remove trailing zeros
-      transactionHash: "",
-      auctionWon: nft.isFromAuction
-        ? {
-            auctionId: nft.auctionId || "",
-            finalBid: Number(
-              (nft.currentBid
-                ? Number(nft.currentBid) / 1e18
-                : nft.startingPrice
-                ? Number(nft.startingPrice) / 1e18
-                : 0.001
-              )
-                .toString()
-                .replace(/\.?0+$/, "")
-            ), // Remove trailing zeros
-            bidders: 0, // Can be enhanced later
-          }
-        : undefined,
-    }));
-  }, [userNFTCollection]);
+    console.log("🔍 DEBUG: allWonAuctions data:", allWonAuctions);
+    console.log("🔍 DEBUG: userNFTCollection data:", userNFTCollection);
+
+    return userNFTCollection.map((nft) => {
+      // Find matching auction data from allWonAuctions
+      const matchingAuction = allWonAuctions.find(
+        (auction) => auction.nftId === nft.tokenId
+      );
+
+      console.log(
+        `🔍 DEBUG: NFT #${nft.tokenId} matching auction:`,
+        matchingAuction
+      );
+
+      return {
+        id: `nft-${nft.tokenId}`,
+        tokenId: nft.tokenId,
+        name: nft.name,
+        description: nft.description,
+        image: nft.image,
+        category: nft.category as "sticker" | "avatar" | "badge" | "skin",
+        rarity: "common", // Default rarity, can be enhanced later
+        purchaseDate: matchingAuction?.endTime
+          ? new Date(matchingAuction.endTime)
+          : new Date(), // Default to current date if no auction
+        price: matchingAuction?.finalBid || 0.001, // Default price if no auction
+        transactionHash: matchingAuction?.transactionHash || "", // Empty if no auction
+        auctionWon: matchingAuction
+          ? {
+              auctionId: matchingAuction.auctionId,
+              finalBid: matchingAuction.finalBid,
+              bidders: matchingAuction.bidders,
+            }
+          : undefined, // No auction info if NFT wasn't won from auction
+      };
+    });
+  }, [userNFTCollection, allWonAuctions]);
 
   // Filter items based on current filters
   const filteredDecorative = useMemo(() => {
@@ -770,7 +785,7 @@ export default function MyCollection() {
   const hasItems = filteredDecorative.length > 0;
 
   // Show loading state
-  if (!isConnected || userNFTsLoading) {
+  if (!isConnected || userNFTsLoading || isLoadingAuctions) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-moove-50 dark:from-gray-900 dark:to-gray-800">
         <div className="container mx-auto px-4 py-8">
@@ -915,7 +930,7 @@ export default function MyCollection() {
         </motion.div>
 
         {/* Won Auctions Section */}
-        {userNFTsLoading ? (
+        {userNFTsLoading || isLoadingAuctions ? (
           <motion.div
             className="mb-8"
             initial={{ opacity: 0, y: 20 }}
@@ -1020,7 +1035,7 @@ export default function MyCollection() {
         />
 
         {/* Transfer NFT Modal */}
-        <TransferNFTModal
+        <TransferNFTModalV2
           nft={selectedTransferNFT}
           isOpen={isTransferModalOpen}
           onClose={handleCloseTransferModal}

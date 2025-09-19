@@ -37,8 +37,9 @@ export interface WonAuction {
 }
 
 export interface UseWonAuctionsReturn {
-  wonAuctions: WonAuction[];
-  unsettledAuctions: WonAuction[];
+  wonAuctions: WonAuction[]; // Only unsettled auctions (for notifications)
+  unsettledAuctions: WonAuction[]; // Alias for wonAuctions
+  allWonAuctions: WonAuction[]; // All won auctions (including settled, for collection)
   isLoading: boolean;
   error: string | null;
   refetch: () => void;
@@ -149,6 +150,7 @@ async function filterAuctionsByOwnership(
 export function useWonAuctions(): UseWonAuctionsReturn {
   const { address } = useAccount();
   const [wonAuctions, setWonAuctions] = useState<WonAuction[]>([]);
+  const [allWonAuctions, setAllWonAuctions] = useState<WonAuction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasLoaded, setHasLoaded] = useState(false);
@@ -175,6 +177,14 @@ export function useWonAuctions(): UseWonAuctionsReturn {
     isLoading: auctionsLoading,
     refetch: refetchAuctions,
   } = useAuctionsEnhanced();
+
+  // Debug: Log auctions data
+  console.log("🔍 DEBUG: useAuctionsEnhanced result:", {
+    auctions,
+    auctionsLoading,
+    auctionsLength: auctions?.length || 0,
+    sampleAuctions: auctions?.slice(0, 3) || [],
+  });
 
   // Transaction tracker not needed for status 3 auctions
 
@@ -371,13 +381,18 @@ export function useWonAuctions(): UseWonAuctionsReturn {
         wonAuctions.push(wonAuction);
       }
 
-      // Filter to show only unsettled auctions
+      // Filter to show only unsettled auctions for notifications
       // Only show auctions that are ready for settlement (status 3) and not yet settled
       const confirmedAuctions = wonAuctions.filter(
         (auction) =>
           auction.status === 3 && // Only ENDED auctions
           !auction.isSettled // Not yet settled
-        // Removed transaction tracker dependency - we don't need it for status 3 auctions
+        // Removed transaction tracker dependency - not needed for status 3 auctions
+      );
+
+      // For collection display, we need ALL won auctions (including settled ones)
+      const allWonAuctions = wonAuctions.filter(
+        (auction) => auction.status === 3 || auction.status === 4 // ENDED or SETTLED auctions
       );
 
       // Debug logging for final filter
@@ -393,6 +408,7 @@ export function useWonAuctions(): UseWonAuctionsReturn {
       });
 
       setWonAuctions(confirmedAuctions);
+      setAllWonAuctions(allWonAuctions);
       setHasLoaded(true);
     } catch (err) {
       console.error("❌ Error fetching won auctions:", err);
@@ -437,6 +453,7 @@ export function useWonAuctions(): UseWonAuctionsReturn {
   return {
     wonAuctions,
     unsettledAuctions,
+    allWonAuctions,
     isLoading,
     error,
     refetch,

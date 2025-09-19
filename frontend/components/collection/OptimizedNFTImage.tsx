@@ -78,12 +78,29 @@ export default function OptimizedNFTImage({
 
   // Function to get the current gateway URL
   const getCurrentGatewayUrl = (originalSrc: string) => {
-    if (!originalSrc || !originalSrc.includes("ipfs://")) {
+    if (!originalSrc) {
+      return originalSrc;
+    }
+
+    // If it's already a proxy URL, return as-is
+    if (originalSrc.includes("/api/ipfs-proxy")) {
+      return originalSrc;
+    }
+
+    // If it's not an IPFS URL, return as-is
+    if (!originalSrc.includes("ipfs://")) {
       return originalSrc;
     }
 
     const cid = originalSrc.replace("ipfs://", "");
-    const currentGateway = ipfsGateways[currentGatewayIndex];
+
+    // Use proxy server as primary solution for images
+    if (currentGatewayIndex === 0) {
+      return `/api/ipfs-proxy?hash=${encodeURIComponent(originalSrc)}`;
+    }
+
+    // Fallback to direct gateway access
+    const currentGateway = ipfsGateways[currentGatewayIndex - 1]; // Adjust index since proxy is at 0
     return `${currentGateway}${cid}`;
   };
 
@@ -98,8 +115,37 @@ export default function OptimizedNFTImage({
       `❌ Image failed to load: ${debouncedSrc} (gateway ${currentGatewayIndex})`
     );
 
-    // Try next gateway if available
-    if (currentGatewayIndex < ipfsGateways.length - 1) {
+    // If it's already a proxy URL, try fallback to direct gateway
+    if (debouncedSrc.includes("/api/ipfs-proxy")) {
+      console.log(
+        `❌ Proxy server failed for: ${src}, trying direct gateway fallback`
+      );
+
+      // Extract the original IPFS hash from the proxy URL
+      const urlParams = new URLSearchParams(debouncedSrc.split("?")[1]);
+      const originalHash = urlParams.get("hash");
+
+      if (originalHash && originalHash.includes("ipfs://")) {
+        const ipfsHash = originalHash.replace("ipfs://", "");
+        const directUrl = `https://ipfs.io/ipfs/${ipfsHash}`;
+        console.log(`🔄 Trying direct gateway fallback: ${directUrl}`);
+        setDebouncedSrc(directUrl);
+        setCurrentGatewayIndex(0);
+        setHasError(false);
+        setIsLoaded(false);
+        return;
+      }
+
+      // If we can't extract the hash, show placeholder
+      console.log(`❌ Cannot extract IPFS hash, showing placeholder`);
+      setHasError(true);
+      setIsLoaded(false);
+      return;
+    }
+
+    // Try next gateway if available (including proxy + direct gateways)
+    const totalGateways = ipfsGateways.length + 1; // +1 for proxy server
+    if (currentGatewayIndex < totalGateways - 1) {
       console.log(`🔄 Trying next gateway: ${currentGatewayIndex + 1}`);
       setCurrentGatewayIndex(currentGatewayIndex + 1);
       setHasError(false);

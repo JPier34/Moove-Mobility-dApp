@@ -12,6 +12,8 @@ import { sepolia } from "wagmi/chains";
 import { config } from "@/lib/wagmi";
 import { ThemeProvider } from "@/providers/ThemeProvider";
 import { AuctionNotificationsProvider } from "@/providers/AuctionNotificationsProvider";
+import { NFTTransferNotificationsProvider } from "@/providers/NFTTransferNotificationsProvider";
+import UnifiedNotificationBadge from "@/components/notifications/UnifiedNotificationBadge";
 // Removed custom wallet persistence - using Wagmi's built-in persistence
 import "@rainbow-me/rainbowkit/styles.css";
 
@@ -73,20 +75,20 @@ export default function SimplifiedAppProvider({
       }, 100);
       return;
     }
-    
+
     // Additional cleanup: clear any corrupted wagmi data
-    const wagmiStore = localStorage.getItem('wagmi.store');
+    const wagmiStore = localStorage.getItem("wagmi.store");
     if (wagmiStore) {
       try {
         const store = JSON.parse(wagmiStore);
         // If store is corrupted or empty, clear it
         if (!store || !store.state) {
           console.log("🧹 Clearing corrupted wagmi store data");
-          localStorage.removeItem('wagmi.store');
+          localStorage.removeItem("wagmi.store");
         }
       } catch (error) {
         console.log("🧹 Clearing corrupted wagmi store data");
-        localStorage.removeItem('wagmi.store');
+        localStorage.removeItem("wagmi.store");
       }
     }
 
@@ -117,7 +119,12 @@ export default function SimplifiedAppProvider({
         >
           <ThemeProvider>
             <AuctionNotificationsProvider>
-              {children}
+              <NFTTransferNotificationsProvider>
+                {children}
+
+                {/* Unified Notification Badge - Rendered after both providers */}
+                <UnifiedNotificationBadge />
+              </NFTTransferNotificationsProvider>
             </AuctionNotificationsProvider>
           </ThemeProvider>
         </RainbowKitProvider>

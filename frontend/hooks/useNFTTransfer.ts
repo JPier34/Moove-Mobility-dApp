@@ -11,6 +11,7 @@ import {
 import { contracts } from "@/utils/contracts";
 import { ethers } from "ethers";
 import { nftEvents } from "@/utils/nftEvents";
+import { useNFTTransferNotifications } from "@/providers/NFTTransferNotificationsProvider";
 
 export interface TransferState {
   status: "idle" | "validating" | "pending" | "success" | "error";
@@ -33,6 +34,15 @@ export function useNFTTransfer() {
     status: "idle",
   });
   const [currentTokenId, setCurrentTokenId] = useState<string | null>(null);
+
+  // Integrazione con il sistema di notifiche NFT transfer
+  const {
+    startTransfer,
+    confirmTransfer,
+    completeTransfer,
+    failTransfer,
+    isTransferring,
+  } = useNFTTransferNotifications();
 
   // Hook per verificare ownership dell'NFT corrente - solo quando abbiamo un tokenId valido
   const {
@@ -210,7 +220,7 @@ export function useNFTTransfer() {
     [address]
   );
 
-  // Trasferimento NFT principale
+  // Trasferimento NFT principale - ora integrato con il sistema di notifiche
   const transferNFT = useCallback(
     async (
       tokenId: string,
@@ -261,25 +271,10 @@ export function useNFTTransfer() {
           };
         }
 
-        // 4. Esecuzione trasferimento
-        setTransferState({ status: "pending" });
+        // 4. Avvia il processo di trasferimento con il sistema di notifiche
+        startTransfer(tokenId, recipientAddress);
 
-        console.log(`🔄 Transferring NFT ${tokenId} to ${recipientAddress}`);
-        console.log(`📋 Transfer parameters:`, {
-          from: address,
-          to: recipientAddress,
-          tokenId: BigInt(tokenId),
-          tokenIdString: tokenId,
-        });
-
-        // Chiamata al contratto
-        writeMooveNFT("transferFrom", [
-          address, // from
-          recipientAddress, // to
-          BigInt(tokenId), // tokenId - convert to BigInt
-        ]);
-
-        // Il risultato sarà gestito dagli hook di Wagmi
+        // Il resto del processo sarà gestito dal sistema di notifiche
         return {
           success: true,
           transactionHash: hash,
@@ -305,7 +300,7 @@ export function useNFTTransfer() {
       validateRecipientAddress,
       verifyNFTOwnership,
       simulateTransfer,
-      writeMooveNFT,
+      startTransfer,
       hash,
     ]
   );
@@ -316,10 +311,13 @@ export function useNFTTransfer() {
     setCurrentTokenId(null);
   }, []);
 
-  // Invalidazione cache quando il trasferimento ha successo
+  // Gestione successo transazione - integrazione con sistema di notifiche
   useEffect(() => {
     if (isSuccess && hash && currentTokenId) {
-      console.log(`🔄 Invalidating cache for NFT transfer: ${currentTokenId}`);
+      console.log(`🔄 NFT transfer successful: ${currentTokenId}`);
+
+      // Completa il trasferimento nel sistema di notifiche
+      completeTransfer(hash);
 
       // Invalida tutte le query relative agli NFT dell'utente
       queryClient.invalidateQueries({
@@ -351,9 +349,29 @@ export function useNFTTransfer() {
       // Emetti evento di trasferimento per notificare altri componenti
       if (address) {
         nftEvents.emitTransfer(currentTokenId, address, "unknown", hash);
+
+        // Emetti anche evento globale per il sistema di notifiche
+        window.dispatchEvent(
+          new CustomEvent("nftTransfer", {
+            detail: {
+              tokenId: currentTokenId,
+              from: address,
+              to: "unknown", // Sarà aggiornato quando il destinatario si connette
+              transactionHash: hash,
+            },
+          })
+        );
       }
     }
-  }, [isSuccess, hash, currentTokenId, queryClient, address]);
+  }, [isSuccess, hash, currentTokenId, queryClient, address, completeTransfer]);
+
+  // Gestione errori transazione - integrazione con sistema di notifiche
+  useEffect(() => {
+    if (error && isTransferring) {
+      console.log(`❌ NFT transfer failed:`, error);
+      failTransfer(error.message || "Transfer failed");
+    }
+  }, [error, isTransferring, failTransfer]);
 
   // Aggiorna stato basato su Wagmi
   const currentState = isPending
@@ -374,8 +392,9 @@ export function useNFTTransfer() {
       error: error?.message || transferState.error,
     },
     resetTransferState,
-    isPending,
+    isPending: isPending || isTransferring,
     isSuccess,
     error,
+    isTransferring,
   };
 }

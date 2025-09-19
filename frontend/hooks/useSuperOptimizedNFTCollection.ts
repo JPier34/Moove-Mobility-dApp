@@ -24,6 +24,7 @@ interface UserNFT {
   endTime?: number;
   auctionId?: string;
   status?: string;
+  bidCount?: number; // Number of bidders in the auction
 }
 
 interface NFTCollectionResult {
@@ -56,58 +57,94 @@ async function fetchNFTMetadata(tokenURI: string): Promise<any> {
   try {
     console.log(`🔍 Fetching metadata from: ${tokenURI}`);
 
-    // Clean the hash
-    const cleanHash = tokenURI.replace("ipfs://", "");
+    // Extract IPFS hash from various formats
+    let cleanHash = tokenURI;
 
-    // Try each gateway with timeout
-    for (const gateway of IPFS_GATEWAYS) {
-      try {
-        const httpUrl = `${gateway}${cleanHash}`;
-        console.log(`🔄 Trying gateway: ${gateway}`);
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-        const response = await fetch(httpUrl, {
-          signal: controller.signal,
-        });
-
-        clearTimeout(timeoutId);
-
-        if (response.ok) {
-          const metadata = await response.json();
-          console.log(
-            `✅ Successfully fetched metadata from ${gateway}:`,
-            metadata
-          );
-
-          // Convert image IPFS URL if needed
-          if (metadata.image && metadata.image.startsWith("ipfs://")) {
-            const imageHash = metadata.image.replace("ipfs://", "");
-            metadata.image = `${IPFS_GATEWAYS[0]}${imageHash}`; // Use Pinata for image
-            console.log(`🔄 Converted image URL to: ${metadata.image}`);
-          }
-
-          return metadata;
-        }
-      } catch (error) {
-        console.warn(`⚠️ Gateway ${gateway} failed:`, error);
-        continue;
-      }
+    // Handle ipfs:// format
+    if (tokenURI.startsWith("ipfs://")) {
+      cleanHash = tokenURI.replace("ipfs://", "");
+    }
+    // Handle https://ipfs.io/ipfs/ format
+    else if (tokenURI.includes("/ipfs/")) {
+      cleanHash = tokenURI.split("/ipfs/")[1];
     }
 
-    // If all gateways fail, try proxy server as last resort
-    console.log(`⚠️ All gateways failed, trying proxy server...`);
-    const response = await fetch(
-      `/api/ipfs-proxy?hash=${encodeURIComponent(tokenURI)}`
-    );
-    if (!response.ok)
-      throw new Error(`Failed to fetch metadata: ${response.statusText}`);
+    console.log(`🧹 Cleaned hash: ${cleanHash}`);
 
-    const metadata = await response.json();
-    console.log(`✅ Successfully fetched metadata via proxy:`, metadata);
+    // Use proxy server as primary solution (more reliable)
+    console.log(`🚀 Using proxy server as primary solution...`);
+    try {
+      const response = await fetch(
+        `/api/ipfs-proxy?hash=${encodeURIComponent(tokenURI)}`
+      );
 
-    return metadata;
+      if (!response.ok)
+        throw new Error(`Failed to fetch metadata: ${response.statusText}`);
+
+      const metadata = await response.json();
+      console.log(`✅ Successfully fetched metadata via proxy:`, metadata);
+
+      // Convert image IPFS URL if needed - use proxy server for images too
+      if (metadata.image && metadata.image.startsWith("ipfs://")) {
+        metadata.image = `/api/ipfs-proxy?hash=${encodeURIComponent(
+          metadata.image
+        )}`;
+        console.log(`🔄 Converted image URL to proxy: ${metadata.image}`);
+      }
+
+      return metadata;
+    } catch (proxyError) {
+      console.warn(`⚠️ Proxy server failed:`, proxyError);
+
+      // Fallback to direct gateway access
+      console.log(`🔄 Falling back to direct gateway access...`);
+      for (const gateway of IPFS_GATEWAYS) {
+        try {
+          const httpUrl = `${gateway}${cleanHash}`;
+          console.log(`🔄 Trying gateway: ${gateway}`);
+
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+          const response = await fetch(httpUrl, {
+            signal: controller.signal,
+          });
+
+          clearTimeout(timeoutId);
+
+          if (response.ok) {
+            const metadata = await response.json();
+            console.log(
+              `✅ Successfully fetched metadata from ${gateway}:`,
+              metadata
+            );
+
+            // Convert image IPFS URL if needed - use proxy server for images too
+            if (metadata.image && metadata.image.startsWith("ipfs://")) {
+              metadata.image = `/api/ipfs-proxy?hash=${encodeURIComponent(
+                metadata.image
+              )}`;
+              console.log(`🔄 Converted image URL to proxy: ${metadata.image}`);
+            }
+
+            return metadata;
+          }
+        } catch (error) {
+          console.warn(`⚠️ Gateway ${gateway} failed:`, error);
+          continue;
+        }
+      }
+
+      // If all methods fail, return mock data
+      console.error("❌ All methods failed, returning mock data");
+      return {
+        name: "Unknown NFT",
+        description: "No description available",
+        image: "/images/default-nft.svg",
+        attributes: [],
+        category: "Unknown",
+      };
+    }
   } catch (error) {
     console.error("Error fetching NFT metadata:", error);
     return {
@@ -169,6 +206,18 @@ export function useSuperOptimizedNFTCollection(): NFTCollectionResult {
           // Fetch metadata solo se non già in cache
           const metadata = await fetchNFTMetadata(nft.tokenURI);
 
+          // Try to get auction data for this NFT
+          let auctionData = null;
+          try {
+            // Check if this NFT has auction data
+            const { getAuctionDataForNFT } = await import(
+              "../utils/auction-utils"
+            );
+            auctionData = await getAuctionDataForNFT(nft.tokenId, address);
+          } catch (auctionError) {
+            console.log(`ℹ️ No auction data found for NFT #${nft.tokenId}`);
+          }
+
           const userNFT: UserNFT = {
             tokenId: nft.tokenId.toString(),
             name: metadata.name || `NFT #${nft.tokenId}`,
@@ -177,16 +226,21 @@ export function useSuperOptimizedNFTCollection(): NFTCollectionResult {
             attributes: metadata.attributes || [],
             category: metadata.category || "Unknown",
             rarity: metadata.rarity || "COMMON",
-            currentBid: BigInt(Math.floor(0.001 * 1e18)), // Default price
-            startingPrice: BigInt(Math.floor(0.001 * 1e18)), // Default price
-            isFromAuction: false,
-            auctionEndTime: 0,
+            currentBid:
+              auctionData?.highestBid ||
+              auctionData?.currentPrice ||
+              BigInt(Math.floor(0.001 * 1e18)),
+            startingPrice:
+              auctionData?.startingPrice || BigInt(Math.floor(0.001 * 1e18)),
+            isFromAuction: !!auctionData,
+            auctionEndTime: auctionData?.endTime || 0,
             purchaseDate: new Date().toISOString().split("T")[0],
             transactionHash: "",
             // Additional properties for compatibility
-            endTime: 0,
-            auctionId: "",
-            status: "owned",
+            endTime: auctionData?.endTime || 0,
+            auctionId: auctionData?.auctionId?.toString() || "",
+            status: auctionData ? "auctioned" : "owned",
+            bidCount: auctionData?.bidCount || 0, // Number of bidders in the auction
           };
 
           userNFTs.push(userNFT);
