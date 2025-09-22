@@ -19,6 +19,7 @@ import {
 import { useAuctionFormValidation } from "@/hooks/useAuctionFormValidation";
 import { useUserRoles } from "@/hooks/useContract";
 import { ErrorBoundary, useLastError } from "./ErrorBoundary";
+import { useNFTUniquenessCheck } from "@/hooks/useNFTUniquenessCheck";
 
 interface NFTFormData {
   name: string;
@@ -61,6 +62,8 @@ function AdminNFTCreatorUltraSimpleContent() {
   } = useIPFSUnified();
   const { validateNFT, isValidating: isValidatingNFT } = useNFTValidationAPI();
   const { isConnected } = useAccount();
+  const { checkUniqueness, isLoading: isCheckingUniqueness } =
+    useNFTUniquenessCheck();
 
   // Auction validation hook (MODULAR)
   const {
@@ -113,6 +116,36 @@ function AdminNFTCreatorUltraSimpleContent() {
     }
   };
 
+  // Check NFT uniqueness
+  const handleUniquenessCheck = async () => {
+    if (!nftData.name.trim() || !nftData.image) {
+      toast.error(
+        "Please provide both name and image before checking uniqueness"
+      );
+      return;
+    }
+
+    try {
+      const result = await checkUniqueness(
+        nftData.name,
+        nftData.image,
+        undefined,
+        address
+      );
+      console.log("🔍 Uniqueness check result:", result);
+      setUniquenessResult(result);
+
+      if (!result.isNameUnique || !result.isImageUnique) {
+        toast.error("NFT name or image already exists!");
+      } else {
+        toast.success("NFT is unique! ✅");
+      }
+    } catch (error) {
+      console.error("Error checking uniqueness:", error);
+      toast.error("Failed to check uniqueness");
+    }
+  };
+
   // State management
   const [step, setStep] = useState<"nft" | "auction">("nft");
   const [nftData, setNftData] = useState<NFTFormData>({
@@ -132,6 +165,24 @@ function AdminNFTCreatorUltraSimpleContent() {
       maxTextLength: "100",
     },
   });
+
+  // Uniqueness check state
+  const [uniquenessResult, setUniquenessResult] = useState<{
+    isNameUnique: boolean | null;
+    isImageUnique: boolean | null;
+    nameError: string | null;
+    imageError: string | null;
+  }>({
+    isNameUnique: null, // null = not checked yet
+    isImageUnique: null, // null = not checked yet
+    nameError: null,
+    imageError: null,
+  });
+
+  // Debug: Log uniqueness result changes
+  React.useEffect(() => {
+    console.log("🔍 Uniqueness result state changed:", uniquenessResult);
+  }, [uniquenessResult]);
 
   const [validationResult, setValidationResult] = useState<any>(null);
   const [showFailureModal, setShowFailureModal] = useState(false);
@@ -278,6 +329,11 @@ function AdminNFTCreatorUltraSimpleContent() {
       if (invalidChars.test(name)) {
         errors.name.push("Invalid characters");
       }
+
+      // Uniqueness validation
+      if (!uniquenessResult.isNameUnique && uniquenessResult.nameError) {
+        errors.name.push(uniquenessResult.nameError);
+      }
     }
 
     // Description validation
@@ -301,10 +357,15 @@ function AdminNFTCreatorUltraSimpleContent() {
       if (nftData.image.size > maxSize) {
         errors.image.push("Image too large (max 10MB)");
       }
+
+      // Uniqueness validation
+      if (!uniquenessResult.isImageUnique && uniquenessResult.imageError) {
+        errors.image.push(uniquenessResult.imageError);
+      }
     }
 
     return errors;
-  }, [nftData]);
+  }, [nftData, uniquenessResult]);
 
   // Check if NFT form is valid
   const isNFTFormValid = useMemo(() => {
@@ -317,9 +378,11 @@ function AdminNFTCreatorUltraSimpleContent() {
       allErrors.length === 0 &&
       nftData.name.trim().length >= 3 &&
       nftData.description.trim().length >= 10 &&
-      nftData.image !== null
+      nftData.image !== null &&
+      uniquenessResult.isNameUnique !== false && // Allow null (not checked) but not false (duplicate)
+      uniquenessResult.isImageUnique !== false // Allow null (not checked) but not false (duplicate)
     );
-  }, [getNFTValidationErrors, nftData]);
+  }, [getNFTValidationErrors, nftData, uniquenessResult]);
 
   // Master admin wallet - always has access
   const MASTER_WALLET = "0x777382955f33Bb8540602E914D9b650C962EF6Cc";
@@ -630,7 +693,7 @@ function AdminNFTCreatorUltraSimpleContent() {
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            Create NFT & Auction (Ultra Simple)
+            Create NFT & Auction
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
             Create a new NFT and configure its auction settings
@@ -811,6 +874,72 @@ function AdminNFTCreatorUltraSimpleContent() {
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* Uniqueness Check */}
+            <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                    Uniqueness Check
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Verify that your NFT name and image are unique
+                  </p>
+                </div>
+                <button
+                  onClick={handleUniquenessCheck}
+                  disabled={
+                    !nftData.name.trim() ||
+                    !nftData.image ||
+                    isCheckingUniqueness
+                  }
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg transition-colors flex items-center space-x-2"
+                >
+                  {isCheckingUniqueness ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                      <span>Checking...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Check Uniqueness</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Uniqueness Results */}
+              {(uniquenessResult.nameError || uniquenessResult.imageError) && (
+                <div className="mt-4 space-y-2">
+                  {uniquenessResult.nameError && (
+                    <div className="flex items-center space-x-2 text-red-600 dark:text-red-400">
+                      <span>❌</span>
+                      <span className="text-sm">
+                        {uniquenessResult.nameError}
+                      </span>
+                    </div>
+                  )}
+                  {uniquenessResult.imageError && (
+                    <div className="flex items-center space-x-2 text-red-600 dark:text-red-400">
+                      <span>❌</span>
+                      <span className="text-sm">
+                        {uniquenessResult.imageError}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {uniquenessResult.isNameUnique === true &&
+                uniquenessResult.isImageUnique === true &&
+                nftData.name.trim() &&
+                nftData.image && (
+                  <div className="mt-4 flex items-center space-x-2 text-green-600 dark:text-green-400">
+                    <span>✅</span>
+                    <span className="text-sm">NFT is unique!</span>
+                  </div>
+                )}
             </div>
 
             {/* Action Buttons */}

@@ -17,6 +17,7 @@ import { useDutchPrice } from "@/hooks/useDutchPrice";
 import { useAuctionHandler } from "@/hooks/useAuctionHandler";
 import { useSealedBidAuction } from "@/hooks/useSealedBidAuction";
 import DutchAuctionSuccessModal from "./DutchAuctionSuccessModal";
+import { AuctionRefundStatus } from "./AuctionRefundStatus";
 import { formatEther, parseEther } from "viem";
 import { ethers } from "ethers";
 import toast from "react-hot-toast";
@@ -56,8 +57,10 @@ export default function AuctionModal({
   const [isRefreshingAuction, setIsRefreshingAuction] = useState(false);
   const [lastBidAmount, setLastBidAmount] = useState<string | null>(null);
 
-  // Sealed bid state
-  const [sealedBidAmount, setSealedBidAmount] = useState("");
+  // Sealed bid state - initialize with start price
+  const [sealedBidAmount, setSealedBidAmount] = useState(
+    auction.startPrice || "0.001"
+  );
 
   // Hooks for auction interactions
   const { placeBid } = usePlaceBid();
@@ -422,8 +425,7 @@ export default function AuctionModal({
           {/* Transaction in progress overlay */}
           {isLocked && (
             <div className="absolute top-0 left-0 right-0 bg-blue-600 text-white px-4 py-2 text-center text-sm font-medium z-10">
-              🔒 Transaction in progress - Modal locked to prevent accidental
-              closure
+              🔒 Transaction in progress
             </div>
           )}
           {/* Header */}
@@ -702,18 +704,32 @@ export default function AuctionModal({
                           <>
                             <div>
                               <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Bid (ETH)
+                                Bid (ETH) - Minimum: {auction.startPrice} ETH
                               </label>
                               <input
                                 type="number"
                                 step="0.0001"
-                                placeholder="0.0000"
+                                placeholder={auction.startPrice}
                                 value={sealedBidAmount}
                                 onChange={(e) =>
                                   setSealedBidAmount(e.target.value)
                                 }
-                                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-moove-primary focus:border-moove-primary"
+                                className={`w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-moove-primary focus:border-moove-primary ${
+                                  sealedBidAmount &&
+                                  parseFloat(sealedBidAmount) <
+                                    parseFloat(auction.startPrice)
+                                    ? "border-red-300 bg-red-50"
+                                    : "border-gray-300"
+                                }`}
                               />
+                              {sealedBidAmount &&
+                                parseFloat(sealedBidAmount) <
+                                  parseFloat(auction.startPrice) && (
+                                  <p className="text-red-600 text-sm mt-1">
+                                    ❌ Bid must be at least {auction.startPrice}{" "}
+                                    ETH
+                                  </p>
+                                )}
                             </div>
                             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                               <div className="text-sm text-blue-800">
@@ -727,7 +743,9 @@ export default function AuctionModal({
                               disabled={
                                 !isConnected ||
                                 isSubmittingBid ||
-                                !sealedBidAmount
+                                !sealedBidAmount ||
+                                parseFloat(sealedBidAmount) <
+                                  parseFloat(auction.startPrice)
                               }
                               className="w-full"
                               size="lg"
@@ -743,7 +761,7 @@ export default function AuctionModal({
 
                   {auction.auctionType === AuctionType.SEALED_BID &&
                     (auction.status as AuctionStatus) ===
-                      AuctionStatus.PENDING && (
+                      AuctionStatus.REVEAL && (
                       <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                         <div className="text-yellow-800 font-medium mb-2">
                           🔓 Reveal phase active
@@ -1002,6 +1020,12 @@ export default function AuctionModal({
                   <span className="font-medium text-gray-700">{timeLeft}</span>
                 </div>
               </div>
+
+              {/* Refund Status - Only show for ended auctions */}
+              <AuctionRefundStatus
+                auctionId={parseInt(auction.auctionId)}
+                auctionStatus={auction.status.toString()}
+              />
             </div>
           </div>
         </div>

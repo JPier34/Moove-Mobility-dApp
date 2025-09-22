@@ -7,8 +7,11 @@ import UnifiedNotificationBadge from "@/components/notifications/UnifiedNotifica
 import AuctionNotificationsDebug from "@/components/debug/AuctionNotificationsDebug";
 import AuctionConfirmationModal from "@/components/notifications/AuctionConfirmationModal";
 import AuctionResultModal from "@/components/notifications/AuctionResultModal";
+import { useSealedBidAutoMonitor } from "@/hooks/useSealedBidStatusManager";
 import { useAccount } from "wagmi";
 import { WonAuction } from "@/hooks/useWonAuctionsForClaim";
+import { ethers } from "ethers";
+import toast from "react-hot-toast";
 
 // ============= CONTEXT =============
 
@@ -34,6 +37,12 @@ interface AuctionNotificationsContextType {
   showResultModal: boolean;
   selectedAuction: WonAuction | null;
   transactionResult: TransactionResult | null;
+  // Sealed bid monitoring
+  addToSealedBidMonitoring: (auctionId: number) => void;
+  removeFromSealedBidMonitoring: (auctionId: number) => void;
+  monitoredSealedBidAuctions: number[];
+  isMonitoringSealedBids: boolean;
+  sealedBidError: string | null;
 }
 
 const AuctionNotificationsContext =
@@ -66,6 +75,15 @@ export function AuctionNotificationsProvider({
     handleCloseCongratulationsModal,
   } = useWonAuctionsManager();
 
+  // Sealed bid auto-monitoring
+  const {
+    addToMonitoring,
+    removeFromMonitoring,
+    monitoredAuctions,
+    isProcessing: isMonitoringSealedBids,
+    error: sealedBidError,
+  } = useSealedBidAutoMonitor();
+
   // Simple transaction tracking
   const [transactionHash, setTransactionHash] = useState<string | null>(null);
   const [isWaitingForConfirmation, setIsWaitingForConfirmation] =
@@ -94,6 +112,275 @@ export function AuctionNotificationsProvider({
       );
     }
   }, [isConnected, address, unsettledAuctions.length, providerId]);
+
+  // Debug sealed bid monitoring status
+  useEffect(() => {
+    console.log(`📡 [${providerId}] Sealed bid monitoring status:`, {
+      monitoredAuctions: Array.from(monitoredAuctions),
+      isMonitoringSealedBids,
+      sealedBidError,
+      providerId,
+    });
+  }, [monitoredAuctions, isMonitoringSealedBids, sealedBidError, providerId]);
+
+  // Auto-monitor all sealed bid auctions in REVEAL phase
+  useEffect(() => {
+    const checkForSealedBidsInReveal = async () => {
+      console.log(`🚀 [${providerId}] Starting sealed bid check:`, {
+        isConnected,
+        address,
+        isMonitoringSealedBids,
+        timestamp: new Date().toISOString(),
+      });
+
+      if (!isConnected || !address) {
+        console.log(`⏭️ [${providerId}] Skipping check - wallet not connected`);
+        return;
+      }
+
+      // Prevent multiple simultaneous checks
+      if (isMonitoringSealedBids) {
+        console.log(`⏸️ [${providerId}] Skipping check - already monitoring`);
+        return;
+      }
+
+      try {
+        // Get all auctions and find sealed bid auctions in REVEAL
+        const { CONTRACT_ADDRESSES, CONTRACT_ABIS } = await import(
+          "@/lib/contracts"
+        );
+        const provider = new ethers.BrowserProvider(window.ethereum as any);
+        const auctionContract = new ethers.Contract(
+          CONTRACT_ADDRESSES.MooveAuction,
+          CONTRACT_ABIS.MooveAuction,
+          provider
+        );
+
+        // Check recent auctions dynamically (start from a reasonable range)
+        const sealedBidsInReveal = [];
+        let auctionId = 1;
+        let consecutiveNotFound = 0;
+        const maxConsecutiveNotFound = 5; // Stop after 5 consecutive not found
+
+        while (consecutiveNotFound < maxConsecutiveNotFound) {
+          try {
+            const auctionData = await auctionContract.getAuction(auctionId);
+            const auctionStatus = Number(auctionData.status);
+            const auctionType = Number(auctionData.auctionType);
+            const auctionEndTime = Number(auctionData.endTime);
+            const currentTime = Math.floor(Date.now() / 1000);
+
+            // Reset consecutive not found counter
+            consecutiveNotFound = 0;
+
+            // Log ALL auctions to see what we're dealing with
+            console.log(`🔍 [${providerId}] Checking auction #${auctionId}:`, {
+              auctionId,
+              status: auctionStatus,
+              type: auctionType,
+              endTime: new Date(auctionEndTime * 1000).toISOString(),
+              currentTime: new Date().toISOString(),
+              timeExpired: Math.floor(Date.now() / 1000) >= auctionEndTime,
+              isSealedBid: auctionType === 2,
+              isInReveal: auctionStatus === 2,
+              isActive: auctionStatus === 1,
+              isEnded: auctionStatus === 3,
+            });
+
+            // Log detailed info for sealed bid auctions
+            if (auctionType === 2) {
+              console.log(
+                `🔍 [${providerId}] SEALED BID auction #${auctionId} found:`,
+                {
+                  auctionId,
+                  status: auctionStatus,
+                  type: auctionType,
+                  endTime: new Date(auctionEndTime * 1000).toISOString(),
+                  isSealedBid: auctionType === 2,
+                  isInReveal: auctionStatus === 2,
+                  currentTime: new Date().toISOString(),
+                  timeExpired: Math.floor(Date.now() / 1000) >= auctionEndTime,
+                }
+              );
+            }
+
+            // Check for sealed bid auctions that need processing
+            if (auctionType === 2) {
+              const timeExpired =
+                Math.floor(Date.now() / 1000) >= auctionEndTime;
+
+              console.log(
+                `🔍 [${providerId}] Evaluating sealed bid auction #${auctionId} for processing:`,
+                {
+                  auctionId,
+                  auctionStatus,
+                  timeExpired,
+                  endTime: new Date(auctionEndTime * 1000).toISOString(),
+                  currentTime: new Date().toISOString(),
+                  shouldProcess:
+                    auctionStatus === 2 || (auctionStatus === 1 && timeExpired),
+                  reason:
+                    auctionStatus === 2
+                      ? "REVEAL phase"
+                      : auctionStatus === 1 && timeExpired
+                      ? "ACTIVE but expired"
+                      : "No processing needed",
+                }
+              );
+
+              if (auctionStatus === 2 || (auctionStatus === 1 && timeExpired)) {
+                // SEALED_BID in REVEAL phase OR ACTIVE but time expired
+                sealedBidsInReveal.push(auctionId);
+                console.log(
+                  `✅ [${providerId}] ADDING sealed bid auction #${auctionId} to monitoring:`,
+                  {
+                    contractStatus: auctionStatus,
+                    timeExpired,
+                    endTime: new Date(auctionEndTime * 1000).toISOString(),
+                    reason:
+                      auctionStatus === 2
+                        ? "REVEAL phase"
+                        : "ACTIVE but expired",
+                  }
+                );
+                addToMonitoring(auctionId);
+              } else {
+                console.log(
+                  `⏭️ [${providerId}] SKIPPING sealed bid auction #${auctionId}:`,
+                  {
+                    auctionId,
+                    auctionStatus,
+                    timeExpired,
+                    reason: "Not in REVEAL phase and not expired",
+                  }
+                );
+              }
+            }
+          } catch (error) {
+            // Auction doesn't exist - increment counter
+            consecutiveNotFound++;
+            console.log(
+              `ℹ️ [${providerId}] Auction #${auctionId} not found (${consecutiveNotFound}/${maxConsecutiveNotFound})`
+            );
+          }
+
+          auctionId++;
+        }
+
+        console.log(
+          `📊 [${providerId}] FINAL RESULT - Found ${sealedBidsInReveal.length} sealed bid auctions needing processing:`,
+          {
+            sealedBidsInReveal,
+            totalChecked: auctionId - 1,
+            consecutiveNotFound,
+            timestamp: new Date().toISOString(),
+          }
+        );
+      } catch (error) {
+        console.error(
+          `❌ [${providerId}] Error checking for sealed bids in REVEAL:`,
+          error
+        );
+      }
+    };
+
+    // Check only once per session to avoid MetaMask spam
+    const sessionKey = `sealed_bid_check_${providerId}`;
+    const hasCheckedThisSession = sessionStorage.getItem(sessionKey);
+
+    console.log(`🔍 [${providerId}] Session check:`, {
+      sessionKey,
+      hasCheckedThisSession,
+      willRun: !hasCheckedThisSession,
+      timestamp: new Date().toISOString(),
+    });
+
+    // TEMPORARY: Force check every time for debugging
+    console.log(`🚀 [${providerId}] FORCING sealed bid check for debugging`);
+    checkForSealedBidsInReveal();
+
+    // Comment out session storage for debugging
+    // if (!hasCheckedThisSession) {
+    //   console.log(
+    //     `🚀 [${providerId}] Running sealed bid check for first time this session`
+    //   );
+    //   checkForSealedBidsInReveal();
+    //   sessionStorage.setItem(sessionKey, "true");
+    // } else {
+    //   console.log(
+    //     `⏭️ [${providerId}] Skipping sealed bid check - already done this session`
+    //   );
+    // }
+
+    // Check every 30 seconds for new sealed bid auctions
+    // DISABLED: Causing too many MetaMask requests
+    // const periodicCheck = setInterval(() => {
+    //   checkForSealedBidsInReveal();
+    // }, 30000);
+
+    return () => {
+      // No cleanup needed since we removed periodic checks
+    };
+  }, [isConnected, address, providerId, addToMonitoring]);
+
+  // Listen for sealed bid winner events
+  useEffect(() => {
+    const handleSealedBidWinner = (event: CustomEvent) => {
+      const { auctionId, winningBid, winner } = event.detail;
+
+      console.log(`🏆 [${providerId}] Sealed bid winner event received:`, {
+        auctionId,
+        winningBid,
+        winner,
+        currentUser: address,
+      });
+
+      // Only show notification if it's for the current user
+      if (winner.toLowerCase() === address?.toLowerCase()) {
+        console.log(
+          `🎉 [${providerId}] Current user won sealed bid auction ${auctionId}!`
+        );
+
+        // Trigger the congratulations modal
+        // The useWonAuctionsManager should automatically detect this
+        // and show the congratulations modal
+      }
+    };
+
+    const handleSealedBidFailed = (event: CustomEvent) => {
+      const { auctionId, reason } = event.detail;
+
+      console.log(`❌ [${providerId}] Sealed bid failed event received:`, {
+        auctionId,
+        reason,
+        currentUser: address,
+      });
+
+      // Show notification for failed auction
+      toast.error(`Auction #${auctionId} failed: ${reason}`);
+    };
+
+    window.addEventListener(
+      "sealedBidWinner",
+      handleSealedBidWinner as EventListener
+    );
+
+    window.addEventListener(
+      "sealedBidFailed",
+      handleSealedBidFailed as EventListener
+    );
+
+    return () => {
+      window.removeEventListener(
+        "sealedBidWinner",
+        handleSealedBidWinner as EventListener
+      );
+      window.removeEventListener(
+        "sealedBidFailed",
+        handleSealedBidFailed as EventListener
+      );
+    };
+  }, [address, providerId]);
 
   // Gestisci la chiusura del modal
   const handleCloseModal = () => {
@@ -239,6 +526,12 @@ export function AuctionNotificationsProvider({
     showResultModal,
     selectedAuction,
     transactionResult,
+    // Sealed bid monitoring
+    addToSealedBidMonitoring: addToMonitoring,
+    removeFromSealedBidMonitoring: removeFromMonitoring,
+    monitoredSealedBidAuctions: monitoredAuctions,
+    isMonitoringSealedBids,
+    sealedBidError,
   };
 
   return (

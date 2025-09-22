@@ -62,11 +62,11 @@ export function useSealedBidAuction(): SealedBidAuctionHandler {
 
       try {
         // Validate bid amount against minimum price
-        if (minimumPrice) {
-          const validation = validateSealedBidAmount(bidAmount, minimumPrice);
-          if (!validation.isValid) {
-            throw new Error(validation.error);
-          }
+        // Always validate - use minimumPrice if provided, otherwise use 0.001 ETH as default
+        const validationPrice = minimumPrice || "0.001";
+        const validation = validateSealedBidAmount(bidAmount, validationPrice);
+        if (!validation.isValid) {
+          throw new Error(validation.error);
         }
 
         // Generate nonce automatically
@@ -95,9 +95,34 @@ export function useSealedBidAuction(): SealedBidAuctionHandler {
           bidder: address,
         });
 
-        // TODO: Implement actual contract call when available
-        // For now, simulate the transaction
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+        // Implement actual contract call
+        if (!window.ethereum) {
+          throw new Error("Ethereum provider not available");
+        }
+
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const signer = await provider.getSigner();
+
+        // Import contract addresses and ABIs
+        const { CONTRACT_ADDRESSES, CONTRACT_ABIS } = await import(
+          "@/lib/contracts"
+        );
+
+        const auctionContract = new ethers.Contract(
+          CONTRACT_ADDRESSES.MooveAuction,
+          CONTRACT_ABIS.MooveAuction,
+          signer
+        );
+
+        // Call submitSealedBid function with ETH value
+        // The contract expects ETH to be sent with the transaction for validation
+        const tx = await auctionContract.submitSealedBid(auctionId, bidHash, {
+          value: bidAmountWei, // Send ETH with the transaction
+        });
+        console.log(`📝 Submit sealed bid transaction submitted: ${tx.hash}`);
+
+        await tx.wait();
+        console.log(`✅ Sealed bid submitted successfully: ${tx.hash}`);
 
         // Save bid data for reveal phase
         saveSealedBidData(
@@ -200,9 +225,41 @@ export function useSealedBidAuction(): SealedBidAuctionHandler {
           bidder: address,
         });
 
-        // TODO: Implement actual contract call when available
-        // For now, simulate the transaction
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+        // Implement actual contract call
+        if (!window.ethereum) {
+          throw new Error("Ethereum provider not available");
+        }
+
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const signer = await provider.getSigner();
+
+        // Import contract addresses and ABIs
+        const { CONTRACT_ADDRESSES, CONTRACT_ABIS } = await import(
+          "@/lib/contracts"
+        );
+
+        const auctionContract = new ethers.Contract(
+          CONTRACT_ADDRESSES.MooveAuction,
+          CONTRACT_ABIS.MooveAuction,
+          signer
+        );
+
+        // Call revealSealedBid function
+        const tx = await auctionContract.revealSealedBid(
+          auctionId,
+          bidAmountWei,
+          nonceBigInt
+        );
+        console.log(`📝 Reveal sealed bid transaction submitted: ${tx.hash}`);
+
+        await tx.wait();
+        console.log(`✅ Sealed bid revealed successfully: ${tx.hash}`);
+
+        // Update bid status in localStorage
+        const { updateSealedBidStatus } = await import(
+          "@/utils/sealedBidUtils"
+        );
+        updateSealedBidStatus(auctionId.toString(), address, "revealed");
 
         console.log("✅ Sealed bid revealed successfully");
         setStep("success");

@@ -241,8 +241,8 @@ export function useWonAuctionsManager() {
           `🔍 Auction ${auctionId} is in REVEAL phase. Checking auction type...`
         );
 
-        // Check if this is a sealed bid auction (auctionType === 1)
-        if (contractStatus.auctionType === 1) {
+        // Check if this is a sealed bid auction (auctionType === 2)
+        if (contractStatus.auctionType === 2) {
           console.log(
             `🔍 Sealed bid auction detected. Starting reveal phase...`
           );

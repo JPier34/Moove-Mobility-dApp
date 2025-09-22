@@ -551,6 +551,118 @@ export function NFTTransferNotificationsProvider({
     return () => clearTimeout(timeoutId);
   }, [address, state.notifications]);
 
+  // Automatic NFT transfer detection
+  useEffect(() => {
+    if (!isConnected || !address) return;
+
+    let lastCheckedBlock: number | null = null;
+    let intervalId: NodeJS.Timeout | null = null;
+
+    const checkForNewTransfers = async () => {
+      try {
+        if (!window.ethereum) return;
+
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const nftContract = new ethers.Contract(
+          CONTRACT_ADDRESSES.MooveNFT,
+          CONTRACT_ABIS.MooveNFT,
+          provider
+        );
+
+        // Get current block number
+        const currentBlock = await provider.getBlockNumber();
+
+        // If this is the first check, start from current block
+        if (lastCheckedBlock === null) {
+          lastCheckedBlock = currentBlock - 10; // Check last 10 blocks
+        }
+
+        console.log(
+          `🔍 Checking for NFT transfers from block ${lastCheckedBlock} to ${currentBlock}`
+        );
+
+        // Create filter for Transfer events TO the current user
+        const filter = nftContract.filters.Transfer(null, address, null);
+
+        // Query events from last checked block to current block
+        const events = await nftContract.queryFilter(
+          filter,
+          lastCheckedBlock + 1,
+          currentBlock
+        );
+
+        console.log(`📜 Found ${events.length} transfer events to ${address}`);
+
+        for (const event of events) {
+          try {
+            const { from, to, tokenId } = event.args;
+            const transactionHash = event.transactionHash;
+
+            console.log(`🎁 Processing transfer event:`, {
+              from,
+              to,
+              tokenId: tokenId.toString(),
+              transactionHash,
+            });
+
+            // Get NFT metadata to get the name
+            let tokenName = `NFT #${tokenId}`;
+            try {
+              const tokenURI = await nftContract.tokenURI(tokenId);
+              if (tokenURI) {
+                // Try to fetch metadata
+                const response = await fetch(
+                  `/api/ipfs-proxy?hash=${encodeURIComponent(tokenURI)}`
+                );
+                if (response.ok) {
+                  const metadata = await response.json();
+                  tokenName = metadata.name || tokenName;
+                }
+              }
+            } catch (metadataError) {
+              console.warn(
+                `⚠️ Could not fetch metadata for NFT #${tokenId}:`,
+                metadataError
+              );
+            }
+
+            // Create notification for received NFT
+            addNotification({
+              type: "received",
+              tokenId: tokenId.toString(),
+              tokenName,
+              transactionHash,
+              senderAddress: from,
+            });
+
+            console.log(
+              `✅ Created notification for NFT #${tokenId} (${tokenName})`
+            );
+          } catch (eventError) {
+            console.error(`❌ Error processing transfer event:`, eventError);
+          }
+        }
+
+        // Update last checked block
+        lastCheckedBlock = currentBlock;
+      } catch (error) {
+        console.error("❌ Error checking for NFT transfers:", error);
+      }
+    };
+
+    // Initial check
+    checkForNewTransfers();
+
+    // Set up periodic checking every 30 seconds
+    intervalId = setInterval(checkForNewTransfers, 30000);
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [isConnected, address, addNotification]);
+
   // Reset state when user disconnects
   useEffect(() => {
     if (!isConnected) {

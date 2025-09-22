@@ -22,36 +22,6 @@ import { nftEvents, NFTTransferEvent } from "@/utils/nftEvents";
 import { WonAuction } from "@/types/user";
 import { useNFTTransferNotifications } from "@/providers/NFTTransferNotificationsProvider";
 
-// ============= TEST COMPONENT =============
-function TestNotificationButton() {
-  const { testReceivedNotification, createReceivedNotification } =
-    useNFTTransferNotifications();
-
-  return (
-    <div className="text-center mb-8 space-x-4">
-      <button
-        onClick={testReceivedNotification}
-        className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
-      >
-        Test Received Notification
-      </button>
-      <button
-        onClick={() =>
-          createReceivedNotification(
-            "36",
-            "Ragdoll",
-            "0x2425504422239c4e407fe37d367c290ea1858f4fa536956f2b176ce56439f8b5",
-            "0xa70e3fA6D66Ec3aa94de67C10c5Ddbeea9bF44A6"
-          )
-        }
-        className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
-      >
-        Test NFT #36 Notification
-      </button>
-    </div>
-  );
-}
-
 // ============= TYPES =============
 interface DecorativeNFT {
   id: string;
@@ -936,7 +906,6 @@ export default function MyCollection() {
         </motion.div>
 
         {/* Test Notification Button - Temporary */}
-        <TestNotificationButton />
 
         {/* Won Auctions Section */}
         {userNFTsLoading || isLoadingAuctions || isLoadingHistories ? (

@@ -625,12 +625,33 @@ async function buildAuctionWithCompleteData(
       );
     }
 
-    // If auction is ACTIVE but endTime has passed, mark it as ENDED
+    // Handle status transitions based on auction type and time
     if (status === 1 && currentTime >= endTime) {
-      status = 3; // ENDED (changed from 2 to 3)
-      console.log(
-        `🕐 [Auction ${auctionId}] Auto-correcting status: ACTIVE -> ENDED (time expired)`
-      );
+      if (auctionType === 2) {
+        // For SEALED_BID auctions, transition to REVEAL phase first
+        status = 2; // REVEAL
+        console.log(
+          `🔓 [Auction ${auctionId}] Auto-correcting status: ACTIVE -> REVEAL (sealed bid phase)`
+        );
+      } else {
+        // For other auction types, go directly to ENDED
+        status = 3; // ENDED
+        console.log(
+          `🕐 [Auction ${auctionId}] Auto-correcting status: ACTIVE -> ENDED (time expired)`
+        );
+      }
+    }
+
+    // For SEALED_BID auctions, check if REVEAL phase should end
+    if (status === 2 && auctionType === 2) {
+      // Check if reveal phase has ended (typically 24 hours after commit phase)
+      const revealEndTime = endTime + 24 * 60 * 60; // 24 hours after commit phase ends
+      if (currentTime >= revealEndTime) {
+        status = 3; // ENDED
+        console.log(
+          `🏁 [Auction ${auctionId}] Auto-correcting status: REVEAL -> ENDED (reveal phase expired)`
+        );
+      }
     }
 
     console.log(`🏗️ [Auction ${auctionId}] Using corrected status:`, {
