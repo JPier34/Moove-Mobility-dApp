@@ -191,7 +191,7 @@ export default function Header() {
               {resolvedTheme === "dark" ? "☀️" : "🌙"}
             </button>
 
-            {/* Wallet Status Debug */}
+            {/* 
             {process.env.NODE_ENV === "development" && (
               <div className="mr-4 text-xs space-y-1">
                 <div
@@ -211,7 +211,7 @@ export default function Header() {
                   </div>
                 )}
               </div>
-            )}
+            )} */}
 
             {/* Custom Connect Button for Wagmi v2 */}
             <ConnectButton.Custom>

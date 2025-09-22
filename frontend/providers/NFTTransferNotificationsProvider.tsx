@@ -11,7 +11,9 @@ import { useAccount } from "wagmi";
 import { toast } from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle, XCircle, Gift, ArrowRight } from "lucide-react";
-import NFTReceivedNotification from "@/components/notifications/NFTReceivedNotification";
+import { ethers } from "ethers";
+import { CONTRACT_ADDRESSES, CONTRACT_ABIS } from "../lib/contracts";
+// import NFTReceivedNotification from "@/components/notifications/NFTReceivedNotification";
 import TransferStatusIndicator from "@/components/TransferStatusIndicator";
 import TransferConfirmationHandler from "@/components/TransferConfirmationHandler";
 
@@ -69,6 +71,15 @@ interface NFTTransferContextType extends NFTTransferState {
   closeTransferConfirmation: () => void;
   closeTransferSuccess: () => void;
   closeReceivedNotification: () => void;
+
+  // Test function
+  testReceivedNotification: () => void;
+  createReceivedNotification: (
+    tokenId: string,
+    tokenName: string,
+    transactionHash: string,
+    senderAddress: string
+  ) => void;
 }
 
 // ============= CONTEXT =============
@@ -139,17 +150,20 @@ export function NFTTransferNotificationsProvider({
   };
 
   const completeTransfer = (transactionHash: string) => {
-    if (!state.transferTokenId || !state.transferRecipient) return;
+    if (!state.transferTokenId || !state.transferRecipient) {
+      console.log(
+        "❌ completeTransfer: Missing transferTokenId or transferRecipient"
+      );
+      return;
+    }
 
-    // Add sent notification
-    addNotification({
-      type: "sent",
-      tokenId: state.transferTokenId,
-      tokenName: `NFT #${state.transferTokenId}`, // Will be updated with real name
+    console.log("🎉 completeTransfer: Setting showTransferSuccess to true", {
+      transferTokenId: state.transferTokenId,
+      transferRecipient: state.transferRecipient,
       transactionHash,
-      recipientAddress: state.transferRecipient,
     });
 
+    // NO NOTIFICATION FOR SENDER - Only show success toast
     setState((prev) => ({
       ...prev,
       isTransferring: false,
@@ -159,12 +173,29 @@ export function NFTTransferNotificationsProvider({
       showTransferSuccess: true,
     }));
 
-    // Show success toast
+    // Show success toast (only for sender)
     toast.success("NFT transferred successfully!", {
-      duration: 5000,
+      duration: 3000,
     });
 
-    // Emit event for other components
+    // Emit event for recipient notification
+    const transferEvent = new CustomEvent("nftTransfer", {
+      detail: {
+        tokenId: state.transferTokenId,
+        from: address, // Current user (sender)
+        to: state.transferRecipient, // Recipient
+        transactionHash,
+      },
+    });
+
+    console.log(
+      "📡 Emitting nftTransfer event for recipient:",
+      transferEvent.detail
+    );
+    console.log("📡 Event will be received by:", state.transferRecipient);
+    window.dispatchEvent(transferEvent);
+
+    // Also emit the sent event for other components
     window.dispatchEvent(
       new CustomEvent("nftTransferSent", {
         detail: {
@@ -199,6 +230,21 @@ export function NFTTransferNotificationsProvider({
   const addNotification = (
     notification: Omit<NFTTransferNotification, "id" | "timestamp" | "isRead">
   ) => {
+    // Prevent duplicate notifications for the same NFT and transaction
+    const existingNotification = state.notifications.find(
+      (n) =>
+        n.tokenId === notification.tokenId &&
+        n.type === notification.type &&
+        n.transactionHash === notification.transactionHash
+    );
+
+    if (existingNotification) {
+      console.log(
+        `⏭️ Notification already exists for NFT #${notification.tokenId} with tx ${notification.transactionHash}, skipping`
+      );
+      return;
+    }
+
     const newNotification: NFTTransferNotification = {
       ...notification,
       id: `nft-transfer-${Date.now()}-${Math.random()
@@ -210,16 +256,22 @@ export function NFTTransferNotificationsProvider({
 
     setState((prev) => ({
       ...prev,
-      notifications: [newNotification, ...prev.notifications],
-      unreadCount: prev.unreadCount + 1,
+      notifications: [newNotification, ...prev.notifications.slice(0, 99)], // Limit to 100 notifications
+      unreadCount: Math.min(prev.unreadCount + 1, 100), // Cap unread count
     }));
 
     // Show received notification modal if it's a received NFT
     if (notification.type === "received") {
+      console.log(
+        "🎁 Setting showReceivedNotification to true for NFT:",
+        notification.tokenId
+      );
+      console.log("🎁 Current notifications:", state.notifications);
       setState((prev) => ({
         ...prev,
         showReceivedNotification: true,
       }));
+      console.log("🎁 showReceivedNotification set to true");
     }
   };
 
@@ -266,6 +318,13 @@ export function NFTTransferNotificationsProvider({
       transferRecipient: null,
       transferTransactionHash: null,
     }));
+
+    // Reload page after user closes the success modal
+    // This ensures the collection is updated and the transferred NFT is removed
+    console.log("🔄 Reloading page after NFT transfer success modal closed");
+    setTimeout(() => {
+      window.location.reload();
+    }, 500); // Small delay to ensure modal closes smoothly
   };
 
   const closeReceivedNotification = () => {
@@ -275,9 +334,48 @@ export function NFTTransferNotificationsProvider({
     }));
   };
 
+  // Test function to manually trigger a received notification
+  const testReceivedNotification = () => {
+    console.log("🧪 Testing received notification");
+    console.log("🧪 Current state before adding notification:", {
+      showReceivedNotification: state.showReceivedNotification,
+      notificationsCount: state.notifications.length,
+    });
+
+    addNotification({
+      type: "received",
+      tokenId: "999",
+      tokenName: "Test NFT #999",
+      transactionHash: "0x1234567890abcdef",
+      senderAddress: "0x1234567890123456789012345678901234567890",
+    });
+
+    console.log("🧪 State after adding notification:", {
+      showReceivedNotification: state.showReceivedNotification,
+      notificationsCount: state.notifications.length,
+    });
+  };
+
+  const createReceivedNotification = (
+    tokenId: string,
+    tokenName: string,
+    transactionHash: string,
+    senderAddress: string
+  ) => {
+    console.log("🎁 Creating received notification for NFT:", tokenId);
+
+    addNotification({
+      type: "received",
+      tokenId,
+      tokenName,
+      transactionHash,
+      senderAddress,
+    });
+  };
+
   // ============= EVENT LISTENERS =============
 
-  // Listener per eventi di trasferimento NFT
+  // Listener per eventi di trasferimento NFT (SOLO per destinatari)
   useEffect(() => {
     if (!address) return;
 
@@ -290,9 +388,10 @@ export function NFTTransferNotificationsProvider({
         to,
         transactionHash,
         currentUser: address,
+        isRecipient: to.toLowerCase() === address.toLowerCase(),
       });
 
-      // Se l'NFT è stato trasferito al current user
+      // SOLO se l'NFT è stato trasferito AL current user (destinatario)
       if (to.toLowerCase() === address.toLowerCase()) {
         console.log(`🎉 NFT ${tokenId} received by current user`);
 
@@ -316,9 +415,10 @@ export function NFTTransferNotificationsProvider({
           })
         );
       }
+      // NO ACTION for sender - they don't need notifications
     };
 
-    // Aggiungi listener
+    // Aggiungi listener per eventi custom
     window.addEventListener("nftTransfer", handleNFTTransfer as EventListener);
 
     // Cleanup
@@ -329,6 +429,127 @@ export function NFTTransferNotificationsProvider({
       );
     };
   }, [address, addNotification]);
+
+  // Listener per eventi blockchain (per destinatari che si connettono dopo)
+  useEffect(() => {
+    if (!address || !window.ethereum) return;
+
+    let contract: ethers.Contract | null = null;
+
+    const setupBlockchainListener = async () => {
+      try {
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        contract = new ethers.Contract(
+          CONTRACT_ADDRESSES.MooveNFT,
+          CONTRACT_ABIS.MooveNFT,
+          provider
+        );
+
+        // Listener per eventi Transfer del contratto
+        const handleTransferEvent = (
+          from: string,
+          to: string,
+          tokenId: bigint,
+          event: any
+        ) => {
+          console.log(`🔗 Blockchain Transfer event received:`, {
+            from,
+            to,
+            tokenId: tokenId.toString(),
+            transactionHash: event.transactionHash,
+            currentUser: address,
+            isRecipient: to.toLowerCase() === address.toLowerCase(),
+          });
+
+          // SOLO se l'NFT è stato trasferito AL current user (destinatario)
+          if (to.toLowerCase() === address.toLowerCase()) {
+            console.log(`🎉 NFT ${tokenId} received via blockchain event`);
+
+            // Aggiungi notifica di ricevuta
+            addNotification({
+              type: "received",
+              tokenId: tokenId.toString(),
+              tokenName: `NFT #${tokenId}`,
+              transactionHash: event.transactionHash,
+              senderAddress: from,
+            });
+
+            // Emetti evento per notificare altri componenti
+            window.dispatchEvent(
+              new CustomEvent("nftTransferReceived", {
+                detail: {
+                  tokenId: tokenId.toString(),
+                  sender: from,
+                  transactionHash: event.transactionHash,
+                },
+              })
+            );
+          }
+        };
+
+        // Filtro per eventi Transfer verso l'utente corrente
+        const filter = contract.filters.Transfer(null, address, null);
+        contract.on(filter, handleTransferEvent);
+
+        console.log(
+          `🔗 Blockchain NFT transfer listener active for address: ${address}`
+        );
+      } catch (error) {
+        console.error("❌ Failed to setup blockchain listener:", error);
+      }
+    };
+
+    setupBlockchainListener();
+
+    // Cleanup
+    return () => {
+      if (contract) {
+        contract.removeAllListeners();
+        console.log(`🔗 Blockchain listener removed for address: ${address}`);
+      }
+    };
+  }, [address, addNotification]);
+
+  // Debug: Monitor showReceivedNotification changes
+  useEffect(() => {
+    console.log(
+      "🔍 showReceivedNotification changed:",
+      state.showReceivedNotification
+    );
+    console.log("🔍 Current notifications:", state.notifications);
+  }, [state.showReceivedNotification, state.notifications]);
+
+  // Auto-notify when user receives an NFT (check on page load)
+  useEffect(() => {
+    if (!address) return;
+
+    const checkForReceivedNFTs = async () => {
+      try {
+        console.log("🔍 Checking for received NFTs on page load...");
+
+        // Check if user has any NFTs that might have been received recently
+        // This is a simple check - in a real app you'd want to check recent Transfer events
+        const hasRecentNotifications = state.notifications.some(
+          (n) => n.type === "received" && !n.isRead
+        );
+
+        if (hasRecentNotifications) {
+          console.log("🎁 Found unread received notifications, showing modal");
+          setState((prev) => ({
+            ...prev,
+            showReceivedNotification: true,
+          }));
+        }
+      } catch (error) {
+        console.error("❌ Error checking for received NFTs:", error);
+      }
+    };
+
+    // Check after a short delay to ensure everything is loaded
+    const timeoutId = setTimeout(checkForReceivedNFTs, 2000);
+
+    return () => clearTimeout(timeoutId);
+  }, [address, state.notifications]);
 
   // Reset state when user disconnects
   useEffect(() => {
@@ -365,6 +586,8 @@ export function NFTTransferNotificationsProvider({
     closeTransferConfirmation,
     closeTransferSuccess,
     closeReceivedNotification,
+    testReceivedNotification,
+    createReceivedNotification,
   };
 
   return (
@@ -382,8 +605,8 @@ export function NFTTransferNotificationsProvider({
 
       {/* Notification Badge - Now handled by UnifiedNotificationBadge */}
 
-      {/* NFT Received Notification */}
-      <NFTReceivedNotification />
+      {/* NFT Received Notification - Disabled, using ReceivedNotificationModal instead */}
+      {/* <NFTReceivedNotification /> */}
 
       {/* Transfer Status Indicator */}
       <TransferStatusIndicator />
@@ -507,13 +730,31 @@ function TransferSuccessModal() {
     closeTransferSuccess,
   } = useNFTTransferNotifications();
 
-  if (!showTransferSuccess || !transferTokenId || !transferRecipient)
+  console.log("🔍 TransferSuccessModal debug:", {
+    showTransferSuccess,
+    transferTokenId,
+    transferRecipient,
+    transferTransactionHash,
+  });
+
+  if (!showTransferSuccess || !transferTokenId || !transferRecipient) {
+    console.log("❌ TransferSuccessModal: Not showing - missing data");
     return null;
+  }
+
+  console.log("✅ TransferSuccessModal: Showing modal");
 
   const copyTransactionHash = () => {
     if (transferTransactionHash) {
       navigator.clipboard.writeText(transferTransactionHash);
       toast.success("Transaction hash copied to clipboard!");
+    }
+  };
+
+  const viewOnEtherscan = () => {
+    if (transferTransactionHash) {
+      const etherscanUrl = `https://sepolia.etherscan.io/tx/${transferTransactionHash}`;
+      window.open(etherscanUrl, "_blank");
     }
   };
 
@@ -545,6 +786,9 @@ function TransferSuccessModal() {
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
                 NFT #{transferTokenId} has been transferred successfully.
               </p>
+              <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                The page will refresh automatically to update your collection.
+              </p>
             </div>
 
             <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-6">
@@ -573,12 +817,22 @@ function TransferSuccessModal() {
               )}
             </div>
 
-            <button
-              onClick={closeTransferSuccess}
-              className="w-full px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors"
-            >
-              Close
-            </button>
+            <div className="flex space-x-3">
+              {transferTransactionHash && (
+                <button
+                  onClick={viewOnEtherscan}
+                  className="flex-1 px-4 py-2 text-sm font-medium text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors"
+                >
+                  View on Etherscan
+                </button>
+              )}
+              <button
+                onClick={closeTransferSuccess}
+                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </motion.div>
       </div>
@@ -598,7 +852,24 @@ function ReceivedNotificationModal() {
     (n) => n.type === "received" && !n.isRead
   );
 
-  if (!showReceivedNotification || !latestReceivedNotification) return null;
+  console.log("🔍 ReceivedNotificationModal debug:", {
+    showReceivedNotification,
+    notificationsCount: notifications.length,
+    latestReceivedNotification,
+    hasUnreadReceived: notifications.some(
+      (n) => n.type === "received" && !n.isRead
+    ),
+  });
+
+  if (!showReceivedNotification || !latestReceivedNotification) {
+    console.log("❌ ReceivedNotificationModal: Not showing - missing data");
+    return null;
+  }
+
+  console.log(
+    "✅ ReceivedNotificationModal: Showing modal for NFT:",
+    latestReceivedNotification.tokenId
+  );
 
   const handleClose = () => {
     markAsRead(latestReceivedNotification.id);

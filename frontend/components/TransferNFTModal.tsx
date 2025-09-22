@@ -61,21 +61,13 @@ export default function TransferNFTModal({
         `📧 Notification sent to ${recipientAddress}: You received NFT ${nft.nftId}`
       );
 
-      // Emetti evento per notificare altri componenti
-      nftEvents.emitTransfer(
-        nft.nftId,
-        "current_user", // Il mittente sarà aggiornato dal hook
-        recipientAddress,
-        transferState.transactionHash
-      );
+      // NO EVENT EMISSION HERE - Events are handled by the provider
+      // This prevents duplicate events and recursive calls
 
-      // Refresh forzato della pagina dopo un breve delay
-      setTimeout(() => {
-        console.log(`🔄 Refreshing page after NFT transfer`);
-        onSuccess?.();
-        onClose();
-        window.location.reload();
-      }, 2000);
+      // Close modal and let the success modal handle the reload
+      onSuccess?.();
+      onClose();
+      // NO automatic reload here - handled by success modal
     }
   }, [
     isSuccess,

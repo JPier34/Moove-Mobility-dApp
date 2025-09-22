@@ -205,3 +205,4 @@ Il sistema è progettato per essere facilmente manutenibile:
 - **Testabilità**: Hook e componenti facilmente testabili
 - **Estensibilità**: Facile aggiungere nuove funzionalità
 - **Documentazione**: Codice ben documentato e commentato
+

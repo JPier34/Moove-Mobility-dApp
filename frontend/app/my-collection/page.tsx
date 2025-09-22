@@ -11,6 +11,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useSuperOptimizedNFTCollection } from "@/hooks/useSuperOptimizedNFTCollection";
 import { useWonAuctions } from "@/hooks/useWonAuctions";
+import { useMultipleNFTHistory } from "@/hooks/useNFTHistory";
 import { useAccount } from "wagmi";
 // Removed wallet debug - using Wagmi's built-in persistence
 import { toast } from "react-hot-toast";
@@ -19,6 +20,37 @@ import TransferNFTModalV2 from "@/components/TransferNFTModalV2";
 import CacheStats from "@/components/CacheStats";
 import { nftEvents, NFTTransferEvent } from "@/utils/nftEvents";
 import { WonAuction } from "@/types/user";
+import { useNFTTransferNotifications } from "@/providers/NFTTransferNotificationsProvider";
+
+// ============= TEST COMPONENT =============
+function TestNotificationButton() {
+  const { testReceivedNotification, createReceivedNotification } =
+    useNFTTransferNotifications();
+
+  return (
+    <div className="text-center mb-8 space-x-4">
+      <button
+        onClick={testReceivedNotification}
+        className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+      >
+        Test Received Notification
+      </button>
+      <button
+        onClick={() =>
+          createReceivedNotification(
+            "36",
+            "Ragdoll",
+            "0x2425504422239c4e407fe37d367c290ea1858f4fa536956f2b176ce56439f8b5",
+            "0xa70e3fA6D66Ec3aa94de67C10c5Ddbeea9bF44A6"
+          )
+        }
+        className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+      >
+        Test NFT #36 Notification
+      </button>
+    </div>
+  );
+}
 
 // ============= TYPES =============
 interface DecorativeNFT {
@@ -556,6 +588,14 @@ export default function MyCollection() {
     cacheStats,
   } = useSuperOptimizedNFTCollection();
 
+  // Get NFT history for all user NFTs - MEMOIZED to prevent recursive calls
+  const tokenIds = useMemo(() => {
+    return userNFTCollection?.map((nft) => nft.tokenId) || [];
+  }, [userNFTCollection]);
+
+  const { histories: nftHistories, isLoading: isLoadingHistories } =
+    useMultipleNFTHistory(tokenIds);
+
   const [filters, setFilters] = useState<FilterOptions>({
     rarity: "all",
     category: "all",
@@ -611,66 +651,8 @@ export default function MyCollection() {
     }
   }, [userNFTCollection?.length, userNFTsLoading]);
 
-  // Listener for NFT transfer events
-  useEffect(() => {
-    const handleNFTTransfer = (event: CustomEvent<NFTTransferEvent>) => {
-      const { tokenId, from, to, transactionHash } = event.detail;
-
-      console.log(`📡 Received NFT transfer event:`, {
-        tokenId,
-        from,
-        to,
-        transactionHash,
-        currentUser: address,
-      });
-
-      // If the NFT was transferred from the current user
-      if (from.toLowerCase() === address?.toLowerCase()) {
-        console.log(`🔄 NFT ${tokenId} transferred away from current user`);
-
-        // Show notification
-        toast.success(`NFT ${tokenId} transferred successfully!`, {
-          duration: 3000,
-        });
-
-        // Refresh forced after a short delay to synchronize with blockchain
-        setTimeout(() => {
-          console.log(`🔄 Refreshing collection after NFT transfer`);
-          window.location.reload();
-        }, 1000);
-      }
-
-      // If the NFT was received by the current user
-      if (to.toLowerCase() === address?.toLowerCase()) {
-        console.log(`🎉 NFT ${tokenId} received by current user`);
-
-        // Show notification
-        toast.success(`You received NFT ${tokenId}!`, {
-          duration: 3000,
-        });
-
-        // Refresh forced to show the new NFT
-        setTimeout(() => {
-          console.log(`🔄 Refreshing collection after receiving NFT`);
-          window.location.reload();
-        }, 1000);
-      }
-    };
-
-    // Add listener
-    nftEvents.addEventListener(
-      "nftTransfer",
-      handleNFTTransfer as EventListener
-    );
-
-    // Cleanup
-    return () => {
-      nftEvents.removeEventListener(
-        "nftTransfer",
-        handleNFTTransfer as EventListener
-      );
-    };
-  }, [address]);
+  // NO NFT TRANSFER LISTENERS HERE - Handled by NFTTransferNotificationsProvider
+  // This prevents duplicate event handling and recursive calls
 
   // Handler functions
   const handleViewDetails = useCallback((nft: DecorativeNFT) => {
@@ -732,10 +714,31 @@ export default function MyCollection() {
         (auction) => auction.nftId === nft.tokenId
       );
 
+      // Get NFT history
+      const nftHistory = nftHistories.get(nft.tokenId);
+
       console.log(
         `🔍 DEBUG: NFT #${nft.tokenId} matching auction:`,
         matchingAuction
       );
+      console.log(`🔍 DEBUG: NFT #${nft.tokenId} history:`, nftHistory);
+
+      // Determine purchase date and transaction hash from history
+      let purchaseDate = new Date();
+      let transactionHash = "";
+
+      if (matchingAuction?.endTime) {
+        // NFT won from auction
+        purchaseDate = new Date(matchingAuction.endTime);
+        transactionHash = matchingAuction.transactionHash || "";
+      } else if (nftHistory) {
+        // Use history to determine when NFT was acquired
+        const lastTransfer = nftHistory.history[nftHistory.history.length - 1];
+        if (lastTransfer) {
+          purchaseDate = new Date(lastTransfer.timestamp * 1000);
+          transactionHash = lastTransfer.transactionHash;
+        }
+      }
 
       return {
         id: `nft-${nft.tokenId}`,
@@ -745,11 +748,9 @@ export default function MyCollection() {
         image: nft.image,
         category: nft.category as "sticker" | "avatar" | "badge" | "skin",
         rarity: "common", // Default rarity, can be enhanced later
-        purchaseDate: matchingAuction?.endTime
-          ? new Date(matchingAuction.endTime)
-          : new Date(), // Default to current date if no auction
+        purchaseDate,
         price: matchingAuction?.finalBid || 0.001, // Default price if no auction
-        transactionHash: matchingAuction?.transactionHash || "", // Empty if no auction
+        transactionHash,
         auctionWon: matchingAuction
           ? {
               auctionId: matchingAuction.auctionId,
@@ -759,7 +760,7 @@ export default function MyCollection() {
           : undefined, // No auction info if NFT wasn't won from auction
       };
     });
-  }, [userNFTCollection, allWonAuctions]);
+  }, [userNFTCollection, allWonAuctions, nftHistories]);
 
   // Filter items based on current filters
   const filteredDecorative = useMemo(() => {
@@ -785,7 +786,12 @@ export default function MyCollection() {
   const hasItems = filteredDecorative.length > 0;
 
   // Show loading state
-  if (!isConnected || userNFTsLoading || isLoadingAuctions) {
+  if (
+    !isConnected ||
+    userNFTsLoading ||
+    isLoadingAuctions ||
+    isLoadingHistories
+  ) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-moove-50 dark:from-gray-900 dark:to-gray-800">
         <div className="container mx-auto px-4 py-8">
@@ -929,8 +935,11 @@ export default function MyCollection() {
           </div>
         </motion.div>
 
+        {/* Test Notification Button - Temporary */}
+        <TestNotificationButton />
+
         {/* Won Auctions Section */}
-        {userNFTsLoading || isLoadingAuctions ? (
+        {userNFTsLoading || isLoadingAuctions || isLoadingHistories ? (
           <motion.div
             className="mb-8"
             initial={{ opacity: 0, y: 20 }}

@@ -3,9 +3,9 @@ import SimplifiedAppProvider from "../providers/SimplifiedAppProvider";
 import Header from "../components/layout/Header";
 import Footer from "../components/layout/Footer";
 import RouteLoadingWrapper from "@/components/layout/RouteLoadingWrapper";
-import WalletDebug from "@/components/wallet/WalletDebug";
+
 import WalletTest from "@/components/wallet/WalletTest";
-import WalletDebugPanel from "@/components/debug/WalletDebugPanel";
+
 import ClientOnly from "@/components/wallet/ClientOnly";
 import { Inter } from "next/font/google";
 
@@ -164,12 +164,11 @@ export default function RootLayout({ children }: RootLayoutProps) {
           {/* Route loading overlay */}
           <RouteLoadingWrapper />
 
-          {/* Wallet debug component (development only) */}
-          <ClientOnly>
+          {/*           <ClientOnly>
             <WalletDebug />
             <WalletTest />
             <WalletDebugPanel />
-          </ClientOnly>
+          </ClientOnly> */}
         </SimplifiedAppProvider>
 
         {/* Enhanced analytics and debug tools */}

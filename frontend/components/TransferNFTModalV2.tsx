@@ -60,13 +60,10 @@ export default function TransferNFTModalV2({
     if (isSuccess && transferState.transactionHash && nft) {
       console.log(`🎉 NFT transfer successful: ${nft.nftId}`);
 
-      // Refresh forzato della pagina dopo un breve delay
-      setTimeout(() => {
-        console.log(`🔄 Refreshing page after NFT transfer`);
-        onSuccess?.();
-        onClose();
-        window.location.reload();
-      }, 2000);
+      // Close modal and let the success modal handle the reload
+      onSuccess?.();
+      onClose();
+      // NO automatic reload here - handled by success modal
     }
   }, [
     isSuccess,

@@ -6,6 +6,7 @@ import { Bell, Gift } from "lucide-react";
 import { useAuctionNotifications } from "@/providers/AuctionNotificationsProvider";
 import { useNFTTransferNotifications } from "@/providers/NFTTransferNotificationsProvider";
 import AuctionNotificationsPanel from "./AuctionNotificationsPanel";
+import NFTTransferNotificationsPanel from "./NFTTransferNotificationsPanel";
 
 export default function UnifiedNotificationBadge() {
   const {
@@ -22,6 +23,7 @@ export default function UnifiedNotificationBadge() {
     useNFTTransferNotifications();
 
   const [showPanel, setShowPanel] = useState(false);
+  const [showTransferPanel, setShowTransferPanel] = useState(false);
 
   // Calcola il totale delle notifiche
   const totalNotifications = auctionCount + transferCount;
@@ -94,7 +96,11 @@ export default function UnifiedNotificationBadge() {
             <button
               onClick={() => {
                 console.log("🔔 UnifiedNotificationBadge clicked!");
-                setShowPanel(true);
+                if (hasAuctionNotifications) {
+                  setShowPanel(true);
+                } else if (hasTransferNotifications) {
+                  setShowTransferPanel(true);
+                }
               }}
               className={`relative bg-gradient-to-r ${gradient} text-white rounded-full p-3 shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-110 cursor-pointer pointer-events-auto`}
               style={{ zIndex: 99999 }}
@@ -115,7 +121,7 @@ export default function UnifiedNotificationBadge() {
         </motion.div>
       </AnimatePresence>
 
-      {/* Notifications Panel - Solo per le aste per ora */}
+      {/* Notifications Panel - Aste */}
       {hasAuctionNotifications && (
         <AuctionNotificationsPanel
           unsettledAuctions={unsettledAuctions}
@@ -123,6 +129,14 @@ export default function UnifiedNotificationBadge() {
           onClose={() => setShowPanel(false)}
           onSettleAuction={handleSettleAuction}
           isSettling={isSettling}
+        />
+      )}
+
+      {/* Notifications Panel - NFT Transfer */}
+      {hasTransferNotifications && (
+        <NFTTransferNotificationsPanel
+          isOpen={showTransferPanel}
+          onClose={() => setShowTransferPanel(false)}
         />
       )}
     </>

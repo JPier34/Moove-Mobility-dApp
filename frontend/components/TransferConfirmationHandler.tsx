@@ -97,9 +97,14 @@ export default function TransferConfirmationHandler() {
   useEffect(() => {
     if (isSuccess && hash) {
       console.log(`✅ Transfer transaction successful: ${hash}`);
+
+      // Always complete the transfer to show success modal
+      // The recursive prevention is only for the contract call, not the completion
       completeTransfer(hash);
+
       // Reset del flag per permettere nuovi trasferimenti
       hasExecutedTransfer.current = false;
+      lastTransferKey.current = null;
     }
   }, [isSuccess, hash, completeTransfer]);
 

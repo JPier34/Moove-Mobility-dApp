@@ -3,6 +3,8 @@ import {
   MooveAuction__factory,
   MooveAccessControl__factory,
 } from "../../typechain-types";
+import MooveNFTABI from "../src/abis/MooveNFT.json";
+import MooveAuctionABI from "../src/abis/MooveAuction.json";
 
 // Contract addresses (actualize after deploy)
 export const CONTRACT_ADDRESSES = {
@@ -12,10 +14,10 @@ export const CONTRACT_ADDRESSES = {
     .NEXT_PUBLIC_MOOVE_ACCESS_CONTROL_ADDRESS as `0x${string}`,
 } as const;
 
-// ABIs from TypeChain
+// ABIs from JSON files (more reliable)
 export const CONTRACT_ABIS = {
-  MooveNFT: IMooveVehicleNFT__factory.abi,
-  MooveAuction: MooveAuction__factory.abi,
+  MooveNFT: MooveNFTABI.abi,
+  MooveAuction: MooveAuctionABI.abi,
   MooveAccessControl: MooveAccessControl__factory.abi,
 } as const;
 

@@ -346,22 +346,8 @@ export function useNFTTransfer() {
 
       console.log(`✅ Cache invalidated for NFT ${currentTokenId}`);
 
-      // Emetti evento di trasferimento per notificare altri componenti
-      if (address) {
-        nftEvents.emitTransfer(currentTokenId, address, "unknown", hash);
-
-        // Emetti anche evento globale per il sistema di notifiche
-        window.dispatchEvent(
-          new CustomEvent("nftTransfer", {
-            detail: {
-              tokenId: currentTokenId,
-              from: address,
-              to: "unknown", // Sarà aggiornato quando il destinatario si connette
-              transactionHash: hash,
-            },
-          })
-        );
-      }
+      // NO EVENT EMISSION HERE - Events are handled by the provider
+      // This prevents duplicate events and recursive calls
     }
   }, [isSuccess, hash, currentTokenId, queryClient, address, completeTransfer]);
 
