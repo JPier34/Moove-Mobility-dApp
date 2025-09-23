@@ -13,6 +13,7 @@ import { config } from "@/lib/wagmi";
 import { ThemeProvider } from "@/providers/ThemeProvider";
 import { AuctionNotificationsProvider } from "@/providers/AuctionNotificationsProvider";
 import { NFTTransferNotificationsProvider } from "@/providers/NFTTransferNotificationsProvider";
+import { useAutomaticAuctionMonitor } from "@/hooks/useAutomaticAuctionMonitor";
 import UnifiedNotificationBadge from "@/components/notifications/UnifiedNotificationBadge";
 // Removed custom wallet persistence - using Wagmi's built-in persistence
 import "@rainbow-me/rainbowkit/styles.css";
@@ -43,6 +44,12 @@ function getQueryClient() {
 
 interface SimplifiedAppProviderProps {
   children: ReactNode;
+}
+
+// Component to handle automatic auction monitoring
+function AuctionMonitor() {
+  useAutomaticAuctionMonitor();
+  return null; // This component doesn't render anything
 }
 
 // Removed WalletPersistenceWrapper - using Wagmi's built-in persistence
@@ -120,6 +127,9 @@ export default function SimplifiedAppProvider({
           <ThemeProvider>
             <AuctionNotificationsProvider>
               <NFTTransferNotificationsProvider>
+                {/* Automatic Auction Monitor - Runs in background */}
+                <AuctionMonitor />
+
                 {children}
 
                 {/* Unified Notification Badge - Rendered after both providers */}

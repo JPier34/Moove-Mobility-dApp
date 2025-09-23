@@ -32,6 +32,7 @@ export function generateSealedBidCommit(
  */
 export function saveSealedBidData(
   auctionId: string,
+  tokenId: string,
   bidderAddress: string,
   bidAmount: string,
   nonce: string,
@@ -47,7 +48,7 @@ export function saveSealedBidData(
     status: "committed" as const,
   };
 
-  const key = `sealed_bid_${auctionId}_${bidderAddress}`;
+  const key = `sealed_bid_${tokenId}_${bidderAddress}`;
   localStorage.setItem(key, JSON.stringify(bidData));
 
   console.log("💾 Sealed bid data saved:", {
@@ -62,7 +63,7 @@ export function saveSealedBidData(
  * Recupera i dati del bid dal localStorage
  */
 export function getSealedBidData(
-  auctionId: string,
+  tokenId: string,
   bidderAddress: string
 ): {
   auctionId: string;
@@ -73,7 +74,7 @@ export function getSealedBidData(
   timestamp: number;
   status: "committed" | "revealed";
 } | null {
-  const key = `sealed_bid_${auctionId}_${bidderAddress}`;
+  const key = `sealed_bid_${tokenId}_${bidderAddress}`;
   const data = localStorage.getItem(key);
 
   if (!data) {
@@ -92,19 +93,19 @@ export function getSealedBidData(
  * Aggiorna lo status del bid (committed -> revealed)
  */
 export function updateSealedBidStatus(
-  auctionId: string,
+  tokenId: string,
   bidderAddress: string,
   status: "revealed"
 ): void {
-  const bidData = getSealedBidData(auctionId, bidderAddress);
+  const bidData = getSealedBidData(tokenId, bidderAddress);
 
   if (bidData) {
     bidData.status = status;
-    const key = `sealed_bid_${auctionId}_${bidderAddress}`;
+    const key = `sealed_bid_${tokenId}_${bidderAddress}`;
     localStorage.setItem(key, JSON.stringify(bidData));
 
     console.log("🔄 Sealed bid status updated:", {
-      auctionId,
+      tokenId,
       status,
     });
   }
@@ -114,14 +115,14 @@ export function updateSealedBidStatus(
  * Rimuove i dati del bid dal localStorage
  */
 export function clearSealedBidData(
-  auctionId: string,
+  tokenId: string,
   bidderAddress: string
 ): void {
-  const key = `sealed_bid_${auctionId}_${bidderAddress}`;
+  const key = `sealed_bid_${tokenId}_${bidderAddress}`;
   localStorage.removeItem(key);
 
   console.log("🗑️ Sealed bid data cleared:", {
-    auctionId,
+    tokenId,
     bidderAddress,
   });
 }
@@ -156,7 +157,7 @@ export function validateSealedBidAmount(
 /**
  * Ottiene tutti i bid committati per un'asta
  */
-export function getAllSealedBidsForAuction(auctionId: string): Array<{
+export function getAllSealedBidsForAuction(tokenId: string): Array<{
   auctionId: string;
   bidderAddress: string;
   bidAmount: string;
@@ -179,8 +180,10 @@ export function getAllSealedBidsForAuction(auctionId: string): Array<{
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
 
-    if (key && key.startsWith(`sealed_bid_${auctionId}_`)) {
-      const data = getSealedBidData(auctionId, key.split("_").pop() || "");
+    if (key && key.startsWith(`sealed_bid_${tokenId}_`)) {
+      const parts = key.split("_");
+      const bidderAddress = parts[3]; // L'indirizzo è sempre alla posizione 3
+      const data = getSealedBidData(tokenId, bidderAddress);
 
       if (data) {
         bids.push(data);
@@ -190,10 +193,3 @@ export function getAllSealedBidsForAuction(auctionId: string): Array<{
 
   return bids;
 }
-
-
-
-
-
-
-

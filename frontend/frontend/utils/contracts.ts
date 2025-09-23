@@ -7,7 +7,7 @@ export const contracts = {
         inputs: [
           {
             internalType: "address",
-            name: "initialAdmin",
+            name: "_admin",
             type: "address",
           },
         ],
@@ -15,94 +15,16 @@ export const contracts = {
         type: "constructor",
       },
       {
-        inputs: [],
-        name: "DEFAULT_ADMIN_ROLE",
-        outputs: [
-          {
-            internalType: "bytes32",
-            name: "",
-            type: "bytes32",
-          },
-        ],
-        stateMutability: "view",
-        type: "function",
-      },
-      {
-        inputs: [],
-        name: "MASTER_ADMIN_ROLE",
-        outputs: [
-          {
-            internalType: "bytes32",
-            name: "",
-            type: "bytes32",
-          },
-        ],
-        stateMutability: "view",
-        type: "function",
-      },
-      {
-        inputs: [],
-        name: "MINTER_ROLE",
-        outputs: [
-          {
-            internalType: "bytes32",
-            name: "",
-            type: "bytes32",
-          },
-        ],
-        stateMutability: "view",
-        type: "function",
-      },
-      {
-        inputs: [],
-        name: "AUCTION_MANAGER_ROLE",
-        outputs: [
-          {
-            internalType: "bytes32",
-            name: "",
-            type: "bytes32",
-          },
-        ],
-        stateMutability: "view",
-        type: "function",
-      },
-      {
-        inputs: [],
-        name: "WITHDRAWER_ROLE",
-        outputs: [
-          {
-            internalType: "bytes32",
-            name: "",
-            type: "bytes32",
-          },
-        ],
-        stateMutability: "view",
-        type: "function",
-      },
-      {
-        inputs: [],
-        name: "PAUSER_ROLE",
-        outputs: [
-          {
-            internalType: "bytes32",
-            name: "",
-            type: "bytes32",
-          },
-        ],
-        stateMutability: "view",
-        type: "function",
-      },
-      {
         inputs: [
-          {
-            internalType: "bytes32",
-            name: "role",
-            type: "bytes32",
-          },
           {
             internalType: "address",
             name: "account",
             type: "address",
+          },
+          {
+            internalType: "bytes32",
+            name: "role",
+            type: "bytes32",
           },
         ],
         name: "hasRole",
@@ -137,24 +59,6 @@ export const contracts = {
       {
         inputs: [
           {
-            internalType: "bytes32",
-            name: "role",
-            type: "bytes32",
-          },
-          {
-            internalType: "address",
-            name: "account",
-            type: "address",
-          },
-        ],
-        name: "revokeRole",
-        outputs: [],
-        stateMutability: "nonpayable",
-        type: "function",
-      },
-      {
-        inputs: [
-          {
             internalType: "address",
             name: "contractAddress",
             type: "address",
@@ -163,95 +67,6 @@ export const contracts = {
         name: "authorizeContract",
         outputs: [],
         stateMutability: "nonpayable",
-        type: "function",
-      },
-      {
-        inputs: [
-          {
-            internalType: "address",
-            name: "contractAddress",
-            type: "address",
-          },
-        ],
-        name: "deauthorizeContract",
-        outputs: [],
-        stateMutability: "nonpayable",
-        type: "function",
-      },
-      {
-        inputs: [
-          {
-            internalType: "address",
-            name: "account",
-            type: "address",
-          },
-        ],
-        name: "canMint",
-        outputs: [
-          {
-            internalType: "bool",
-            name: "hasMinterRole",
-            type: "bool",
-          },
-        ],
-        stateMutability: "view",
-        type: "function",
-      },
-      {
-        inputs: [
-          {
-            internalType: "address",
-            name: "account",
-            type: "address",
-          },
-        ],
-        name: "canManageAuctions",
-        outputs: [
-          {
-            internalType: "bool",
-            name: "hasAuctionRole",
-            type: "bool",
-          },
-        ],
-        stateMutability: "view",
-        type: "function",
-      },
-      {
-        inputs: [
-          {
-            internalType: "address",
-            name: "account",
-            type: "address",
-          },
-        ],
-        name: "canWithdraw",
-        outputs: [
-          {
-            internalType: "bool",
-            name: "hasWithdrawRole",
-            type: "bool",
-          },
-        ],
-        stateMutability: "view",
-        type: "function",
-      },
-      {
-        inputs: [
-          {
-            internalType: "address",
-            name: "account",
-            type: "address",
-          },
-        ],
-        name: "canPause",
-        outputs: [
-          {
-            internalType: "bool",
-            name: "hasPauserRole",
-            type: "bool",
-          },
-        ],
-        stateMutability: "view",
         type: "function",
       },
     ],
@@ -279,56 +94,6 @@ export const contracts = {
         ],
         stateMutability: "nonpayable",
         type: "constructor",
-      },
-      {
-        anonymous: false,
-        inputs: [
-          {
-            indexed: true,
-            internalType: "address",
-            name: "from",
-            type: "address",
-          },
-          {
-            indexed: true,
-            internalType: "address",
-            name: "to",
-            type: "address",
-          },
-          {
-            indexed: true,
-            internalType: "uint256",
-            name: "tokenId",
-            type: "uint256",
-          },
-        ],
-        name: "Transfer",
-        type: "event",
-      },
-      {
-        anonymous: false,
-        inputs: [
-          {
-            indexed: true,
-            internalType: "address",
-            name: "owner",
-            type: "address",
-          },
-          {
-            indexed: true,
-            internalType: "address",
-            name: "approved",
-            type: "address",
-          },
-          {
-            indexed: true,
-            internalType: "uint256",
-            name: "tokenId",
-            type: "uint256",
-          },
-        ],
-        name: "Approval",
-        type: "event",
       },
       {
         inputs: [
@@ -442,109 +207,6 @@ export const contracts = {
           },
         ],
         name: "transferFrom",
-        outputs: [],
-        stateMutability: "nonpayable",
-        type: "function",
-      },
-      {
-        inputs: [
-          {
-            internalType: "address",
-            name: "from",
-            type: "address",
-          },
-          {
-            internalType: "address",
-            name: "to",
-            type: "address",
-          },
-          {
-            internalType: "uint256",
-            name: "tokenId",
-            type: "uint256",
-          },
-        ],
-        name: "safeTransferFrom",
-        outputs: [],
-        stateMutability: "nonpayable",
-        type: "function",
-      },
-      {
-        inputs: [
-          {
-            internalType: "uint256",
-            name: "tokenId",
-            type: "uint256",
-          },
-        ],
-        name: "tokenURI",
-        outputs: [
-          {
-            internalType: "string",
-            name: "",
-            type: "string",
-          },
-        ],
-        stateMutability: "view",
-        type: "function",
-      },
-      {
-        inputs: [
-          {
-            internalType: "uint256",
-            name: "tokenId",
-            type: "uint256",
-          },
-        ],
-        name: "getApproved",
-        outputs: [
-          {
-            internalType: "address",
-            name: "",
-            type: "address",
-          },
-        ],
-        stateMutability: "view",
-        type: "function",
-      },
-      {
-        inputs: [
-          {
-            internalType: "address",
-            name: "owner",
-            type: "address",
-          },
-          {
-            internalType: "address",
-            name: "operator",
-            type: "address",
-          },
-        ],
-        name: "isApprovedForAll",
-        outputs: [
-          {
-            internalType: "bool",
-            name: "",
-            type: "bool",
-          },
-        ],
-        stateMutability: "view",
-        type: "function",
-      },
-      {
-        inputs: [
-          {
-            internalType: "address",
-            name: "operator",
-            type: "address",
-          },
-          {
-            internalType: "bool",
-            name: "approved",
-            type: "bool",
-          },
-        ],
-        name: "setApprovalForAll",
         outputs: [],
         stateMutability: "nonpayable",
         type: "function",

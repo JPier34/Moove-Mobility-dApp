@@ -111,7 +111,7 @@ export default function AuctionModal({
         try {
           // Check if user has already submitted a sealed bid
           const bidData = localStorage.getItem(
-            `sealed_bid_${auction.auctionId}_${address}`
+            `sealed_bid_${auction.nftId}_${address}`
           );
           if (bidData) {
             const parsedData = JSON.parse(bidData);
@@ -294,6 +294,7 @@ export default function AuctionModal({
       // Use the new sealed bid handler with automatic nonce
       const success = await sealedBidAuction.submitSealedBid(
         parseInt(auction.auctionId),
+        parseInt(auction.nftId),
         sealedBidAmount,
         auction.startPrice // Pass minimum price for validation
       );

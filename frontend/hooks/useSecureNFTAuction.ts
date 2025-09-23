@@ -591,6 +591,26 @@ async function secureAuctionCreation(
 
     console.log("🆔 Auction created with ID:", auctionId.toString());
 
+    // 6. Se è un'asta sealed bid, aggiungila al monitoraggio automatico
+    if (params.auctionType === AuctionType.SEALED_BID) {
+      console.log(
+        "🔓 Sealed bid auction created, adding to automatic monitoring"
+      );
+
+      // Emit custom event to trigger monitoring
+      const monitoringEvent = new CustomEvent("sealedBidAuctionCreated", {
+        detail: {
+          auctionId: auctionId.toString(),
+          auctionType: params.auctionType,
+          endTime: params.duration,
+          timestamp: new Date().toISOString(),
+        },
+      });
+      window.dispatchEvent(monitoringEvent);
+
+      console.log("📡 Sealed bid monitoring event dispatched");
+    }
+
     return {
       auctionId,
       transactionHash: receipt.hash,

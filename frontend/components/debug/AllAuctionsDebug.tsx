@@ -56,7 +56,7 @@ export default function AllAuctionsDebug() {
 
       const provider = new ethers.BrowserProvider(window.ethereum);
       const auctionContract = new ethers.Contract(
-        "0xF3A15bf233D28435E338DFF2aF2E33c72b701525", // CORRECTED MooveAuction address
+        "0x6096c74Ed257b14c601210e0B6256e39D534154e", // CORRECTED MooveAuction address
         [
           "function totalAuctions() view returns (uint256)",
           "function getAuction(uint256 auctionId) view returns (bytes)",

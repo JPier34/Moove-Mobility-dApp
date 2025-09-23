@@ -54,13 +54,10 @@ export function useUserCollection(): UserCollection {
       }
 
       const provider = new ethers.BrowserProvider(window.ethereum);
+      const { contracts } = await import("@/utils/contracts");
       const auctionContract = new ethers.Contract(
-        "0xF3A15bf233D28435E338DFF2aF2E33c72b701525",
-        [
-          "function getAuction(uint256 auctionId) view returns (tuple(uint256 auctionId, address nftContract, uint256 tokenId, address seller, uint8 auctionType, uint256 startingPrice, uint256 reservePrice, uint256 buyNowPrice, uint256 currentPrice, uint256 startTime, uint256 endTime, uint256 bidIncrement, address highestBidder, uint256 highestBid, uint8 status, bool allowPartialFulfillment, uint256 minBidders, uint256 totalBidders, bool isSettled, uint256 extensionThreshold, uint256 extensionDuration, uint256 revealEndTime, bool revealPhaseStarted))",
-          "function settleAuction(uint256 auctionId) external",
-          "function totalAuctions() view returns (uint256)",
-        ],
+        contracts.MooveAuction.address,
+        contracts.MooveAuction.abi,
         provider
       );
 
@@ -182,7 +179,7 @@ export function useSettleAuction() {
   }, [writeError]);
 
   const settleAuction = useCallback(
-    (auctionId: string) => {
+    async (auctionId: string) => {
       // Prevent multiple calls for the same auction
       if (isSettling || currentAuctionId === auctionId) {
         console.log(
@@ -203,12 +200,12 @@ export function useSettleAuction() {
         (window as any).currentSettlingAuctionId = auctionId;
 
         // Write the contract (non-async)
+        const { contracts } = await import("@/utils/contracts");
         writeContract({
-          address:
-            "0xF3A15bf233D28435E338DFF2aF2E33c72b701525" as `0x${string}`,
-          abi: ["function settleAuction(uint256 auctionId) external"],
-          functionName: "settleAuction",
-          args: [auctionId],
+          address: contracts.MooveAuction.address,
+          abi: contracts.MooveAuction.abi,
+          functionName: "settleAuction" as any,
+          args: [BigInt(auctionId)],
         });
       } catch (err) {
         console.error(`❌ Error settling auction ${auctionId}:`, err);

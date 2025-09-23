@@ -46,8 +46,8 @@ export function useAuctionExtensionEvents() {
           extensionDuration: Number(extensionDuration),
           newEndTime: Number(newEndTime),
           reason,
-          transactionHash: log.transactionHash || "",
-          blockNumber: Number(log.blockNumber),
+          transactionHash: (log as any).transactionHash || "",
+          blockNumber: Number((log as any).blockNumber),
           timestamp: new Date(),
         };
 

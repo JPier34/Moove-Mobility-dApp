@@ -62,7 +62,7 @@ export const useDutchAuction = () => {
         const provider = new ethers.BrowserProvider(window.ethereum);
         const signer = await provider.getSigner();
         const auctionContract = new ethers.Contract(
-          "0xF3A15bf233D28435E338DFF2aF2E33c72b701525", // MooveAuction address
+          "0x6096c74Ed257b14c601210e0B6256e39D534154e", // MooveAuction address
           [
             "function commitToBuyDutch(uint256 auctionId, bytes32 commitment) external payable",
             "function buyNowDutch(uint256 auctionId, uint256 nonce) external payable",

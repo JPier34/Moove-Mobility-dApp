@@ -1,0 +1,3 @@
+exit
+node test-auction-debug.js
+npx hardhat console --network sepolia

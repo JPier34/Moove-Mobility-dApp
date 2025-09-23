@@ -15,11 +15,13 @@ import {
 export interface SealedBidAuctionHandler {
   submitSealedBid: (
     auctionId: number,
+    tokenId: number,
     bidAmount: string,
     minimumPrice?: string
   ) => Promise<boolean>;
   revealBid: (
     auctionId: number,
+    tokenId: number,
     bidAmount: string,
     nonce: string
   ) => Promise<boolean>;
@@ -41,6 +43,7 @@ export function useSealedBidAuction(): SealedBidAuctionHandler {
   const submitSealedBid = useCallback(
     async (
       auctionId: number,
+      tokenId: number,
       bidAmount: string,
       minimumPrice?: string
     ): Promise<boolean> => {
@@ -127,6 +130,7 @@ export function useSealedBidAuction(): SealedBidAuctionHandler {
         // Save bid data for reveal phase
         saveSealedBidData(
           auctionId.toString(),
+          tokenId.toString(),
           address,
           bidAmount,
           nonce,
@@ -175,6 +179,7 @@ export function useSealedBidAuction(): SealedBidAuctionHandler {
   const revealBid = useCallback(
     async (
       auctionId: number,
+      tokenId: number,
       bidAmount: string,
       nonce: string
     ): Promise<boolean> => {
@@ -259,7 +264,7 @@ export function useSealedBidAuction(): SealedBidAuctionHandler {
         const { updateSealedBidStatus } = await import(
           "@/utils/sealedBidUtils"
         );
-        updateSealedBidStatus(auctionId.toString(), address, "revealed");
+        updateSealedBidStatus(tokenId.toString(), address, "revealed");
 
         console.log("✅ Sealed bid revealed successfully");
         setStep("success");

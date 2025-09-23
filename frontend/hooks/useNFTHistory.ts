@@ -94,7 +94,7 @@ export function useNFTHistory(tokenId: string | null) {
             // Check if minted to auction contract or directly to user
             if (
               historyItem.to.toLowerCase() ===
-              CONTRACT_ADDRESSES.MooveAuction.toLowerCase()
+              contracts.MooveAuction.address.toLowerCase()
             ) {
               creationType = "auction_won";
             } else {
@@ -284,7 +284,7 @@ export function useMultipleNFTHistory(tokenIds: string[]) {
                 // Check if minted to auction contract or directly to user
                 if (
                   historyItem.to.toLowerCase() ===
-                  CONTRACT_ADDRESSES.MooveAuction.toLowerCase()
+                  contracts.MooveAuction.address.toLowerCase()
                 ) {
                   creationType = "auction_won";
                 } else {

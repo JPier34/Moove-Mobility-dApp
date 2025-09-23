@@ -138,6 +138,7 @@ export function useAuctionHandler(): AuctionHandler {
             if (action === "bid" && amount && nonce) {
               const success = await sealedBidAuction.submitSealedBid(
                 parseInt(auction.auctionId),
+                parseInt(auction.nftId),
                 amount,
                 nonce
               );
@@ -152,6 +153,7 @@ export function useAuctionHandler(): AuctionHandler {
               // For sealed bid, "buyNow" means reveal the bid
               const success = await sealedBidAuction.revealBid(
                 parseInt(auction.auctionId),
+                parseInt(auction.nftId),
                 amount,
                 nonce
               );

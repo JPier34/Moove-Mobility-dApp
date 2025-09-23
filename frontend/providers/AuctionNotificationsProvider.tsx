@@ -323,6 +323,31 @@ export function AuctionNotificationsProvider({
     };
   }, [isConnected, address, providerId, addToMonitoring]);
 
+  // Listen for new sealed bid auction creation events
+  useEffect(() => {
+    const handleSealedBidAuctionCreated = (event: CustomEvent) => {
+      const { auctionId, auctionType, endTime } = event.detail;
+      
+      console.log(`🆕 [${providerId}] New sealed bid auction created:`, {
+        auctionId,
+        auctionType,
+        endTime: new Date(endTime * 1000).toISOString(),
+        timestamp: new Date().toISOString(),
+      });
+      
+      // Add to monitoring immediately
+      addToMonitoring(parseInt(auctionId));
+      
+      console.log(`➕ [${providerId}] Added new sealed bid auction #${auctionId} to monitoring`);
+    };
+
+    window.addEventListener("sealedBidAuctionCreated", handleSealedBidAuctionCreated as EventListener);
+
+    return () => {
+      window.removeEventListener("sealedBidAuctionCreated", handleSealedBidAuctionCreated as EventListener);
+    };
+  }, [providerId, addToMonitoring]);
+
   // Listen for sealed bid winner events
   useEffect(() => {
     const handleSealedBidWinner = (event: CustomEvent) => {

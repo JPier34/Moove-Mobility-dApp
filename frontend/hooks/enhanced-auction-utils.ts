@@ -718,15 +718,15 @@ async function buildAuctionWithCompleteData(
       seller: auctionData.seller || ethers.ZeroAddress,
       auctionType: Number(auctionData.auctionType) || 0,
       status,
-      startPrice: ethers.formatEther(auctionData.startingPrice || 0),
-      reservePrice: ethers.formatEther(auctionData.reservePrice || 0),
-      buyNowPrice: ethers.formatEther(auctionData.buyNowPrice || 0),
-      currentBid: ethers.formatEther(auctionData.highestBid || 0),
+      startPrice: auctionData.startingPrice || "0",
+      reservePrice: auctionData.reservePrice || "0",
+      buyNowPrice: auctionData.buyNowPrice || "0",
+      currentBid: auctionData.highestBid || "0",
       highestBidder: auctionData.highestBidder || ethers.ZeroAddress,
       bidCount: bidCount,
       startTime: new Date(startTime * 1000),
       endTime: new Date(endTime * 1000),
-      bidIncrement: ethers.formatEther(auctionData.bidIncrement || 0),
+      bidIncrement: auctionData.bidIncrement || "0",
       currency: "ETH",
       isSettled: auctionData.isSettled || false, // Campo isSettled dal contratto
       transactionHash: undefined, // Non disponibile direttamente dal contratto
@@ -890,11 +890,8 @@ async function fetchAuctionFromContractCorrected(
     const provider = new ethers.BrowserProvider(window.ethereum);
 
     const auctionContract = new ethers.Contract(
-      "0xF3A15bf233D28435E338DFF2aF2E33c72b701525", // CORRECTED MooveAuction address
-      [
-        "function totalAuctions() view returns (uint256)",
-        "function getAuction(uint256 auctionId) view returns (bytes)",
-      ],
+      contracts.MooveAuction.address,
+      contracts.MooveAuction.abi,
       provider
     );
 
@@ -904,76 +901,57 @@ async function fetchAuctionFromContractCorrected(
       provider
     );
 
-    // Fetch auction data with manual hex parsing
-    const rawData = await auctionContract.getAuction(auctionId);
-    console.log(`📊 Raw data for auction ${auctionId}:`, rawData);
-
-    // Manual hex parsing for truncated data
+    // Use direct contract call with proper ABI
     let auctionData;
     try {
-      const hexData = rawData.slice(2); // Remove "0x"
-      const dataBytes = hexData.length / 2;
+      console.log(`🔍 Fetching auction ${auctionId} with proper ABI...`);
 
-      if (dataBytes >= 256) {
-        console.log(
-          `🔍 Manual hex parsing for auction ${auctionId} (${dataBytes} bytes)`
-        );
+      // Create contract with full ABI for proper decoding
+      const fullAuctionContract = new ethers.Contract(
+        contracts.MooveAuction.address,
+        contracts.MooveAuction.abi,
+        provider
+      );
 
-        // Parse first 8 fields (256 bytes = 8 * 32 bytes)
-        const auctionId = BigInt("0x" + hexData.slice(0, 64));
-        const nftContract = "0x" + hexData.slice(64, 104);
-        const tokenId = BigInt("0x" + hexData.slice(104, 168));
-        const seller = "0x" + hexData.slice(168, 208);
-        const auctionType = parseInt(hexData.slice(208, 210), 16);
-        const startingPrice = BigInt("0x" + hexData.slice(210, 274));
-        const reservePrice = BigInt("0x" + hexData.slice(274, 338));
-        const buyNowPrice = BigInt("0x" + hexData.slice(338, 402));
+      auctionData = await fullAuctionContract.getAuction(auctionId);
+      console.log(
+        `✅ Auction data fetched successfully for auction ${auctionId}:`,
+        auctionData
+      );
 
-        console.log(`🔍 Manual parsing results:`, {
-          auctionId: auctionId.toString(),
-          nftContract,
-          tokenId: tokenId.toString(),
-          seller,
-          auctionType,
-          startingPrice: ethers.formatEther(startingPrice),
-          reservePrice: ethers.formatEther(reservePrice),
-          buyNowPrice: ethers.formatEther(buyNowPrice),
-        });
+      // Convert BigInt values to strings for frontend compatibility
+      auctionData = {
+        auctionId: auctionData.auctionId.toString(),
+        nftContract: auctionData.nftContract,
+        tokenId: auctionData.tokenId.toString(),
+        seller: auctionData.seller,
+        auctionType: Number(auctionData.auctionType),
+        startingPrice: ethers.formatEther(auctionData.startingPrice),
+        reservePrice: ethers.formatEther(auctionData.reservePrice),
+        buyNowPrice: ethers.formatEther(auctionData.buyNowPrice),
+        currentPrice: ethers.formatEther(auctionData.currentPrice),
+        startTime: Number(auctionData.startTime),
+        endTime: Number(auctionData.endTime),
+        bidIncrement: ethers.formatEther(auctionData.bidIncrement),
+        highestBidder: auctionData.highestBidder,
+        highestBid: ethers.formatEther(auctionData.highestBid),
+        status: Number(auctionData.status),
+        allowPartialFulfillment: auctionData.allowPartialFulfillment,
+        minBidders: Number(auctionData.minBidders),
+        totalBidders: Number(auctionData.totalBidders),
+        isSettled: auctionData.isSettled,
+        extensionThreshold: ethers.formatEther(auctionData.extensionThreshold),
+        extensionDuration: Number(auctionData.extensionDuration),
+        revealEndTime: Number(auctionData.revealEndTime),
+        revealPhaseStarted: auctionData.revealPhaseStarted,
+      };
 
-        auctionData = {
-          auctionId: auctionId.toString(),
-          nftContract,
-          tokenId: tokenId.toString(),
-          seller,
-          auctionType,
-          startingPrice: ethers.formatEther(startingPrice),
-          reservePrice: ethers.formatEther(reservePrice),
-          buyNowPrice: ethers.formatEther(buyNowPrice),
-          // Default values for missing fields
-          currentPrice: "0.0",
-          startTime: 0,
-          endTime: 0,
-          bidIncrement: "0.0",
-          highestBidder: "0x0000000000000000000000000000000000000000",
-          highestBid: "0.0",
-          status: 0,
-          allowPartialFulfillment: false,
-          minBidders: 0,
-          totalBidders: 0,
-          isSettled: false,
-          extensionThreshold: "0.0",
-          extensionDuration: 0,
-        };
-
-        console.log(`✅ Decoded auction ${auctionId}:`, auctionData);
-      } else {
-        console.log(
-          `❌ Data too short for auction ${auctionId}: ${dataBytes} bytes`
-        );
-        return null;
-      }
+      console.log(
+        `✅ Converted auction data for auction ${auctionId}:`,
+        auctionData
+      );
     } catch (error) {
-      console.error(`❌ Failed to parse auction ${auctionId}:`, error);
+      console.error(`❌ Failed to fetch auction ${auctionId}:`, error);
       return null;
     }
 
