@@ -1,10 +1,10 @@
 "use client";
 
 import { ethers } from "ethers";
+import { contracts } from "@/utils/contracts";
 import { useState, useEffect, useCallback } from "react";
 import { useAccount } from "wagmi";
 import { useUserRoles } from "./useContract";
-import { contracts } from "@/utils/contracts";
 import { Auction, AuctionType } from "@/types/auction";
 import { useActiveAuctions } from "./useAuction";
 import { useSmartRefresh } from "./useSmartRefresh";
@@ -890,8 +890,11 @@ async function fetchAuctionFromContractCorrected(
     const provider = new ethers.BrowserProvider(window.ethereum);
 
     const auctionContract = new ethers.Contract(
-      contracts.MooveAuction.address,
-      contracts.MooveAuction.abi,
+      "0xF3A15bf233D28435E338DFF2aF2E33c72b701525", // CORRECTED MooveAuction address
+      [
+        "function totalAuctions() view returns (uint256)",
+        "function getAuction(uint256 auctionId) view returns (bytes)",
+      ],
       provider
     );
 
@@ -901,9 +904,78 @@ async function fetchAuctionFromContractCorrected(
       provider
     );
 
-    // Fetch auction data with enhanced error handling
-    const auctionData = await auctionContract.getAuction(auctionId);
-    console.log(`📊 Auction ${auctionId} data:`, auctionData);
+    // Fetch auction data with manual hex parsing
+    const rawData = await auctionContract.getAuction(auctionId);
+    console.log(`📊 Raw data for auction ${auctionId}:`, rawData);
+
+    // Manual hex parsing for truncated data
+    let auctionData;
+    try {
+      const hexData = rawData.slice(2); // Remove "0x"
+      const dataBytes = hexData.length / 2;
+
+      if (dataBytes >= 256) {
+        console.log(
+          `🔍 Manual hex parsing for auction ${auctionId} (${dataBytes} bytes)`
+        );
+
+        // Parse first 8 fields (256 bytes = 8 * 32 bytes)
+        const auctionId = BigInt("0x" + hexData.slice(0, 64));
+        const nftContract = "0x" + hexData.slice(64, 104);
+        const tokenId = BigInt("0x" + hexData.slice(104, 168));
+        const seller = "0x" + hexData.slice(168, 208);
+        const auctionType = parseInt(hexData.slice(208, 210), 16);
+        const startingPrice = BigInt("0x" + hexData.slice(210, 274));
+        const reservePrice = BigInt("0x" + hexData.slice(274, 338));
+        const buyNowPrice = BigInt("0x" + hexData.slice(338, 402));
+
+        console.log(`🔍 Manual parsing results:`, {
+          auctionId: auctionId.toString(),
+          nftContract,
+          tokenId: tokenId.toString(),
+          seller,
+          auctionType,
+          startingPrice: ethers.formatEther(startingPrice),
+          reservePrice: ethers.formatEther(reservePrice),
+          buyNowPrice: ethers.formatEther(buyNowPrice),
+        });
+
+        auctionData = {
+          auctionId: auctionId.toString(),
+          nftContract,
+          tokenId: tokenId.toString(),
+          seller,
+          auctionType,
+          startingPrice: ethers.formatEther(startingPrice),
+          reservePrice: ethers.formatEther(reservePrice),
+          buyNowPrice: ethers.formatEther(buyNowPrice),
+          // Default values for missing fields
+          currentPrice: "0.0",
+          startTime: 0,
+          endTime: 0,
+          bidIncrement: "0.0",
+          highestBidder: "0x0000000000000000000000000000000000000000",
+          highestBid: "0.0",
+          status: 0,
+          allowPartialFulfillment: false,
+          minBidders: 0,
+          totalBidders: 0,
+          isSettled: false,
+          extensionThreshold: "0.0",
+          extensionDuration: 0,
+        };
+
+        console.log(`✅ Decoded auction ${auctionId}:`, auctionData);
+      } else {
+        console.log(
+          `❌ Data too short for auction ${auctionId}: ${dataBytes} bytes`
+        );
+        return null;
+      }
+    } catch (error) {
+      console.error(`❌ Failed to parse auction ${auctionId}:`, error);
+      return null;
+    }
 
     // Validate auction data before processing
     if (!auctionData || auctionData.tokenId === undefined) {

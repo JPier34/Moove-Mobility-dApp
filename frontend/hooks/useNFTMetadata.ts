@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useReadContract } from "wagmi";
-import { contracts } from "../utils/contracts";
+import { contracts } from "@/utils/contracts";
 
 export interface NFTMetadata {
   name: string;
@@ -26,7 +26,7 @@ export function useNFTMetadata(tokenId: number) {
 
   // Use Wagmi to read tokenURI from contract
   const { data: tokenURI, isLoading: uriLoading } = useReadContract({
-    address: contracts.MooveNFT.address as `0x${string}`,
+    address: contracts.MooveNFT.address,
     abi: contracts.MooveNFT.abi,
     functionName: "tokenURI",
     args: [BigInt(tokenId)],

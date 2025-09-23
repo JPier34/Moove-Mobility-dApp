@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAccount } from "wagmi";
 import { ethers } from "ethers";
-import { CONTRACT_ADDRESSES, CONTRACT_ABIS } from "@/lib/contracts";
+import { contracts } from "@/utils/contracts";
 import { useStartRevealPhase } from "@/hooks/useAuction";
 import toast from "react-hot-toast";
 
 interface SealedBidStatusManager {
   checkAndTransitionStatus: (auctionId: number) => Promise<void>;
+  startRevealPhaseForNewAuction: (auctionId: number) => Promise<boolean>;
   isProcessing: boolean;
   error: string | null;
 }
@@ -149,8 +150,8 @@ export function useSealedBidStatusManager(): SealedBidStatusManager {
 
         const provider = new ethers.BrowserProvider(window.ethereum);
         const auctionContract = new ethers.Contract(
-          CONTRACT_ADDRESSES.MooveAuction,
-          CONTRACT_ABIS.MooveAuction,
+          contracts.MooveAuction.address,
+          contracts.MooveAuction.abi,
           provider
         );
 
@@ -163,6 +164,28 @@ export function useSealedBidStatusManager(): SealedBidStatusManager {
           rawData: auctionData,
           keys: Object.keys(auctionData),
           values: Object.values(auctionData),
+        });
+
+        // Debug: Log timing information
+        console.log(`⏰ Timing debug for auction ${auctionId}:`, {
+          auctionId,
+          startTime: Number(auctionData.startTime),
+          endTime: Number(auctionData.endTime),
+          duration: Number(auctionData.endTime) - Number(auctionData.startTime),
+          durationMinutes:
+            (Number(auctionData.endTime) - Number(auctionData.startTime)) / 60,
+          currentTime: Math.floor(Date.now() / 1000),
+          startDate: new Date(
+            Number(auctionData.startTime) * 1000
+          ).toISOString(),
+          endDate: new Date(Number(auctionData.endTime) * 1000).toISOString(),
+          currentDate: new Date().toISOString(),
+          timeExpired:
+            Math.floor(Date.now() / 1000) >= Number(auctionData.endTime),
+          timeToEnd:
+            Number(auctionData.endTime) - Math.floor(Date.now() / 1000),
+          timeToEndMinutes:
+            (Number(auctionData.endTime) - Math.floor(Date.now() / 1000)) / 60,
         });
 
         const currentStatus = Number(auctionData.status);
@@ -217,9 +240,9 @@ export function useSealedBidStatusManager(): SealedBidStatusManager {
             const auctionContractWithSigner = auctionContract.connect(signer);
 
             console.log(`🔓 Starting reveal phase for auction ${auctionId}`);
-            const revealTx = await auctionContractWithSigner.startRevealPhase(
-              auctionId
-            );
+            const revealTx = await (
+              auctionContractWithSigner as any
+            ).startRevealPhase(auctionId);
             console.log(
               `📝 Start reveal phase transaction submitted: ${revealTx.hash}`
             );
@@ -238,9 +261,9 @@ export function useSealedBidStatusManager(): SealedBidStatusManager {
                 console.log(
                   `🏁 Ending auction ${auctionId} after reveal phase started`
                 );
-                const endTx = await auctionContractWithSigner.endAuction(
-                  auctionId
-                );
+                const endTx = await (
+                  auctionContractWithSigner as any
+                ).endAuction(auctionId);
                 console.log(
                   `📝 End auction transaction submitted: ${endTx.hash}`
                 );
@@ -277,79 +300,176 @@ export function useSealedBidStatusManager(): SealedBidStatusManager {
             );
           }
         } else if (currentStatus === 2) {
-          // Check if reveal phase has expired (typically 24 hours after commit phase ends)
-          const revealEndTime = endTime + 24 * 60 * 60; // 24 hours after commit phase ends
+          // For REVEAL phase, use the new revealEndTime field from the contract
+          // First try to get reveal info from the new contract function
+          try {
+            const revealInfo = await auctionContract.getSealedBidRevealInfo(
+              auctionId
+            );
+            const revealEndTime = revealInfo.revealEndTime;
 
-          console.log(
-            `🔍 REVEAL -> ENDED: Processing sealed bid auction ${auctionId}:`,
-            {
+            console.log(`🔍 REVEAL phase info for auction ${auctionId}:`, {
               auctionId,
               currentStatus,
-              endTime: new Date(endTime * 1000).toISOString(),
-              revealEndTime: new Date(revealEndTime * 1000).toISOString(),
+              revealEndTime: new Date(
+                Number(revealEndTime) * 1000
+              ).toISOString(),
               currentTime: new Date().toISOString(),
+              timeExpired: currentTime >= Number(revealEndTime),
               creator: creator || "undefined",
               currentUser: address,
-              timeExpired: currentTime >= revealEndTime,
               timestamp: new Date().toISOString(),
-            }
-          );
+            });
 
-          // Only end the auction if the reveal phase has expired
-          if (currentTime >= revealEndTime) {
-            console.log(
-              `🏁 REVEAL -> ENDED: Ending sealed bid auction ${auctionId} (reveal phase expired)`
-            );
-
-            try {
-              const signer = await provider.getSigner();
-              const auctionContractWithSigner = auctionContract.connect(signer);
-
-              console.log(`🏁 Ending auction ${auctionId} to determine winner`);
-              const endTx = await auctionContractWithSigner.endAuction(
-                auctionId
-              );
+            // Only end the auction if the reveal phase has expired
+            if (currentTime >= Number(revealEndTime)) {
               console.log(
-                `📝 End auction transaction submitted: ${endTx.hash}`
+                `🏁 REVEAL -> ENDED: Ending sealed bid auction ${auctionId} (reveal phase expired)`
               );
 
-              await endTx.wait();
-              console.log(`✅ Auction ${auctionId} ended successfully`);
+              try {
+                const signer = await provider.getSigner();
+                const auctionContractWithSigner =
+                  auctionContract.connect(signer);
 
-              // Show notification
-              toast.success(
-                `🏁 Auction #${auctionId} ended - winner determined`
-              );
+                console.log(
+                  `🏁 Ending auction ${auctionId} to determine winner`
+                );
+                const endTx = await (
+                  auctionContractWithSigner as any
+                ).endRevealPhase(auctionId);
+                console.log(
+                  `📝 End reveal phase transaction submitted: ${endTx.hash}`
+                );
 
-              // Check for winner after ending
-              setTimeout(async () => {
-                await checkForWinner(auctionId, auctionContract);
-              }, 2000);
-            } catch (error) {
-              console.error(`❌ Error ending auction ${auctionId}:`, error);
-              toast.error(
-                `Failed to end auction: ${
-                  error instanceof Error ? error.message : "Unknown error"
-                }`
+                await endTx.wait();
+                console.log(
+                  `✅ Auction ${auctionId} reveal phase ended successfully`
+                );
+
+                // Show notification
+                toast.success(
+                  `🏁 Auction #${auctionId} ended - winner determined`
+                );
+
+                // Check for winner after ending
+                setTimeout(async () => {
+                  await checkForWinner(auctionId, auctionContract);
+                }, 2000);
+              } catch (error) {
+                console.error(
+                  `❌ Error ending reveal phase for auction ${auctionId}:`,
+                  error
+                );
+                toast.error(
+                  `Failed to end reveal phase: ${
+                    error instanceof Error ? error.message : "Unknown error"
+                  }`
+                );
+              }
+            } else {
+              console.log(
+                `⏳ REVEAL phase still active for auction ${auctionId}:`,
+                {
+                  auctionId,
+                  revealEndTime: new Date(
+                    Number(revealEndTime) * 1000
+                  ).toISOString(),
+                  currentTime: new Date().toISOString(),
+                  timeRemaining: Math.round(
+                    (Number(revealEndTime) - currentTime) / 60
+                  ),
+                  timeRemainingHours: Math.round(
+                    (Number(revealEndTime) - currentTime) / 3600
+                  ),
+                  message:
+                    "Waiting for reveal phase to expire before ending auction",
+                  note: "Using new revealEndTime field from contract",
+                }
               );
             }
-          } else {
+          } catch (error) {
+            console.error(
+              `❌ Error getting reveal info for auction ${auctionId}:`,
+              error
+            );
+            // Fallback to old logic if new function fails
+            const revealEndTime = endTime;
+
             console.log(
-              `⏳ REVEAL phase still active for auction ${auctionId}:`,
+              `🔍 REVEAL -> ENDED: Processing sealed bid auction ${auctionId} (fallback):`,
               {
                 auctionId,
+                currentStatus,
                 endTime: new Date(endTime * 1000).toISOString(),
                 revealEndTime: new Date(revealEndTime * 1000).toISOString(),
                 currentTime: new Date().toISOString(),
-                timeRemaining: Math.round((revealEndTime - currentTime) / 60),
-                timeRemainingHours: Math.round(
-                  (revealEndTime - currentTime) / 3600
-                ),
-                message:
-                  "Waiting for reveal phase to expire before ending auction",
-                note: "Auction was created with endTime in the future - this is normal behavior",
+                creator: creator || "undefined",
+                currentUser: address,
+                timeExpired: currentTime >= revealEndTime,
+                timestamp: new Date().toISOString(),
               }
             );
+
+            // Only end the auction if the reveal phase has expired
+            if (currentTime >= revealEndTime) {
+              console.log(
+                `🏁 REVEAL -> ENDED: Ending sealed bid auction ${auctionId} (reveal phase expired - fallback)`
+              );
+
+              try {
+                const signer = await provider.getSigner();
+                const auctionContractWithSigner =
+                  auctionContract.connect(signer);
+
+                console.log(
+                  `🏁 Ending auction ${auctionId} to determine winner`
+                );
+                const endTx = await (
+                  auctionContractWithSigner as any
+                ).endAuction(auctionId);
+                console.log(
+                  `📝 End auction transaction submitted: ${endTx.hash}`
+                );
+
+                await endTx.wait();
+                console.log(`✅ Auction ${auctionId} ended successfully`);
+
+                // Show notification
+                toast.success(
+                  `🏁 Auction #${auctionId} ended - winner determined`
+                );
+
+                // Check for winner after ending
+                setTimeout(async () => {
+                  await checkForWinner(auctionId, auctionContract);
+                }, 2000);
+              } catch (error) {
+                console.error(`❌ Error ending auction ${auctionId}:`, error);
+                toast.error(
+                  `Failed to end auction: ${
+                    error instanceof Error ? error.message : "Unknown error"
+                  }`
+                );
+              }
+            } else {
+              console.log(
+                `⏳ REVEAL phase still active for auction ${auctionId} (fallback):`,
+                {
+                  auctionId,
+                  endTime: new Date(endTime * 1000).toISOString(),
+                  revealEndTime: new Date(revealEndTime * 1000).toISOString(),
+                  currentTime: new Date().toISOString(),
+                  timeRemaining: Math.round((revealEndTime - currentTime) / 60),
+                  timeRemainingHours: Math.round(
+                    (revealEndTime - currentTime) / 3600
+                  ),
+                  message:
+                    "Waiting for reveal phase to expire before ending auction",
+                  note: "Using fallback logic - new contract function failed",
+                }
+              );
+            }
           }
         } else if (currentStatus === 3) {
           console.log(
@@ -398,8 +518,10 @@ export function useSealedBidStatusManager(): SealedBidStatusManager {
   useEffect(() => {
     if (revealError) {
       console.error("❌ Reveal phase error:", revealError);
-      setError(revealError);
-      toast.error(`Reveal phase failed: ${revealError}`);
+      setError(revealError?.message || "Unknown error");
+      toast.error(
+        `Reveal phase failed: ${revealError?.message || "Unknown error"}`
+      );
     }
   }, [revealError]);
 
@@ -446,7 +568,7 @@ export function useSealedBidStatusManager(): SealedBidStatusManager {
     checkAndTransitionStatus,
     startRevealPhaseForNewAuction,
     isProcessing: isProcessing || isPending,
-    error: error || revealError,
+    error: error || revealError?.message || null,
   };
 }
 

@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react";
 import { ethers } from "ethers";
 import { useAccount } from "wagmi";
-import { CONTRACT_ADDRESSES, CONTRACT_ABIS } from "@/lib/contracts";
+import { contracts } from "@/utils/contracts";
 import { useGlobalNFTCache } from "./useGlobalNFTCache";
 
 interface UniquenessCheckResult {
@@ -55,8 +55,8 @@ export function useNFTUniquenessCheck() {
 
         const provider = new ethers.BrowserProvider(window.ethereum);
         const nftContract = new ethers.Contract(
-          CONTRACT_ADDRESSES.MooveNFT,
-          CONTRACT_ABIS.MooveNFT,
+          contracts.MooveNFT.address,
+          contracts.MooveNFT.abi,
           provider
         );
 

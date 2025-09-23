@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { ethers } from "ethers";
-import { contracts } from "../../utils/contracts";
+import { contracts } from "@/utils/contracts";
 
 interface AuctionStatusCheckerProps {
   auctionId: number;

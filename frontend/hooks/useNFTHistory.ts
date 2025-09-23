@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useAccount } from "wagmi";
 import { ethers } from "ethers";
-import { CONTRACT_ADDRESSES, CONTRACT_ABIS } from "../lib/contracts";
+import { contracts } from "@/utils/contracts";
 
 export interface NFTHistoryItem {
   type: "mint" | "transfer";
@@ -38,10 +38,13 @@ export function useNFTHistory(tokenId: string | null) {
       console.log(`🔍 Fetching NFT history for token #${tokenId}`);
 
       // Create contract instance
-      const provider = new ethers.BrowserProvider(window.ethereum);
+      if (!window.ethereum) {
+        throw new Error("No ethereum provider available");
+      }
+      const provider = new ethers.BrowserProvider(window.ethereum as any);
       const nftContract = new ethers.Contract(
-        CONTRACT_ADDRESSES.MooveNFT,
-        CONTRACT_ABIS.MooveNFT,
+        contracts.MooveNFT.address,
+        contracts.MooveNFT.abi,
         provider
       );
 
@@ -65,13 +68,21 @@ export function useNFTHistory(tokenId: string | null) {
       for (const event of events) {
         try {
           const block = await provider.getBlock(event.blockNumber);
+          if (!block) {
+            console.warn(
+              `⚠️ Block ${event.blockNumber} not found, skipping event`
+            );
+            continue;
+          }
 
+          const eventLog = event as ethers.EventLog;
           const historyItem: NFTHistoryItem = {
-            type: event.args.from === ethers.ZeroAddress ? "mint" : "transfer",
-            from: event.args.from,
-            to: event.args.to,
-            transactionHash: event.transactionHash,
-            blockNumber: event.blockNumber,
+            type:
+              eventLog.args.from === ethers.ZeroAddress ? "mint" : "transfer",
+            from: eventLog.args.from,
+            to: eventLog.args.to,
+            transactionHash: eventLog.transactionHash,
+            blockNumber: eventLog.blockNumber,
             timestamp: block.timestamp,
           };
 
@@ -168,22 +179,22 @@ export function useMultipleNFTHistory(tokenIds: string[]) {
       }
 
       // Create contract instance
-      const provider = new ethers.BrowserProvider(window.ethereum);
+      const provider = new ethers.BrowserProvider(window.ethereum as any);
 
       // Verify ABI is loaded
-      if (!CONTRACT_ABIS.MooveNFT || !CONTRACT_ABIS.MooveNFT.length) {
+      if (!contracts.MooveNFT.abi || !contracts.MooveNFT.abi.length) {
         throw new Error("MooveNFT ABI not loaded");
       }
 
       console.log(
         "🔧 Creating contract with ABI:",
-        CONTRACT_ABIS.MooveNFT.length,
+        contracts.MooveNFT.abi.length,
         "functions"
       );
 
       const nftContract = new ethers.Contract(
-        CONTRACT_ADDRESSES.MooveNFT,
-        CONTRACT_ABIS.MooveNFT,
+        contracts.MooveNFT.address,
+        contracts.MooveNFT.abi,
         provider
       );
 
@@ -245,14 +256,23 @@ export function useMultipleNFTHistory(tokenIds: string[]) {
           for (const event of events) {
             try {
               const block = await provider.getBlock(event.blockNumber);
+              if (!block) {
+                console.warn(
+                  `⚠️ Block ${event.blockNumber} not found, skipping event`
+                );
+                continue;
+              }
 
+              const eventLog = event as ethers.EventLog;
               const historyItem: NFTHistoryItem = {
                 type:
-                  event.args.from === ethers.ZeroAddress ? "mint" : "transfer",
-                from: event.args.from,
-                to: event.args.to,
-                transactionHash: event.transactionHash,
-                blockNumber: event.blockNumber,
+                  eventLog.args.from === ethers.ZeroAddress
+                    ? "mint"
+                    : "transfer",
+                from: eventLog.args.from,
+                to: eventLog.args.to,
+                transactionHash: eventLog.transactionHash,
+                blockNumber: eventLog.blockNumber,
                 timestamp: block.timestamp,
               };
 

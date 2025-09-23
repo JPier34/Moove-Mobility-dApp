@@ -1,23 +1,29 @@
-// Auto-generated contract configuration (UPDATED - NEW DEPLOYMENT)
-import MooveAccessControlABI from "@/src/abis/MooveAccessControl.json";
-import MooveNFTABI from "@/src/abis/MooveNFT.json";
-import MooveAuctionABI from "@/src/abis/MooveAuction.json";
+// Import ABI from JSON files (more reliable)
+import MooveNFTABI from "../src/abis/MooveNFT.json";
+import MooveAuctionABI from "../src/abis/MooveAuction.json";
+import MooveAccessControlABI from "../src/abis/MooveAccessControl.json";
 
+// Type assertion for JSON imports
+const nftABI = MooveNFTABI as any;
+const auctionABI = MooveAuctionABI as any;
+const accessControlABI = MooveAccessControlABI as any;
+
+// Auto-generated contract configuration
 export const contracts = {
-  MooveAccessControl: {
-    address: "0x93b6F6F4b28cd61F68c16A85c9FC107Bf8f47e42",
-    abi: (MooveAccessControlABI as any).abi,
-  },
   MooveNFT: {
-    address: "0x40E455515bf712144C1A5D859F19d64b537754f7",
-    abi: (MooveNFTABI as any).abi,
+    address: "0x40E455515bf712144C1A5D859F19d64b537754f7", // NFT contract address
+    abi: nftABI.abi,
   },
   MooveAuction: {
-    address: "0x7D06E101bD77668f3B55eE9c30dccEe4b01B3F22", // Updated with new deployment (1 minute duration)
-    abi: (MooveAuctionABI as any).abi,
+    address: "0xF3A15bf233D28435E338DFF2aF2E33c72b701525", // CORRECTED auction contract address
+    abi: auctionABI.abi,
+  },
+  MooveAccessControl: {
+    address: "0x005672EcC14b09A958742B960Ebb76eBE52Be44A",
+    abi: accessControlABI,
   },
   MooveRentalPass: {
-    address: "0x0a2af1Fc7E02F9FB82f1D727d325435D128A4127",
-    abi: (MooveAccessControlABI as any).abi, // Using AccessControl ABI (same as rental pass)
+    address: "0x8fd53ca6D96a3fF33b820E0531d2446524E6400C",
+    abi: [], // Add ABI if needed
   },
 } as const;

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useAccount } from "wagmi";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useReadMooveNFT } from "./useContract";
+import { contracts } from "@/utils/contracts";
 
 interface UserNFT {
   tokenId: string;
@@ -153,12 +154,8 @@ async function scanAllNFTs(userAddress: string): Promise<{
       window.ethereum
     );
     const nftContract = new (await import("ethers")).Contract(
-      "0x40E455515bf712144C1A5D859F19d64b537754f7", // MooveNFT address
-      [
-        "function totalSupply() view returns (uint256)",
-        "function ownerOf(uint256 tokenId) view returns (address)",
-        "function tokenURI(uint256 tokenId) view returns (string)",
-      ],
+      contracts.MooveNFT.address,
+      contracts.MooveNFT.abi,
       provider
     );
 
@@ -324,11 +321,8 @@ export function useRealNFTCollection(): NFTCollectionResult {
             window.ethereum
           );
           const nftContract = new (await import("ethers")).Contract(
-            "0x40E455515bf712144C1A5D859F19d64b537754f7", // MooveNFT address
-            [
-              "function ownerOf(uint256 tokenId) view returns (address)",
-              "function tokenURI(uint256 tokenId) view returns (string)",
-            ],
+            contracts.MooveNFT.address,
+            contracts.MooveNFT.abi,
             provider
           );
 

@@ -5,6 +5,7 @@ import Footer from "../components/layout/Footer";
 import RouteLoadingWrapper from "@/components/layout/RouteLoadingWrapper";
 
 import WalletTest from "@/components/wallet/WalletTest";
+import ContractFunctionTester from "@/components/debug/ContractFunctionTester";
 
 import ClientOnly from "@/components/wallet/ClientOnly";
 import { Inter } from "next/font/google";
@@ -164,11 +165,10 @@ export default function RootLayout({ children }: RootLayoutProps) {
           {/* Route loading overlay */}
           <RouteLoadingWrapper />
 
-          {/*           <ClientOnly>
-            <WalletDebug />
+          <ClientOnly>
             <WalletTest />
-            <WalletDebugPanel />
-          </ClientOnly> */}
+            <ContractFunctionTester />
+          </ClientOnly>
         </SimplifiedAppProvider>
 
         {/* Enhanced analytics and debug tools */}

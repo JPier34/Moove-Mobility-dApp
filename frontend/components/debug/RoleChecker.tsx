@@ -1,173 +1,172 @@
 "use client";
 
 import { useAccount } from "wagmi";
-import { useHasRole, useUserRoles } from "../../hooks/useContract";
-
-const ROLES = {
-  DEFAULT_ADMIN:
-    "0x0000000000000000000000000000000000000000000000000000000000000000",
-  MASTER_ADMIN:
-    "0xa49807205ce4d355092ef5a8a18f56e8913cf4a201fbe287825b095693c21775",
-  MINTER: "0x9f2df0fed2c77648de5860a4cc508cd0818c85b8b8a1ab4ceeef8d981c8956a6",
-  AUCTION_MANAGER:
-    "0x2e1a7d4d13322e7b96f9a57413e1525c250fb7a9021cf91d1540d5b69f16a49f",
-  CUSTOMIZATION_ADMIN:
-    "0xf0887ba65ee2024ea881d91b74c2450ef19e1557f03bed3ea9f16b037cbe2dc9",
-} as const;
+import { useState, useEffect } from "react";
+import { ethers } from "ethers";
+import { contracts } from "@/utils/contracts";
 
 export default function RoleChecker() {
   const { address, isConnected } = useAccount();
-  const { isMasterAdmin, canMint, isLoading } = useUserRoles(address);
+  const [roleInfo, setRoleInfo] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const { data: hasDefaultAdmin } = useHasRole(ROLES.DEFAULT_ADMIN, address);
-  const { data: hasMasterAdmin } = useHasRole(ROLES.MASTER_ADMIN, address);
-  const { data: hasMinter } = useHasRole(ROLES.MINTER, address);
-  const { data: hasAuctionManager } = useHasRole(
-    ROLES.AUCTION_MANAGER,
-    address
-  );
-  const { data: hasCustomizationAdmin } = useHasRole(
-    ROLES.CUSTOMIZATION_ADMIN,
-    address
-  );
+  const checkRoles = async () => {
+    if (!address || !isConnected) return;
+    
+    setIsLoading(true);
+    setError(null);
 
-  if (!isConnected) {
-    return (
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
-        <p className="text-yellow-800">🔐 Connect wallet to check roles</p>
-      </div>
-    );
-  }
+    try {
+      if (typeof window === "undefined" || !window.ethereum) {
+        throw new Error("No ethereum provider available");
+      }
 
-  if (isLoading) {
-    return (
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-        <p className="text-blue-800">🔄 Checking wallet roles...</p>
-      </div>
-    );
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const accessControlContract = new ethers.Contract(
+        contracts.MooveAccessControl.address,
+        contracts.MooveAccessControl.abi,
+        provider
+      );
+
+      console.log(`🔍 Checking roles for account: ${address}`);
+      console.log(`📋 Using access control contract: ${contracts.MooveAccessControl.address}`);
+
+      // Get role constants
+      const DEFAULT_ADMIN_ROLE = await accessControlContract.DEFAULT_ADMIN_ROLE();
+      const MASTER_ADMIN_ROLE = await accessControlContract.MASTER_ADMIN_ROLE();
+      const MINTER_ROLE = await accessControlContract.MINTER_ROLE();
+      const AUCTION_MANAGER_ROLE = await accessControlContract.AUCTION_MANAGER_ROLE();
+
+      console.log("📋 Role constants:", {
+        DEFAULT_ADMIN_ROLE,
+        MASTER_ADMIN_ROLE,
+        MINTER_ROLE,
+        AUCTION_MANAGER_ROLE
+      });
+
+      // Check roles
+      const hasDefaultAdmin = await accessControlContract.hasRole(DEFAULT_ADMIN_ROLE, address);
+      const hasMasterAdmin = await accessControlContract.hasRole(MASTER_ADMIN_ROLE, address);
+      const hasMinter = await accessControlContract.hasRole(MINTER_ROLE, address);
+      const hasAuctionManager = await accessControlContract.hasRole(AUCTION_MANAGER_ROLE, address);
+
+      // Check convenience functions
+      const canMint = await accessControlContract.canMint(address);
+      const canManageAuctions = await accessControlContract.canManageAuctions(address);
+
+      const result = {
+        account: address,
+        roles: {
+          DEFAULT_ADMIN: hasDefaultAdmin,
+          MASTER_ADMIN: hasMasterAdmin,
+          MINTER: hasMinter,
+          AUCTION_MANAGER: hasAuctionManager,
+        },
+        convenience: {
+          canMint,
+          canManageAuctions,
+        },
+        roleConstants: {
+          DEFAULT_ADMIN_ROLE,
+          MASTER_ADMIN_ROLE,
+          MINTER_ROLE,
+          AUCTION_MANAGER_ROLE,
+        }
+      };
+
+      setRoleInfo(result);
+      console.log("🎯 Role check completed:", result);
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Unknown error";
+      setError(errorMessage);
+      console.error("❌ Role check failed:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (address && isConnected) {
+      checkRoles();
+    }
+  }, [address, isConnected]);
+
+  if (process.env.NODE_ENV !== "development") {
+    return null;
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
-      <h3 className="text-lg font-semibold mb-3 text-gray-900">
-        🔐 Wallet Role Checker
-      </h3>
+    <div className="fixed top-4 right-4 bg-black/90 text-white p-4 rounded-lg text-xs font-mono z-50 max-w-md">
+      <div className="font-bold mb-3 text-green-400">🔐 Role Checker</div>
+      
+      {isLoading && (
+        <div className="text-yellow-400 mb-3">🔄 Checking roles...</div>
+      )}
 
-      <div className="space-y-2 mb-4">
-        <p className="text-sm text-gray-600">
-          <strong>Wallet:</strong> {address}
-        </p>
-      </div>
+      {error && (
+        <div className="text-red-400 mb-3">❌ Error: {error}</div>
+      )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <h4 className="font-medium text-gray-800">Primary Roles</h4>
-          <div className="space-y-1 text-sm">
-            <div className="flex items-center justify-between">
-              <span>Master Admin:</span>
-              <span
-                className={isMasterAdmin ? "text-green-600" : "text-red-600"}
-              >
-                {isMasterAdmin ? "✅ Yes" : "❌ No"}
-              </span>
+      {roleInfo && (
+        <div className="space-y-3">
+          {/* Account Info */}
+          <div>
+            <div className="text-yellow-400 font-semibold">Account:</div>
+            <div className="break-all">{roleInfo.account}</div>
+          </div>
+
+          {/* Roles */}
+          <div>
+            <div className="text-yellow-400 font-semibold">Roles:</div>
+            <div className={roleInfo.roles.DEFAULT_ADMIN ? "text-green-400" : "text-red-400"}>
+              {roleInfo.roles.DEFAULT_ADMIN ? "✅" : "❌"} DEFAULT_ADMIN
             </div>
-            <div className="flex items-center justify-between">
-              <span>Can Mint NFTs:</span>
-              <span className={canMint ? "text-green-600" : "text-red-600"}>
-                {canMint ? "✅ Yes" : "❌ No"}
-              </span>
+            <div className={roleInfo.roles.MASTER_ADMIN ? "text-green-400" : "text-red-400"}>
+              {roleInfo.roles.MASTER_ADMIN ? "✅" : "❌"} MASTER_ADMIN
+            </div>
+            <div className={roleInfo.roles.MINTER ? "text-green-400" : "text-red-400"}>
+              {roleInfo.roles.MINTER ? "✅" : "❌"} MINTER
+            </div>
+            <div className={roleInfo.roles.AUCTION_MANAGER ? "text-green-400" : "text-red-400"}>
+              {roleInfo.roles.AUCTION_MANAGER ? "✅" : "❌"} AUCTION_MANAGER
             </div>
           </div>
-        </div>
 
-        <div className="space-y-2">
-          <h4 className="font-medium text-gray-800">Detailed Roles</h4>
-          <div className="space-y-1 text-sm">
-            <div className="flex items-center justify-between">
-              <span>Default Admin:</span>
-              <span
-                className={hasDefaultAdmin ? "text-green-600" : "text-red-600"}
-              >
-                {hasDefaultAdmin ? "✅ Yes" : "❌ No"}
-              </span>
+          {/* Convenience Functions */}
+          <div>
+            <div className="text-yellow-400 font-semibold">Convenience:</div>
+            <div className={roleInfo.convenience.canMint ? "text-green-400" : "text-red-400"}>
+              {roleInfo.convenience.canMint ? "✅" : "❌"} canMint()
             </div>
-            <div className="flex items-center justify-between">
-              <span>Master Admin:</span>
-              <span
-                className={hasMasterAdmin ? "text-green-600" : "text-red-600"}
-              >
-                {hasMasterAdmin ? "✅ Yes" : "❌ No"}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>Minter:</span>
-              <span className={hasMinter ? "text-green-600" : "text-red-600"}>
-                {hasMinter ? "✅ Yes" : "❌ No"}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>Auction Manager:</span>
-              <span
-                className={
-                  hasAuctionManager ? "text-green-600" : "text-red-600"
-                }
-              >
-                {hasAuctionManager ? "✅ Yes" : "❌ No"}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>Customization Admin:</span>
-              <span
-                className={
-                  hasCustomizationAdmin ? "text-green-600" : "text-red-600"
-                }
-              >
-                {hasCustomizationAdmin ? "✅ Yes" : "❌ No"}
-              </span>
+            <div className={roleInfo.convenience.canManageAuctions ? "text-green-400" : "text-red-400"}>
+              {roleInfo.convenience.canManageAuctions ? "✅" : "❌"} canManageAuctions()
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* Extension capability warning */}
-      <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-        <h5 className="font-medium text-amber-800 mb-1">
-          ⏰ English Auction Auto-Extension
-        </h5>
-        <p className="text-sm text-amber-700">
-          {hasAuctionManager
-            ? "✅ Your wallet can extend auctions. English auction auto-extension should work properly."
-            : "⚠️ Your wallet cannot extend auctions. English auction auto-extension may not work - auctions may end as originally scheduled."}
-        </p>
-      </div>
-
-      {/* Role explanations */}
-      <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
-        <h5 className="font-medium text-gray-800 mb-2">Role Explanations</h5>
-        <div className="space-y-1 text-xs text-gray-600">
-          <p>
-            <strong>Default Admin:</strong> Can grant/revoke all roles
-          </p>
-          <p>
-            <strong>Master Admin:</strong> Full system administration privileges
-          </p>
-          <p>
-            <strong>Minter:</strong> Can mint new NFTs
-          </p>
-          <p>
-            <strong>Auction Manager:</strong> Can extend auction durations
-            (required for auto-extension)
-          </p>
-          <p>
-            <strong>Customization Admin:</strong> Can modify system settings
-          </p>
+          {/* Summary */}
+          <div className="border-t border-gray-600 pt-2">
+            <div className="text-yellow-400 font-semibold">Summary:</div>
+            {roleInfo.convenience.canMint ? (
+              <div className="text-green-400">🎯 Can mint NFTs!</div>
+            ) : (
+              <div className="text-red-400">❌ Cannot mint NFTs - missing MINTER_ROLE</div>
+            )}
+          </div>
         </div>
+      )}
+
+      {/* Actions */}
+      <div className="mt-3 space-y-2">
+        <button
+          onClick={checkRoles}
+          disabled={isLoading || !address}
+          className="w-full px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 disabled:opacity-50"
+        >
+          {isLoading ? "Checking..." : "Check Roles"}
+        </button>
       </div>
     </div>
   );
 }
-
-
-
-
-

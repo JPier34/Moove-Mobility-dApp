@@ -56,8 +56,11 @@ export default function AllAuctionsDebug() {
 
       const provider = new ethers.BrowserProvider(window.ethereum);
       const auctionContract = new ethers.Contract(
-        contracts.MooveAuction.address,
-        contracts.MooveAuction.abi,
+        "0xF3A15bf233D28435E338DFF2aF2E33c72b701525", // CORRECTED MooveAuction address
+        [
+          "function totalAuctions() view returns (uint256)",
+          "function getAuction(uint256 auctionId) view returns (bytes)",
+        ],
         provider
       );
 
@@ -69,7 +72,113 @@ export default function AllAuctionsDebug() {
       const contractAuctions = [];
       for (let i = 0; i < totalCount; i++) {
         try {
-          const auctionData = await auctionContract.getAuction(i);
+          // Get raw bytes data
+          const rawData = await auctionContract.getAuction(i);
+          console.log(`📊 Raw data for auction ${i}:`, rawData);
+          console.log(`📏 Raw data length: ${rawData.length} characters`);
+          console.log(`📏 Raw data bytes: ${(rawData.length - 2) / 2} bytes`);
+
+          // Analyze the raw data structure
+          const dataBytes = (rawData.length - 2) / 2;
+          console.log(
+            `🔍 Data analysis: ${dataBytes} bytes = ${
+              dataBytes / 32
+            } fields of 32 bytes each`
+          );
+
+          // Try different decoding approaches based on data length
+          let decoded;
+          let auctionData;
+
+          if (rawData === "0x") {
+            // Auction doesn't exist
+            console.log(`ℹ️ Auction ${i} doesn't exist (empty data)`);
+            continue;
+          }
+
+          // Calculate expected length for different structures
+          const dataLength = rawData.length - 2; // Remove "0x" prefix
+          console.log(`📏 Data length for auction ${i}: ${dataLength} bytes`);
+
+          // Try manual hex parsing for truncated data
+          if (dataBytes >= 256) {
+            console.log(
+              `🔍 Manual hex parsing for auction ${i} (${dataBytes} bytes)`
+            );
+
+            // Extract data manually from hex string
+            const hexData = rawData.slice(2); // Remove "0x"
+
+            // Parse first 8 fields (256 bytes = 8 * 32 bytes)
+            const auctionId = BigInt("0x" + hexData.slice(0, 64));
+            const nftContract = "0x" + hexData.slice(64, 104);
+            const tokenId = BigInt("0x" + hexData.slice(104, 168));
+            const seller = "0x" + hexData.slice(168, 208);
+            const auctionType = parseInt(hexData.slice(208, 210), 16);
+            const startingPrice = BigInt("0x" + hexData.slice(210, 274));
+            const reservePrice = BigInt("0x" + hexData.slice(274, 338));
+            const buyNowPrice = BigInt("0x" + hexData.slice(338, 402));
+
+            console.log(`🔍 Manual parsing results:`, {
+              auctionId: auctionId.toString(),
+              nftContract,
+              tokenId: tokenId.toString(),
+              seller,
+              auctionType,
+              startingPrice: ethers.formatEther(startingPrice),
+              reservePrice: ethers.formatEther(reservePrice),
+              buyNowPrice: ethers.formatEther(buyNowPrice),
+            });
+
+            decoded = [
+              auctionId,
+              nftContract,
+              tokenId,
+              seller,
+              auctionType,
+              startingPrice,
+              reservePrice,
+              buyNowPrice,
+            ];
+          } else {
+            console.log(
+              `❌ Data too short for auction ${i}: ${dataBytes} bytes`
+            );
+            continue;
+          }
+
+          // Create auctionData based on number of decoded fields
+          auctionData = {
+            auctionId: decoded[0].toString(),
+            nftContract: decoded[1],
+            tokenId: decoded[2].toString(),
+            seller: decoded[3],
+            // Use decoded values if available, otherwise defaults
+            auctionType: decoded[4] !== undefined ? Number(decoded[4]) : 0,
+            startingPrice:
+              decoded[5] !== undefined ? ethers.formatEther(decoded[5]) : "0.0",
+            reservePrice:
+              decoded[6] !== undefined ? ethers.formatEther(decoded[6]) : "0.0",
+            buyNowPrice:
+              decoded[7] !== undefined ? ethers.formatEther(decoded[7]) : "0.0",
+            // Default values for missing fields
+            currentPrice: "0.0",
+            startTime: 0,
+            endTime: 0,
+            bidIncrement: "0.0",
+            highestBidder: "0x0000000000000000000000000000000000000000",
+            highestBid: "0.0",
+            status: 0,
+            allowPartialFulfillment: false,
+            minBidders: 0,
+            totalBidders: 0,
+            isSettled: false,
+            extensionThreshold: "0.0",
+            extensionDuration: 0,
+          };
+
+          console.log(`✅ Decoded auction ${i}:`, auctionData);
+
           contractAuctions.push({
             auctionId: i,
             contractData: auctionData,
@@ -81,18 +190,19 @@ export default function AllAuctionsDebug() {
             ),
             highestBidder: auctionData.highestBidder,
             seller: auctionData.seller,
-            tokenId: auctionData.tokenId.toString(),
+            tokenId: auctionData.tokenId,
             nftContract: auctionData.nftContract,
             isSettled: auctionData.isSettled,
-            startTime: new Date(
-              Number(auctionData.startTime) * 1000
-            ).toISOString(),
-            endTime: new Date(Number(auctionData.endTime) * 1000).toISOString(),
-            startingPrice: ethers.formatEther(auctionData.startingPrice),
-            reservePrice: auctionData.reservePrice
-              ? ethers.formatEther(auctionData.reservePrice)
-              : "N/A",
-            highestBid: ethers.formatEther(auctionData.highestBid),
+            startTime: new Date(auctionData.startTime * 1000).toISOString(),
+            endTime: new Date(auctionData.endTime * 1000).toISOString(),
+            startingPrice: auctionData.startingPrice,
+            reservePrice: auctionData.reservePrice,
+            highestBid: auctionData.highestBid,
+            timeRemaining: auctionData.endTime - Math.floor(Date.now() / 1000),
+            timeRemainingMinutes: Math.round(
+              (auctionData.endTime - Math.floor(Date.now() / 1000)) / 60
+            ),
+            isExpired: Math.floor(Date.now() / 1000) >= auctionData.endTime,
           });
         } catch (err) {
           console.error(`❌ Error fetching auction ${i}:`, err);

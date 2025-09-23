@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { ethers } from "ethers";
-import { CONTRACT_ADDRESSES, CONTRACT_ABIS } from "@/lib/contracts";
+import { contracts } from "@/utils/contracts";
 
 // Global cache for all NFTs (not user-specific)
 interface GlobalNFTCacheEntry {
@@ -150,8 +150,8 @@ export function useGlobalNFTCache() {
 
       const provider = new ethers.BrowserProvider(window.ethereum);
       const nftContract = new ethers.Contract(
-        CONTRACT_ADDRESSES.MooveNFT,
-        CONTRACT_ABIS.MooveNFT,
+        contracts.MooveNFT.address,
+        contracts.MooveNFT.abi,
         provider
       );
 

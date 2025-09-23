@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
 import { useAccount } from "wagmi";
 import { ethers } from "ethers";
-import { CONTRACT_ADDRESSES, CONTRACT_ABIS } from "@/lib/contracts";
+import { contracts } from "@/utils/contracts";
 import toast from "react-hot-toast";
 
 export interface BidRefundInfo {
@@ -35,8 +35,8 @@ export function useAuctionRefunds() {
 
       const provider = new ethers.BrowserProvider(window.ethereum);
       const auctionContract = new ethers.Contract(
-        CONTRACT_ADDRESSES.MooveAuction,
-        CONTRACT_ABIS.MooveAuction,
+        contracts.MooveAuction.address,
+        contracts.MooveAuction.abi,
         provider
       );
 
@@ -127,8 +127,8 @@ export function useAuctionRefunds() {
         const signer = await provider.getSigner();
 
         const auctionContract = new ethers.Contract(
-          CONTRACT_ADDRESSES.MooveAuction,
-          CONTRACT_ABIS.MooveAuction,
+          contracts.MooveAuction.address,
+          contracts.MooveAuction.abi,
           signer
         );
 
@@ -170,8 +170,8 @@ export function useAuctionRefunds() {
 
       const provider = new ethers.BrowserProvider(window.ethereum);
       const auctionContract = new ethers.Contract(
-        CONTRACT_ADDRESSES.MooveAuction,
-        CONTRACT_ABIS.MooveAuction,
+        contracts.MooveAuction.address,
+        contracts.MooveAuction.abi,
         provider
       );
 

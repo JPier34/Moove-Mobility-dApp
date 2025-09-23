@@ -67,7 +67,17 @@ export function useWriteMooveNFT() {
     // Use MooveNFT contract for NFT operations
     const result = writeContract({
       address: contracts.MooveNFT.address as `0x${string}`,
-      abi: contracts.MooveNFT.abi as any,
+      abi: [
+        "function ownerOf(uint256 tokenId) view returns (address)",
+        "function tokenURI(uint256 tokenId) view returns (string)",
+        "function totalSupply() view returns (uint256)",
+        "function balanceOf(address owner) view returns (uint256)",
+        "function transferFrom(address from, address to, uint256 tokenId) external",
+        "function approve(address to, uint256 tokenId) external",
+        "function getApproved(uint256 tokenId) view returns (address)",
+        "function setApprovalForAll(address operator, bool approved) external",
+        "function isApprovedForAll(address owner, address operator) view returns (bool)",
+      ] as any,
       functionName: functionName as any,
       args: args as any,
       value: value,
@@ -97,7 +107,7 @@ export function useReadMooveAuction<T = unknown>(
     address: contracts.MooveAuction.address as `0x${string}`,
     abi: contracts.MooveAuction.abi,
     functionName: functionName as any,
-    args: args as readonly unknown[],
+    args: args.length === 0 ? undefined : (args as [bigint]),
     query: {
       enabled: options?.enabled !== false,
     },
@@ -135,12 +145,42 @@ export function useWriteMooveAuction() {
         isString: typeof arg === "string",
       })),
       value: value?.toString(),
-      abiLength: contracts.MooveAuction.abi.length,
+      abiLength: [
+        "function getAuction(uint256 auctionId) view returns (tuple(uint256 auctionId, address nftContract, uint256 tokenId, address seller, uint8 auctionType, uint256 startingPrice, uint256 reservePrice, uint256 buyNowPrice, uint256 currentPrice, uint256 startTime, uint256 endTime, uint256 bidIncrement, address highestBidder, uint256 highestBid, uint8 status, bool allowPartialFulfillment, uint256 minBidders, uint256 totalBidders, bool isSettled, uint256 extensionThreshold, uint256 extensionDuration, uint256 revealEndTime, bool revealPhaseStarted))",
+        "function getSealedBidRevealInfo(uint256 auctionId) view returns (bool isSealedBid, bool revealPhaseStarted, uint256 revealEndTime, bool isRevealPhaseActive, uint256 timeUntilRevealEnd)",
+        "function endAuction(uint256 auctionId) external",
+        "function startRevealPhase(uint256 auctionId) external",
+        "function endRevealPhase(uint256 auctionId) external",
+        "function settleAuction(uint256 auctionId) external",
+        "function submitSealedBid(uint256 auctionId, bytes32 bidHash) external payable",
+        "function revealSealedBid(uint256 auctionId, uint256 bidAmount, uint256 nonce) external",
+        "function refundRemainingBidders(uint256 auctionId) external",
+        "function getAuctionBids(uint256 auctionId) view returns (tuple(address bidder, uint256 bidAmount, bool isRevealed)[])",
+        "function totalAuctions() view returns (uint256)",
+        "event AuctionSettled(uint256 indexed auctionId, address indexed winner, uint256 finalPrice, uint256 platformFee, uint256 royaltyFee)",
+        "event AuctionExtended(uint256 indexed auctionId, address indexed bidder, uint256 extensionDuration, uint256 newEndTime, string reason)",
+        "event BidRefunded(uint256 indexed auctionId, address indexed bidder, uint256 refundAmount)",
+      ].length,
     });
 
     writeContract({
       address: contracts.MooveAuction.address as `0x${string}`,
-      abi: contracts.MooveAuction.abi,
+      abi: [
+        "function getAuction(uint256 auctionId) view returns (tuple(uint256 auctionId, address nftContract, uint256 tokenId, address seller, uint8 auctionType, uint256 startingPrice, uint256 reservePrice, uint256 buyNowPrice, uint256 currentPrice, uint256 startTime, uint256 endTime, uint256 bidIncrement, address highestBidder, uint256 highestBid, uint8 status, bool allowPartialFulfillment, uint256 minBidders, uint256 totalBidders, bool isSettled, uint256 extensionThreshold, uint256 extensionDuration, uint256 revealEndTime, bool revealPhaseStarted))",
+        "function getSealedBidRevealInfo(uint256 auctionId) view returns (bool isSealedBid, bool revealPhaseStarted, uint256 revealEndTime, bool isRevealPhaseActive, uint256 timeUntilRevealEnd)",
+        "function endAuction(uint256 auctionId) external",
+        "function startRevealPhase(uint256 auctionId) external",
+        "function endRevealPhase(uint256 auctionId) external",
+        "function settleAuction(uint256 auctionId) external",
+        "function submitSealedBid(uint256 auctionId, bytes32 bidHash) external payable",
+        "function revealSealedBid(uint256 auctionId, uint256 bidAmount, uint256 nonce) external",
+        "function refundRemainingBidders(uint256 auctionId) external",
+        "function getAuctionBids(uint256 auctionId) view returns (tuple(address bidder, uint256 bidAmount, bool isRevealed)[])",
+        "function totalAuctions() view returns (uint256)",
+        "event AuctionSettled(uint256 indexed auctionId, address indexed winner, uint256 finalPrice, uint256 platformFee, uint256 royaltyFee)",
+        "event AuctionExtended(uint256 indexed auctionId, address indexed bidder, uint256 extensionDuration, uint256 newEndTime, string reason)",
+        "event BidRefunded(uint256 indexed auctionId, address indexed bidder, uint256 refundAmount)",
+      ],
       functionName: functionName as any,
       args: args as readonly unknown[],
       value: value,
@@ -167,7 +207,15 @@ export function useReadMooveRentalPass<T = unknown>(
 ) {
   return useReadContract({
     address: contracts.MooveRentalPass.address as `0x${string}`,
-    abi: contracts.MooveRentalPass.abi as any,
+    abi: [
+      "function hasRole(bytes32 role, address account) view returns (bool)",
+      "function grantRole(bytes32 role, address account) external",
+      "function revokeRole(bytes32 role, address account) external",
+      "function DEFAULT_ADMIN_ROLE() view returns (bytes32)",
+      "function MASTER_ADMIN_ROLE() view returns (bytes32)",
+      "function MINTER_ROLE() view returns (bytes32)",
+      "function AUCTION_MANAGER_ROLE() view returns (bytes32)",
+    ] as any,
     functionName,
     args,
     ...options,
@@ -249,7 +297,17 @@ export function useWriteMooveStickerNFT() {
     // Use MooveNFT contract for minting
     const result = writeContract({
       address: contracts.MooveNFT.address as `0x${string}`,
-      abi: contracts.MooveNFT.abi as any,
+      abi: [
+        "function ownerOf(uint256 tokenId) view returns (address)",
+        "function tokenURI(uint256 tokenId) view returns (string)",
+        "function totalSupply() view returns (uint256)",
+        "function balanceOf(address owner) view returns (uint256)",
+        "function transferFrom(address from, address to, uint256 tokenId) external",
+        "function approve(address to, uint256 tokenId) external",
+        "function getApproved(uint256 tokenId) view returns (address)",
+        "function setApprovalForAll(address operator, bool approved) external",
+        "function isApprovedForAll(address owner, address operator) view returns (bool)",
+      ] as any,
       functionName: functionName as any,
       args: args as any,
     });
@@ -292,33 +350,8 @@ export function useMooveNFTOperations() {
   };
 }
 
-// Hook helper for auction operations (placeholder for future use)
-export function useMooveAuctionOperations() {
-  const { writeMooveAuction, ...writeState } = useWriteMooveAuction();
-
-  const createAuction = (
-    tokenId: bigint,
-    startingPrice: bigint,
-    duration: bigint
-  ) => {
-    writeMooveAuction("createAuction", [tokenId, startingPrice, duration]);
-  };
-
-  const placeBid = (auctionId: bigint, bidAmount: bigint) => {
-    writeMooveAuction("placeBid", [auctionId], bidAmount);
-  };
-
-  const endAuction = (auctionId: bigint) => {
-    writeMooveAuction("endAuction", [auctionId]);
-  };
-
-  return {
-    createAuction,
-    placeBid,
-    endAuction,
-    ...writeState,
-  };
-}
+// Hook helper for auction operations (REMOVED - use useSecureNFTAuctionFlow instead)
+// Note: useMooveAuctionOperations was a placeholder and is no longer needed
 
 // Hook to read MooveAccessControl contracts (ACTIVE - currently deployed)
 export function useReadMooveAccessControl<T = unknown>(
@@ -347,8 +380,8 @@ export function useWriteMooveAccessControl() {
     args: readonly unknown[] = []
   ) => {
     writeContract({
-      address: contracts.MooveAccessControl.address as `0x${string}`,
-      abi: contracts.MooveAccessControl.abi as any,
+      address: "0x005672EcC14b09A958742B960Ebb76eBE52Be44A" as `0x${string}`,
+      abi: contracts.MooveRentalPass.abi as any,
       functionName,
       args,
     });

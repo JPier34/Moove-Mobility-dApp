@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useWatchContractEvent } from "wagmi";
 import { contracts } from "../utils/contracts";
-import MooveAuctionABI from "../src/abis/MooveAuction.json";
 import { toast } from "react-hot-toast";
 
 export interface AuctionExtensionEvent {
@@ -25,7 +24,7 @@ export function useAuctionExtensionEvents() {
   // Watch for AuctionExtended events
   useWatchContractEvent({
     address: contracts.MooveAuction.address as `0x${string}`,
-    abi: MooveAuctionABI.abi,
+    abi: contracts.MooveAuction.abi,
     eventName: "AuctionExtended",
     onLogs(logs) {
       console.log("🔄 AuctionExtended events received:", logs);

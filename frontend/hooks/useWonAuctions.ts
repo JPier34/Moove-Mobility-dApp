@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useAccount, useWatchContractEvent } from "wagmi";
 import { useAuctionsEnhanced } from "./enhanced-auction-utils";
-import { contracts } from "../utils/contracts";
 import { ethers } from "ethers";
+import { contracts } from "../utils/contracts";
 
 export interface WonAuction {
   auctionId: string;

@@ -3,8 +3,8 @@
 import { useState, useCallback } from "react";
 import { ethers } from "ethers";
 import { useAccount } from "wagmi";
-import { contracts } from "@/utils/contracts";
 import { AuctionType } from "@/types/auction";
+import { contracts } from "@/utils/contracts";
 
 // ============================================================================
 // TYPES & INTERFACES
@@ -26,8 +26,8 @@ interface AuctionParams {
   buyNowPrice: bigint;
   duration: number;
   bidIncrement: bigint;
-  extensionThreshold: number;
-  extensionDuration: number;
+  extensionThreshold: number; // Required by contract
+  extensionDuration: number; // Required by contract
 }
 
 interface FlowResult {
@@ -56,6 +56,52 @@ async function secureNFTMint(
   console.log("🎨 Starting secure NFT mint...");
 
   try {
+    // 0. Check if caller has MINTER_ROLE
+    console.log("🔍 Checking MINTER_ROLE...");
+    const callerAddress = mintParams[0];
+
+    // Get access control contract
+    if (!window.ethereum) {
+      throw new Error("No ethereum provider available");
+    }
+
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    const accessControlContract = new ethers.Contract(
+      contracts.MooveAccessControl.address,
+      contracts.MooveAccessControl.abi,
+      provider
+    );
+
+    // Check MINTER_ROLE and MASTER_ADMIN_ROLE
+    const MINTER_ROLE = await accessControlContract.MINTER_ROLE();
+    const MASTER_ADMIN_ROLE = await accessControlContract.MASTER_ADMIN_ROLE();
+
+    const hasMinterRole = await accessControlContract.hasRole(
+      MINTER_ROLE,
+      callerAddress
+    );
+    const hasMasterAdminRole = await accessControlContract.hasRole(
+      MASTER_ADMIN_ROLE,
+      callerAddress
+    );
+
+    console.log("📋 Role check result:", {
+      callerAddress,
+      MINTER_ROLE,
+      MASTER_ADMIN_ROLE,
+      hasMinterRole,
+      hasMasterAdminRole,
+      accessControlAddress: contracts.MooveAccessControl.address,
+    });
+
+    if (!hasMinterRole && !hasMasterAdminRole) {
+      throw new Error(
+        `Account ${callerAddress} does not have MINTER_ROLE or MASTER_ADMIN_ROLE. Cannot mint NFT.`
+      );
+    }
+
+    console.log("✅ MINTER_ROLE confirmed, proceeding with mint...");
+
     // 1. Esegui la transazione di mint
     // La funzione mintNFT richiede: to (address) e metadataURI (string)
     const tx = await nftContract.mintNFT(
@@ -69,18 +115,37 @@ async function secureNFTMint(
     console.log("✅ Transaction confirmed in block:", receipt.blockNumber);
 
     // 3. Parsing sicuro degli eventi per ottenere l'ID reale
+    console.log("🔍 Total logs in receipt:", receipt.logs.length);
+    console.log("📋 All logs:", receipt.logs);
+
     const transferEvents = receipt.logs
       .map((log: any) => {
         try {
-          return nftContract.interface.parseLog(log);
-        } catch {
+          const parsed = nftContract.interface.parseLog(log);
+          console.log("✅ Parsed log:", parsed);
+          return parsed;
+        } catch (error) {
+          console.log("❌ Failed to parse log:", log, "Error:", error);
           return null;
         }
       })
-      .filter(
-        (event: any) =>
-          event?.name === "Transfer" && event.args.from === ethers.ZeroAddress // Mint event
-      );
+      .filter((event: any) => {
+        console.log("🔍 Checking event:", event);
+        if (event?.name === "Transfer") {
+          console.log("📤 Transfer event found:", event);
+          console.log("📤 From:", event.args.from);
+          console.log("📤 To:", event.args.to);
+          console.log("📤 TokenId:", event.args.tokenId);
+          console.log("📤 ZeroAddress:", ethers.ZeroAddress);
+          console.log(
+            "📤 Is mint event:",
+            event.args.from === ethers.ZeroAddress
+          );
+        }
+        return (
+          event?.name === "Transfer" && event.args.from === ethers.ZeroAddress
+        ); // Mint event
+      });
 
     if (transferEvents.length === 0) {
       throw new Error("No Transfer event found in transaction");
@@ -107,6 +172,19 @@ async function secureNFTMint(
     } catch (error) {
       console.warn("⚠️ Could not fetch token URI:", error);
     }
+
+    // 7. Emit custom event to prevent duplicate notifications
+    // This ensures the notification system knows this is a mint, not a transfer
+    const mintEvent = new CustomEvent("nftMinted", {
+      detail: {
+        tokenId: tokenId.toString(),
+        owner: owner,
+        transactionHash: receipt.hash,
+        blockNumber: receipt.blockNumber,
+        isMint: true, // Flag to distinguish from transfers
+      },
+    });
+    window.dispatchEvent(mintEvent);
 
     return {
       tokenId,
@@ -358,18 +436,136 @@ async function secureAuctionCreation(
 
   // 4. Crea l'asta
   try {
-    const tx = await auctionContract.createAuction(
-      params.nftContract,
-      params.tokenId,
-      params.auctionType,
-      params.startPrice,
-      params.reservePrice,
-      params.buyNowPrice,
-      params.duration,
-      params.bidIncrement,
-      params.extensionThreshold,
-      params.extensionDuration
-    );
+    // First, let's test if the contract is accessible
+    console.log("🔍 Testing contract accessibility...");
+    try {
+      const totalAuctions = await auctionContract.totalAuctions();
+      console.log(
+        "✅ Contract accessible, total auctions:",
+        totalAuctions.toString()
+      );
+    } catch (testError) {
+      console.error("❌ Contract not accessible:", testError);
+      throw new Error(
+        `Contract not accessible: ${
+          testError instanceof Error ? testError.message : String(testError)
+        }`
+      );
+    }
+
+    // Test if createAuction function exists
+    console.log("🔍 Testing createAuction function existence...");
+    try {
+      // Try to get the function signature
+      const createAuctionFunction =
+        auctionContract.interface.getFunction("createAuction");
+      if (createAuctionFunction) {
+        console.log(
+          "✅ createAuction function exists:",
+          createAuctionFunction.format()
+        );
+      }
+    } catch (functionError) {
+      console.error("❌ createAuction function not found:", functionError);
+
+      // List all available functions
+      console.log("🔍 Available functions in contract:");
+      const functions = auctionContract.interface.fragments;
+      Object.keys(functions).forEach((funcName) => {
+        const fragment = (functions as any)[funcName];
+        if (fragment && typeof fragment.format === "function") {
+          console.log(`  - ${funcName}: ${fragment.format()}`);
+        }
+      });
+
+      throw new Error(
+        `createAuction function not found: ${
+          functionError instanceof Error
+            ? functionError.message
+            : String(functionError)
+        }`
+      );
+    }
+
+    console.log("🔍 Calling createAuction with params:", {
+      nftContract: params.nftContract,
+      tokenId: params.tokenId.toString(),
+      auctionType: params.auctionType,
+      startPrice: params.startPrice.toString(),
+      reservePrice: params.reservePrice.toString(),
+      buyNowPrice: params.buyNowPrice.toString(),
+      duration: params.duration.toString(),
+      bidIncrement: params.bidIncrement.toString(),
+      extensionThreshold: params.extensionThreshold.toString(),
+      extensionDuration: params.extensionDuration.toString(),
+    });
+
+    // Test both 8 and 10 parameters to see which one works
+    console.log("🔍 Testing createAuction with different parameter counts...");
+
+    let tx;
+    let successWith8Params = false;
+    let successWith10Params = false;
+
+    // Try with 8 parameters first (older contract version)
+    try {
+      console.log(
+        "🔍 Trying createAuction with 8 parameters (older version)..."
+      );
+      tx = await auctionContract.createAuction(
+        params.nftContract,
+        params.tokenId,
+        params.auctionType,
+        params.startPrice,
+        params.reservePrice,
+        params.buyNowPrice,
+        params.duration,
+        params.bidIncrement
+      );
+      successWith8Params = true;
+      console.log("✅ createAuction with 8 parameters succeeded!");
+    } catch (error8) {
+      console.log(
+        "❌ createAuction with 8 parameters failed:",
+        error8 instanceof Error ? error8.message : String(error8)
+      );
+    }
+
+    // Try with 10 parameters (newer contract version)
+    if (!successWith8Params) {
+      try {
+        console.log(
+          "🔍 Trying createAuction with 10 parameters (newer version)..."
+        );
+        tx = await auctionContract.createAuction(
+          params.nftContract,
+          params.tokenId,
+          params.auctionType,
+          params.startPrice,
+          params.reservePrice,
+          params.buyNowPrice,
+          params.duration,
+          params.bidIncrement,
+          params.extensionThreshold,
+          params.extensionDuration
+        );
+        successWith10Params = true;
+        console.log("✅ createAuction with 10 parameters succeeded!");
+      } catch (error10) {
+        console.log(
+          "❌ createAuction with 10 parameters failed:",
+          error10 instanceof Error ? error10.message : String(error10)
+        );
+      }
+    }
+
+    if (!successWith8Params && !successWith10Params) {
+      throw new Error(
+        "Both 8 and 10 parameter versions failed. Contract may not have createAuction function."
+      );
+    }
+
+    console.log("✅ createAuction transaction sent successfully");
 
     console.log("📡 Auction creation transaction sent:", tx.hash);
 
@@ -517,6 +713,7 @@ export function useSecureNFTAuctionFlow() {
           signer
         );
 
+        // Use the complete ABI from JSON file
         const auctionContract = new ethers.Contract(
           contracts.MooveAuction.address,
           contracts.MooveAuction.abi,

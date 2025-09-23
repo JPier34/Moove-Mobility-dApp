@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useAccount } from "wagmi";
+import { contracts } from "@/utils/contracts";
 
 // Cache per NFT ownership e metadata
 interface NFTCacheEntry {
@@ -195,11 +196,8 @@ export function useNFTCache() {
           window.ethereum
         );
         const nftContract = new (await import("ethers")).Contract(
-          "0x40E455515bf712144C1A5D859F19d64b537754f7",
-          [
-            "function ownerOf(uint256 tokenId) view returns (address)",
-            "function tokenURI(uint256 tokenId) view returns (string)",
-          ],
+          contracts.MooveNFT.address,
+          contracts.MooveNFT.abi,
           provider
         );
 

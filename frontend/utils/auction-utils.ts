@@ -1,17 +1,40 @@
 import { ethers } from "ethers";
-import { CONTRACT_ADDRESSES, CONTRACT_ABIS } from "../lib/contracts";
+import { contracts } from "@/utils/contracts";
 
 export interface AuctionData {
   auctionId: number;
+  nftContract: string;
   tokenId: number;
-  startingPrice: bigint;
-  currentPrice: bigint;
-  highestBid: bigint;
-  endTime: number;
-  status: number;
   seller: string;
+  auctionType: number;
+  startingPrice: bigint;
+  reservePrice: bigint;
+  buyNowPrice: bigint;
+  currentPrice: bigint;
+  startTime: number;
+  endTime: number;
+  bidIncrement: bigint;
   highestBidder: string;
-  bidCount?: number; // Number of bidders in the auction
+  highestBid: bigint;
+  status: number;
+  allowPartialFulfillment: boolean;
+  minBidders: number;
+  totalBidders: number;
+  isSettled: boolean;
+  extensionThreshold: bigint;
+  extensionDuration: bigint;
+  lastBidTime: number;
+  bidCount: number;
+  hasReservePrice: boolean;
+  isDutchAuction: boolean;
+  dutchStartPrice: bigint;
+  dutchEndPrice: bigint;
+  dutchPriceDecrement: bigint;
+  dutchTimeInterval: bigint;
+  isSealedBid: boolean;
+  sealedBidDeadline: number;
+  isRevealPhase: boolean;
+  revealDeadline: number;
 }
 
 /**
@@ -29,8 +52,8 @@ export async function getAuctionDataForNFT(
 
     const provider = new ethers.BrowserProvider(window.ethereum);
     const auctionContract = new ethers.Contract(
-      CONTRACT_ADDRESSES.MooveAuction,
-      CONTRACT_ABIS.MooveAuction,
+      contracts.MooveAuction.address,
+      contracts.MooveAuction.abi,
       provider
     );
 
@@ -54,11 +77,20 @@ export async function getAuctionDataForNFT(
           debugAuctionId
         );
         console.log(`🔍 Auction #${debugAuctionId}:`, {
+          auctionId: Number(debugAuctionData.auctionId),
+          nftContract: debugAuctionData.nftContract,
           tokenId: Number(debugAuctionData.tokenId),
+          seller: debugAuctionData.seller,
+          auctionType: Number(debugAuctionData.auctionType),
+          startingPrice: debugAuctionData.startingPrice.toString(),
+          currentPrice: debugAuctionData.currentPrice.toString(),
+          highestBid: debugAuctionData.highestBid.toString(),
           status: Number(debugAuctionData.status),
           highestBidder: debugAuctionData.highestBidder,
           endTime: Number(debugAuctionData.endTime),
-          startingPrice: debugAuctionData.startingPrice.toString(),
+          bidCount: Number(debugAuctionData.bidCount),
+          isDutchAuction: debugAuctionData.isDutchAuction,
+          isSealedBid: debugAuctionData.isSealedBid,
         });
       } catch (error) {
         console.log(`❌ Auction #${debugAuctionId} error:`, error);
@@ -72,13 +104,28 @@ export async function getAuctionDataForNFT(
 
         // Debug: Log all auction data
         console.log(`🔍 Auction #${auctionId}:`, {
+          auctionId: Number(auctionData.auctionId),
+          nftContract: auctionData.nftContract,
           tokenId: Number(auctionData.tokenId),
+          seller: auctionData.seller,
+          auctionType: Number(auctionData.auctionType),
           startingPrice: auctionData.startingPrice.toString(),
+          reservePrice: auctionData.reservePrice.toString(),
+          buyNowPrice: auctionData.buyNowPrice.toString(),
           currentPrice: auctionData.currentPrice.toString(),
+          startTime: Number(auctionData.startTime),
+          endTime: Number(auctionData.endTime),
+          bidIncrement: auctionData.bidIncrement.toString(),
+          highestBidder: auctionData.highestBidder,
           highestBid: auctionData.highestBid.toString(),
           status: Number(auctionData.status),
-          seller: auctionData.seller,
-          highestBidder: auctionData.highestBidder,
+          allowPartialFulfillment: auctionData.allowPartialFulfillment,
+          minBidders: Number(auctionData.minBidders),
+          totalBidders: Number(auctionData.totalBidders),
+          isSettled: auctionData.isSettled,
+          bidCount: Number(auctionData.bidCount),
+          isDutchAuction: auctionData.isDutchAuction,
+          isSealedBid: auctionData.isSealedBid,
         });
 
         // Check if this auction is for the NFT we're looking for
@@ -87,15 +134,38 @@ export async function getAuctionDataForNFT(
 
           return {
             auctionId,
+            nftContract: auctionData.nftContract,
             tokenId: Number(auctionData.tokenId),
-            startingPrice: auctionData.startingPrice,
-            currentPrice: auctionData.currentPrice,
-            highestBid: auctionData.highestBid,
-            endTime: Number(auctionData.endTime),
-            status: Number(auctionData.status),
             seller: auctionData.seller,
+            auctionType: Number(auctionData.auctionType),
+            startingPrice: auctionData.startingPrice,
+            reservePrice: auctionData.reservePrice,
+            buyNowPrice: auctionData.buyNowPrice,
+            currentPrice: auctionData.currentPrice,
+            startTime: Number(auctionData.startTime),
+            endTime: Number(auctionData.endTime),
+            bidIncrement: auctionData.bidIncrement,
             highestBidder: auctionData.highestBidder,
-            bidCount: 0, // TODO: Get real bid count from contract
+            highestBid: auctionData.highestBid,
+            status: Number(auctionData.status),
+            allowPartialFulfillment: auctionData.allowPartialFulfillment,
+            minBidders: Number(auctionData.minBidders),
+            totalBidders: Number(auctionData.totalBidders),
+            isSettled: auctionData.isSettled,
+            extensionThreshold: auctionData.extensionThreshold,
+            extensionDuration: auctionData.extensionDuration,
+            lastBidTime: Number(auctionData.lastBidTime),
+            bidCount: Number(auctionData.bidCount),
+            hasReservePrice: auctionData.hasReservePrice,
+            isDutchAuction: auctionData.isDutchAuction,
+            dutchStartPrice: auctionData.dutchStartPrice,
+            dutchEndPrice: auctionData.dutchEndPrice,
+            dutchPriceDecrement: auctionData.dutchPriceDecrement,
+            dutchTimeInterval: auctionData.dutchTimeInterval,
+            isSealedBid: auctionData.isSealedBid,
+            sealedBidDeadline: Number(auctionData.sealedBidDeadline),
+            isRevealPhase: auctionData.isRevealPhase,
+            revealDeadline: Number(auctionData.revealDeadline),
           };
         }
 
@@ -115,15 +185,38 @@ export async function getAuctionDataForNFT(
           // This helps with price reference for similar NFTs
           return {
             auctionId,
+            nftContract: auctionData.nftContract,
             tokenId: Number(auctionData.tokenId),
-            startingPrice: auctionData.startingPrice,
-            currentPrice: auctionData.currentPrice,
-            highestBid: auctionData.highestBid,
-            endTime: Number(auctionData.endTime),
-            status: Number(auctionData.status),
             seller: auctionData.seller,
+            auctionType: Number(auctionData.auctionType),
+            startingPrice: auctionData.startingPrice,
+            reservePrice: auctionData.reservePrice,
+            buyNowPrice: auctionData.buyNowPrice,
+            currentPrice: auctionData.currentPrice,
+            startTime: Number(auctionData.startTime),
+            endTime: Number(auctionData.endTime),
+            bidIncrement: auctionData.bidIncrement,
             highestBidder: auctionData.highestBidder,
-            bidCount: 0, // TODO: Get real bid count from contract
+            highestBid: auctionData.highestBid,
+            status: Number(auctionData.status),
+            allowPartialFulfillment: auctionData.allowPartialFulfillment,
+            minBidders: Number(auctionData.minBidders),
+            totalBidders: Number(auctionData.totalBidders),
+            isSettled: auctionData.isSettled,
+            extensionThreshold: auctionData.extensionThreshold,
+            extensionDuration: auctionData.extensionDuration,
+            lastBidTime: Number(auctionData.lastBidTime),
+            bidCount: Number(auctionData.bidCount),
+            hasReservePrice: auctionData.hasReservePrice,
+            isDutchAuction: auctionData.isDutchAuction,
+            dutchStartPrice: auctionData.dutchStartPrice,
+            dutchEndPrice: auctionData.dutchEndPrice,
+            dutchPriceDecrement: auctionData.dutchPriceDecrement,
+            dutchTimeInterval: auctionData.dutchTimeInterval,
+            isSealedBid: auctionData.isSealedBid,
+            sealedBidDeadline: Number(auctionData.sealedBidDeadline),
+            isRevealPhase: auctionData.isRevealPhase,
+            revealDeadline: Number(auctionData.revealDeadline),
           };
         }
       } catch (error) {
@@ -157,8 +250,8 @@ export async function getAllAuctionsForNFT(
 
     const provider = new ethers.BrowserProvider(window.ethereum);
     const auctionContract = new ethers.Contract(
-      CONTRACT_ADDRESSES.MooveAuction,
-      CONTRACT_ABIS.MooveAuction,
+      contracts.MooveAuction.address,
+      contracts.MooveAuction.abi,
       provider
     );
 
@@ -177,14 +270,38 @@ export async function getAllAuctionsForNFT(
         if (Number(auctionData.tokenId) === tokenId) {
           auctions.push({
             auctionId,
+            nftContract: auctionData.nftContract,
             tokenId: Number(auctionData.tokenId),
-            startingPrice: auctionData.startingPrice,
-            currentPrice: auctionData.currentPrice,
-            highestBid: auctionData.highestBid,
-            endTime: Number(auctionData.endTime),
-            status: Number(auctionData.status),
             seller: auctionData.seller,
+            auctionType: Number(auctionData.auctionType),
+            startingPrice: auctionData.startingPrice,
+            reservePrice: auctionData.reservePrice,
+            buyNowPrice: auctionData.buyNowPrice,
+            currentPrice: auctionData.currentPrice,
+            startTime: Number(auctionData.startTime),
+            endTime: Number(auctionData.endTime),
+            bidIncrement: auctionData.bidIncrement,
             highestBidder: auctionData.highestBidder,
+            highestBid: auctionData.highestBid,
+            status: Number(auctionData.status),
+            allowPartialFulfillment: auctionData.allowPartialFulfillment,
+            minBidders: Number(auctionData.minBidders),
+            totalBidders: Number(auctionData.totalBidders),
+            isSettled: auctionData.isSettled,
+            extensionThreshold: auctionData.extensionThreshold,
+            extensionDuration: auctionData.extensionDuration,
+            lastBidTime: Number(auctionData.lastBidTime),
+            bidCount: Number(auctionData.bidCount),
+            hasReservePrice: auctionData.hasReservePrice,
+            isDutchAuction: auctionData.isDutchAuction,
+            dutchStartPrice: auctionData.dutchStartPrice,
+            dutchEndPrice: auctionData.dutchEndPrice,
+            dutchPriceDecrement: auctionData.dutchPriceDecrement,
+            dutchTimeInterval: auctionData.dutchTimeInterval,
+            isSealedBid: auctionData.isSealedBid,
+            sealedBidDeadline: Number(auctionData.sealedBidDeadline),
+            isRevealPhase: auctionData.isRevealPhase,
+            revealDeadline: Number(auctionData.revealDeadline),
           });
         }
       } catch (error) {

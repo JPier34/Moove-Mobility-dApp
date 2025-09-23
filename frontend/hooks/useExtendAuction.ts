@@ -5,7 +5,6 @@ import { useAccount } from "wagmi";
 import { useWriteContract } from "wagmi";
 import { toast } from "react-hot-toast";
 import { contracts } from "../utils/contracts";
-import MooveAuctionABI from "../src/abis/MooveAuction.json";
 import { useHasRole } from "./useContract"; // Import role check hook
 
 const AUCTION_MANAGER_ROLE =
@@ -76,9 +75,9 @@ export function useExtendAuction(): ExtendAuctionHandler {
         // Call the extendAuction function on the smart contract
         const result = await writeContractAsync({
           address: contracts.MooveAuction.address as `0x${string}`,
-          abi: MooveAuctionABI.abi,
+          abi: contracts.MooveAuction.abi,
           functionName: "extendAuction",
-          args: [auctionId, additionalTimeSeconds],
+          args: [BigInt(auctionId), BigInt(additionalTimeSeconds)],
         });
 
         console.log("✅ Auction extended successfully:", result);

@@ -12,7 +12,7 @@ import { toast } from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle, XCircle, Gift, ArrowRight } from "lucide-react";
 import { ethers } from "ethers";
-import { CONTRACT_ADDRESSES, CONTRACT_ABIS } from "../lib/contracts";
+import { contracts } from "@/utils/contracts";
 // import NFTReceivedNotification from "@/components/notifications/NFTReceivedNotification";
 import TransferStatusIndicator from "@/components/TransferStatusIndicator";
 import TransferConfirmationHandler from "@/components/TransferConfirmationHandler";
@@ -230,6 +230,9 @@ export function NFTTransferNotificationsProvider({
   const addNotification = (
     notification: Omit<NFTTransferNotification, "id" | "timestamp" | "isRead">
   ) => {
+    // Create a unique key for this notification
+    const notificationKey = `${notification.type}-${notification.tokenId}-${notification.transactionHash}`;
+
     // Prevent duplicate notifications for the same NFT and transaction
     const existingNotification = state.notifications.find(
       (n) =>
@@ -241,6 +244,25 @@ export function NFTTransferNotificationsProvider({
     if (existingNotification) {
       console.log(
         `⏭️ Notification already exists for NFT #${notification.tokenId} with tx ${notification.transactionHash}, skipping`
+      );
+      return;
+    }
+
+    // Additional check: prevent notifications for the same NFT within the last 5 minutes
+    const recentNotification = state.notifications.find(
+      (n) =>
+        n.tokenId === notification.tokenId &&
+        n.type === notification.type &&
+        Date.now() - n.timestamp < 300000 // 5 minutes
+    );
+
+    if (recentNotification) {
+      console.log(
+        `⏭️ Recent notification exists for NFT #${
+          notification.tokenId
+        } (${Math.round(
+          (Date.now() - recentNotification.timestamp) / 1000
+        )}s ago), skipping`
       );
       return;
     }
@@ -266,7 +288,6 @@ export function NFTTransferNotificationsProvider({
         "🎁 Setting showReceivedNotification to true for NFT:",
         notification.tokenId
       );
-      console.log("🎁 Current notifications:", state.notifications);
       setState((prev) => ({
         ...prev,
         showReceivedNotification: true,
@@ -421,12 +442,27 @@ export function NFTTransferNotificationsProvider({
     // Aggiungi listener per eventi custom
     window.addEventListener("nftTransfer", handleNFTTransfer as EventListener);
 
+    // Listener per eventi di minting per prevenire notifiche duplicate
+    const handleNFTMinted = (event: CustomEvent) => {
+      const { tokenId, transactionHash } = event.detail;
+      console.log(
+        `🎨 NFT minted detected: #${tokenId}, tx: ${transactionHash}`
+      );
+
+      // Add to processed transactions to prevent duplicate notifications
+      const transactionKey = `${transactionHash}-${tokenId}`;
+      // This will be handled by the polling system's processedTransactions Set
+    };
+
+    window.addEventListener("nftMinted", handleNFTMinted as EventListener);
+
     // Cleanup
     return () => {
       window.removeEventListener(
         "nftTransfer",
         handleNFTTransfer as EventListener
       );
+      window.removeEventListener("nftMinted", handleNFTMinted as EventListener);
     };
   }, [address, addNotification]);
 
@@ -438,10 +474,10 @@ export function NFTTransferNotificationsProvider({
 
     const setupBlockchainListener = async () => {
       try {
-        const provider = new ethers.BrowserProvider(window.ethereum);
+        const provider = new ethers.BrowserProvider(window.ethereum as any);
         contract = new ethers.Contract(
-          CONTRACT_ADDRESSES.MooveNFT,
-          CONTRACT_ABIS.MooveNFT,
+          contracts.MooveNFT.address,
+          contracts.MooveNFT.abi,
           provider
         );
 
@@ -551,12 +587,13 @@ export function NFTTransferNotificationsProvider({
     return () => clearTimeout(timeoutId);
   }, [address, state.notifications]);
 
-  // Automatic NFT transfer detection
+  // Automatic NFT transfer detection with duplicate prevention
   useEffect(() => {
     if (!isConnected || !address) return;
 
     let lastCheckedBlock: number | null = null;
     let intervalId: NodeJS.Timeout | null = null;
+    const processedTransactions = new Set<string>(); // Track processed transactions
 
     const checkForNewTransfers = async () => {
       try {
@@ -564,8 +601,8 @@ export function NFTTransferNotificationsProvider({
 
         const provider = new ethers.BrowserProvider(window.ethereum);
         const nftContract = new ethers.Contract(
-          CONTRACT_ADDRESSES.MooveNFT,
-          CONTRACT_ABIS.MooveNFT,
+          contracts.MooveNFT.address,
+          contracts.MooveNFT.abi,
           provider
         );
 
@@ -595,8 +632,20 @@ export function NFTTransferNotificationsProvider({
 
         for (const event of events) {
           try {
-            const { from, to, tokenId } = event.args;
+            const eventLog = event as ethers.EventLog;
+            const { from, to, tokenId } = eventLog.args;
             const transactionHash = event.transactionHash;
+
+            // Create unique key for this transaction + token combination
+            const transactionKey = `${transactionHash}-${tokenId.toString()}`;
+
+            // Skip if we've already processed this transaction
+            if (processedTransactions.has(transactionKey)) {
+              console.log(
+                `⏭️ Already processed transaction ${transactionKey}, skipping`
+              );
+              continue;
+            }
 
             console.log(`🎁 Processing transfer event:`, {
               from,
@@ -634,6 +683,15 @@ export function NFTTransferNotificationsProvider({
               transactionHash,
               senderAddress: from,
             });
+
+            // Mark this transaction as processed
+            processedTransactions.add(transactionKey);
+
+            // Clean up old processed transactions (keep only last 100)
+            if (processedTransactions.size > 100) {
+              const oldestKeys = Array.from(processedTransactions).slice(0, 50);
+              oldestKeys.forEach((key) => processedTransactions.delete(key));
+            }
 
             console.log(
               `✅ Created notification for NFT #${tokenId} (${tokenName})`

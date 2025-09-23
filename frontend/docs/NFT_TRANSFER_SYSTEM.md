@@ -206,3 +206,5 @@ Il sistema è progettato per essere facilmente manutenibile:
 - **Estensibilità**: Facile aggiungere nuove funzionalità
 - **Documentazione**: Codice ben documentato e commentato
 
+
+
