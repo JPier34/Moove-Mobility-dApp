@@ -9,7 +9,6 @@ import { useModalLock } from "@/hooks/useModalLock";
 import {
   usePlaceBid,
   useCurrentDutchPrice,
-  useCommitToBuyDutch,
   useBuyNowDutch,
 } from "@/hooks/useAuction";
 import { useDutchAuction } from "../../hooks/useDutchAuction";
@@ -64,7 +63,6 @@ export default function AuctionModal({
 
   // Hooks for auction interactions
   const { placeBid } = usePlaceBid();
-  const { commitToBuyDutch } = useCommitToBuyDutch();
   const { buyNowDutch } = useBuyNowDutch();
   const {
     handleDutchAuction,

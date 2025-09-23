@@ -4,11 +4,7 @@ import React, { useState, useEffect } from "react";
 import { Auction, AuctionType, AuctionStatus } from "../../types/auction";
 import { useAccount } from "wagmi";
 import { shortenAddress } from "../../utils/shortenAddress";
-import {
-  useCurrentDutchPrice,
-  useCommitToBuyDutch,
-  useBuyNowDutch,
-} from "@/hooks/useAuction";
+import { useCurrentDutchPrice, useBuyNowDutch } from "@/hooks/useAuction";
 import { useDutchAuction } from "../../hooks/useDutchAuction";
 import { useDutchPrice } from "@/hooks/useDutchPrice";
 import DutchAuctionSuccessModal from "./DutchAuctionSuccessModal";
@@ -81,7 +77,6 @@ export default function AuctionCard({
     useDutchPrice(auction, 5000);
 
   // Hooks for auction interactions
-  const { commitToBuyDutch } = useCommitToBuyDutch();
   const { buyNowDutch } = useBuyNowDutch();
   const {
     handleDutchAuction,

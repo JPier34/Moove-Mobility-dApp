@@ -92,3 +92,4 @@ checkAuction4Status()
         console.error("❌ Status check failed:", error);
         process.exit(1);
     });
+
