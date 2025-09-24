@@ -71,6 +71,7 @@ export function useWonAuctionsForClaim(): UseWonAuctionsReturn {
       const userWonAuctions = auctions.filter((auction) => {
         const isUserWinner =
           auction.highestBidder &&
+          typeof auction.highestBidder === "string" &&
           auction.highestBidder.toLowerCase() === address.toLowerCase();
 
         // Consider the auction "ended" if status === 3 (ENDED) OR status === 4 (SETTLED) OR if status === 1 but time expired

@@ -663,9 +663,7 @@ export default function AuctionModal({
                       size="lg"
                     >
                       {isSubmittingBid || isDutchProcessing
-                        ? dutchStep === "committing"
-                          ? "Committing..."
-                          : dutchStep === "buying"
+                        ? dutchStep === "buying"
                           ? "Buying..."
                           : "Processing..."
                         : !isDutchActive

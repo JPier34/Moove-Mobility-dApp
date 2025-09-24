@@ -93,6 +93,7 @@ async function filterAuctionsByOwnership(
   for (const auction of auctions) {
     const isUserWinner =
       auction.highestBidder &&
+      typeof auction.highestBidder === "string" &&
       auction.highestBidder.toLowerCase() === address.toLowerCase();
 
     // Considera l'asta "ended" se status === 3 (ENDED) OPPURE status === 4 (SETTLED) OPPURE se status === 1 ma tempo scaduto
@@ -314,7 +315,9 @@ export function useWonAuctions(): UseWonAuctionsReturn {
           highestBidder: a.highestBidder,
           status: a.status,
           isUserWinner:
-            a.highestBidder?.toLowerCase() === address?.toLowerCase(),
+            a.highestBidder &&
+            typeof a.highestBidder === "string" &&
+            a.highestBidder.toLowerCase() === address?.toLowerCase(),
         })),
       });
 

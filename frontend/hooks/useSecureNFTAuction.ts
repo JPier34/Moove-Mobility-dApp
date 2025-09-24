@@ -322,8 +322,8 @@ function validateAuctionParams(params: AuctionParams): void {
     "Bid increment:",
     params.bidIncrement
   );
-  if (params.auctionType !== 2) {
-    // Non SEALED_BID (2)
+  if (params.auctionType !== 2 && params.auctionType !== 1) {
+    // Non SEALED_BID (2) and non DUTCH (1) - only English (0) and Reserve (3)
     if (params.bidIncrement <= 0n) {
       throw new Error("Bid increment must be greater than 0");
     }
@@ -332,7 +332,7 @@ function validateAuctionParams(params: AuctionParams): void {
     }
   } else {
     console.log(
-      "✅ [VALIDATION DEBUG] Skipping bidIncrement validation for SEALED_BID auction"
+      "✅ [VALIDATION DEBUG] Skipping bidIncrement validation for SEALED_BID or DUTCH auction"
     );
   }
 
@@ -342,16 +342,12 @@ function validateAuctionParams(params: AuctionParams): void {
 
   // DUTCH AUCTION (tipo 1)
   if (params.auctionType === 1) {
-    // Reserve price è opzionale, ma se fornito deve essere < start price
-    if (params.reservePrice > 0n && params.reservePrice >= params.startPrice) {
-      throw new Error(
-        "Dutch auction reserve price must be < start price (or 0 for no reserve)"
-      );
-    }
-    // BuyNowPrice deve essere uguale a reservePrice per Dutch auctions
-    if (params.buyNowPrice !== params.reservePrice) {
-      throw new Error("Dutch auction buyNowPrice must equal reservePrice");
-    }
+    // Dutch auctions don't use reserve price or buy now price
+    // They start high and decrease to 0 or until someone buys
+    // No validation needed for Dutch auctions
+    console.log(
+      "✅ [VALIDATION DEBUG] Dutch auction - no additional validation needed"
+    );
   }
 
   // ENGLISH AUCTION (tipo 0)

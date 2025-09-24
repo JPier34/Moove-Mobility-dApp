@@ -93,3 +93,4 @@ checkAuction4Status()
         process.exit(1);
     });
 
+

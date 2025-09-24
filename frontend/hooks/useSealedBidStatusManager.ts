@@ -41,7 +41,9 @@ export function useSealedBidStatusManager(): SealedBidStatusManager {
           highestBidder,
           highestBid: ethers.formatEther(highestBid),
           currentUser: address,
-          isWinner: highestBidder.toLowerCase() === address.toLowerCase(),
+          isWinner:
+            typeof highestBidder === "string" &&
+            highestBidder.toLowerCase() === address.toLowerCase(),
           isZeroAddress: highestBidder === ethers.ZeroAddress,
           isZeroBid: highestBid === 0n,
           timestamp: new Date().toISOString(),
@@ -85,7 +87,10 @@ export function useSealedBidStatusManager(): SealedBidStatusManager {
         }
 
         // Check if current user is the winner
-        if (highestBidder.toLowerCase() === address.toLowerCase()) {
+        if (
+          typeof highestBidder === "string" &&
+          highestBidder.toLowerCase() === address.toLowerCase()
+        ) {
           console.log(`🏆 USER WON auction ${auctionId}:`, {
             auctionStatus,
             winningBid: ethers.formatEther(highestBid),

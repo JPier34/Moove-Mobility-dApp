@@ -147,7 +147,7 @@ export function AuctionNotificationsProvider({
       try {
         // Get all auctions and find sealed bid auctions in REVEAL
         const { CONTRACT_ADDRESSES, CONTRACT_ABIS } = await import(
-          "@/lib/contracts"
+          "@/utils/contracts"
         );
         const provider = new ethers.BrowserProvider(window.ethereum as any);
         const auctionContract = new ethers.Contract(
@@ -327,24 +327,32 @@ export function AuctionNotificationsProvider({
   useEffect(() => {
     const handleSealedBidAuctionCreated = (event: CustomEvent) => {
       const { auctionId, auctionType, endTime } = event.detail;
-      
+
       console.log(`🆕 [${providerId}] New sealed bid auction created:`, {
         auctionId,
         auctionType,
         endTime: new Date(endTime * 1000).toISOString(),
         timestamp: new Date().toISOString(),
       });
-      
+
       // Add to monitoring immediately
       addToMonitoring(parseInt(auctionId));
-      
-      console.log(`➕ [${providerId}] Added new sealed bid auction #${auctionId} to monitoring`);
+
+      console.log(
+        `➕ [${providerId}] Added new sealed bid auction #${auctionId} to monitoring`
+      );
     };
 
-    window.addEventListener("sealedBidAuctionCreated", handleSealedBidAuctionCreated as EventListener);
+    window.addEventListener(
+      "sealedBidAuctionCreated",
+      handleSealedBidAuctionCreated as EventListener
+    );
 
     return () => {
-      window.removeEventListener("sealedBidAuctionCreated", handleSealedBidAuctionCreated as EventListener);
+      window.removeEventListener(
+        "sealedBidAuctionCreated",
+        handleSealedBidAuctionCreated as EventListener
+      );
     };
   }, [providerId, addToMonitoring]);
 

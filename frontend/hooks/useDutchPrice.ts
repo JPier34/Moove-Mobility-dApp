@@ -25,9 +25,10 @@ export function useDutchPrice(
       return;
     }
 
-    const now = new Date().getTime();
-    const startTime = new Date(auction.startTime).getTime();
-    const endTime = new Date(auction.endTime).getTime();
+    // Use seconds instead of milliseconds to match smart contract
+    const now = Math.floor(Date.now() / 1000);
+    const startTime = Math.floor(auction.startTime.getTime() / 1000);
+    const endTime = Math.floor(auction.endTime.getTime() / 1000);
     const elapsed = now - startTime;
     const duration = endTime - startTime;
 
@@ -64,8 +65,12 @@ export function useDutchPrice(
     const currentReduction = (totalReduction * elapsed) / duration;
     const currentPriceValue = startPrice - currentReduction;
 
-    // Ensure price doesn't go below reserve
-    const finalPrice = Math.max(currentPriceValue, reservePrice);
+    // Set minimum price to prevent going too low (0.000001 ETH minimum - same as system validation)
+    const minimumPrice = 0.000001;
+    const finalPrice = Math.max(
+      currentPriceValue,
+      Math.max(reservePrice, minimumPrice)
+    );
 
     setCurrentPrice(finalPrice.toFixed(6));
     setPriceReduction(currentReduction);
@@ -84,14 +89,3 @@ export function useDutchPrice(
     priceReduction,
   };
 }
-
-
-
-
-
-
-
-
-
-
-

@@ -30,10 +30,10 @@ export interface ValidationResult {
 // Default form data
 const DEFAULT_FORM_DATA: AuctionFormData = {
   auctionType: AuctionType.ENGLISH,
-  startPrice: "",
-  duration: "",
+  startPrice: "0.001", // Default start price
+  duration: "24", // Default to 24 hours
   durationUnit: "hours",
-  bidIncrement: "",
+  bidIncrement: "0.001", // Default bid increment
   reservePrice: "",
   buyNowPrice: "",
   // English auction extension defaults
@@ -56,11 +56,46 @@ export function useAuctionValidationModular() {
     if (!formData.startPrice || !formData.duration) {
       return { isValid: false, error: "Missing required fields" };
     }
+
+    // Validate start price is a positive number
+    const startPriceNum = parseFloat(formData.startPrice);
+    if (isNaN(startPriceNum) || startPriceNum <= 0) {
+      return { isValid: false, error: "Start price must be a positive number" };
+    }
+
+    // Validate duration is a positive number
+    const durationNum = parseInt(formData.duration);
+    if (isNaN(durationNum) || durationNum <= 0) {
+      return { isValid: false, error: "Duration must be a positive number" };
+    }
+
+    // Validate bid increment for English and Reserve auctions only
+    if (
+      formData.auctionType === AuctionType.ENGLISH ||
+      formData.auctionType === AuctionType.RESERVE
+    ) {
+      if (!formData.bidIncrement) {
+        return { isValid: false, error: "Bid increment is required" };
+      }
+      const bidIncrementNum = parseFloat(formData.bidIncrement);
+      if (isNaN(bidIncrementNum) || bidIncrementNum <= 0) {
+        return {
+          isValid: false,
+          error: "Bid increment must be a positive number",
+        };
+      }
+    }
+
     return { isValid: true, error: null };
   }, [formData]);
 
   // Simple validation check
-  const isValid = formData.startPrice !== "" && formData.duration !== "";
+  const isValid =
+    formData.startPrice !== "" &&
+    formData.duration !== "" &&
+    (formData.auctionType === AuctionType.SEALED_BID ||
+      formData.auctionType === AuctionType.DUTCH ||
+      formData.bidIncrement !== "");
 
   return {
     formData,

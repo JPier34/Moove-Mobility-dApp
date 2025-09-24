@@ -83,9 +83,9 @@ function AdminNFTCreatorUltraSimpleContent() {
     // Set appropriate default values based on auction type
     switch (newType) {
       case AuctionType.DUTCH:
-        // Dutch auction: start high, end low
+        // Dutch auction: start high, end low (reserve price set to minimum)
         updateField("startPrice", "0.01");
-        updateField("reservePrice", "0.001");
+        updateField("reservePrice", "0.00000001"); // Ultra-low reserve (always < startPrice)
         updateField("buyNowPrice", ""); // Not used in Dutch auctions
         updateField("bidIncrement", "0.001"); // Price decrease rate
         break;
@@ -205,9 +205,10 @@ function AdminNFTCreatorUltraSimpleContent() {
     const bidIncrement = parseFloat(auctionFormData.bidIncrement);
 
     // Skip validation if basic fields are empty
-    // Note: bidIncrement is not required for Sealed Bid auctions
+    // Note: bidIncrement is not required for Sealed Bid and Dutch auctions
     const bidIncrementRequired =
-      auctionFormData.auctionType !== AuctionType.SEALED_BID;
+      auctionFormData.auctionType !== AuctionType.SEALED_BID &&
+      auctionFormData.auctionType !== AuctionType.DUTCH;
     if (
       !auctionFormData.startPrice ||
       (bidIncrementRequired && !auctionFormData.bidIncrement)
@@ -219,8 +220,11 @@ function AdminNFTCreatorUltraSimpleContent() {
     if (isNaN(startPrice) || startPrice <= 0) {
       errors.push("Start price must be a positive number");
     }
-    // Bid increment validation (not required for Sealed Bid)
-    if (auctionFormData.auctionType !== AuctionType.SEALED_BID) {
+    // Bid increment validation (not required for Sealed Bid and Dutch auctions)
+    if (
+      auctionFormData.auctionType !== AuctionType.SEALED_BID &&
+      auctionFormData.auctionType !== AuctionType.DUTCH
+    ) {
       if (isNaN(bidIncrement) || bidIncrement <= 0) {
         errors.push("Bid increment must be a positive number");
       }
@@ -237,19 +241,8 @@ function AdminNFTCreatorUltraSimpleContent() {
             );
           }
         }
-        // For Dutch auctions, buyNowPrice should equal reservePrice (final price)
-        if (
-          auctionFormData.buyNowPrice &&
-          !isNaN(buyNowPrice) &&
-          auctionFormData.reservePrice &&
-          !isNaN(reservePrice)
-        ) {
-          if (Math.abs(buyNowPrice - reservePrice) > 0.000001) {
-            errors.push(
-              "Dutch auction: Buy Now price should equal Reserve price (final price)"
-            );
-          }
-        }
+        // Dutch auctions don't use reserve price or buy now price
+        // They start high and decrease to 0 or until someone buys
         break;
 
       case AuctionType.ENGLISH:
@@ -288,9 +281,10 @@ function AdminNFTCreatorUltraSimpleContent() {
         break;
     }
 
-    // Bid increment should be reasonable compared to start price
+    // Bid increment should be reasonable compared to start price (only for English and Reserve auctions)
     if (
-      auctionFormData.auctionType !== AuctionType.SEALED_BID &&
+      (auctionFormData.auctionType === AuctionType.ENGLISH ||
+        auctionFormData.auctionType === AuctionType.RESERVE) &&
       !isNaN(startPrice) &&
       !isNaN(bidIncrement) &&
       bidIncrement > startPrice
@@ -570,18 +564,162 @@ function AdminNFTCreatorUltraSimpleContent() {
       const metadataUrl = `https://ipfs.io/ipfs/${ipfsHash}`;
       console.log("🔗 Final metadata URL:", metadataUrl);
 
-      // Prepare mint parameters
-      const mintParams = [
-        address,
-        metadataUrl,
-        nftData.isLimitedEdition ? parseInt(nftData.editionSize) : 1,
-      ];
+      // Prepare mint parameters (only 2 params: to, uri)
+      const mintParams = [address, metadataUrl];
+
+      // Debug: Log auction form data
+      console.log("🔍 Auction form data:", {
+        auctionType: auctionFormData.auctionType,
+        startPrice: auctionFormData.startPrice,
+        duration: auctionFormData.duration,
+        durationUnit: auctionFormData.durationUnit,
+        bidIncrement: auctionFormData.bidIncrement,
+        reservePrice: auctionFormData.reservePrice,
+        buyNowPrice: auctionFormData.buyNowPrice,
+        extensionThresholdMinutes: auctionFormData.extensionThresholdMinutes,
+        extensionDurationMinutes: auctionFormData.extensionDurationMinutes,
+      });
 
       // Prepare auction parameters
+      if (!auctionFormData.startPrice || !auctionFormData.duration) {
+        console.error("❌ Missing required fields:", {
+          startPrice: auctionFormData.startPrice,
+          duration: auctionFormData.duration,
+        });
+        throw new Error("Missing required fields: start price and duration");
+      }
+
+      if (
+        (auctionFormData.auctionType === AuctionType.ENGLISH ||
+          auctionFormData.auctionType === AuctionType.RESERVE) &&
+        !auctionFormData.bidIncrement
+      ) {
+        console.error(
+          "❌ Missing bid increment for auction type:",
+          auctionFormData.auctionType
+        );
+        throw new Error("Missing required field: bid increment");
+      }
+
+      const startPriceValue = parseFloat(auctionFormData.startPrice);
+      console.log("🔍 Start price validation:", {
+        startPrice: auctionFormData.startPrice,
+        startPriceValue,
+        isNaN: isNaN(startPriceValue),
+        isPositive: startPriceValue > 0,
+      });
+      if (isNaN(startPriceValue) || startPriceValue <= 0) {
+        throw new Error("Start price must be a positive number");
+      }
+
+      const durationValue = parseInt(auctionFormData.duration);
+      console.log("🔍 Duration validation:", {
+        duration: auctionFormData.duration,
+        durationValue,
+        isNaN: isNaN(durationValue),
+        isPositive: durationValue > 0,
+      });
+      if (isNaN(durationValue) || durationValue <= 0) {
+        throw new Error("Duration must be a positive number");
+      }
+
       const durationInSeconds =
         auctionFormData.durationUnit === "minutes"
-          ? parseInt(auctionFormData.duration) * 60
-          : parseInt(auctionFormData.duration) * 3600;
+          ? durationValue * 60
+          : durationValue * 3600;
+
+      // Validate bid increment for English and Reserve auctions only
+      let bidIncrementValue = 0;
+      if (
+        auctionFormData.auctionType === AuctionType.ENGLISH ||
+        auctionFormData.auctionType === AuctionType.RESERVE
+      ) {
+        if (!auctionFormData.bidIncrement) {
+          console.error(
+            "❌ Missing bid increment for auction type:",
+            auctionFormData.auctionType
+          );
+          throw new Error("Bid increment is required for this auction type");
+        }
+        bidIncrementValue = parseFloat(auctionFormData.bidIncrement);
+        console.log("🔍 Bid increment validation:", {
+          bidIncrement: auctionFormData.bidIncrement,
+          bidIncrementValue,
+          isNaN: isNaN(bidIncrementValue),
+          isPositive: bidIncrementValue > 0,
+        });
+        if (isNaN(bidIncrementValue) || bidIncrementValue <= 0) {
+          throw new Error("Bid increment must be a positive number");
+        }
+      } else {
+        console.log(
+          "🔍 Skipping bid increment validation for auction type:",
+          auctionFormData.auctionType
+        );
+      }
+
+      // Validate reserve price and buy now price
+      let reservePriceValue = 0;
+      let buyNowPriceValue = 0;
+
+      if (auctionFormData.reservePrice) {
+        reservePriceValue = parseFloat(auctionFormData.reservePrice);
+        console.log("🔍 Reserve price validation:", {
+          reservePrice: auctionFormData.reservePrice,
+          reservePriceValue,
+          isNaN: isNaN(reservePriceValue),
+          isNonNegative: reservePriceValue >= 0,
+        });
+        if (isNaN(reservePriceValue) || reservePriceValue < 0) {
+          throw new Error("Reserve price must be a non-negative number");
+        }
+      }
+      if (auctionFormData.buyNowPrice) {
+        buyNowPriceValue = parseFloat(auctionFormData.buyNowPrice);
+        console.log("🔍 Buy now price validation:", {
+          buyNowPrice: auctionFormData.buyNowPrice,
+          buyNowPriceValue,
+          isNaN: isNaN(buyNowPriceValue),
+          isNonNegative: buyNowPriceValue >= 0,
+        });
+        if (isNaN(buyNowPriceValue) || buyNowPriceValue < 0) {
+          throw new Error("Buy now price must be a non-negative number");
+        }
+      }
+
+      console.log("🔍 Auction duration calculation:", {
+        durationValue,
+        durationUnit: auctionFormData.durationUnit,
+        durationInSeconds,
+        bidIncrementValue,
+        reservePriceValue,
+        buyNowPriceValue,
+      });
+
+      // Validate duration
+      if (durationInSeconds <= 0) {
+        console.error("❌ Invalid duration:", {
+          durationValue,
+          durationUnit: auctionFormData.durationUnit,
+          durationInSeconds,
+        });
+        throw new Error("Duration must be greater than 0");
+      }
+
+      // Additional validation: ensure durationInSeconds is a valid number
+      if (isNaN(durationInSeconds) || !isFinite(durationInSeconds)) {
+        console.error("❌ Invalid duration calculation:", {
+          durationValue,
+          durationUnit: auctionFormData.durationUnit,
+          durationInSeconds,
+          calculation: `${durationValue} * ${
+            auctionFormData.durationUnit === "minutes" ? 60 : 3600
+          }`,
+        });
+        throw new Error("Duration calculation resulted in invalid number");
+      }
+
+      console.log("🔍 Creating auction parameters...");
 
       const auctionParams = {
         auctionType: auctionFormData.auctionType,
@@ -593,15 +731,44 @@ function AdminNFTCreatorUltraSimpleContent() {
           ? ethers.parseEther(auctionFormData.buyNowPrice)
           : 0n,
         duration: durationInSeconds,
-        bidIncrement: ethers.parseEther(auctionFormData.bidIncrement),
+        bidIncrement:
+          auctionFormData.auctionType === AuctionType.ENGLISH ||
+          auctionFormData.auctionType === AuctionType.RESERVE
+            ? ethers.parseEther(auctionFormData.bidIncrement)
+            : 0n,
         extensionThreshold:
           parseInt(auctionFormData.extensionThresholdMinutes || "5") * 60, // Convert to seconds
         extensionDuration:
           parseInt(auctionFormData.extensionDurationMinutes || "10") * 60, // Convert to seconds
       };
 
+      console.log("🔍 Auction parameters prepared:", {
+        ...auctionParams,
+        startPrice: auctionParams.startPrice.toString(),
+        reservePrice: auctionParams.reservePrice.toString(),
+        buyNowPrice: auctionParams.buyNowPrice.toString(),
+        duration: auctionParams.duration.toString(),
+        bidIncrement: auctionParams.bidIncrement.toString(),
+      });
+
+      // CRITICAL DEBUG: Check if duration is 0
+      if (auctionParams.duration === 0) {
+        console.error("❌ CRITICAL ERROR: Duration is 0!", {
+          auctionFormData: auctionFormData,
+          durationValue: durationValue,
+          durationUnit: auctionFormData.durationUnit,
+          durationInSeconds: durationInSeconds,
+          auctionParams: auctionParams,
+        });
+        throw new Error(
+          "Duration cannot be 0 - this will cause invalid timestamps"
+        );
+      }
+
       // Execute secure flow
+      console.log("🚀 Executing secure flow...");
       await executeSecureFlow(mintParams, auctionParams);
+      console.log("✅ Secure flow executed successfully");
 
       // Wait for processing to complete instead of fixed timeout
       console.log("⏳ Waiting for processing to complete...");
@@ -614,6 +781,12 @@ function AdminNFTCreatorUltraSimpleContent() {
         console.log(`⏳ Processing check ${attempts}/${maxAttempts}...`);
       }
 
+      console.log("⏳ Processing wait completed:", {
+        attempts,
+        maxAttempts,
+        isSecureProcessing,
+      });
+
       console.log("📊 Secure flow result:", {
         secureResult,
         secureError,
@@ -623,8 +796,19 @@ function AdminNFTCreatorUltraSimpleContent() {
 
       console.log("🎯 SecureResult received:", secureResult);
 
+      if (secureError) {
+        console.error("❌ Secure flow error:", secureError);
+        throw new Error(`Secure flow failed: ${secureError}`);
+      }
+
       if (secureResult) {
         console.log("✅ SecureResult is truthy, proceeding with success flow");
+        console.log("🎉 Success! NFT and auction created:", {
+          nftTokenId: secureResult.nft.tokenId.toString(),
+          nftTransactionHash: secureResult.nft.transactionHash,
+          auctionId: secureResult.auction.auctionId.toString(),
+          auctionTransactionHash: secureResult.auction.transactionHash,
+        });
         toast.success("NFT and auction created successfully!");
 
         // Clear cache
@@ -666,6 +850,9 @@ function AdminNFTCreatorUltraSimpleContent() {
         }
       } else {
         console.log("❌ SecureResult is falsy, using fallback redirect");
+        console.log(
+          "⚠️ Warning: No secure result received, but no error either"
+        );
         toast.success(
           "NFT and auction created! Redirecting to auctions page..."
         );
@@ -675,6 +862,7 @@ function AdminNFTCreatorUltraSimpleContent() {
         }, 2000);
       }
     } catch (error) {
+      console.error("❌ Creation failed with error:", error);
       toast.error(
         `Creation failed: ${
           error instanceof Error ? error.message : String(error)
@@ -1075,54 +1263,73 @@ function AdminNFTCreatorUltraSimpleContent() {
                   </select>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    {auctionFormData.auctionType === AuctionType.DUTCH
-                      ? "Price Decrease Rate (ETH) *"
-                      : "Bid Increment (ETH) *"}
-                  </label>
-                  <input
-                    type="number"
-                    step="0.000001"
-                    value={auctionFormData.bidIncrement}
-                    onChange={(e) =>
-                      updateField("bidIncrement", e.target.value)
-                    }
-                    disabled={
-                      auctionFormData.auctionType === AuctionType.SEALED_BID
-                    }
-                    className={`w-full px-4 py-2 border rounded-lg text-gray-900 dark:text-white focus:border-purple-500 ${
-                      auctionFormData.auctionType === AuctionType.SEALED_BID
-                        ? "bg-gray-100 dark:bg-gray-600 border-gray-300 dark:border-gray-600 cursor-not-allowed opacity-50"
-                        : "bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600"
-                    }`}
-                    placeholder={
-                      auctionFormData.auctionType === AuctionType.SEALED_BID
-                        ? "Not applicable"
-                        : "0.0001"
-                    }
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    {auctionFormData.auctionType === AuctionType.DUTCH &&
-                      "🔻 How much price decreases every 20 minutes"}
-                    {(auctionFormData.auctionType === AuctionType.ENGLISH ||
-                      auctionFormData.auctionType === AuctionType.RESERVE) &&
-                      "📈 Minimum amount each bid must increase"}
-                  </p>
-                  {auctionFormData.auctionType === AuctionType.SEALED_BID && (
-                    <p className="text-xs text-orange-600 mt-1">
-                      🔒 Sealed bid auctions don't use bid increments - bidders
-                      submit any amount
+                {/* Bid Increment - Only show for English and Reserve auctions */}
+                {(auctionFormData.auctionType === AuctionType.ENGLISH ||
+                  auctionFormData.auctionType === AuctionType.RESERVE) && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Bid Increment (ETH) *
+                    </label>
+                    <input
+                      type="number"
+                      step="0.000001"
+                      value={auctionFormData.bidIncrement}
+                      onChange={(e) =>
+                        updateField("bidIncrement", e.target.value)
+                      }
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500"
+                      placeholder="0.0001"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      📈 Minimum amount each bid must increase
                     </p>
-                  )}
-                </div>
+                  </div>
+                )}
+
+                {/* Dutch Auction Info - Only show for Dutch auctions */}
+                {auctionFormData.auctionType === AuctionType.DUTCH && (
+                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <h4 className="font-medium text-blue-900 dark:text-blue-300 mb-2">
+                      🔻 Dutch Auction Price Decrease
+                    </h4>
+                    <p className="text-sm text-blue-700 dark:text-blue-400">
+                      The price automatically decreases from{" "}
+                      <span className="font-semibold">
+                        {auctionFormData.startPrice || "0.01"} ETH
+                      </span>{" "}
+                      to{" "}
+                      <span className="font-semibold">
+                        {auctionFormData.reservePrice || "0.00000001"} ETH
+                      </span>{" "}
+                      over the duration of{" "}
+                      <span className="font-semibold">
+                        {auctionFormData.duration || "24"}{" "}
+                        {auctionFormData.durationUnit || "hours"}
+                      </span>
+                      . No bid increment needed - price decreases automatically!
+                    </p>
+                  </div>
+                )}
+
+                {/* Sealed Bid Info - Only show for Sealed Bid auctions */}
+                {auctionFormData.auctionType === AuctionType.SEALED_BID && (
+                  <div className="p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                    <h4 className="font-medium text-orange-900 dark:text-orange-300 mb-2">
+                      🔒 Sealed Bid Auction
+                    </h4>
+                    <p className="text-sm text-orange-700 dark:text-orange-400">
+                      Bidders submit secret bids without knowing others' bids.
+                      No bid increment needed - bidders can submit any amount
+                      above the starting price.
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Optional Fields */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Reserve Price - Only show for Dutch and Reserve auctions */}
-                {(auctionFormData.auctionType === AuctionType.DUTCH ||
-                  auctionFormData.auctionType === AuctionType.RESERVE) && (
+                {/* Reserve Price - Only show for Reserve auctions */}
+                {auctionFormData.auctionType === AuctionType.RESERVE && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Reserve Price (ETH)
@@ -1144,17 +1351,10 @@ function AdminNFTCreatorUltraSimpleContent() {
                         updateField("reservePrice", e.target.value)
                       }
                       className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500"
-                      placeholder={
-                        auctionFormData.auctionType === AuctionType.DUTCH
-                          ? "0.001 (final price)"
-                          : "0.01 (minimum price)"
-                      }
+                      placeholder="0.01 (minimum price)"
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      {auctionFormData.auctionType === AuctionType.DUTCH &&
-                        "🔻 Final price when auction ends (must be < start price)"}
-                      {auctionFormData.auctionType === AuctionType.RESERVE &&
-                        "🏛️ Required minimum price (must be ≥ start price)"}
+                      🏛️ Required minimum price (must be ≥ start price)
                     </p>
                   </div>
                 )}
@@ -1266,7 +1466,7 @@ function AdminNFTCreatorUltraSimpleContent() {
                       auctionFormData.extensionThresholdMinutes || 5
                     } minutes.`}
                   {auctionFormData.auctionType === AuctionType.DUTCH &&
-                    "The price starts high and decreases every 20 minutes by the specified rate until someone buys at the current price or it reaches the reserve price."}
+                    "The price starts high and decreases gradually by the specified rate until someone buys at the current price or it reaches the reserve price."}
                   {auctionFormData.auctionType === AuctionType.SEALED_BID &&
                     "Bidders submit secret bids without knowing others' bids. The highest bid wins after a reveal phase."}
                   {auctionFormData.auctionType === AuctionType.RESERVE &&

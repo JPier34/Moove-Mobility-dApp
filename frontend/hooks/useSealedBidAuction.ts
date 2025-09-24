@@ -108,7 +108,7 @@ export function useSealedBidAuction(): SealedBidAuctionHandler {
 
         // Import contract addresses and ABIs
         const { CONTRACT_ADDRESSES, CONTRACT_ABIS } = await import(
-          "@/lib/contracts"
+          "@/utils/contracts"
         );
 
         const auctionContract = new ethers.Contract(
@@ -240,7 +240,7 @@ export function useSealedBidAuction(): SealedBidAuctionHandler {
 
         // Import contract addresses and ABIs
         const { CONTRACT_ADDRESSES, CONTRACT_ABIS } = await import(
-          "@/lib/contracts"
+          "@/utils/contracts"
         );
 
         const auctionContract = new ethers.Contract(

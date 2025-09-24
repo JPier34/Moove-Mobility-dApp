@@ -12,9 +12,7 @@ import AdminNFTCreatorUltraSimple from "@/components/admin/AdminNFTCreatorUltraS
 // import AdminNFTCreatorDebug from "@/components/admin/AdminNFTCreatorDebug";
 import AdminGuard from "@/components/admin/AdminGuard";
 import AuctionTypeTester from "@/components/admin/AuctionTypeTester";
-import AuctionStatusChecker from "@/components/debug/AuctionStatusChecker";
-import NFTCollectionChecker from "@/components/debug/NFTCollectionChecker";
-import TransactionTrackerDebug from "@/components/debug/TransactionTrackerDebug";
+// Debug components removed
 // import FailedAuctionHandler from "@/components/admin/FailedAuctionHandler"; // Temporarily disabled
 
 export default function AdminPage() {
@@ -137,35 +135,7 @@ export default function AdminPage() {
             <AuctionTypeTester />
           </motion.div>
 
-          {/* Auction Status Checker */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.8 }}
-            className="mt-8"
-          >
-            <AuctionStatusChecker auctionId={8} />
-          </motion.div>
-
-          {/* NFT Collection Checker */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 1.0 }}
-            className="mt-8"
-          >
-            <NFTCollectionChecker tokenId={45} userAddress={address || ""} />
-          </motion.div>
-
-          {/* Transaction Tracker Debug */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 1.2 }}
-            className="mt-8"
-          >
-            <TransactionTrackerDebug />
-          </motion.div>
+          {/* Debug components removed */}
         </div>
       </div>
     </AdminGuard>

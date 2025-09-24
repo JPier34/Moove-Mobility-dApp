@@ -21,8 +21,30 @@ export function useAutomaticAuctionMonitor() {
         provider
       );
 
-      // Get total auctions
-      const totalAuctions = await auctionContract.totalAuctions();
+      // Get total auctions with fallback
+      let totalAuctions = 0;
+      try {
+        totalAuctions = await auctionContract.totalAuctions();
+      } catch (error) {
+        console.warn("⚠️ totalAuctions function not available, using fallback method");
+        // Fallback: try to find auctions by checking sequential IDs
+        // This is less efficient but works if totalAuctions is not available
+        let foundAuctions = 0;
+        for (let i = 0; i < 100; i++) { // Check up to 100 auctions
+          try {
+            const auction = await auctionContract.getAuction(i);
+            if (auction && auction.seller !== "0x0000000000000000000000000000000000000000") {
+              foundAuctions = i + 1;
+            } else {
+              break;
+            }
+          } catch {
+            break;
+          }
+        }
+        totalAuctions = foundAuctions;
+      }
+
       const currentTime = Math.floor(Date.now() / 1000);
 
       console.log(`🔍 Checking ${totalAuctions} auctions for expiration...`);

@@ -22,66 +22,67 @@ export function useAuctionExtensionEvents() {
   >([]);
 
   // Watch for AuctionExtended events
-  useWatchContractEvent({
-    address: contracts.MooveAuction.address as `0x${string}`,
-    abi: contracts.MooveAuction.abi,
-    eventName: "AuctionExtended",
-    onLogs(logs) {
-      console.log("🔄 AuctionExtended events received:", logs);
+  // AuctionExtended event not available in simplified ABI
+  // useWatchContractEvent({
+  //   address: contracts.MooveAuction.address as `0x${string}`,
+  //   abi: contracts.MooveAuction.abi,
+  //   eventName: "AuctionExtended",
+  //   onLogs(logs) {
+  //     console.log("🔄 AuctionExtended events received:", logs);
 
-      logs.forEach((log) => {
-        const { auctionId, bidder, extensionDuration, newEndTime, reason } = (
-          log as any
-        ).args as {
-          auctionId: bigint;
-          bidder: string;
-          extensionDuration: bigint;
-          newEndTime: bigint;
-          reason: string;
-        };
+  //     logs.forEach((log) => {
+  //       const { auctionId, bidder, extensionDuration, newEndTime, reason } = (
+  //         log as any
+  //       ).args as {
+  //         auctionId: bigint;
+  //         bidder: string;
+  //         extensionDuration: bigint;
+  //         newEndTime: bigint;
+  //         reason: string;
+  //       };
 
-        const extensionEvent: AuctionExtensionEvent = {
-          auctionId: Number(auctionId),
-          bidder,
-          extensionDuration: Number(extensionDuration),
-          newEndTime: Number(newEndTime),
-          reason,
-          transactionHash: (log as any).transactionHash || "",
-          blockNumber: Number((log as any).blockNumber),
-          timestamp: new Date(),
-        };
+  //       const extensionEvent: AuctionExtensionEvent = {
+  //         auctionId: Number(auctionId),
+  //         bidder,
+  //         extensionDuration: Number(extensionDuration),
+  //         newEndTime: Number(newEndTime),
+  //         reason,
+  //         transactionHash: (log as any).transactionHash || "",
+  //         blockNumber: Number((log as any).blockNumber),
+  //         timestamp: new Date(),
+  //       };
 
-        console.log("⏰ Auction Extended:", {
-          auctionId: extensionEvent.auctionId,
-          bidder: extensionEvent.bidder,
-          extensionMinutes: extensionEvent.extensionDuration / 60,
-          newEndTime: new Date(
-            extensionEvent.newEndTime * 1000
-          ).toLocaleString(),
-          reason: extensionEvent.reason,
-        });
+  //       console.log("⏰ Auction Extended:", {
+  //         auctionId: extensionEvent.auctionId,
+  //         bidder: extensionEvent.bidder,
+  //         extensionMinutes: extensionEvent.extensionDuration / 60,
+  //         newEndTime: new Date(
+  //           extensionEvent.newEndTime * 1000
+  //         ).toLocaleString(),
+  //         reason: extensionEvent.reason,
+  //       });
 
-        // Add to recent extensions
-        setRecentExtensions((prev) => [extensionEvent, ...prev.slice(0, 9)]); // Keep last 10
+  //       // Add to recent extensions
+  //       setRecentExtensions((prev) => [extensionEvent, ...prev.slice(0, 9)]); // Keep last 10
 
-        // Show toast notification
-        const extensionMinutes = Math.round(
-          extensionEvent.extensionDuration / 60
-        );
-        const newEndTimeFormatted = new Date(
-          extensionEvent.newEndTime * 1000
-        ).toLocaleTimeString();
+  //       // Show toast notification
+  //       const extensionMinutes = Math.round(
+  //         extensionEvent.extensionDuration / 60
+  //       );
+  //       const newEndTimeFormatted = new Date(
+  //         extensionEvent.newEndTime * 1000
+  //       ).toLocaleTimeString();
 
-        toast.success(
-          `🔄 Auction #${extensionEvent.auctionId} extended by ${extensionMinutes} minutes! New end time: ${newEndTimeFormatted}`,
-          {
-            duration: 5000,
-            icon: "⏰",
-          }
-        );
-      });
-    },
-  });
+  //       toast.success(
+  //         `🔄 Auction #${extensionEvent.auctionId} extended by ${extensionMinutes} minutes! New end time: ${newEndTimeFormatted}`,
+  //         {
+  //           duration: 5000,
+  //           icon: "⏰",
+  //         }
+  //       );
+  //     });
+  //   },
+  // });
 
   // Clear old extensions (older than 1 hour)
   useEffect(() => {

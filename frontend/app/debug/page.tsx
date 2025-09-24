@@ -1,16 +1,14 @@
 "use client";
 
-import React from "react";
-import AuctionTypeTester from "@/components/debug/AuctionTypeTester";
-import AuctionStatusChecker from "@/components/debug/AuctionStatusChecker";
-import TransactionTrackerDebug from "@/components/debug/TransactionTrackerDebug";
-import NFTCollectionChecker from "@/components/debug/NFTCollectionChecker";
-import EnglishAuctionTester from "@/components/debug/EnglishAuctionTester";
-import RoleChecker from "@/components/debug/RoleChecker";
-import AllAuctionsDebug from "@/components/debug/AllAuctionsDebug";
+import React, { useState } from "react";
+import DutchAuctionChecker from "@/components/debug/DutchAuctionChecker";
+// Debug components removed
 // ModularValidationTester COMPLETELY REMOVED - was causing build errors
 
 export default function DebugPage() {
+  const [auctionId, setAuctionId] = useState<number>(2);
+  const [buyerAddress, setBuyerAddress] = useState<string>("");
+
   return (
     <div className="min-h-screen bg-black dark:bg-gray-900 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -23,54 +21,55 @@ export default function DebugPage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Role Checker - NEW */}
-          <div className="lg:col-span-2">
-            <RoleChecker />
-          </div>
-
-          {/* Modular Validation Tester - DISABLED */}
-          <div className="lg:col-span-2">
-            <div className="p-6 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <h3 className="text-lg font-semibold text-yellow-800 mb-2">
-                ⚠️ Modular Validation Tester - Temporarily Disabled
-              </h3>
-              <p className="text-yellow-700">
-                This component uses the old complex modular system that was
-                causing React hooks errors. It will be rebuilt with the new
-                simplified approach.
-              </p>
+        {/* Dutch Auction Checker */}
+        <div className="mb-8">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-4">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+              🔍 Dutch Auction Purchase Checker
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Auction ID
+                </label>
+                <input
+                  type="number"
+                  value={auctionId}
+                  onChange={(e) => setAuctionId(Number(e.target.value))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter auction ID"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Buyer Address (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={buyerAddress}
+                  onChange={(e) => setBuyerAddress(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="0x..."
+                />
+              </div>
             </div>
           </div>
 
-          {/* English Auction Tester */}
-          <div className="lg:col-span-2 text-black">
-            <EnglishAuctionTester />
-          </div>
+          <DutchAuctionChecker
+            auctionId={auctionId}
+            buyerAddress={buyerAddress || undefined}
+          />
+        </div>
 
-          {/* Auction Type Tester */}
-          <div className="lg:col-span-2 text-black">
-            <AuctionTypeTester />
-          </div>
-
-          {/* Auction Status Checker */}
-          <div className="text-black">
-            <AuctionStatusChecker auctionId={0} />
-          </div>
-
-          {/* All Auctions Debug */}
-          <div className="text-black">
-            <AllAuctionsDebug />
-          </div>
-
-          {/* Transaction Tracker Debug */}
-          <div className="text-black">
-            <TransactionTrackerDebug />
-          </div>
-
-          {/* NFT Collection Checker */}
-          <div className="lg:col-span-2 text-black">
-            <NFTCollectionChecker />
+        <div className="text-center">
+          <div className="p-8 bg-gray-100 border border-gray-300 rounded-lg">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">
+              🧹 Debug Components Removed
+            </h3>
+            <p className="text-gray-700">
+              All debug components have been removed for production readiness.
+              The system is now clean and optimized.
+            </p>
           </div>
         </div>
 

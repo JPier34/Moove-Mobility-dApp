@@ -81,6 +81,13 @@ function validateAuctionData(auctionData: any): ValidationResult {
     const startTime = Number(auctionData.startTime);
     const endTime = Number(auctionData.endTime);
     if (isNaN(startTime) || isNaN(endTime) || startTime >= endTime) {
+      console.error("❌ Timestamp validation failed:", {
+        startTime,
+        endTime,
+        startTimeType: typeof auctionData.startTime,
+        endTimeType: typeof auctionData.endTime,
+        rawData: auctionData,
+      });
       return { isValid: false, error: "Invalid timestamps" };
     }
 
@@ -920,30 +927,36 @@ async function fetchAuctionFromContractCorrected(
       );
 
       // Convert BigInt values to strings for frontend compatibility
+      // Map array indices to struct fields based on Auction struct order:
+      // 0: auctionId, 1: nftContract, 2: tokenId, 3: seller, 4: auctionType, 5: status,
+      // 6: allowPartialFulfillment, 7: isSettled, 8: revealPhaseStarted, 9: startingPrice,
+      // 10: reservePrice, 11: buyNowPrice, 12: currentPrice, 13: bidIncrement, 14: highestBid,
+      // 15: startTime, 16: endTime, 17: extensionThreshold, 18: extensionDuration, 19: revealEndTime,
+      // 20: highestBidder, 21: minBidders, 22: totalBidders
       auctionData = {
-        auctionId: auctionData.auctionId.toString(),
-        nftContract: auctionData.nftContract,
-        tokenId: auctionData.tokenId.toString(),
-        seller: auctionData.seller,
-        auctionType: Number(auctionData.auctionType),
-        startingPrice: ethers.formatEther(auctionData.startingPrice),
-        reservePrice: ethers.formatEther(auctionData.reservePrice),
-        buyNowPrice: ethers.formatEther(auctionData.buyNowPrice),
-        currentPrice: ethers.formatEther(auctionData.currentPrice),
-        startTime: Number(auctionData.startTime),
-        endTime: Number(auctionData.endTime),
-        bidIncrement: ethers.formatEther(auctionData.bidIncrement),
-        highestBidder: auctionData.highestBidder,
-        highestBid: ethers.formatEther(auctionData.highestBid),
-        status: Number(auctionData.status),
-        allowPartialFulfillment: auctionData.allowPartialFulfillment,
-        minBidders: Number(auctionData.minBidders),
-        totalBidders: Number(auctionData.totalBidders),
-        isSettled: auctionData.isSettled,
-        extensionThreshold: ethers.formatEther(auctionData.extensionThreshold),
-        extensionDuration: Number(auctionData.extensionDuration),
-        revealEndTime: Number(auctionData.revealEndTime),
-        revealPhaseStarted: auctionData.revealPhaseStarted,
+        auctionId: auctionData[0].toString(),
+        nftContract: auctionData[1],
+        tokenId: auctionData[2].toString(),
+        seller: auctionData[3],
+        auctionType: Number(auctionData[4]),
+        status: Number(auctionData[5]),
+        allowPartialFulfillment: auctionData[6],
+        isSettled: auctionData[7],
+        revealPhaseStarted: auctionData[8],
+        startingPrice: ethers.formatEther(auctionData[9]),
+        reservePrice: ethers.formatEther(auctionData[10]),
+        buyNowPrice: ethers.formatEther(auctionData[11]),
+        currentPrice: ethers.formatEther(auctionData[12]),
+        bidIncrement: ethers.formatEther(auctionData[13]),
+        highestBid: ethers.formatEther(auctionData[14]),
+        startTime: Number(auctionData[15]),
+        endTime: Number(auctionData[16]),
+        extensionThreshold: ethers.formatEther(auctionData[17]),
+        extensionDuration: Number(auctionData[18]),
+        revealEndTime: Number(auctionData[19]),
+        highestBidder: auctionData[20],
+        minBidders: Number(auctionData[21]),
+        totalBidders: Number(auctionData[22]),
       };
 
       console.log(
