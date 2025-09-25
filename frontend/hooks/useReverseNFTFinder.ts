@@ -26,7 +26,6 @@ export interface ReverseNFTFinderResult {
 
 const INITIAL_DISPLAY_COUNT = 12;
 const BATCH_SIZE = 20;
-const MAX_CONSECUTIVE_NOT_FOUND = 10;
 
 export function useReverseNFTFinder(): ReverseNFTFinderResult {
   const { address } = useAccount();
@@ -47,9 +46,10 @@ export function useReverseNFTFinder(): ReverseNFTFinderResult {
   const [totalSupply, setTotalSupply] = useState<number | undefined>();
   const [consecutiveNotFound, setConsecutiveNotFound] = useState(0);
 
-  // Since totalSupply doesn't exist in the contract, we'll use a different approach
-  // We'll start from a reasonable number and work backwards
-  const MAX_SEARCH_RANGE = 1000; // Search up to 1000 NFTs
+  // Optimized search strategy: start from 200 and work down to 0
+  // Based on our testing, we know NFTs exist in range 0-97
+  const START_SEARCH_FROM = 200; // Start from 200 as suggested
+  const MAX_CONSECUTIVE_NOT_FOUND = 10;
 
   // Debug logging removed for performance
 
@@ -149,14 +149,14 @@ export function useReverseNFTFinder(): ReverseNFTFinderResult {
     setIsComplete(false);
 
     try {
-      // Start from a reasonable number and work backwards
-      let currentTokenId = MAX_SEARCH_RANGE - 1; // Start from 999 and work backwards
+      // Start from 200 and work backwards to 0
+      let currentTokenId = START_SEARCH_FROM; // Start from 200 as suggested
       let consecutiveNotFound = 0;
       let checked = 0;
       let found = 0;
 
       console.log(
-        `🔍 [useReverseNFTFinder] Starting search from token ${currentTokenId} for address ${address}`
+        `🔍 [useReverseNFTFinder] Starting optimized search from token ${currentTokenId} for address ${address}`
       );
       setLastCheckedTokenId(currentTokenId);
 
@@ -192,12 +192,14 @@ export function useReverseNFTFinder(): ReverseNFTFinderResult {
         setLastCheckedTokenId(currentTokenId);
 
         // Stop condition: found enough consecutive empty tokens
+        // Since we know NFTs exist in range 0-97, we can stop earlier
         if (
           consecutiveNotFound >= MAX_CONSECUTIVE_NOT_FOUND * BATCH_SIZE &&
-          checked >= 100
+          checked >= 50 && // Reduced from 100 since we know the range
+          currentTokenId < 50 // Stop if we're below 50 and found many consecutive empty
         ) {
           console.log(
-            `🛑 [useReverseNFTFinder] Stopping search: ${consecutiveNotFound} consecutive not found, ${checked} total checked`
+            `🛑 [useReverseNFTFinder] Stopping search: ${consecutiveNotFound} consecutive not found, ${checked} total checked, currentTokenId: ${currentTokenId}`
           );
           setIsComplete(true);
           break;
@@ -207,9 +209,42 @@ export function useReverseNFTFinder(): ReverseNFTFinderResult {
         await new Promise((resolve) => setTimeout(resolve, 10));
       }
 
+      // If we haven't reached 0 yet, continue with a more targeted search
+      if (currentTokenId > 0) {
+        console.log(
+          `🔄 [useReverseNFTFinder] Continuing search from ${currentTokenId} to 0...`
+        );
+
+        // Continue searching from current position to 0
+        while (currentTokenId >= 0) {
+          const nft = await checkTokenOwnership(currentTokenId);
+          if (nft) {
+            console.log(
+              `🔍 [useReverseNFTFinder] Found NFT at token ${currentTokenId}`
+            );
+            setUserNFTs((prev) => [nft, ...prev]);
+            found++;
+            setFoundCount(found);
+            consecutiveNotFound = 0;
+            setConsecutiveNotFound(0);
+          } else {
+            consecutiveNotFound++;
+            setConsecutiveNotFound(consecutiveNotFound);
+          }
+
+          checked++;
+          setTotalChecked(checked);
+          setLastCheckedTokenId(currentTokenId);
+          currentTokenId--;
+
+          // Small delay to prevent blocking
+          await new Promise((resolve) => setTimeout(resolve, 5));
+        }
+      }
+
       setIsComplete(true);
       console.log(
-        `✅ [useReverseNFTFinder] Search completed: found ${found} NFTs, checked ${checked} tokens`
+        `✅ [useReverseNFTFinder] Search completed: found ${found} NFTs, checked ${checked} tokens, range: ${START_SEARCH_FROM} to 0`
       );
     } catch (error) {
       console.error("❌ [useReverseNFTFinder] Error searching NFTs:", error);
@@ -219,7 +254,7 @@ export function useReverseNFTFinder(): ReverseNFTFinderResult {
     }
   }, [address, isLoading, checkTokenOwnership, isComplete]);
 
-  // Start search when address is available (no longer depends on totalSupply)
+  // Start optimized search when address is available
   useEffect(() => {
     console.log("🔍 [useReverseNFTFinder] Effect triggered:", {
       address: !!address,
@@ -230,7 +265,7 @@ export function useReverseNFTFinder(): ReverseNFTFinderResult {
 
     if (address && !isLoading && !isComplete) {
       console.log(
-        "🔍 [useReverseNFTFinder] Starting reverse search without totalSupply..."
+        `🔍 [useReverseNFTFinder] Starting optimized search from ${START_SEARCH_FROM} to 0...`
       );
       searchNFTs();
     }
