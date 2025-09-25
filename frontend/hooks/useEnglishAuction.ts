@@ -4,8 +4,8 @@ import { useState, useCallback } from "react";
 import { useAccount } from "wagmi";
 import { usePlaceBid } from "./useAuction";
 import { parseEther, formatEther } from "viem";
-import { toast } from "react-hot-toast";
 import { useExtendAuction } from "./useExtendAuction";
+import { useAuctionNotificationTriggers } from "./useUnifiedAuctionNotifications";
 
 export interface EnglishAuctionHandler {
   placeBid: (
@@ -35,6 +35,8 @@ export function useEnglishAuction(): EnglishAuctionHandler {
   >("idle");
 
   const { placeBid, isPending: isBidding, error: bidError } = usePlaceBid();
+  const { notifyEnglishWin, notifyAuctionFailed } =
+    useAuctionNotificationTriggers();
   // Auto-extension is now handled by smart contract - no manual extension needed
 
   // Default extension settings (can be overridden)
@@ -57,7 +59,7 @@ export function useEnglishAuction(): EnglishAuctionHandler {
       if (!isConnected || !address) {
         setError("Wallet not connected");
         setStep("error");
-        toast.error("Connect wallet to place bid");
+        notifyAuctionFailed(auctionId.toString(), "Wallet not connected");
         return false;
       }
 
@@ -159,16 +161,13 @@ export function useEnglishAuction(): EnglishAuctionHandler {
 
         console.log("✅ Bid placed successfully");
 
-        // Show success message with auto-extension info
+        // Success handled by notification system
         if (shouldExtend) {
           console.log(
             `⏰ Bid placed in last ${extensionThreshold} minutes - smart contract will auto-extend`
           );
-          toast.success(
-            `Bid placed! Auction will auto-extend by ${extensionDuration} minutes due to late bid`
-          );
         } else {
-          toast.success(`Bid of ${bidAmount} ETH placed successfully!`);
+          console.log(`Bid of ${bidAmount} ETH placed successfully!`);
         }
 
         setStep("success");
@@ -180,18 +179,8 @@ export function useEnglishAuction(): EnglishAuctionHandler {
         setError(errorMessage);
         setStep("error");
 
-        // Show specific error messages
-        if (errorMessage.includes("timeout")) {
-          toast.error("Transaction timeout - please try again");
-        } else if (errorMessage.includes("insufficient funds")) {
-          toast.error("Insufficient funds for this bid");
-        } else if (errorMessage.includes("user rejected")) {
-          toast.error("Transaction rejected by user");
-        } else if (errorMessage.includes("bid too low")) {
-          toast.error("Bid amount is too low");
-        } else {
-          toast.error(`Bid failed: ${errorMessage}`);
-        }
+        // Use unified notification system for errors
+        notifyAuctionFailed(auctionId.toString(), errorMessage);
 
         return false;
       } finally {
@@ -220,7 +209,7 @@ export function useEnglishAuction(): EnglishAuctionHandler {
       if (!isConnected || !address) {
         setError("Wallet not connected");
         setStep("error");
-        toast.error("Connect wallet to buy now");
+        notifyAuctionFailed(auctionId.toString(), "Wallet not connected");
         return false;
       }
 
@@ -270,7 +259,8 @@ export function useEnglishAuction(): EnglishAuctionHandler {
 
         console.log("✅ Buy now successful");
         setStep("success");
-        toast.success(`Successfully bought for ${buyNowPrice} ETH!`);
+        // Notifica di vincita per buy now
+        notifyEnglishWin(auctionId.toString(), parseFloat(buyNowPrice));
 
         return true;
       } catch (error) {
@@ -280,16 +270,8 @@ export function useEnglishAuction(): EnglishAuctionHandler {
         setError(errorMessage);
         setStep("error");
 
-        // Show specific error messages
-        if (errorMessage.includes("timeout")) {
-          toast.error("Transaction timeout - please try again");
-        } else if (errorMessage.includes("insufficient funds")) {
-          toast.error("Insufficient funds for buy now");
-        } else if (errorMessage.includes("user rejected")) {
-          toast.error("Transaction rejected by user");
-        } else {
-          toast.error(`Buy now failed: ${errorMessage}`);
-        }
+        // Use unified notification system for errors
+        notifyAuctionFailed(auctionId.toString(), errorMessage);
 
         return false;
       } finally {

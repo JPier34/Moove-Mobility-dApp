@@ -3,7 +3,7 @@ import { useAccount } from "wagmi";
 import { ethers } from "ethers";
 import { contracts } from "@/utils/contracts";
 import { useStartRevealPhase } from "@/hooks/useAuction";
-import toast from "react-hot-toast";
+import { useAuctionNotificationTriggers } from "./useUnifiedAuctionNotifications";
 
 interface SealedBidStatusManager {
   checkAndTransitionStatus: (auctionId: number) => Promise<void>;
@@ -21,6 +21,8 @@ export function useSealedBidStatusManager(): SealedBidStatusManager {
     isPending,
     error: revealError,
   } = useStartRevealPhase();
+  const { notifySealedBidWin, notifyAuctionFailed, notifyClaimReady } =
+    useAuctionNotificationTriggers();
 
   // Check if current user is the winner of a sealed bid auction
   const checkForWinner = useCallback(
@@ -65,9 +67,10 @@ export function useSealedBidStatusManager(): SealedBidStatusManager {
             }
           );
 
-          // Show notification about failed auction
-          toast.error(
-            `Auction #${auctionId} failed - no valid bids were revealed`
+          // Usa il sistema di notifiche unificato
+          notifyAuctionFailed(
+            auctionId.toString(),
+            "no valid bids were revealed"
           );
 
           // Emit custom event for failed auction with detailed info
@@ -98,11 +101,10 @@ export function useSealedBidStatusManager(): SealedBidStatusManager {
             timestamp: new Date().toISOString(),
           });
 
-          // Show winner notification
-          toast.success(
-            `🏆 Congratulations! You won auction #${auctionId} for ${ethers.formatEther(
-              highestBid
-            )} ETH!`
+          // Usa il sistema di notifiche unificato
+          notifySealedBidWin(
+            auctionId.toString(),
+            parseFloat(ethers.formatEther(highestBid))
           );
 
           // Emit custom event for winner notification
@@ -257,8 +259,8 @@ export function useSealedBidStatusManager(): SealedBidStatusManager {
               `✅ Reveal phase started successfully for auction ${auctionId}`
             );
 
-            // Show notification
-            toast.success(`🔓 Reveal phase started for auction #${auctionId}`);
+            // Notifica gestita dal sistema unificato
+            console.log(`🔓 Reveal phase started for auction #${auctionId}`);
 
             // After starting reveal phase, immediately end the auction
             setTimeout(async () => {
@@ -276,7 +278,8 @@ export function useSealedBidStatusManager(): SealedBidStatusManager {
                 await endTx.wait();
                 console.log(`✅ Auction ${auctionId} ended successfully`);
 
-                toast.success(
+                // Notifica gestita dal sistema unificato
+                console.log(
                   `🏁 Auction #${auctionId} ended - winner determined`
                 );
 
@@ -286,7 +289,8 @@ export function useSealedBidStatusManager(): SealedBidStatusManager {
                 }, 2000);
               } catch (error) {
                 console.error(`❌ Error ending auction ${auctionId}:`, error);
-                toast.error(
+                // Notifica gestita dal sistema unificato
+                console.error(
                   `Failed to end auction: ${
                     error instanceof Error ? error.message : "Unknown error"
                   }`
@@ -298,7 +302,8 @@ export function useSealedBidStatusManager(): SealedBidStatusManager {
               `❌ Error starting reveal phase for auction ${auctionId}:`,
               error
             );
-            toast.error(
+            // Notifica gestita dal sistema unificato
+            console.error(
               `Failed to start reveal phase: ${
                 error instanceof Error ? error.message : "Unknown error"
               }`
@@ -353,7 +358,8 @@ export function useSealedBidStatusManager(): SealedBidStatusManager {
                 );
 
                 // Show notification
-                toast.success(
+                // Notifica gestita dal sistema unificato
+                console.log(
                   `🏁 Auction #${auctionId} ended - winner determined`
                 );
 
@@ -366,7 +372,8 @@ export function useSealedBidStatusManager(): SealedBidStatusManager {
                   `❌ Error ending reveal phase for auction ${auctionId}:`,
                   error
                 );
-                toast.error(
+                // Notifica gestita dal sistema unificato
+                console.error(
                   `Failed to end reveal phase: ${
                     error instanceof Error ? error.message : "Unknown error"
                   }`
@@ -441,7 +448,8 @@ export function useSealedBidStatusManager(): SealedBidStatusManager {
                 console.log(`✅ Auction ${auctionId} ended successfully`);
 
                 // Show notification
-                toast.success(
+                // Notifica gestita dal sistema unificato
+                console.log(
                   `🏁 Auction #${auctionId} ended - winner determined`
                 );
 
@@ -451,7 +459,8 @@ export function useSealedBidStatusManager(): SealedBidStatusManager {
                 }, 2000);
               } catch (error) {
                 console.error(`❌ Error ending auction ${auctionId}:`, error);
-                toast.error(
+                // Notifica gestita dal sistema unificato
+                console.error(
                   `Failed to end auction: ${
                     error instanceof Error ? error.message : "Unknown error"
                   }`
@@ -511,7 +520,8 @@ export function useSealedBidStatusManager(): SealedBidStatusManager {
           errorMessage
         );
         setError(errorMessage);
-        toast.error(`Failed to check auction status: ${errorMessage}`);
+        // Notifica gestita dal sistema unificato
+        console.error(`Failed to check auction status: ${errorMessage}`);
       } finally {
         setIsProcessing(false);
       }
@@ -524,7 +534,8 @@ export function useSealedBidStatusManager(): SealedBidStatusManager {
     if (revealError) {
       console.error("❌ Reveal phase error:", revealError);
       setError(revealError?.message || "Unknown error");
-      toast.error(
+      // Notifica gestita dal sistema unificato
+      console.error(
         `Reveal phase failed: ${revealError?.message || "Unknown error"}`
       );
     }
@@ -546,8 +557,8 @@ export function useSealedBidStatusManager(): SealedBidStatusManager {
         // Call startRevealPhase directly
         startRevealPhase(auctionId);
 
-        // Show notification
-        toast.success(`🔓 Reveal phase started for auction #${auctionId}`);
+        // Notifica gestita dal sistema unificato
+        console.log(`🔓 Reveal phase started for auction #${auctionId}`);
 
         console.log(
           `✅ Reveal phase initiated for newly created auction ${auctionId}`
@@ -558,7 +569,8 @@ export function useSealedBidStatusManager(): SealedBidStatusManager {
           `❌ Error starting reveal phase for auction ${auctionId}:`,
           error
         );
-        toast.error(
+        // Notifica gestita dal sistema unificato
+        console.error(
           `Failed to start reveal phase: ${
             error instanceof Error ? error.message : "Unknown error"
           }`

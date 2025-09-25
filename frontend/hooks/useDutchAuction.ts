@@ -1,10 +1,10 @@
 import { useState, useCallback } from "react";
 import { ethers, parseUnits } from "ethers";
 import { useAccount } from "wagmi";
-import { toast } from "react-hot-toast";
 import { useTransactionTracker } from "./useTransactionTracker";
 import { contracts } from "@/utils/contracts";
 import { parseEther } from "viem";
+import { useAuctionNotificationTriggers } from "./useUnifiedAuctionNotifications";
 
 interface DutchAuctionSuccessData {
   auctionId: number;
@@ -23,6 +23,8 @@ export const useDutchAuction = () => {
   const [successData, setSuccessData] =
     useState<DutchAuctionSuccessData | null>(null);
   const { addTransaction, updateTransactionStatus } = useTransactionTracker();
+  const { notifyDutchPurchase, notifyAuctionFailed } =
+    useAuctionNotificationTriggers();
 
   const closeSuccessModal = useCallback(() => {
     setShowSuccessModal(false);
@@ -36,18 +38,18 @@ export const useDutchAuction = () => {
       onSuccess?: () => void
     ): Promise<boolean> => {
       if (!isConnected || !address) {
-        toast.error("Please connect your wallet");
+        setError("Please connect your wallet");
         return false;
       }
 
       if (isProcessing) {
-        toast.error("Transaction already in progress");
+        setError("Transaction already in progress");
         return false;
       }
 
       // Validate price
       if (currentPrice <= 0 || !isFinite(currentPrice)) {
-        toast.error("Invalid price for Dutch auction");
+        setError("Invalid price for Dutch auction");
         return false;
       }
 
@@ -314,9 +316,9 @@ export const useDutchAuction = () => {
           transactionHash: buyTx.hash, // Use buy transaction hash as the final confirmation
         });
         setShowSuccessModal(true);
-        toast.success(
-          `Successfully purchased Dutch auction for ${currentPrice} ETH!`
-        );
+
+        // Usa il sistema di notifiche unificato invece del toast duplicato
+        notifyDutchPurchase(auctionId.toString(), currentPrice);
 
         if (onSuccess) {
           onSuccess();
@@ -358,7 +360,7 @@ export const useDutchAuction = () => {
         }
 
         setError(errorMessage);
-        toast.error(errorMessage);
+        notifyAuctionFailed(auctionId.toString(), errorMessage);
         return false;
       } finally {
         setIsProcessing(false);

@@ -303,3 +303,4 @@ if (require.main === module) {
 }
 
 module.exports = { compareABIs, loadABIFromJSON, loadABIFromContractsTS };
+

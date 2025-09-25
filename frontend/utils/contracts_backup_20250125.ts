@@ -22,3 +22,4 @@ export const CONTRACT_ADDRESSES = {
 // 4. Gli indirizzi sono quelli deployati e testati
 
 // Questo backup deve essere mantenuto fino a quando il nuovo contratto non è completamente testato
+

@@ -4,7 +4,7 @@ import { useState, useCallback } from "react";
 import { useAccount } from "wagmi";
 import { usePlaceBid } from "./useAuction";
 import { parseEther, formatEther } from "viem";
-import { toast } from "react-hot-toast";
+import { useAuctionNotificationTriggers } from "./useUnifiedAuctionNotifications";
 
 export interface ReserveAuctionHandler {
   placeBid: (
@@ -34,6 +34,8 @@ export function useReserveAuction(): ReserveAuctionHandler {
   const [isUnderReserve, setIsUnderReserve] = useState(false);
 
   const { placeBid, isPending: isBidding, error: bidError } = usePlaceBid();
+  const { notifyReserveWin, notifyAuctionFailed } =
+    useAuctionNotificationTriggers();
 
   const placeBidWithValidation = useCallback(
     async (
@@ -49,7 +51,7 @@ export function useReserveAuction(): ReserveAuctionHandler {
       if (!isConnected || !address) {
         setError("Wallet not connected");
         setStep("error");
-        toast.error("Connect wallet to place bid");
+        notifyAuctionFailed(auctionId.toString(), "Wallet not connected");
         return false;
       }
 
@@ -100,7 +102,8 @@ export function useReserveAuction(): ReserveAuctionHandler {
           console.warn(
             `⚠️ Bid ${bidAmount} ETH is under reserve price ${auctionData.reservePrice} ETH`
           );
-          toast.error(
+          notifyAuctionFailed(
+            auctionId.toString(),
             `Bid is under reserve price. Auction may not complete if reserve is not met.`
           );
         }
@@ -136,12 +139,13 @@ export function useReserveAuction(): ReserveAuctionHandler {
         console.log("✅ Bid placed successfully");
         setStep("success");
 
+        // Success handled by notification system
         if (isUnderReservePrice) {
-          toast.success(
+          console.log(
             `Bid placed! Note: ${bidAmount} ETH is under reserve price ${auctionData.reservePrice} ETH`
           );
         } else {
-          toast.success(`Bid of ${bidAmount} ETH placed successfully!`);
+          console.log(`Bid of ${bidAmount} ETH placed successfully!`);
         }
 
         return true;
@@ -152,18 +156,8 @@ export function useReserveAuction(): ReserveAuctionHandler {
         setError(errorMessage);
         setStep("error");
 
-        // Show specific error messages
-        if (errorMessage.includes("timeout")) {
-          toast.error("Transaction timeout - please try again");
-        } else if (errorMessage.includes("insufficient funds")) {
-          toast.error("Insufficient funds for this bid");
-        } else if (errorMessage.includes("user rejected")) {
-          toast.error("Transaction rejected by user");
-        } else if (errorMessage.includes("bid too low")) {
-          toast.error("Bid amount is too low");
-        } else {
-          toast.error(`Bid failed: ${errorMessage}`);
-        }
+        // Use unified notification system for errors
+        notifyAuctionFailed(auctionId.toString(), errorMessage);
 
         return false;
       } finally {
@@ -182,7 +176,7 @@ export function useReserveAuction(): ReserveAuctionHandler {
       if (!isConnected || !address) {
         setError("Wallet not connected");
         setStep("error");
-        toast.error("Connect wallet to buy now");
+        notifyAuctionFailed(auctionId.toString(), "Wallet not connected");
         return false;
       }
 
@@ -232,7 +226,8 @@ export function useReserveAuction(): ReserveAuctionHandler {
 
         console.log("✅ Buy now successful");
         setStep("success");
-        toast.success(`Successfully bought for ${buyNowPrice} ETH!`);
+        // Notifica di vincita per buy now
+        notifyReserveWin(auctionId.toString(), parseFloat(buyNowPrice));
 
         return true;
       } catch (error) {
@@ -242,16 +237,8 @@ export function useReserveAuction(): ReserveAuctionHandler {
         setError(errorMessage);
         setStep("error");
 
-        // Show specific error messages
-        if (errorMessage.includes("timeout")) {
-          toast.error("Transaction timeout - please try again");
-        } else if (errorMessage.includes("insufficient funds")) {
-          toast.error("Insufficient funds for buy now");
-        } else if (errorMessage.includes("user rejected")) {
-          toast.error("Transaction rejected by user");
-        } else {
-          toast.error(`Buy now failed: ${errorMessage}`);
-        }
+        // Use unified notification system for errors
+        notifyAuctionFailed(auctionId.toString(), errorMessage);
 
         return false;
       } finally {

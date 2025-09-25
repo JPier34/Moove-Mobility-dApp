@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAccount } from "wagmi";
 import { useUserCollection } from "./useUserCollection";
-import { toast } from "react-hot-toast";
+import { useUnifiedAuctionNotifications } from "./useUnifiedAuctionNotifications";
 
 interface NotificationState {
   hasNewWins: boolean;
@@ -13,6 +13,7 @@ interface NotificationState {
 export function useAuctionNotifications() {
   const { address, isConnected } = useAccount();
   const { wonAuctions, isLoading } = useUserCollection();
+  const { addNotification } = useUnifiedAuctionNotifications();
   const [notificationState, setNotificationState] = useState<NotificationState>(
     {
       hasNewWins: false,
@@ -35,22 +36,17 @@ export function useAuctionNotifications() {
     if (newWins.length > 0) {
       console.log("🎉 New auction wins detected:", newWins);
 
-      // Show notification for each new win
+      // Usa il sistema di notifiche unificato per evitare duplicazioni
       newWins.forEach((auctionId) => {
         const auction = wonAuctions.find((a) => a.auctionId === auctionId);
         if (auction) {
-          toast.success(
-            `🏆 Congratulations! You won auction #${auctionId} - ${auction.nftName}`,
-            {
-              duration: 8000,
-              position: "top-right",
-              style: {
-                background: "#10B981",
-                color: "white",
-                fontWeight: "bold",
-              },
-            }
-          );
+          // Usa un tipo generico per le notifiche da collezione
+          // Il tipo specifico sarà determinato dalle notifiche immediate
+          addNotification("sealed_bid_win", auctionId, {
+            nftName: auction.nftName,
+            price: auction.finalBid,
+            source: "collection_check", // Marca come controllo collezione per evitare toast duplicati
+          });
         }
       });
 
@@ -85,18 +81,3 @@ export function useAuctionNotifications() {
     ).length,
   };
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
