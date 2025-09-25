@@ -20,17 +20,17 @@ interface GlobalNFTCache {
 
 // Global cache instance
 const globalNFTCache: GlobalNFTCache = {};
-const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
-const METADATA_CACHE_TTL = 60 * 60 * 1000; // 1 hour for metadata
+const CACHE_TTL = 2 * 60 * 60 * 1000; // 2 hours - Increased for better performance
+const METADATA_CACHE_TTL = 4 * 60 * 60 * 1000; // 4 hours for metadata - Increased
 
 // Cache for last valid NFT ID to avoid unnecessary scans
 let lastValidNFTId: number | null = null;
-const LAST_VALID_ID_CACHE_TTL = 60 * 60 * 1000; // 1 hour
+const LAST_VALID_ID_CACHE_TTL = 4 * 60 * 60 * 1000; // 4 hours - Increased
 let lastValidIdTimestamp: number = 0;
 
 // Cache for metadata to avoid duplicate IPFS calls
 const metadataCache = new Map<string, any>();
-const METADATA_CACHE_KEY_TTL = 60 * 60 * 1000; // 1 hour
+const METADATA_CACHE_KEY_TTL = 4 * 60 * 60 * 1000; // 4 hours - Increased
 
 export function useGlobalNFTCache() {
   const [isLoading, setIsLoading] = useState(false);

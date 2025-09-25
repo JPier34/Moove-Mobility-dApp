@@ -161,6 +161,11 @@ async function fetchFromIPFSRobust(
   let hash = uri;
   if (uri.startsWith("ipfs://")) {
     hash = uri.replace("ipfs://", "");
+  } else if (uri.includes("/ipfs/")) {
+    // Extract hash from full IPFS URL like https://ipfs.io/ipfs/Qm...
+    const parts = uri.split("/ipfs/");
+    hash = parts[parts.length - 1];
+    console.log(`🔍 Extracted IPFS hash: ${hash} from URL: ${uri}`);
   }
 
   // Check if we have tracked this file before
@@ -325,7 +330,7 @@ async function fetchNFTMetadataComplete(
   nftContract: ethers.Contract,
   tokenId: number
 ): Promise<any> {
-  console.log(`🔍 Starting complete metadata fetch for NFT #${tokenId}`);
+  // Starting complete metadata fetch for NFT
 
   // Special debug for NFT #47
   if (tokenId === 47) {
@@ -356,11 +361,7 @@ async function fetchNFTMetadataComplete(
     try {
       const keys = Object.keys(localStorage);
       const nftKeys = keys.filter((key) => key.startsWith("nft_creation_"));
-      console.log(`🔍 Checking localStorage for NFT #${tokenId}:`, {
-        totalKeys: keys.length,
-        nftKeys: nftKeys.length,
-        nftKeysList: nftKeys,
-      });
+      // Checking localStorage for NFT metadata
 
       for (const key of nftKeys) {
         const data = JSON.parse(localStorage.getItem(key) || "{}");
@@ -457,15 +458,7 @@ async function fetchNFTMetadataComplete(
         },
     };
 
-    console.log(`✅ Final metadata for NFT #${tokenId}:`, finalMetadata);
-    console.log(`🔍 Metadata sources used:`, {
-      tokenURI,
-      ipfsMetadata: ipfsMetadata ? "Found" : "Not found",
-      localMetadata: localMetadata ? "Found" : "Not found",
-      contractMetadata: contractMetadata ? "Found" : "Not found",
-      finalName: finalMetadata.name,
-      finalImage: finalMetadata.image,
-    });
+    // Final metadata fetched successfully
 
     // Special debug for NFT #47
     if (tokenId === 47) {

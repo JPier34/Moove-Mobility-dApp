@@ -243,9 +243,6 @@ export default function TransferNFTModal({
                   <p className="text-sm text-gray-600 dark:text-gray-400">
                     Token ID: {nft.nftId}
                   </p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Category: {nft.category}
-                  </p>
                 </div>
               </div>
 

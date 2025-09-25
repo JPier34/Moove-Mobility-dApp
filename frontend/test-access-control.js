@@ -8,7 +8,7 @@ async function testAccessControl() {
 
   try {
     const provider = new ethers.JsonRpcProvider(
-      "https://sepolia.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161"
+      "https://ethereum-sepolia.publicnode.com"
     );
 
     // Simple ABI with just the functions we need
@@ -99,6 +99,3 @@ async function testAccessControl() {
 }
 
 testAccessControl().catch(console.error);
-
-
-

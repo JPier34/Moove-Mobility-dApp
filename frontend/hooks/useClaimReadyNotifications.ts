@@ -89,10 +89,17 @@ export function useClaimReadyNotifications() {
         provider
       );
 
-      const totalAuctions = await auctionContract.getTotalAuctions();
-      console.log(
-        `🔍 [Claim Monitor] Checking ${totalAuctions} auctions for claim status...`
-      );
+      // Check if contract is deployed
+      const code = await provider.getCode(contracts.MooveAuction.address);
+      if (code === "0x") {
+        console.warn(
+          "Auction contract not deployed at address:",
+          contracts.MooveAuction.address
+        );
+        return;
+      }
+
+      const totalAuctions = await auctionContract.totalAuctions();
 
       // Controlla le ultime 50 aste (più efficiente)
       const startIndex = Math.max(0, Number(totalAuctions) - 50);

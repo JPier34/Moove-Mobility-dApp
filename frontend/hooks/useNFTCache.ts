@@ -20,12 +20,12 @@ interface NFTOwnershipCache {
 
 // Cache globale per evitare chiamate duplicate
 const nftCache = new Map<string, NFTOwnershipCache>();
-const CACHE_TTL = 10 * 60 * 1000; // 10 minuti
-const METADATA_CACHE_TTL = 30 * 60 * 1000; // 30 minuti per metadata
+const CACHE_TTL = 60 * 60 * 1000; // 1 ora - Increased for better performance
+const METADATA_CACHE_TTL = 2 * 60 * 60 * 1000; // 2 ore per metadata - Increased
 
 // Cache globale per l'ultimo NFT ID valido (per evitare scansioni inutili)
 const lastValidNFTIdCache = new Map<string, number>();
-const LAST_VALID_ID_CACHE_TTL = 30 * 60 * 1000; // 30 minuti
+const LAST_VALID_ID_CACHE_TTL = 2 * 60 * 60 * 1000; // 2 ore - Increased
 
 // Hook per gestire la cache NFT
 export function useNFTCache() {

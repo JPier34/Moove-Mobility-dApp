@@ -10,8 +10,7 @@ const fs = require("fs");
 const path = require("path");
 
 // Configurazione
-const SEPOLIA_RPC =
-  "https://sepolia.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161";
+const SEPOLIA_RPC = "https://ethereum-sepolia.publicnode.com";
 const CONTRACT_ADDRESSES = {
   MooveAccessControl: "0x93b6F6F4b28cd61F68c16A85c9FC107Bf8f47e42",
   MooveNFT: "0x40E455515bf712144C1A5D859F19d64b537754f7",

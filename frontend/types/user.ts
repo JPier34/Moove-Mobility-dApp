@@ -16,7 +16,6 @@ export interface WonAuction {
   nftId: string;
   name: string;
   image: string;
-  category: string;
   status: number;
   hasImage: boolean;
   hasName: boolean;

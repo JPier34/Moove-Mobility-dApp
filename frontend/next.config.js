@@ -9,6 +9,7 @@ const nextConfig = {
       "wagmi",
       "ethers",
       "viem",
+      "@tanstack/react-query",
     ],
     // Faster compilation
     turbo: {
@@ -19,6 +20,8 @@ const nextConfig = {
         },
       },
     },
+    // Enable SWC minification for better performance
+    swcMinify: true,
   },
 
   // Webpack optimizations

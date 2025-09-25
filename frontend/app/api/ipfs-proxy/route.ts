@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 // Cache per evitare chiamate duplicate
 const ipfsCache = new Map<string, { data: any; timestamp: number }>();
-const CACHE_TTL = 5 * 60 * 1000; // 5 minuti
+const CACHE_TTL = 30 * 60 * 1000; // 30 minuti - Increased for better performance
 
 const IPFS_GATEWAYS = [
   // Primary: Most reliable gateways only

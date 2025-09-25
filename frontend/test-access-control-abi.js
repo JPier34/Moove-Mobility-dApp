@@ -9,7 +9,7 @@ async function testAccessControlABI() {
 
   try {
     const provider = new ethers.JsonRpcProvider(
-      "https://sepolia.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161"
+      "https://ethereum-sepolia.publicnode.com"
     );
 
     // ABI completo dal file JSON
@@ -156,6 +156,3 @@ async function testAccessControlABI() {
 }
 
 testAccessControlABI().catch(console.error);
-
-
-

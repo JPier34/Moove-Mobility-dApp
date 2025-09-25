@@ -7,16 +7,16 @@ interface CacheStatsProps {
   stats: {
     hits: number;
     misses: number;
-    totalCalls: number;
-    hitRate: string;
-    totalEntries: number;
+    evictions: number;
+    totalSize: number;
+    hitRate: number;
   };
 }
 
 export default function CacheStats({ stats }: CacheStatsProps) {
-  const hitRate = parseFloat(stats.hitRate);
-  const isGoodPerformance = hitRate >= 70;
-  const isExcellentPerformance = hitRate >= 90;
+  const hitRate = stats.hitRate;
+  const isGoodPerformance = hitRate >= 0.7;
+  const isExcellentPerformance = hitRate >= 0.9;
 
   return (
     <motion.div
@@ -52,7 +52,7 @@ export default function CacheStats({ stats }: CacheStatsProps) {
                 : "text-red-600 dark:text-red-400"
             }`}
           >
-            {stats.hitRate}
+            {(stats.hitRate * 100).toFixed(1)}%
           </span>
         </div>
 
@@ -73,14 +73,21 @@ export default function CacheStats({ stats }: CacheStatsProps) {
         <div className="flex justify-between">
           <span>Total Calls:</span>
           <span className="font-medium text-blue-600 dark:text-blue-400">
-            {stats.totalCalls}
+            {stats.hits + stats.misses}
           </span>
         </div>
 
         <div className="flex justify-between">
           <span>Cached Items:</span>
           <span className="font-medium text-purple-600 dark:text-purple-400">
-            {stats.totalEntries}
+            {stats.totalSize}
+          </span>
+        </div>
+
+        <div className="flex justify-between">
+          <span>Evictions:</span>
+          <span className="font-medium text-orange-600 dark:text-orange-400">
+            {stats.evictions}
           </span>
         </div>
       </div>

@@ -9,18 +9,14 @@ import React, {
 } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import { useSuperOptimizedNFTCollection } from "@/hooks/useSuperOptimizedNFTCollection";
-import { useWonAuctions } from "@/hooks/useWonAuctions";
-import { useMultipleNFTHistory } from "@/hooks/useNFTHistory";
+import { useSmartLazyCollection } from "@/hooks/useSmartLazyCollection";
 import { useAccount } from "wagmi";
-// Removed wallet debug - using Wagmi's built-in persistence
 import { toast } from "react-hot-toast";
 import OptimizedNFTImage from "@/components/collection/OptimizedNFTImage";
 import TransferNFTModalV2 from "@/components/TransferNFTModalV2";
 import CacheStats from "@/components/CacheStats";
-import { nftEvents, NFTTransferEvent } from "@/utils/nftEvents";
+import InfiniteScrollTrigger from "@/components/collection/InfiniteScrollTrigger";
 import { WonAuction } from "@/types/user";
-import { useNFTTransferNotifications } from "@/providers/NFTTransferNotificationsProvider";
 
 // ============= TYPES =============
 interface DecorativeNFT {
@@ -29,7 +25,6 @@ interface DecorativeNFT {
   name: string;
   description: string;
   image: string;
-  category: "sticker" | "avatar" | "badge" | "skin";
   rarity: "common" | "rare" | "epic" | "legendary";
   purchaseDate: Date;
   price: number;
@@ -49,14 +44,25 @@ interface NFTDetailsModalProps {
 }
 
 interface FilterOptions {
-  rarity: "all" | "common" | "rare" | "epic" | "legendary";
-  category: "all" | "sticker" | "avatar" | "badge" | "skin";
+  rarity:
+    | "all"
+    | "common"
+    | "uncommon"
+    | "rare"
+    | "epic"
+    | "legendary"
+    | "mythic";
   priceRange: "all" | "low" | "medium" | "high";
 }
 
 // ============= DATA =============
 const RARITY_CONFIG = {
   common: { color: "gray", emoji: "⚪", gradient: "from-gray-400 to-gray-600" },
+  uncommon: {
+    color: "green",
+    emoji: "🟢",
+    gradient: "from-green-400 to-green-600",
+  },
   rare: { color: "blue", emoji: "🔵", gradient: "from-blue-400 to-blue-600" },
   epic: {
     color: "purple",
@@ -67,6 +73,11 @@ const RARITY_CONFIG = {
     color: "yellow",
     emoji: "🟡",
     gradient: "from-yellow-400 to-orange-600",
+  },
+  mythic: {
+    color: "pink",
+    emoji: "🔮",
+    gradient: "from-pink-400 to-pink-600",
   },
 };
 
@@ -288,7 +299,7 @@ function FilterBar({
               whileHover={{ scale: 1.05 }}
             >
               <div className="text-3xl font-bold text-green-600 mb-2">
-                {stats.totalValue.toFixed(2)}
+                {stats.totalValue.toFixed(5)}
               </div>
               <div className="text-sm text-gray-600 dark:text-gray-400 font-medium">
                 Total Value (ETH)
@@ -303,7 +314,7 @@ function FilterBar({
             <span className="text-2xl mr-3">🔍</span>
             Filter Collection
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -324,13 +335,15 @@ function FilterBar({
               >
                 <option value="all">All Rarities</option>
                 <option value="common">⚪ Common</option>
+                <option value="uncommon">🟢 Uncommon</option>
                 <option value="rare">🔵 Rare</option>
                 <option value="epic">🟣 Epic</option>
                 <option value="legendary">🟡 Legendary</option>
+                <option value="mythic">🔮 Mythic</option>
               </select>
             </motion.div>
 
-            <motion.div
+            {/* <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.4 }}
@@ -354,7 +367,7 @@ function FilterBar({
                 <option value="badge">🏆 Badges</option>
                 <option value="skin">🎨 Skins</option>
               </select>
-            </motion.div>
+            </motion.div> */}
 
             <motion.div
               initial={{ opacity: 0, x: -20 }}
@@ -420,11 +433,7 @@ function DecorativeNFTCard({
       </div>
 
       {/* Image */}
-      <OptimizedNFTImage
-        src={nft.image}
-        alt={nft.name}
-        category={nft.category}
-      />
+      <OptimizedNFTImage src={nft.image} alt={nft.name} />
 
       {/* Content */}
       <div className="p-6">
@@ -531,48 +540,36 @@ export default function MyCollection() {
 
   // Removed wallet debug - using Wagmi's built-in persistence
 
-  // Use won auctions hook for real auction data
+  // Smart lazy collection with reverse search
   const {
-    allWonAuctions,
-    isLoading: isLoadingAuctions,
-    error: auctionError,
-    refetch: refetchAuctions,
-  } = useWonAuctions();
-
-  // Debug: Log auction data
-  console.log("🔍 DEBUG: useWonAuctions result:", {
-    allWonAuctions,
-    isLoadingAuctions,
-    auctionError,
-    allWonAuctionsLength: allWonAuctions?.length || 0,
-  });
-
-  // User's NFT collection (optimized with Wagmi + TanStack Query)
-  const {
-    userNFTs: userNFTCollection,
+    displayedNFTs: userNFTCollection,
+    allNFTs: allUserNFTs,
     isLoading: userNFTsLoading,
+    isLoadingMore: isLoadingMoreNFTs,
+    hasMore: hasMoreNFTs,
     error: userNFTsError,
-    refetch: refetchUserNFTs,
     totalItems,
     totalValue,
     cacheStats,
-  } = useSuperOptimizedNFTCollection();
+    loadMore: loadMoreNFTs,
+    refresh: refreshUserNFTs,
+  } = useSmartLazyCollection();
 
-  // Get NFT history for all user NFTs - MEMOIZED to prevent recursive calls
-  const tokenIds = useMemo(() => {
-    return userNFTCollection?.map((nft) => nft.tokenId) || [];
-  }, [userNFTCollection]);
-
-  const { histories: nftHistories, isLoading: isLoadingHistories } =
-    useMultipleNFTHistory(tokenIds);
+  console.log("🔍 [MyCollection] Hook result:", {
+    displayedNFTs: userNFTCollection.length,
+    allNFTs: allUserNFTs.length,
+    userNFTsLoading,
+    isLoadingMoreNFTs,
+    hasMoreNFTs,
+    userNFTsError,
+    totalItems,
+    totalValue,
+  });
 
   const [filters, setFilters] = useState<FilterOptions>({
     rarity: "all",
-    category: "all",
     priceRange: "all",
   });
-
-  // Stats are now calculated in the hook
 
   // Modal state
   const [selectedNFT, setSelectedNFT] = useState<DecorativeNFT | null>(null);
@@ -643,7 +640,6 @@ export default function MyCollection() {
       nftId: nft.tokenId,
       name: nft.name,
       image: nft.image,
-      category: nft.category,
       finalBid: nft.price,
       bidders: nft.auctionWon?.bidders || 0,
       endTime: nft.purchaseDate.getTime(),
@@ -669,68 +665,12 @@ export default function MyCollection() {
 
   const handleTransferSuccess = useCallback(() => {
     // Refresh the collection after successful transfer
-    refetchUserNFTs();
+    refreshUserNFTs();
     toast.success("NFT transferred successfully!");
-  }, [refetchUserNFTs]);
+  }, [refreshUserNFTs]);
 
-  // Convert user NFT collection to decorative NFTs format using real auction data
-  const decorativeNFTs: DecorativeNFT[] = useMemo(() => {
-    console.log("🔍 DEBUG: allWonAuctions data:", allWonAuctions);
-    console.log("🔍 DEBUG: userNFTCollection data:", userNFTCollection);
-
-    return userNFTCollection.map((nft) => {
-      // Find matching auction data from allWonAuctions
-      const matchingAuction = allWonAuctions.find(
-        (auction) => auction.nftId === nft.tokenId
-      );
-
-      // Get NFT history
-      const nftHistory = nftHistories.get(nft.tokenId);
-
-      console.log(
-        `🔍 DEBUG: NFT #${nft.tokenId} matching auction:`,
-        matchingAuction
-      );
-      console.log(`🔍 DEBUG: NFT #${nft.tokenId} history:`, nftHistory);
-
-      // Determine purchase date and transaction hash from history
-      let purchaseDate = new Date();
-      let transactionHash = "";
-
-      if (matchingAuction?.endTime) {
-        // NFT won from auction
-        purchaseDate = new Date(matchingAuction.endTime);
-        transactionHash = matchingAuction.transactionHash || "";
-      } else if (nftHistory) {
-        // Use history to determine when NFT was acquired
-        const lastTransfer = nftHistory.history[nftHistory.history.length - 1];
-        if (lastTransfer) {
-          purchaseDate = new Date(lastTransfer.timestamp * 1000);
-          transactionHash = lastTransfer.transactionHash;
-        }
-      }
-
-      return {
-        id: `nft-${nft.tokenId}`,
-        tokenId: nft.tokenId,
-        name: nft.name,
-        description: nft.description,
-        image: nft.image,
-        category: nft.category as "sticker" | "avatar" | "badge" | "skin",
-        rarity: "common", // Default rarity, can be enhanced later
-        purchaseDate,
-        price: matchingAuction?.finalBid || 0.001, // Default price if no auction
-        transactionHash,
-        auctionWon: matchingAuction
-          ? {
-              auctionId: matchingAuction.auctionId,
-              finalBid: matchingAuction.finalBid,
-              bidders: matchingAuction.bidders,
-            }
-          : undefined, // No auction info if NFT wasn't won from auction
-      };
-    });
-  }, [userNFTCollection, allWonAuctions, nftHistories]);
+  // Use the decorative NFTs directly from the hook
+  const decorativeNFTs = userNFTCollection;
 
   // Filter items based on current filters
   const filteredDecorative = useMemo(() => {
@@ -738,9 +678,7 @@ export default function MyCollection() {
       // Filter by rarity
       if (filters.rarity !== "all" && nft.rarity !== filters.rarity)
         return false;
-      // Filter by category
-      if (filters.category !== "all" && nft.category !== filters.category)
-        return false;
+
       // Filter by price range
       if (filters.priceRange !== "all") {
         const price = nft.price;
@@ -751,17 +689,12 @@ export default function MyCollection() {
       }
       return true;
     });
-  }, [decorativeNFTs, filters.rarity, filters.category, filters.priceRange]);
+  }, [decorativeNFTs, filters.rarity, filters.priceRange]);
 
   const hasItems = filteredDecorative.length > 0;
 
   // Show loading state
-  if (
-    !isConnected ||
-    userNFTsLoading ||
-    isLoadingAuctions ||
-    isLoadingHistories
-  ) {
+  if (!isConnected || userNFTsLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-moove-50 dark:from-gray-900 dark:to-gray-800">
         <div className="container mx-auto px-4 py-8">
@@ -908,7 +841,7 @@ export default function MyCollection() {
         {/* Test Notification Button - Temporary */}
 
         {/* Won Auctions Section */}
-        {userNFTsLoading || isLoadingAuctions || isLoadingHistories ? (
+        {userNFTsLoading ? (
           <motion.div
             className="mb-8"
             initial={{ opacity: 0, y: 20 }}
@@ -978,7 +911,7 @@ export default function MyCollection() {
                 Error loading collection: {userNFTsError}
               </span>
               <button
-                onClick={refetchUserNFTs}
+                onClick={refreshUserNFTs}
                 className="ml-auto text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 font-medium"
               >
                 Retry
@@ -989,19 +922,28 @@ export default function MyCollection() {
 
         {/* Content */}
         {hasItems ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            <AnimatePresence>
-              {filteredDecorative.map((nft) => (
-                <DecorativeNFTCard
-                  key={nft.id}
-                  nft={nft}
-                  onViewDetails={handleViewDetails}
-                />
-              ))}
-            </AnimatePresence>
-          </div>
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              <AnimatePresence>
+                {filteredDecorative.map((nft) => (
+                  <DecorativeNFTCard
+                    key={nft.id}
+                    nft={nft}
+                    onViewDetails={handleViewDetails}
+                  />
+                ))}
+              </AnimatePresence>
+            </div>
+
+            {/* Infinite Scroll Trigger */}
+            <InfiniteScrollTrigger
+              onLoadMore={loadMoreNFTs}
+              hasMore={hasMoreNFTs}
+              isLoading={isLoadingMoreNFTs}
+            />
+          </>
         ) : (
-          <EmptyState onRefresh={refetchUserNFTs} />
+          <EmptyState onRefresh={refreshUserNFTs} />
         )}
 
         {/* NFT Details Modal */}

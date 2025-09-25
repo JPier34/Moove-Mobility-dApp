@@ -28,14 +28,20 @@ function getQueryClient() {
       defaultOptions: {
         queries: {
           retry: 1,
-          staleTime: 60_000, // 1 minute
-          gcTime: 5 * 60 * 1000, // 5 minutes
+          staleTime: 10 * 60 * 1000, // 10 minutes - Increased for better caching
+          gcTime: 30 * 60 * 1000, // 30 minutes - Keep data longer
           refetchOnWindowFocus: false,
-          refetchOnReconnect: true,
+          refetchOnReconnect: false, // Disabled to prevent unnecessary refetches
           refetchOnMount: false, // Prevent unnecessary refetches
+          refetchInterval: false, // Disable automatic refetching
+          refetchIntervalInBackground: false,
+          // Optimize for performance
+          networkMode: "online",
+          structuralSharing: true, // Enable structural sharing for better performance
         },
         mutations: {
           retry: 1,
+          networkMode: "online",
         },
       },
     });
@@ -106,6 +112,42 @@ export default function SimplifiedAppProvider({
     }
 
     const client = getQueryClient();
+
+    // Clear any stale cache entries that might cause errors
+    try {
+      // Remove any stale query entries that might reference non-existent hooks
+      const queryCache = client.getQueryCache();
+      const queries = queryCache.getAll();
+
+      // Find and remove any queries that might be causing the useIncrementalNFTLoading error
+      const staleQueries = queries.filter((query) =>
+        query.queryKey.some(
+          (key) =>
+            typeof key === "string" && key.includes("useIncrementalNFTLoading")
+        )
+      );
+
+      if (staleQueries.length > 0) {
+        console.log(`🧹 Removing ${staleQueries.length} stale query entries`);
+        staleQueries.forEach((query) => {
+          queryCache.remove(query);
+        });
+      }
+
+      // Also clear any queries that might be in error state
+      const errorQueries = queries.filter(
+        (query) => query.state.status === "error"
+      );
+      if (errorQueries.length > 0) {
+        console.log(`🧹 Removing ${errorQueries.length} error query entries`);
+        errorQueries.forEach((query) => {
+          queryCache.remove(query);
+        });
+      }
+    } catch (error) {
+      console.warn("⚠️ Error clearing stale cache entries:", error);
+    }
+
     console.log("📊 QueryClient config:", {
       staleTime: client.getDefaultOptions().queries?.staleTime,
       gcTime: client.getDefaultOptions().queries?.gcTime,
