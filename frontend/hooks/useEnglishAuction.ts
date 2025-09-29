@@ -34,7 +34,13 @@ export function useEnglishAuction(): EnglishAuctionHandler {
     "idle" | "bidding" | "buying" | "success" | "error"
   >("idle");
 
-  const { placeBid, isPending: isBidding, error: bidError } = usePlaceBid();
+  const {
+    placeBid,
+    isPending: isBidding,
+    isConfirming,
+    isSuccess,
+    error: bidError,
+  } = usePlaceBid();
   const { notifyEnglishWin, notifyAuctionFailed } =
     useAuctionNotificationTriggers();
   // Auto-extension is now handled by smart contract - no manual extension needed
@@ -141,17 +147,36 @@ export function useEnglishAuction(): EnglishAuctionHandler {
             reject(new Error("Bid transaction timeout"));
           }, 30000); // 30 second timeout
 
+          console.log("🚀 Calling placeBid - waiting for MetaMask...");
           placeBid(auctionId, bidAmountWei);
 
-          // Listen for success/error
+          // Listen for success/error - wait for actual transaction confirmation
           const checkStatus = () => {
+            console.log("🔍 Checking bid status:", {
+              bidError: !!bidError,
+              isBidding,
+              isConfirming,
+              isSuccess,
+              error: bidError?.message,
+            });
+
             if (bidError) {
               clearTimeout(timeout);
+              console.error("❌ Bid failed with error:", bidError);
               reject(new Error(`Bid failed: ${bidError}`));
-            } else if (!isBidding) {
+            } else if (isSuccess) {
               clearTimeout(timeout);
+              console.log("✅ Bid transaction confirmed on blockchain!");
               resolve();
+            } else if (!isBidding && !isConfirming) {
+              // If not bidding and not confirming, but no success, it might be a silent failure
+              clearTimeout(timeout);
+              console.warn("⚠️ Bid completed but no success confirmation");
+              reject(
+                new Error("Bid completed but transaction may have failed")
+              );
             } else {
+              // Still processing - check again in 1 second
               setTimeout(checkStatus, 1000);
             }
           };

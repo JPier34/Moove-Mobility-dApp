@@ -163,28 +163,48 @@ export function useWriteMooveAuction() {
       ].length,
     });
 
-    writeContract({
-      address: contracts.MooveAuction.address as `0x${string}`,
-      abi: [
-        "function getAuction(uint256 auctionId) view returns (tuple(uint256 auctionId, address nftContract, uint256 tokenId, address seller, uint8 auctionType, uint256 startingPrice, uint256 reservePrice, uint256 buyNowPrice, uint256 currentPrice, uint256 startTime, uint256 endTime, uint256 bidIncrement, address highestBidder, uint256 highestBid, uint8 status, bool allowPartialFulfillment, uint256 minBidders, uint256 totalBidders, bool isSettled, uint256 extensionThreshold, uint256 extensionDuration, uint256 revealEndTime, bool revealPhaseStarted))",
-        "function getSealedBidRevealInfo(uint256 auctionId) view returns (bool isSealedBid, bool revealPhaseStarted, uint256 revealEndTime, bool isRevealPhaseActive, uint256 timeUntilRevealEnd)",
-        "function endAuction(uint256 auctionId) external",
-        "function startRevealPhase(uint256 auctionId) external",
-        "function endRevealPhase(uint256 auctionId) external",
-        "function settleAuction(uint256 auctionId) external",
-        "function submitSealedBid(uint256 auctionId, bytes32 bidHash) external payable",
-        "function revealSealedBid(uint256 auctionId, uint256 bidAmount, uint256 nonce) external",
-        "function refundRemainingBidders(uint256 auctionId) external",
-        "function getAuctionBids(uint256 auctionId) view returns (tuple(address bidder, uint256 bidAmount, bool isRevealed)[])",
-        "function totalAuctions() view returns (uint256)",
-        "event AuctionSettled(uint256 indexed auctionId, address indexed winner, uint256 finalPrice, uint256 platformFee, uint256 royaltyFee)",
-        "event AuctionExtended(uint256 indexed auctionId, address indexed bidder, uint256 extensionDuration, uint256 newEndTime, string reason)",
-        "event BidRefunded(uint256 indexed auctionId, address indexed bidder, uint256 refundAmount)",
-      ],
-      functionName: functionName as any,
-      args: args as readonly unknown[],
-      value: value,
+    console.log("🚀 About to call writeContract with:", {
+      address: contracts.MooveAuction.address,
+      functionName,
+      args,
+      value: value?.toString(),
     });
+
+    try {
+      console.log("🔍 Pre-writeContract checks:", {
+        hasWallet:
+          typeof window !== "undefined" &&
+          typeof window.ethereum !== "undefined",
+        walletConnected: false, // Simplified check to avoid TypeScript issues
+        functionName,
+        argsLength: args.length,
+        valueProvided: !!value,
+        valueAmount: value?.toString(),
+      });
+
+      const contractCall: any = {
+        address: contracts.MooveAuction.address as `0x${string}`,
+        abi: contracts.MooveAuction.abi,
+        functionName: functionName as any,
+        args: args as any,
+      };
+
+      if (value) {
+        contractCall.value = value;
+      }
+
+      const result = writeContract(contractCall);
+
+      console.log("✅ writeContract called successfully");
+      console.log("🔍 writeContract result details:", {
+        resultType: typeof result,
+        isVoid: result === undefined,
+      });
+      return result;
+    } catch (error) {
+      console.error("❌ writeContract failed:", error);
+      throw error;
+    }
   };
 
   return {

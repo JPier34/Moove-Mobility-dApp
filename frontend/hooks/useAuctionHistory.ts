@@ -89,20 +89,32 @@ export function useAuctionHistory(tokenId: string | null) {
       if (allCreatedEvents.length > 0) {
         console.log(
           "📜 [useAuctionHistory] Sample AuctionCreated events:",
-          allCreatedEvents.slice(0, 3).map((event) => ({
-            tokenId: event.args?.tokenId?.toString(),
-            auctionId: event.args?.auctionId?.toString(),
-            seller: event.args?.seller,
-            nftContract: event.args?.nftContract,
-            blockNumber: event.blockNumber,
-          }))
+          allCreatedEvents.slice(0, 3).map((event) => {
+            // Type guard to check if event has args property
+            if ("args" in event && event.args) {
+              return {
+                tokenId: event.args.tokenId?.toString(),
+                auctionId: event.args.auctionId?.toString(),
+                seller: event.args.seller,
+                nftContract: event.args.nftContract,
+                blockNumber: event.blockNumber,
+              };
+            }
+            return {
+              blockNumber: event.blockNumber,
+              transactionHash: event.transactionHash,
+            };
+          })
         );
       }
 
       // Filter by tokenId manually since it's non-indexed
       const createdEvents = allCreatedEvents.filter((event) => {
-        const eventTokenId = event.args?.tokenId?.toString();
-        return eventTokenId === tokenId;
+        if ("args" in event && event.args) {
+          const eventTokenId = event.args.tokenId?.toString();
+          return eventTokenId === tokenId;
+        }
+        return false;
       });
 
       console.log(
@@ -119,7 +131,7 @@ export function useAuctionHistory(tokenId: string | null) {
 
           const historyItem: AuctionHistoryItem = {
             type: "auction_created",
-            auctionId: auctionId,
+            auctionId: auctionId || "unknown",
             tokenId: eventLog.args.tokenId.toString(),
             seller: eventLog.args.seller,
             transactionHash: eventLog.transactionHash,
@@ -339,18 +351,31 @@ export function useMultipleAuctionHistory(tokenIds: string[]) {
           if (tokenId === tokenIds[0] && allCreatedEvents.length > 0) {
             console.log(
               "🔍 [useMultipleAuctionHistory] Sample AuctionCreated events:",
-              allCreatedEvents.slice(0, 3).map((event) => ({
-                tokenId: event.args?.tokenId?.toString(),
-                auctionId: event.args?.auctionId?.toString(),
-                seller: event.args?.seller,
-                nftContract: event.args?.nftContract,
-                blockNumber: event.blockNumber,
-              }))
+              allCreatedEvents.slice(0, 3).map((event) => {
+                if ("args" in event && event.args) {
+                  return {
+                    tokenId: event.args.tokenId?.toString(),
+                    auctionId: event.args.auctionId?.toString(),
+                    seller: event.args.seller,
+                    nftContract: event.args.nftContract,
+                    blockNumber: event.blockNumber,
+                  };
+                }
+                return {
+                  blockNumber: event.blockNumber,
+                  transactionHash: event.transactionHash,
+                };
+              })
             );
 
             // Show ALL tokenIds that have auctions
             const allTokenIdsWithAuctions = allCreatedEvents
-              .map((event) => event.args?.tokenId?.toString())
+              .map((event) => {
+                if ("args" in event && event.args) {
+                  return event.args.tokenId?.toString();
+                }
+                return null;
+              })
               .filter(Boolean);
             console.log(
               "🔍 [useMultipleAuctionHistory] All tokenIds with auctions:",
@@ -360,8 +385,11 @@ export function useMultipleAuctionHistory(tokenIds: string[]) {
 
           // Filter by tokenId manually since it's non-indexed
           const createdEvents = allCreatedEvents.filter((event) => {
-            const eventTokenId = event.args?.tokenId?.toString();
-            return eventTokenId === tokenId;
+            if ("args" in event && event.args) {
+              const eventTokenId = event.args.tokenId?.toString();
+              return eventTokenId === tokenId;
+            }
+            return false;
           });
 
           console.log(
@@ -378,7 +406,7 @@ export function useMultipleAuctionHistory(tokenIds: string[]) {
 
               const historyItem: AuctionHistoryItem = {
                 type: "auction_created",
-                auctionId: auctionId,
+                auctionId: auctionId || "unknown",
                 tokenId: eventLog.args.tokenId.toString(),
                 seller: eventLog.args.seller,
                 transactionHash: eventLog.transactionHash,

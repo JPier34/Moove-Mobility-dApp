@@ -11,7 +11,8 @@ export type AuctionNotificationType =
   | "english_win"
   | "reserve_win"
   | "auction_failed"
-  | "claim_ready";
+  | "claim_ready"
+  | "bid_refunded";
 
 export interface AuctionNotification {
   id: string;
@@ -55,6 +56,7 @@ export function useUnifiedAuctionNotifications() {
     (type: AuctionNotificationType): number => {
       const priority = {
         claim_ready: 1, // Massima priorità - sempre immediata
+        bid_refunded: 2, // Alta priorità - rimborsi importanti
         sealed_bid_win: 2, // Alta priorità
         dutch_purchase: 3, // Media priorità
         english_win: 3, // Media priorità
@@ -100,11 +102,11 @@ export function useUnifiedAuctionNotifications() {
           } Reserve auction${batch.length > 1 ? "s" : ""}!`;
           icon = "🏆";
           break;
-        case "auction_failed":
-          message = `❌ ${batch.length} auction${
+        case "bid_refunded":
+          message = `💰 You received ${batch.length} refund${
             batch.length > 1 ? "s" : ""
-          } failed`;
-          icon = "❌";
+          } from auction${batch.length > 1 ? "s" : ""}!`;
+          icon = "💰";
           break;
       }
 
@@ -295,6 +297,12 @@ export function useUnifiedAuctionNotifications() {
           message = `🎁 NFT from auction #${auctionId} is ready to claim!`;
           icon = "🎁";
           break;
+        case "bid_refunded":
+          message = `💰 Refund received! ${
+            price ? `${price} ETH` : "Funds"
+          } returned from auction #${auctionId}`;
+          icon = "💰";
+          break;
       }
 
       if (message) {
@@ -461,6 +469,18 @@ export function useAuctionNotificationTriggers() {
     [addNotification]
   );
 
+  // Trigger per rimborso ricevuto
+  const notifyBidRefunded = useCallback(
+    (auctionId: string, refundAmount?: number, nftName?: string) => {
+      addNotification("bid_refunded", auctionId, {
+        nftName,
+        price: refundAmount,
+        source: "immediate",
+      });
+    },
+    [addNotification]
+  );
+
   return {
     notifyDutchPurchase,
     notifySealedBidWin,
@@ -468,5 +488,6 @@ export function useAuctionNotificationTriggers() {
     notifyReserveWin,
     notifyAuctionFailed,
     notifyClaimReady,
+    notifyBidRefunded,
   };
 }

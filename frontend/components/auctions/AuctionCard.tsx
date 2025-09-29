@@ -11,6 +11,7 @@ import DutchAuctionSuccessModal from "./DutchAuctionSuccessModal";
 import { formatEther, parseEther } from "viem";
 import { ethers } from "ethers";
 import toast from "react-hot-toast";
+import { useAuctionRefresh } from "@/hooks/useAuctionRefresh";
 
 interface AuctionCardProps {
   auction: Auction;
@@ -72,9 +73,38 @@ export default function AuctionCard({
 
   const { address, isConnected } = useAccount();
   const [timeLeft, setTimeLeft] = useState("");
-  // Use the unified Dutch price hook
+  const [localAuction, setLocalAuction] = useState<Auction>(auction);
+
+  // Use the global auction refresh system
+  const { auctions, refreshTrigger, triggerRefresh } = useAuctionRefresh();
+
+  // Update local auction when global data changes
+  useEffect(() => {
+    const updatedAuction = auctions.find(
+      (a) => a.auctionId === auction.auctionId
+    );
+    if (updatedAuction) {
+      console.log(
+        `🔄 [AuctionCard ${auction.auctionId}] Updating from global refresh:`,
+        {
+          oldStatus: localAuction.status,
+          newStatus: updatedAuction.status,
+          oldCurrentBid: localAuction.currentBid,
+          newCurrentBid: updatedAuction.currentBid,
+        }
+      );
+      setLocalAuction(updatedAuction);
+    }
+  }, [
+    auctions,
+    auction.auctionId,
+    localAuction.status,
+    localAuction.currentBid,
+  ]);
+
+  // Use the unified Dutch price hook with local auction
   const { currentPrice: currentDutchPrice, isActive: isDutchActive } =
-    useDutchPrice(auction, 5000);
+    useDutchPrice(localAuction, 5000);
 
   // Hooks for auction interactions
   const { buyNowDutch } = useBuyNowDutch();
@@ -91,7 +121,7 @@ export default function AuctionCard({
   useEffect(() => {
     const updateTimeLeft = () => {
       const now = new Date().getTime();
-      const endTime = new Date(auction.endTime).getTime();
+      const endTime = new Date(localAuction.endTime).getTime();
       const difference = endTime - now;
 
       if (difference > 0) {
@@ -121,7 +151,7 @@ export default function AuctionCard({
     updateTimeLeft();
     const interval = setInterval(updateTimeLeft, 1000);
     return () => clearInterval(interval);
-  }, [auction.endTime]);
+  }, [localAuction.endTime]);
 
   // Dutch price calculation is now handled by useDutchPrice hook
 
@@ -134,16 +164,17 @@ export default function AuctionCard({
     }
 
     try {
-      if (auction.auctionType === AuctionType.DUTCH) {
+      if (localAuction.auctionType === AuctionType.DUTCH) {
         // Use the improved Dutch auction handler with success callback
         const success = await handleDutchAuction(
-          parseInt(auction.auctionId),
+          parseInt(localAuction.auctionId),
           parseFloat(currentDutchPrice),
           () => {
             // Success callback - refresh data
             console.log(
               "Dutch auction purchase successful, refreshing data..."
             );
+            triggerRefresh();
           }
         );
         if (!success) {
@@ -153,9 +184,9 @@ export default function AuctionCard({
         // For other auction types, just log for now
         console.log(
           "Quick action for auction:",
-          auction.auctionId,
+          localAuction.auctionId,
           "Type:",
-          auction.auctionType
+          localAuction.auctionType
         );
       }
     } catch (error) {
@@ -168,12 +199,12 @@ export default function AuctionCard({
   // All auction interactions are handled in the modal
 
   const getTimeStatus = () => {
-    if (showEndedState || auction.status !== AuctionStatus.ACTIVE) {
+    if (showEndedState || localAuction.status !== AuctionStatus.ACTIVE) {
       return { color: "text-gray-500", label: "Ended", canExtend: false };
     }
 
     const now = new Date().getTime();
-    const endTime = new Date(auction.endTime).getTime();
+    const endTime = new Date(localAuction.endTime).getTime();
     const difference = endTime - now;
 
     if (difference <= 0) {
@@ -181,9 +212,9 @@ export default function AuctionCard({
     }
 
     // English auction specific logic
-    if (auction.auctionType === AuctionType.ENGLISH) {
+    if (localAuction.auctionType === AuctionType.ENGLISH) {
       const extensionThreshold =
-        (auction.extensionThresholdMinutes || 5) * 60 * 1000; // Convert to milliseconds
+        (localAuction.extensionThresholdMinutes || 5) * 60 * 1000; // Convert to milliseconds
 
       if (difference <= 60000) {
         // Last minute - critical
@@ -232,7 +263,7 @@ export default function AuctionCard({
   };
 
   const timeStatus = getTimeStatus();
-  const typeInfo = auctionTypeInfo[auction.auctionType];
+  const typeInfo = auctionTypeInfo[localAuction.auctionType];
 
   return (
     <div
@@ -248,9 +279,9 @@ export default function AuctionCard({
             {typeInfo.emoji} {typeInfo.name}
           </span>
 
-          {(auction.status as AuctionStatus) === AuctionStatus.PENDING && (
+          {(localAuction.status as AuctionStatus) === AuctionStatus.PENDING && (
             <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium animate-pulse">
-              🔓 Apertura buste
+              🔓 Sealed Bid Reveal
             </span>
           )}
         </div>
@@ -262,14 +293,16 @@ export default function AuctionCard({
               ⏰ {timeStatus.label}
             </span>
             {/* Extension zone indicator for English auctions */}
-            {auction.auctionType === AuctionType.ENGLISH &&
+            {localAuction.auctionType === AuctionType.ENGLISH &&
               timeStatus.isExtensionZone && (
                 <span className="px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-xs font-medium animate-pulse">
                   🔄 Auto-extend zone
                 </span>
               )}
           </div>
-          <span className="text-xs text-gray-500">#{auction.auctionId}</span>
+          <span className="text-xs text-gray-500">
+            #{localAuction.auctionId}
+          </span>
         </div>
       </div>
 
@@ -368,14 +401,14 @@ export default function AuctionCard({
                 </span>
               </div>
               <div className="flex justify-between text-xs text-gray-500">
-                <span>
-                  {auction.currentBid !== "0"
+                {/* <span>
+                   {auction.currentBid !== "0"
                     ? `Next: ${(
                         parseFloat(auction.currentBid) +
                         parseFloat(auction.bidIncrement)
                       ).toFixed(6)} ETH`
                     : `Min bid: ${auction.startPrice} ETH`}
-                </span>
+                </span> */}
                 {/* Extension info for English auctions */}
                 {timeStatus.isExtensionZone && (
                   <span className="text-orange-600 font-medium">

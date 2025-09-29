@@ -20,6 +20,8 @@ import { AuctionRefundStatus } from "./AuctionRefundStatus";
 import { formatEther, parseEther } from "viem";
 import { ethers } from "ethers";
 import toast from "react-hot-toast";
+import { useAuctionsEnhanced } from "@/hooks/enhanced-auction-utils";
+import { useAuctionRefresh } from "@/hooks/useAuctionRefresh";
 
 interface AuctionModalProps {
   auction: Auction;
@@ -45,9 +47,55 @@ export default function AuctionModal({
   const { address, isConnected } = useAccount();
   const [activeTab, setActiveTab] = useState<"details">("details");
   const [timeLeft, setTimeLeft] = useState("");
-  // Use the unified Dutch price hook
+
+  // Local auction state that can be updated
+  const [localAuction, setLocalAuction] = useState<Auction>(auction);
+
+  // Use the global auction refresh system
+  const { auctions, refreshTrigger, triggerRefresh } = useAuctionRefresh();
+
+  // Update local auction when global data changes
+  useEffect(() => {
+    const updatedAuction = auctions.find(
+      (a) => a.auctionId === auction.auctionId
+    );
+    if (updatedAuction) {
+      console.log(
+        `🔄 [AuctionModal ${auction.auctionId}] Updating from global refresh:`,
+        {
+          oldCurrentBid: localAuction.currentBid,
+          newCurrentBid: updatedAuction.currentBid,
+          oldStartPrice: localAuction.startPrice,
+          newStartPrice: updatedAuction.startPrice,
+          oldStatus: localAuction.status,
+          newStatus: updatedAuction.status,
+        }
+      );
+      setLocalAuction(updatedAuction);
+    }
+  }, [
+    auctions,
+    auction.auctionId,
+    localAuction.currentBid,
+    localAuction.startPrice,
+    localAuction.status,
+  ]);
+
+  // Update local auction when prop changes
+  useEffect(() => {
+    console.log("🔄 Auction prop changed, updating local state:", {
+      auctionId: auction.auctionId,
+      currentBid: auction.currentBid,
+      startPrice: auction.startPrice,
+      oldCurrentBid: localAuction.currentBid,
+      oldStartPrice: localAuction.startPrice,
+    });
+    setLocalAuction(auction);
+  }, [auction]);
+
+  // Use the unified Dutch price hook with local auction
   const { currentPrice: currentDutchPrice, isActive: isDutchActive } =
-    useDutchPrice(auction, 1000);
+    useDutchPrice(localAuction, 1000);
 
   // Bidding state
   const [bidAmount, setBidAmount] = useState("");
@@ -58,7 +106,7 @@ export default function AuctionModal({
 
   // Sealed bid state - initialize with start price
   const [sealedBidAmount, setSealedBidAmount] = useState(
-    auction.startPrice || "0.001"
+    localAuction.startPrice || "0.001"
   );
 
   // Hooks for auction interactions
@@ -105,11 +153,11 @@ export default function AuctionModal({
   // Check sealed bid status when auction changes
   useEffect(() => {
     const checkSealedBidStatus = async () => {
-      if (auction.auctionType === AuctionType.SEALED_BID && address) {
+      if (localAuction.auctionType === AuctionType.SEALED_BID && address) {
         try {
           // Check if user has already submitted a sealed bid
           const bidData = localStorage.getItem(
-            `sealed_bid_${auction.nftId}_${address}`
+            `sealed_bid_${localAuction.nftId}_${address}`
           );
           if (bidData) {
             const parsedData = JSON.parse(bidData);
@@ -133,7 +181,7 @@ export default function AuctionModal({
     };
 
     checkSealedBidStatus();
-  }, [auction.auctionId, auction.auctionType, address]);
+  }, [localAuction.auctionId, localAuction.auctionType, address]);
 
   // Calculate time remaining
   useEffect(() => {
@@ -141,7 +189,7 @@ export default function AuctionModal({
 
     const updateTimeLeft = () => {
       const now = new Date().getTime();
-      const endTime = new Date(auction.endTime).getTime();
+      const endTime = new Date(localAuction.endTime).getTime();
       const difference = endTime - now;
 
       if (difference > 0) {
@@ -169,21 +217,80 @@ export default function AuctionModal({
     updateTimeLeft();
     const interval = setInterval(updateTimeLeft, 1000);
     return () => clearInterval(interval);
-  }, [auction.endTime, isOpen]);
+  }, [localAuction.endTime, isOpen]);
 
   // Dutch price calculation is now handled by useDutchPrice hook
 
+  // Function to manually update local auction state
+  const updateLocalAuction = (updatedAuction: Auction) => {
+    console.log("🔄 Updating local auction state:", {
+      oldCurrentBid: localAuction.currentBid,
+      newCurrentBid: updatedAuction.currentBid,
+      oldStartPrice: localAuction.startPrice,
+      newStartPrice: updatedAuction.startPrice,
+    });
+    setLocalAuction(updatedAuction);
+  };
+
+  // Function to fetch fresh auction data directly
+  const fetchFreshAuctionData = async () => {
+    try {
+      console.log(
+        `🔄 Fetching fresh data for auction ${localAuction.auctionId}...`
+      );
+
+      // Use the global refresh system instead of calling hook inside function
+      triggerRefresh();
+
+      // Wait a bit for the refresh to complete
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      // Find the specific auction from the global auctions data
+      const freshAuction = auctions.find(
+        (a: Auction) => a.auctionId === localAuction.auctionId
+      );
+
+      if (freshAuction) {
+        console.log("✅ Fresh auction data found:", {
+          auctionId: freshAuction.auctionId,
+          currentBid: freshAuction.currentBid,
+          startPrice: freshAuction.startPrice,
+          status: freshAuction.status,
+        });
+        setLocalAuction(freshAuction);
+        return freshAuction;
+      } else {
+        console.warn("⚠️ Fresh auction data not found");
+        return null;
+      }
+    } catch (error) {
+      console.error("❌ Error fetching fresh auction data:", error);
+      return null;
+    }
+  };
+
   // Function to refresh only this specific auction data
   const refreshAuctionData = async () => {
-    if (!onRefresh) return;
-
     setIsRefreshingAuction(true);
     try {
-      console.log(`🔄 Refreshing auction ${auction.auctionId} data...`);
-      await onRefresh();
-      console.log(`✅ Auction ${auction.auctionId} data refreshed`);
+      console.log(`🔄 Refreshing auction ${localAuction.auctionId} data...`);
+
+      // Use the global refresh system
+      triggerRefresh();
+      console.log("✅ Auction data refresh triggered globally");
+
+      // Also try parent refresh function as fallback
+      if (onRefresh && typeof onRefresh === "function") {
+        await onRefresh();
+        console.log(
+          `✅ Auction ${localAuction.auctionId} data refreshed via parent`
+        );
+      }
     } catch (error) {
       console.error("❌ Error refreshing auction data:", error);
+      // Fallback to page reload on error
+      console.log("🔄 Fallback: reloading page due to refresh error");
+      window.location.reload();
     } finally {
       setIsRefreshingAuction(false);
     }
@@ -221,13 +328,13 @@ export default function AuctionModal({
         "Placing bid:",
         amount,
         "ETH for auction:",
-        auction.auctionId,
+        localAuction.auctionId,
         "Type:",
-        auction.auctionType
+        localAuction.auctionType
       );
 
       // Use the unified auction handler for all auction types
-      const result = await handleAuctionAction(auction, "bid", amount);
+      const result = await handleAuctionAction(localAuction, "bid", amount);
 
       if (result.success) {
         console.log("✅ Bid transaction CONFIRMED on blockchain!");
@@ -235,16 +342,26 @@ export default function AuctionModal({
         setBidAmount(""); // Clear the bid field
 
         // Show success message - transaction is already confirmed
-        toast.success(
-          `🎉 Bid of ${amount} ETH confirmed! Updating auction data...`,
-          { duration: 2000 }
-        );
+        toast.success(`🎉 Bid of ${amount} ETH confirmed on blockchain!`, {
+          duration: 3000,
+        });
 
         // Transaction is already confirmed, refresh immediately
         console.log("🔄 Transaction confirmed, refreshing auction data...");
 
+        // Emit bid placed event for global refresh
+        window.dispatchEvent(
+          new CustomEvent("bidPlaced", {
+            detail: {
+              auctionId: localAuction.auctionId,
+              bidAmount: amount,
+              bidder: address,
+            },
+          })
+        );
+
         // Store original bid to verify changes
-        const originalCurrentBid = auction.currentBid;
+        const originalCurrentBid = localAuction.currentBid;
         console.log("📊 Original current bid:", originalCurrentBid);
         console.log("📊 Expected new bid:", amount);
 
@@ -253,15 +370,18 @@ export default function AuctionModal({
           await refreshAuctionData();
           console.log("✅ Auction data refresh completed");
 
-          // Show success message - bid is submitted and will update when confirmed
-          toast.success(`✅ Your bid of ${amount} ETH is being processed!`, {
-            duration: 4000,
-          });
+          // Show final success message with updated data
+          toast.success(
+            `✅ Bid of ${amount} ETH placed successfully! Current bid updated.`,
+            {
+              duration: 5000,
+            }
+          );
         } catch (error) {
           console.error("❌ Failed to refresh auction data:", error);
           // Fallback message
           toast.success(
-            `✅ Bid submitted! Data will update when blockchain confirms the transaction.`,
+            `✅ Bid of ${amount} ETH placed successfully! The auction will update shortly.`,
             {
               duration: 5000,
             }
@@ -358,10 +478,10 @@ export default function AuctionModal({
 
   // Quick bid amounts - first bid can be startPrice, subsequent bids need increment
   const getQuickBidAmounts = () => {
-    const currentBidStr = auction.currentBid || "0";
+    const currentBidStr = localAuction.currentBid || "0";
     const currentBid = parseFloat(currentBidStr);
-    const increment = parseFloat(auction.bidIncrement) || 0.001;
-    const startPrice = parseFloat(auction.startPrice) || 0.001;
+    const increment = parseFloat(localAuction.bidIncrement) || 0.001;
+    const startPrice = parseFloat(localAuction.startPrice) || 0.001;
 
     // If no bids yet, first bid can be startPrice
     if (currentBid === 0 || isNaN(currentBid)) {

@@ -448,7 +448,11 @@ export default function AuctionsPage() {
                   status: a.status,
                 }))
               )}
-              <AuctionGrid auctions={activeAuctions} onRefresh={refetch} />
+              <AuctionGrid
+                auctions={activeAuctions}
+                onRefresh={refetch}
+                refreshAuctionCache={refreshAuctionCache}
+              />
             </>
           ) : (
             <motion.div

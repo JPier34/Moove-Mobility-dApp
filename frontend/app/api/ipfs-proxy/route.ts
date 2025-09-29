@@ -35,10 +35,19 @@ export async function GET(request: NextRequest) {
   }
 
   // Check cache first
-  const cached = ipfsCache.get(ipfsHash);
+  const cached = ipfsHash ? ipfsCache.get(ipfsHash) : null;
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
     console.log(`📦 Returning cached data for hash: ${ipfsHash}`);
     return NextResponse.json(cached.data);
+  }
+
+  // Check if we have a valid IPFS hash
+  if (!ipfsHash) {
+    console.error("❌ No valid IPFS hash provided");
+    return NextResponse.json(
+      { error: "No valid IPFS hash provided" },
+      { status: 400 }
+    );
   }
 
   // Try each gateway

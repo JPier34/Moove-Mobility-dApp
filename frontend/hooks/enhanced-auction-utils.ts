@@ -589,11 +589,38 @@ async function buildAuctionWithCompleteData(
 
     // Fetch bid data if auction contract is available
     let bidCount = 0;
+    let actualHighestBid = "0";
+    let actualHighestBidder = ethers.ZeroAddress;
+
     if (auctionContract) {
       try {
         const bidData = await fetchAuctionBids(auctionContract, auctionId);
         bidCount = bidData.bidCount;
         console.log(`📊 [Auction ${auctionId}] Found ${bidCount} active bids`);
+
+        // If we have bids, find the highest one
+        if (bidData.bids && bidData.bids.length > 0) {
+          const highestBid = bidData.bids.reduce(
+            (highest: any, current: any) => {
+              const highestValue = BigInt(highest.value || 0);
+              const currentValue = BigInt(current.value || 0);
+              return currentValue > highestValue ? current : highest;
+            }
+          );
+
+          actualHighestBid = ethers.formatEther(highestBid.value || 0);
+          actualHighestBidder = highestBid.bidder || ethers.ZeroAddress;
+
+          console.log(
+            `🔍 [Auction ${auctionId}] Actual highest bid from bid data:`,
+            {
+              value: actualHighestBid,
+              bidder: actualHighestBidder,
+              contractHighestBid: auctionData.highestBid,
+              contractHighestBidder: auctionData.highestBidder,
+            }
+          );
+        }
       } catch (error) {
         console.warn(
           `⚠️ [Auction ${auctionId}] Could not fetch bid data:`,
@@ -721,8 +748,14 @@ async function buildAuctionWithCompleteData(
       startPrice: auctionData.startingPrice || "0",
       reservePrice: auctionData.reservePrice || "0",
       buyNowPrice: auctionData.buyNowPrice || "0",
-      currentBid: auctionData.highestBid || "0",
-      highestBidder: auctionData.highestBidder || ethers.ZeroAddress,
+      currentBid:
+        actualHighestBid !== "0"
+          ? actualHighestBid
+          : auctionData.highestBid || "0",
+      highestBidder:
+        actualHighestBidder !== ethers.ZeroAddress
+          ? actualHighestBidder
+          : auctionData.highestBidder || ethers.ZeroAddress,
       bidCount: bidCount,
       startTime: new Date(startTime * 1000),
       endTime: new Date(endTime * 1000),
@@ -761,6 +794,18 @@ async function buildAuctionWithCompleteData(
         extensionThresholdMinutes: auction.extensionThresholdMinutes,
         extensionDurationMinutes: auction.extensionDurationMinutes,
       }),
+    });
+
+    // Debug current bid assignment
+    console.log(`🔍 [Auction ${auctionId}] Current bid assignment:`, {
+      highestBidFromContract: auctionData.highestBid,
+      actualHighestBidFromBids: actualHighestBid,
+      currentBidInAuction: auction.currentBid,
+      bidCount: auction.bidCount,
+      highestBidder: auction.highestBidder,
+      isHighestBidZero: auctionData.highestBid === "0",
+      isActualHighestBidZero: actualHighestBid === "0",
+      usingFallback: actualHighestBid === "0" && auctionData.highestBid !== "0",
     });
 
     // Special debug for NFT #47
@@ -956,6 +1001,15 @@ async function fetchAuctionFromContractCorrected(
         `✅ Converted auction data for auction ${auctionId}:`,
         auctionData
       );
+
+      // Debug bid-related fields
+      console.log(`🔍 [Auction ${auctionId}] Bid-related fields:`, {
+        highestBid: auctionData.highestBid,
+        highestBidder: auctionData.highestBidder,
+        currentPrice: auctionData.currentPrice,
+        bidIncrement: auctionData.bidIncrement,
+        totalBidders: auctionData.totalBidders,
+      });
     } catch (error) {
       console.error(`❌ Failed to fetch auction ${auctionId}:`, error);
       return null;

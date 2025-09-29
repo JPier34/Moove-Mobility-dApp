@@ -57,25 +57,11 @@ export function useSimpleWonAuctions(): SimpleWonAuctionsResult {
         console.log(
           `🔍 [useSimpleWonAuctions] Sample auction data for debugging:`
         );
-        for (let i = 0; i < Math.min(3, totalCount); i++) {
-          try {
-            const auction = await auctionContract.auctions(i);
-            console.log(`🔍 [useSimpleWonAuctions] Auction ${i}:`, {
-              auctionId: i,
-              tokenId: auction.tokenId.toString(),
-              highestBidder: auction.highestBidder,
-              finalBid: auction.finalBid.toString(),
-              status: auction.status,
-              seller: auction.seller,
-              isUserWinner:
-                auction.highestBidder &&
-                auction.highestBidder.toLowerCase() === address?.toLowerCase(),
-              userAddress: address,
-            });
-          } catch (e) {
-            console.log(`🔍 [useSimpleWonAuctions] Auction ${i} failed:`, e);
-          }
-        }
+        // Note: We can't easily debug individual auctions here without contract instance
+        // This debug section is commented out to avoid build errors
+        console.log(
+          `🔍 [useSimpleWonAuctions] Total auctions to check: ${totalCount}`
+        );
       }
 
       // Check each auction to see if user won it

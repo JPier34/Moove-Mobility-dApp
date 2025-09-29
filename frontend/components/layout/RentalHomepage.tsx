@@ -521,12 +521,7 @@ function LocationStatusBanner({
 export default function RentalHomepage() {
   const [
     locationState,
-    {
-      handleLocationGranted,
-      handleLocationDenied,
-      handleManualCitySelect,
-      requestLocationAgain,
-    },
+    { handleLocationGranted, handleLocationDenied, requestLocationAgain },
   ] = useLocationWithModal();
 
   const { preloadAllCityImages } = usePreloadCityImages();

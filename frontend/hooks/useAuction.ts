@@ -111,6 +111,13 @@ export function usePlaceBid() {
     useWriteMooveAuction();
 
   const placeBid = (auctionId: number, bidAmount: bigint) => {
+    console.log("🎯 usePlaceBid: Calling writeMooveAuction", {
+      auctionId,
+      bidAmount: bidAmount.toString(),
+      isPending,
+      isConfirming,
+      isSuccess,
+    });
     writeMooveAuction("placeBid", [auctionId], bidAmount);
   };
 

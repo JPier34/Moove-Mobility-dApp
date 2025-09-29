@@ -72,7 +72,13 @@ function PremiumVehicleCard({
         <div className="absolute bottom-4 left-4">
           <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-full px-4 py-2 shadow-lg">
             <div className="text-lg font-bold text-gray-900 dark:text-white">
-              {vehicle.priceEth}
+              {(() => {
+                const priceStr = vehicle.priceEth;
+                const priceMatch = priceStr.match(/(\d+\.?\d*)/);
+                const priceValue = priceMatch ? parseFloat(priceMatch[1]) : 0;
+                return Math.floor(priceValue * 1e9);
+              })()}{" "}
+              gWei
             </div>
             <div className="text-xs text-gray-500 dark:text-gray-400">
               30 days access

@@ -11,6 +11,7 @@ interface AuctionGridProps {
   isLoading?: boolean;
   showEndedState?: boolean;
   onRefresh?: () => void;
+  refreshAuctionCache?: (auctionId: number) => Promise<void>;
 }
 
 export default function AuctionGrid({
@@ -18,6 +19,7 @@ export default function AuctionGrid({
   isLoading = false,
   showEndedState = false,
   onRefresh,
+  refreshAuctionCache,
 }: AuctionGridProps) {
   const [selectedAuction, setSelectedAuction] = useState<Auction | null>(null);
 
@@ -142,7 +144,11 @@ export default function AuctionGrid({
           auction={selectedAuction}
           isOpen={!!selectedAuction}
           onClose={() => setSelectedAuction(null)}
-          onRefresh={onRefresh}
+          onRefresh={
+            refreshAuctionCache
+              ? () => refreshAuctionCache(parseInt(selectedAuction.auctionId))
+              : onRefresh
+          }
         />
       )}
     </>
