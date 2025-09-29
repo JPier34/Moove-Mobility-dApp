@@ -22,6 +22,8 @@ export interface ReverseNFTFinderResult {
   lastCheckedTokenId: number;
   foundCount: number;
   totalSupply: number | undefined;
+  currentSearchPoint: number;
+  hasFoundUpperBound: boolean;
 }
 
 const INITIAL_DISPLAY_COUNT = 12;
@@ -44,25 +46,41 @@ export function useReverseNFTFinder(): ReverseNFTFinderResult {
   const [lastCheckedTokenId, setLastCheckedTokenId] = useState<number>(-1);
   const [foundCount, setFoundCount] = useState(0);
   const [totalSupply, setTotalSupply] = useState<number | undefined>();
-  const [consecutiveNotFound, setConsecutiveNotFound] = useState(0);
-
-  // Optimized search strategy: start from 200 and work down to 0
-  // Based on our testing, we know NFTs exist in range 0-97
-  const START_SEARCH_FROM = 200; // Start from 200 as suggested
+  // Smart dynamic range detection
+  const INITIAL_SEARCH_POINT = 200;
+  const SEARCH_INCREMENT = 100; // +100, +200, +300, etc.
   const MAX_CONSECUTIVE_NOT_FOUND = 10;
+
+  const [consecutiveNotFound, setConsecutiveNotFound] = useState(0);
+  const [currentSearchPoint, setCurrentSearchPoint] =
+    useState(INITIAL_SEARCH_POINT);
+  const [hasFoundUpperBound, setHasFoundUpperBound] = useState(false);
 
   // Debug logging removed for performance
 
   // Fetch NFT metadata from IPFS
   const fetchNFTMetadata = useCallback(async (tokenURI: string) => {
     try {
+      console.log(
+        `🔍 [useReverseNFTFinder] Fetching metadata from: ${tokenURI}`
+      );
       const response = await fetch(
         `/api/ipfs-proxy?url=${encodeURIComponent(tokenURI)}`
       );
-      if (!response.ok) throw new Error("Failed to fetch metadata");
-      return await response.json();
+      if (!response.ok) {
+        console.warn(
+          `❌ [useReverseNFTFinder] Failed to fetch metadata: ${response.status} ${response.statusText}`
+        );
+        throw new Error("Failed to fetch metadata");
+      }
+      const metadata = await response.json();
+      console.log(`✅ [useReverseNFTFinder] Metadata fetched:`, metadata);
+      return metadata;
     } catch (error) {
-      console.warn("Failed to fetch NFT metadata:", error);
+      console.warn(
+        "❌ [useReverseNFTFinder] Failed to fetch NFT metadata:",
+        error
+      );
       return null;
     }
   }, []);
@@ -73,7 +91,7 @@ export function useReverseNFTFinder(): ReverseNFTFinderResult {
       if (!address) return null;
 
       console.log(
-        `🔍 [useReverseNFTFinder] Checking token ${tokenId} ownership...`
+        `🔍 [useReverseNFTFinder] Checking token ${tokenId} ownership for address ${address}...`
       );
 
       try {
@@ -98,7 +116,15 @@ export function useReverseNFTFinder(): ReverseNFTFinderResult {
         const owner = await ownerResponse.text();
         const cleanOwner = owner.replace(/"/g, ""); // Remove quotes
 
+        console.log(
+          `🔍 [useReverseNFTFinder] Token ${tokenId} owner: ${cleanOwner}, user: ${address}`
+        );
+
         if (cleanOwner.toLowerCase() === address.toLowerCase()) {
+          console.log(
+            `✅ [useReverseNFTFinder] User owns token ${tokenId}, fetching metadata...`
+          );
+
           const tokenURIResponse = await fetch("/api/contract-call", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -109,12 +135,30 @@ export function useReverseNFTFinder(): ReverseNFTFinderResult {
             }),
           });
 
-          if (!tokenURIResponse.ok) return null;
+          if (!tokenURIResponse.ok) {
+            console.log(
+              `❌ [useReverseNFTFinder] Token ${tokenId} tokenURI failed: ${tokenURIResponse.status}`
+            );
+            return null;
+          }
 
           const tokenURI = await tokenURIResponse.text();
           const cleanTokenURI = tokenURI.replace(/"/g, ""); // Remove quotes
 
+          console.log(
+            `🔍 [useReverseNFTFinder] Token ${tokenId} tokenURI: ${cleanTokenURI}`
+          );
+
           const metadata = await fetchNFTMetadata(cleanTokenURI);
+
+          console.log(`🔍 [useReverseNFTFinder] NFT ${tokenId} metadata:`, {
+            tokenId,
+            tokenURI: cleanTokenURI,
+            metadata,
+            name: metadata?.name,
+            description: metadata?.description,
+            image: metadata?.image,
+          });
 
           return {
             tokenId,
@@ -126,6 +170,10 @@ export function useReverseNFTFinder(): ReverseNFTFinderResult {
             image: metadata?.image || "/images/default-nft.png",
             metadata,
           };
+        } else {
+          console.log(
+            `❌ [useReverseNFTFinder] Token ${tokenId} not owned by user`
+          );
         }
         return null;
       } catch (error) {
@@ -135,7 +183,67 @@ export function useReverseNFTFinder(): ReverseNFTFinderResult {
     [address, fetchNFTMetadata]
   );
 
-  // Main search function - no longer depends on totalSupply
+  // Smart range detection function - find first non-existent token
+  const findUpperBound = useCallback(async (): Promise<number> => {
+    let searchPoint = INITIAL_SEARCH_POINT;
+    let increment = SEARCH_INCREMENT;
+
+    console.log(
+      `🔍 [useReverseNFTFinder] Starting smart range detection from ${searchPoint}`
+    );
+
+    while (true) {
+      try {
+        // Check if token exists at current search point
+        const ownerResponse = await fetch("/api/contract-call", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            method: "ownerOf",
+            args: [searchPoint],
+            contract: "nft",
+          }),
+        });
+
+        if (ownerResponse.ok) {
+          // Token exists, continue searching higher
+          searchPoint += increment;
+          increment += SEARCH_INCREMENT; // Progressive increment: +100, +200, +300, etc.
+          console.log(
+            `🔍 [useReverseNFTFinder] Token ${
+              searchPoint - increment
+            } exists, trying ${searchPoint}`
+          );
+        } else {
+          // Token doesn't exist, this is our upper bound
+          console.log(
+            `✅ [useReverseNFTFinder] Found upper bound at token ${searchPoint} (first non-existent)`
+          );
+          return searchPoint;
+        }
+      } catch (error) {
+        console.warn(
+          `⚠️ [useReverseNFTFinder] Error checking token ${searchPoint}:`,
+          error
+        );
+        // On error, assume token doesn't exist
+        console.log(
+          `✅ [useReverseNFTFinder] Found upper bound at token ${searchPoint} (error case)`
+        );
+        return searchPoint;
+      }
+
+      // Safety limit to prevent infinite loops
+      if (searchPoint > 10000) {
+        console.log(
+          `🛑 [useReverseNFTFinder] Reached safety limit, using ${searchPoint} as upper bound`
+        );
+        return searchPoint;
+      }
+    }
+  }, []);
+
+  // Main search function with smart range detection
   const searchNFTs = useCallback(async () => {
     if (!address || isLoading) {
       return;
@@ -147,16 +255,22 @@ export function useReverseNFTFinder(): ReverseNFTFinderResult {
     setFoundCount(0);
     setConsecutiveNotFound(0);
     setIsComplete(false);
+    setHasFoundUpperBound(false);
 
     try {
-      // Start from 200 and work backwards to 0
-      let currentTokenId = START_SEARCH_FROM; // Start from 200 as suggested
+      // First, find the upper bound dynamically
+      const upperBound = await findUpperBound();
+      setCurrentSearchPoint(upperBound);
+      setHasFoundUpperBound(true);
+
+      // Start from upper bound and work backwards to 0
+      let currentTokenId = upperBound;
       let consecutiveNotFound = 0;
       let checked = 0;
       let found = 0;
 
       console.log(
-        `🔍 [useReverseNFTFinder] Starting optimized search from token ${currentTokenId} for address ${address}`
+        `🔍 [useReverseNFTFinder] Starting smart search from token ${currentTokenId} to 0 for address ${address}`
       );
       setLastCheckedTokenId(currentTokenId);
 
@@ -177,7 +291,7 @@ export function useReverseNFTFinder(): ReverseNFTFinderResult {
             `🔍 [useReverseNFTFinder] Found ${foundNFTs.length} NFTs in batch:`,
             foundNFTs.map((nft) => nft.tokenId)
           );
-          setUserNFTs((prev) => [...foundNFTs, ...prev]); // Add to beginning to maintain reverse order
+          setUserNFTs((prev) => [...foundNFTs, ...prev]); // Add to beginning to maintain reverse order (highest token ID first)
           found += foundNFTs.length;
           setFoundCount(found);
           consecutiveNotFound = 0;
@@ -191,12 +305,11 @@ export function useReverseNFTFinder(): ReverseNFTFinderResult {
         setTotalChecked(checked);
         setLastCheckedTokenId(currentTokenId);
 
-        // Stop condition: found enough consecutive empty tokens
-        // Since we know NFTs exist in range 0-97, we can stop earlier
+        // Smart stop condition: found enough consecutive empty tokens
         if (
           consecutiveNotFound >= MAX_CONSECUTIVE_NOT_FOUND * BATCH_SIZE &&
-          checked >= 50 && // Reduced from 100 since we know the range
-          currentTokenId < 50 // Stop if we're below 50 and found many consecutive empty
+          checked >= 50 && // Minimum checks before stopping
+          currentTokenId < 100 // Stop if we're below 100 and found many consecutive empty
         ) {
           console.log(
             `🛑 [useReverseNFTFinder] Stopping search: ${consecutiveNotFound} consecutive not found, ${checked} total checked, currentTokenId: ${currentTokenId}`
@@ -222,7 +335,7 @@ export function useReverseNFTFinder(): ReverseNFTFinderResult {
             console.log(
               `🔍 [useReverseNFTFinder] Found NFT at token ${currentTokenId}`
             );
-            setUserNFTs((prev) => [nft, ...prev]);
+            setUserNFTs((prev) => [nft, ...prev]); // Add to beginning to maintain reverse order (highest token ID first)
             found++;
             setFoundCount(found);
             consecutiveNotFound = 0;
@@ -244,7 +357,7 @@ export function useReverseNFTFinder(): ReverseNFTFinderResult {
 
       setIsComplete(true);
       console.log(
-        `✅ [useReverseNFTFinder] Search completed: found ${found} NFTs, checked ${checked} tokens, range: ${START_SEARCH_FROM} to 0`
+        `✅ [useReverseNFTFinder] Smart search completed: found ${found} NFTs, checked ${checked} tokens, range: ${upperBound} to 0`
       );
     } catch (error) {
       console.error("❌ [useReverseNFTFinder] Error searching NFTs:", error);
@@ -252,7 +365,7 @@ export function useReverseNFTFinder(): ReverseNFTFinderResult {
     } finally {
       setIsLoading(false);
     }
-  }, [address, isLoading, checkTokenOwnership, isComplete]);
+  }, [address, isLoading, checkTokenOwnership, isComplete, findUpperBound]);
 
   // Start optimized search when address is available
   useEffect(() => {
@@ -265,7 +378,7 @@ export function useReverseNFTFinder(): ReverseNFTFinderResult {
 
     if (address && !isLoading && !isComplete) {
       console.log(
-        `🔍 [useReverseNFTFinder] Starting optimized search from ${START_SEARCH_FROM} to 0...`
+        `🔍 [useReverseNFTFinder] Starting smart search with dynamic range detection...`
       );
       searchNFTs();
     }
@@ -281,5 +394,7 @@ export function useReverseNFTFinder(): ReverseNFTFinderResult {
     lastCheckedTokenId,
     foundCount,
     totalSupply,
+    currentSearchPoint,
+    hasFoundUpperBound,
   };
 }

@@ -119,11 +119,21 @@ export default function SimplifiedAppProvider({
       const queryCache = client.getQueryCache();
       const queries = queryCache.getAll();
 
-      // Find and remove any queries that might be causing the useIncrementalNFTLoading error
+      // Find and remove any stale queries from old NFT loading hooks
       const staleQueries = queries.filter((query) =>
         query.queryKey.some(
           (key) =>
-            typeof key === "string" && key.includes("useIncrementalNFTLoading")
+            typeof key === "string" &&
+            (key.includes("useIncrementalNFTLoading") ||
+              key.includes("useOptimizedMyCollection") ||
+              key.includes("useNFTDebug") ||
+              key.includes("useUserNFTFinder") ||
+              key.includes("useSmartNFTFinder") ||
+              key.includes("useConditionalNFTLoading") ||
+              key.includes("useLazyMyCollection") ||
+              key.includes("useOptimizedUserNFTFinder") ||
+              key.includes("useImmediateLazyCollection") ||
+              key.includes("useSimpleLazyCollection"))
         )
       );
 

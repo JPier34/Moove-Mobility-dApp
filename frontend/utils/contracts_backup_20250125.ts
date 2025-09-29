@@ -23,3 +23,5 @@ export const CONTRACT_ADDRESSES = {
 
 // Questo backup deve essere mantenuto fino a quando il nuovo contratto non è completamente testato
 
+
+

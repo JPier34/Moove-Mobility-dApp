@@ -48,6 +48,10 @@ export function useSimpleWonAuctions(): SimpleWonAuctionsResult {
       const auctions: SimpleWonAuction[] = [];
       const totalCount = Number(totalAuctions);
 
+      console.log(
+        `🔍 [useSimpleWonAuctions] Checking ${totalCount} auctions for address ${address}`
+      );
+
       // Check each auction to see if user won it
       for (let i = 0; i < totalCount; i++) {
         try {
@@ -70,6 +74,9 @@ export function useSimpleWonAuctions(): SimpleWonAuctionsResult {
               auction.winner &&
               auction.winner.toLowerCase() === address.toLowerCase()
             ) {
+              console.log(
+                `✅ [useSimpleWonAuctions] User won auction ${i} for NFT ${auction.tokenId}`
+              );
               // Get NFT metadata
               const tokenURI = await fetch("/api/contract-call", {
                 method: "POST",
@@ -125,6 +132,10 @@ export function useSimpleWonAuctions(): SimpleWonAuctionsResult {
         }
       }
 
+      console.log(
+        `🔍 [useSimpleWonAuctions] Found ${auctions.length} won auctions:`,
+        auctions.map((a) => ({ nftId: a.nftId, finalBid: a.finalBid }))
+      );
       setWonAuctions(auctions);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");

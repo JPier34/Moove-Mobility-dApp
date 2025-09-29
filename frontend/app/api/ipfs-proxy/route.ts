@@ -18,19 +18,20 @@ const IPFS_GATEWAYS = [
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const hash = searchParams.get("hash");
+  const url = searchParams.get("url");
 
-  if (!hash) {
+  if (!hash && !url) {
     return NextResponse.json(
-      { error: "Hash parameter is required" },
+      { error: "Hash or URL parameter is required" },
       { status: 400 }
     );
   }
 
   // Extract IPFS hash from URL if it's a full URL
-  let ipfsHash = hash;
-  if (hash.includes("/ipfs/")) {
-    ipfsHash = hash.split("/ipfs/")[1];
-    console.log(`🔍 Extracted IPFS hash: ${ipfsHash} from URL: ${hash}`);
+  let ipfsHash = hash || url;
+  if (ipfsHash && ipfsHash.includes("/ipfs/")) {
+    ipfsHash = ipfsHash.split("/ipfs/")[1];
+    console.log(`🔍 Extracted IPFS hash: ${ipfsHash} from URL: ${hash || url}`);
   }
 
   // Check cache first

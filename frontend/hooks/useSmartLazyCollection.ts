@@ -51,7 +51,21 @@ export function useSmartLazyCollection(): SmartLazyCollectionResult {
   }, [reverseNFTFinder.userNFTs, currentPage]);
 
   const loadMore = () => {
-    if (isLoadingMore || !reverseNFTFinder.hasMore) return;
+    console.log("🔄 [useSmartLazyCollection] loadMore called:", {
+      isLoadingMore,
+      hasMore,
+      displayedCount: displayedNFTs.length,
+      totalCount: reverseNFTFinder.userNFTs.length,
+      isComplete: reverseNFTFinder.isComplete,
+    });
+
+    if (isLoadingMore || !hasMore) {
+      console.log("🛑 [useSmartLazyCollection] loadMore blocked:", {
+        isLoadingMore,
+        hasMore,
+      });
+      return;
+    }
 
     setIsLoadingMore(true);
 
@@ -68,9 +82,14 @@ export function useSmartLazyCollection(): SmartLazyCollectionResult {
     // The reverseNFTFinder will automatically restart
   };
 
-  const hasMore =
-    displayedNFTs.length < reverseNFTFinder.userNFTs.length ||
-    !reverseNFTFinder.isComplete;
+  const hasMore = displayedNFTs.length < reverseNFTFinder.userNFTs.length;
+
+  console.log("🔍 [useSmartLazyCollection] hasMore calculation:", {
+    displayedCount: displayedNFTs.length,
+    totalCount: reverseNFTFinder.userNFTs.length,
+    isComplete: reverseNFTFinder.isComplete,
+    hasMore,
+  });
 
   // Calculate total value from won auctions
   const totalValue = useMemo(() => {
@@ -81,9 +100,28 @@ export function useSmartLazyCollection(): SmartLazyCollectionResult {
 
   // Create decorative NFTs with auction data
   const decorativeNFTs = useMemo(() => {
+    console.log("🔍 [useSmartLazyCollection] Creating decorative NFTs:", {
+      displayedCount: displayedNFTs.length,
+      wonAuctionsCount: allWonAuctions.length,
+      wonAuctions: allWonAuctions.map((a) => ({
+        nftId: a.nftId,
+        finalBid: a.finalBid,
+      })),
+    });
+
     return displayedNFTs.map((nft) => {
       const auction = allWonAuctions.find(
         (auction) => auction.nftId === nft.tokenId.toString()
+      );
+
+      console.log(
+        `🔍 [useSmartLazyCollection] NFT ${nft.tokenId} auction match:`,
+        {
+          tokenId: nft.tokenId,
+          auction: auction
+            ? { nftId: auction.nftId, finalBid: auction.finalBid }
+            : null,
+        }
       );
 
       const history = nftHistories.histories.get(nft.tokenId.toString());

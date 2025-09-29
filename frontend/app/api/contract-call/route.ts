@@ -41,8 +41,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(result);
   } catch (error) {
     console.error("Contract call error:", error);
+    console.error("Error details:", {
+      message: (error as Error).message,
+      stack: (error as Error).stack,
+      method,
+      args,
+      contract,
+    });
     return NextResponse.json(
-      { error: "Contract call failed" },
+      {
+        error: "Contract call failed",
+        details: (error as Error).message,
+        method,
+        args,
+        contract,
+      },
       { status: 500 }
     );
   }

@@ -55,7 +55,7 @@ export default function InfiniteScrollTrigger({
         className="text-center py-8"
       >
         <div className="text-gray-500 dark:text-gray-400 text-sm">
-          🎉 Hai visualizzato tutti i tuoi NFT!
+          🎉 You've viewed all your NFTs!
         </div>
       </motion.div>
     );
@@ -72,12 +72,12 @@ export default function InfiniteScrollTrigger({
         <div className="flex items-center space-x-3">
           <div className="animate-spin rounded-full h-6 w-6 border-2 border-moove-primary border-t-transparent"></div>
           <span className="text-gray-600 dark:text-gray-400 text-sm">
-            Caricamento NFT...
+            Loading NFTs...
           </span>
         </div>
       ) : (
         <div className="text-gray-400 dark:text-gray-500 text-sm">
-          Scrolla per caricare più NFT
+          Scroll to load more NFTs
         </div>
       )}
     </motion.div>
