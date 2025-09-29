@@ -52,6 +52,32 @@ export function useSimpleWonAuctions(): SimpleWonAuctionsResult {
         `🔍 [useSimpleWonAuctions] Checking ${totalCount} auctions for address ${address}`
       );
 
+      // Debug: show first few auctions to understand structure
+      if (totalCount > 0) {
+        console.log(
+          `🔍 [useSimpleWonAuctions] Sample auction data for debugging:`
+        );
+        for (let i = 0; i < Math.min(3, totalCount); i++) {
+          try {
+            const auction = await auctionContract.auctions(i);
+            console.log(`🔍 [useSimpleWonAuctions] Auction ${i}:`, {
+              auctionId: i,
+              tokenId: auction.tokenId.toString(),
+              highestBidder: auction.highestBidder,
+              finalBid: auction.finalBid.toString(),
+              status: auction.status,
+              seller: auction.seller,
+              isUserWinner:
+                auction.highestBidder &&
+                auction.highestBidder.toLowerCase() === address?.toLowerCase(),
+              userAddress: address,
+            });
+          } catch (e) {
+            console.log(`🔍 [useSimpleWonAuctions] Auction ${i} failed:`, e);
+          }
+        }
+      }
+
       // Check each auction to see if user won it
       for (let i = 0; i < totalCount; i++) {
         try {
@@ -70,6 +96,22 @@ export function useSimpleWonAuctions(): SimpleWonAuctionsResult {
             const auction = await auctionData.json();
 
             // Check if user is the winner
+            console.log(`🔍 [useSimpleWonAuctions] Auction ${i} data:`, {
+              auctionId: i,
+              tokenId: auction.tokenId,
+              winner: auction.winner,
+              highestBidder: auction.highestBidder,
+              userAddress: address,
+              isWinner:
+                auction.winner &&
+                auction.winner.toLowerCase() === address.toLowerCase(),
+              isHighestBidder:
+                auction.highestBidder &&
+                auction.highestBidder.toLowerCase() === address.toLowerCase(),
+              status: auction.status,
+              finalBid: auction.finalBid,
+            });
+
             if (
               auction.winner &&
               auction.winner.toLowerCase() === address.toLowerCase()
@@ -124,6 +166,19 @@ export function useSimpleWonAuctions(): SimpleWonAuctionsResult {
                 isSettled: auction.status === 4,
                 endTime: auction.endTime,
               });
+
+              console.log(
+                `🔍 [useSimpleWonAuctions] Added auction ${i} for NFT ${auction.tokenId}:`,
+                {
+                  auctionId: i.toString(),
+                  nftId: auction.tokenId.toString(),
+                  finalBid: auction.finalBid,
+                  finalBidType: typeof auction.finalBid,
+                  finalBidNumber: Number(auction.finalBid || 0),
+                  status: auction.status,
+                  isSettled: auction.status === 4,
+                }
+              );
             }
           }
         } catch (e) {

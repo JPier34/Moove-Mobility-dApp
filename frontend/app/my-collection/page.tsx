@@ -282,8 +282,8 @@ function FilterBar({
             <span className="text-2xl mr-3">📊</span>
             Collection Overview
           </h3>
-          <div className="grid grid-cols-2 gap-6">
-            <motion.div
+          <div className="grid grid-cols-1 gap-6">
+            {/* <motion.div
               className="text-center p-4 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-2xl"
               whileHover={{ scale: 1.05 }}
             >
@@ -293,13 +293,13 @@ function FilterBar({
               <div className="text-sm text-gray-600 dark:text-gray-400 font-medium">
                 Total Items
               </div>
-            </motion.div>
+            </motion.div> */}
             <motion.div
               className="text-center p-4 bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 rounded-2xl"
               whileHover={{ scale: 1.05 }}
             >
               <div className="text-3xl font-bold text-green-600 mb-2">
-                {stats.totalValue.toFixed(5)}
+                {stats.totalValue.toFixed(6)}
               </div>
               <div className="text-sm text-gray-600 dark:text-gray-400 font-medium">
                 Total Value (ETH)
@@ -564,6 +564,8 @@ export default function MyCollection() {
     userNFTsError,
     totalItems,
     totalValue,
+    totalValueType: typeof totalValue,
+    totalValueString: String(totalValue),
   });
 
   const [filters, setFilters] = useState<FilterOptions>({

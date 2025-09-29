@@ -264,7 +264,7 @@ export default function Header() {
                         <div className="flex items-center space-x-2">
                           <button
                             onClick={openChainModal}
-                            className="flex items-center bg-gray-100 dark:bg-gray-800 px-3 py-2 rounded-lg text-sm font-medium"
+                            className="flex items-center bg-gray-100 dark:bg-gray-800 px-3 py-2 rounded-lg text-sm font-medium text-gray-800 dark:text-gray-200"
                           >
                             {chain.hasIcon && chain.iconUrl && (
                               <img

@@ -43,7 +43,7 @@ export default function Footer() {
   ];
 
   return (
-    <footer className="relative bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+    <footer className="relative bg-gradient-to-br from-gray-100 via-gray-50 to-gray-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
       {/* Decorative gradient overlay */}
       <div className="absolute inset-0 bg-gradient-to-t from-purple-900/10 via-transparent to-transparent pointer-events-none" />
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -55,12 +55,12 @@ export default function Footer() {
               <div className="w-19 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-sm">mOOve</span>
               </div>
-              <h3 className="text-xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
+              <h3 className="text-xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
                 Offered by{" "}
                 <span className="homepage-signature-text ">J.Pier</span>
               </h3>
             </div>
-            <p className="text-gray-400 text-sm leading-relaxed mb-6">
+            <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed mb-6">
               The future of urban mobility is here.
             </p>
 
@@ -70,10 +70,10 @@ export default function Footer() {
                 <Link
                   key={social.name}
                   href={social.href}
-                  className="w-10 h-10 bg-gray-800 hover:bg-gradient-to-r hover:from-purple-500 hover:to-pink-500 rounded-lg flex items-center justify-center transition-all duration-300 group"
+                  className="w-10 h-10 bg-gray-200 hover:bg-gradient-to-r hover:from-purple-500 hover:to-pink-500 dark:bg-gray-800 dark:hover:bg-gradient-to-r dark:hover:from-purple-500 dark:hover:to-pink-500 rounded-lg flex items-center justify-center transition-all duration-300 group"
                   aria-label={social.name}
                 >
-                  <social.icon className="w-5 h-5 text-gray-400 group-hover:text-white transition-colors" />
+                  <social.icon className="w-5 h-5 text-gray-600 group-hover:text-white dark:text-gray-400 dark:group-hover:text-white transition-colors" />
                 </Link>
               ))}
             </div>
@@ -81,7 +81,7 @@ export default function Footer() {
 
           {/* Platform Links */}
           <div>
-            <h4 className="text-white font-semibold mb-4 flex justify-center items-center">
+            <h4 className="text-gray-900 dark:text-white font-semibold mb-4 flex justify-center items-center">
               <span className="w-2 h-2 bg-purple-500 rounded-full mr-2"></span>
               Platform
             </h4>
@@ -93,7 +93,7 @@ export default function Footer() {
                 >
                   <Link
                     href={link.href}
-                    className="text-gray-400 hover:text-white hover:translate-x-1 transition-all duration-200 inline-block text-sm"
+                    className="text-gray-600 hover:text-gray-900 hover:translate-x-1 dark:text-gray-400 dark:hover:text-white transition-all duration-200 inline-block text-sm"
                   >
                     {link.name}
                   </Link>
@@ -102,32 +102,32 @@ export default function Footer() {
             </ul>
 
             {/* Contact Info */}
-            <p className="text-base flex justify-center items-center mt-4">
+            <p className="text-gray-600 dark:text-gray-400 text-base flex justify-center items-center mt-4">
               📍 San Benedetto del Tronto, IT
             </p>
           </div>
         </div>
 
         {/* Bottom Section */}
-        <div className="mt-12 pt-8 border-t border-gray-700">
+        <div className="mt-12 pt-8 border-t border-gray-300 dark:border-gray-700">
           <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
             {/* Copyright */}
-            <p className="text-gray-400 text-sm">
+            <p className="text-gray-600 dark:text-gray-400 text-sm">
               © {currentYear} mOOve. Built for smart mobility.
             </p>
 
             {/* Tech Stack Badge */}
             <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2 bg-gray-800 rounded-full px-3 py-1">
+              <div className="flex items-center space-x-2 bg-gray-200 dark:bg-gray-800 rounded-full px-3 py-1">
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-gray-300 text-xs">
+                <span className="text-gray-700 dark:text-gray-300 text-xs">
                   Powered by Blockchain
                 </span>
               </div>
 
-              <div className="flex items-center space-x-2 bg-gray-800 rounded-full px-3 py-1">
+              <div className="flex items-center space-x-2 bg-gray-200 dark:bg-gray-800 rounded-full px-3 py-1">
                 <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                <span className="text-gray-300 text-xs">
+                <span className="text-gray-700 dark:text-gray-300 text-xs">
                   Built with Next.js
                 </span>
               </div>

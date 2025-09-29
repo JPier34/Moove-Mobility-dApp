@@ -47,8 +47,8 @@ export function useReverseNFTFinder(): ReverseNFTFinderResult {
   const [foundCount, setFoundCount] = useState(0);
   const [totalSupply, setTotalSupply] = useState<number | undefined>();
   // Smart dynamic range detection
-  const INITIAL_SEARCH_POINT = 200;
-  const SEARCH_INCREMENT = 100; // +100, +200, +300, etc.
+  const INITIAL_SEARCH_POINT = 50; // Start from 50 instead of 200
+  const SEARCH_INCREMENT = 25; // Smaller increments for better detection
   const MAX_CONSECUTIVE_NOT_FOUND = 10;
 
   const [consecutiveNotFound, setConsecutiveNotFound] = useState(0);
@@ -208,7 +208,7 @@ export function useReverseNFTFinder(): ReverseNFTFinderResult {
         if (ownerResponse.ok) {
           // Token exists, continue searching higher
           searchPoint += increment;
-          increment += SEARCH_INCREMENT; // Progressive increment: +100, +200, +300, etc.
+          increment += SEARCH_INCREMENT; // Progressive increment: +25, +50, +75, etc.
           console.log(
             `🔍 [useReverseNFTFinder] Token ${
               searchPoint - increment
@@ -291,7 +291,7 @@ export function useReverseNFTFinder(): ReverseNFTFinderResult {
             `🔍 [useReverseNFTFinder] Found ${foundNFTs.length} NFTs in batch:`,
             foundNFTs.map((nft) => nft.tokenId)
           );
-          setUserNFTs((prev) => [...foundNFTs, ...prev]); // Add to beginning to maintain reverse order (highest token ID first)
+          setUserNFTs((prev) => [...prev, ...foundNFTs]); // Add batch after existing NFTs to maintain descending order (highest token ID first)
           found += foundNFTs.length;
           setFoundCount(found);
           consecutiveNotFound = 0;

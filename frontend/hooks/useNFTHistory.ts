@@ -6,12 +6,15 @@ import { ethers } from "ethers";
 import { contracts } from "@/utils/contracts";
 
 export interface NFTHistoryItem {
-  type: "mint" | "transfer";
+  type: "mint" | "transfer" | "auction_won";
   from: string;
   to: string;
   transactionHash: string;
   blockNumber: number;
   timestamp: number;
+  value?: string; // ETH value transferred
+  gasPrice?: string;
+  gasUsed?: string;
 }
 
 export interface NFTHistory {
@@ -31,6 +34,7 @@ export function useNFTHistory(tokenId: string | null) {
   const fetchNFTHistory = useCallback(async () => {
     if (!tokenId || !address) return;
 
+    console.log(`🚀 [useNFTHistory] Starting fetch for token ${tokenId}`);
     setIsLoading(true);
     setError(null);
 
@@ -76,6 +80,28 @@ export function useNFTHistory(tokenId: string | null) {
           }
 
           const eventLog = event as ethers.EventLog;
+
+          // Get transaction details to extract value
+          const tx = await provider.getTransaction(eventLog.transactionHash);
+          const txReceipt = await provider.getTransactionReceipt(
+            eventLog.transactionHash
+          );
+
+          console.log(
+            `🔍 [useNFTHistory] Transaction ${eventLog.transactionHash} details:`,
+            {
+              tokenId,
+              txValue: tx?.value?.toString(),
+              txValueETH: tx?.value ? ethers.formatEther(tx.value) : "0",
+              gasPrice: tx?.gasPrice?.toString(),
+              gasUsed: txReceipt?.gasUsed?.toString(),
+              from: eventLog.args.from,
+              to: eventLog.args.to,
+              type:
+                eventLog.args.from === ethers.ZeroAddress ? "mint" : "transfer",
+            }
+          );
+
           const historyItem: NFTHistoryItem = {
             type:
               eventLog.args.from === ethers.ZeroAddress ? "mint" : "transfer",
@@ -84,6 +110,9 @@ export function useNFTHistory(tokenId: string | null) {
             transactionHash: eventLog.transactionHash,
             blockNumber: eventLog.blockNumber,
             timestamp: block.timestamp,
+            value: tx?.value?.toString() || "0",
+            gasPrice: tx?.gasPrice?.toString() || "0",
+            gasUsed: txReceipt?.gasUsed?.toString() || "0",
           };
 
           historyItems.push(historyItem);
@@ -148,6 +177,11 @@ export function useMultipleNFTHistory(tokenIds: string[]) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const lastTokenIdsRef = useRef<string>("");
+
+  console.log(
+    `🚀 [useMultipleNFTHistory] Called with ${tokenIds.length} token IDs:`,
+    tokenIds
+  );
 
   const fetchAllHistories = useCallback(async () => {
     if (tokenIds.length === 0 || !address) return;
