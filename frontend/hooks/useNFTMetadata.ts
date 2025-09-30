@@ -50,7 +50,29 @@ export function useNFTMetadata(tokenId: number) {
 
         const response = await fetch(httpUrl);
         if (!response.ok) {
-          throw new Error(`Failed to fetch metadata: ${response.statusText}`);
+          console.warn(
+            `⚠️ Failed to fetch metadata from IPFS: ${response.statusText}`
+          );
+          // Return fallback metadata instead of throwing error
+          return {
+            name: `NFT #${tokenId}`,
+            description: `A unique NFT with token ID ${tokenId}`,
+            image: "/images/default-nft.svg",
+            attributes: [
+              {
+                trait_type: "Category",
+                value: "VEHICLE_DECORATION",
+              },
+              {
+                trait_type: "Rarity",
+                value: "Common",
+              },
+            ],
+            properties: {
+              category: "sticker",
+              rarity: "common",
+            },
+          };
         }
 
         const ipfsMetadata = await response.json();
@@ -87,7 +109,26 @@ export function useNFTMetadata(tokenId: number) {
         };
       } catch (err) {
         console.error(`❌ Failed to fetch metadata for NFT #${tokenId}:`, err);
-        return null;
+        // Return fallback metadata instead of null
+        return {
+          name: `NFT #${tokenId}`,
+          description: `A unique NFT with token ID ${tokenId}`,
+          image: "/images/default-nft.svg",
+          attributes: [
+            {
+              trait_type: "Category",
+              value: "VEHICLE_DECORATION",
+            },
+            {
+              trait_type: "Rarity",
+              value: "Common",
+            },
+          ],
+          properties: {
+            category: "sticker",
+            rarity: "common",
+          },
+        };
       }
     },
     [tokenId]
@@ -102,7 +143,9 @@ export function useNFTMetadata(tokenId: number) {
       setError(null);
 
       try {
-        const fetchedMetadata = await fetchMetadataFromIPFS(tokenURI as string);
+        const fetchedMetadata = await fetchMetadataFromIPFS(
+          tokenURI as unknown as string
+        );
 
         if (fetchedMetadata) {
           setMetadata(fetchedMetadata);

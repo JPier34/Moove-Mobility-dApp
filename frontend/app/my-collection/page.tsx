@@ -642,6 +642,7 @@ export default function MyCollection() {
       nftId: nft.tokenId,
       name: nft.name,
       image: nft.image,
+      category: "VEHICLE_DECORATION",
       finalBid: nft.price,
       bidders: nft.auctionWon?.bidders || 0,
       endTime: nft.purchaseDate.getTime(),
@@ -684,6 +685,7 @@ export default function MyCollection() {
       // Filter by price range
       if (filters.priceRange !== "all") {
         const price = nft.price;
+        if (price === undefined) return false; // Skip NFTs without price
         if (filters.priceRange === "low" && price >= 0.01) return false;
         if (filters.priceRange === "medium" && (price < 0.01 || price >= 0.1))
           return false;
@@ -859,7 +861,7 @@ export default function MyCollection() {
             </div>
           </motion.div>
         ) : userNFTCollection.filter(
-            (nft) => nft.isFromAuction && nft.status === "3"
+            (nft) => (nft as any).isFromAuction && (nft as any).status === "3"
           ).length > 0 ? (
           <motion.div
             className="mb-8"
@@ -878,12 +880,14 @@ export default function MyCollection() {
                 You have won{" "}
                 {
                   userNFTCollection.filter(
-                    (nft) => nft.isFromAuction && nft.status === "3"
+                    (nft) =>
+                      (nft as any).isFromAuction && (nft as any).status === "3"
                   ).length
                 }{" "}
                 auction
                 {userNFTCollection.filter(
-                  (nft) => nft.isFromAuction && nft.status === "3"
+                  (nft) =>
+                    (nft as any).isFromAuction && (nft as any).status === "3"
                 ).length > 1
                   ? "e"
                   : ""}{" "}
@@ -929,8 +933,8 @@ export default function MyCollection() {
               <AnimatePresence>
                 {filteredDecorative.map((nft) => (
                   <DecorativeNFTCard
-                    key={nft.id}
-                    nft={nft}
+                    key={(nft as any).id || nft.tokenId}
+                    nft={nft as any}
                     onViewDetails={handleViewDetails}
                   />
                 ))}
@@ -965,7 +969,17 @@ export default function MyCollection() {
         />
 
         {/* Cache Performance Stats */}
-        {cacheStats && <CacheStats stats={cacheStats} />}
+        {cacheStats && (
+          <CacheStats
+            stats={{
+              hits: cacheStats.cached,
+              misses: cacheStats.total - cacheStats.cached,
+              evictions: 0,
+              totalSize: cacheStats.total,
+              hitRate: cacheStats.cached / cacheStats.total,
+            }}
+          />
+        )}
 
         {/* Congratulations Modal is now handled globally by AuctionNotificationsProvider */}
       </div>

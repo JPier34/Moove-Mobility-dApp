@@ -26,6 +26,7 @@ export interface AuctionHandler {
 }
 
 export function useAuctionHandler(): AuctionHandler {
+  // Initialize hooks - only useEnglishAuction needs auctionId parameter
   const englishAuction = useEnglishAuction();
   const reserveAuction = useReserveAuction();
   const sealedBidAuction = useSealedBidAuction();
@@ -82,8 +83,7 @@ export function useAuctionHandler(): AuctionHandler {
               };
               const success = await englishAuction.placeBid(
                 parseInt(auction.auctionId),
-                amount,
-                auctionData
+                amount
               );
               return {
                 success,
@@ -92,8 +92,7 @@ export function useAuctionHandler(): AuctionHandler {
               };
             } else if (action === "buyNow" && amount) {
               const success = await englishAuction.buyNow(
-                parseInt(auction.auctionId),
-                amount
+                parseInt(auction.auctionId)
               );
               return {
                 success,

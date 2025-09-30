@@ -6,6 +6,7 @@ import LocationIndicator from "@/components/layout/LocationIndicator";
 import { useTheme } from "@/providers/ThemeProvider";
 import Link from "next/link";
 import { useUserRoles } from "@/hooks/useContract";
+import { getAdminAddress } from "@/config/admin";
 import { useAccount } from "wagmi";
 import { useNavigationLoading } from "@/hooks/useNavigationLoading";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
@@ -103,7 +104,7 @@ export default function Header() {
   const adminItems = [{ label: "Admin Panel", href: "/admin", icon: "⚙️" }];
 
   // Master admin wallet - always has access
-  const MASTER_WALLET = "0x777382955f33Bb8540602E914D9b650C962EF6Cc";
+  const MASTER_WALLET = getAdminAddress();
   const isMasterWallet = address?.toLowerCase() === MASTER_WALLET.toLowerCase();
 
   // Check if user has admin access
@@ -411,3 +412,4 @@ export default function Header() {
     </>
   );
 }
+

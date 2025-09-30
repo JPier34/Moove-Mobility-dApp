@@ -595,39 +595,28 @@ export default function RentalHomepage() {
             className="absolute inset-0 overflow-hidden pointer-events-none"
             style={{ zIndex: 2 }}
           >
-            {[...Array(20)].map((_, i) => (
-              <motion.div
-                key={i}
-                className="absolute w-1 h-1 bg-white/40 rounded-full"
-                initial={{
-                  x:
-                    typeof window !== "undefined"
-                      ? Math.random() * window.innerWidth
-                      : 0,
-                  y:
-                    typeof window !== "undefined"
-                      ? Math.random() * window.innerHeight
-                      : 0,
-                  opacity: 0,
-                }}
-                animate={{
-                  x:
-                    typeof window !== "undefined"
-                      ? Math.random() * window.innerWidth
-                      : 0,
-                  y:
-                    typeof window !== "undefined"
-                      ? Math.random() * window.innerHeight
-                      : 0,
-                  opacity: [0, 1],
-                }}
-                transition={{
-                  duration: 4 + Math.random() * 3,
-                  repeat: Infinity,
-                  delay: Math.random() * 3,
-                }}
-              />
-            ))}
+            {typeof window !== "undefined" &&
+              [...Array(20)].map((_, i) => (
+                <motion.div
+                  key={i}
+                  className="absolute w-1 h-1 bg-white/40 rounded-full"
+                  initial={{
+                    x: Math.random() * window.innerWidth,
+                    y: Math.random() * window.innerHeight,
+                    opacity: 0,
+                  }}
+                  animate={{
+                    x: Math.random() * window.innerWidth,
+                    y: Math.random() * window.innerHeight,
+                    opacity: [0, 1],
+                  }}
+                  transition={{
+                    duration: 4 + Math.random() * 3,
+                    repeat: Infinity,
+                    delay: Math.random() * 3,
+                  }}
+                />
+              ))}
           </div>
         </div>
 

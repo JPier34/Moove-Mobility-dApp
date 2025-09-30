@@ -3,421 +3,263 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAccount } from "wagmi";
 import { contracts } from "@/utils/contracts";
+import { ethers } from "ethers";
 
-// Cache per NFT ownership e metadata
+// Cache interfaces
 interface NFTCacheEntry {
   tokenId: number;
+  metadata: any;
   owner: string;
-  tokenURI: string;
-  metadata?: any;
   timestamp: number;
-  lastChecked: number;
 }
 
-interface NFTOwnershipCache {
-  [tokenId: number]: NFTCacheEntry;
+interface MetadataCacheEntry {
+  uri: string;
+  metadata: any;
+  timestamp: number;
 }
 
-// Cache globale per evitare chiamate duplicate
-const nftCache = new Map<string, NFTOwnershipCache>();
-const CACHE_TTL = 60 * 60 * 1000; // 1 ora - Increased for better performance
-const METADATA_CACHE_TTL = 2 * 60 * 60 * 1000; // 2 ore per metadata - Increased
+// Cache storage
+const nftCache: Record<number, NFTCacheEntry> = {};
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const METADATA_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 
-// Cache globale per l'ultimo NFT ID valido (per evitare scansioni inutili)
-const lastValidNFTIdCache = new Map<string, number>();
-const LAST_VALID_ID_CACHE_TTL = 2 * 60 * 60 * 1000; // 2 ore - Increased
+// Last valid NFT ID cache
+const lastValidNFTIdCache: Record<string, { id: number; timestamp: number }> =
+  {};
+const LAST_VALID_ID_CACHE_TTL = 2 * 60 * 1000; // 2 minutes
 
-// Hook per gestire la cache NFT
 export function useNFTCache() {
   const { address } = useAccount();
-  const [cacheStats, setCacheStats] = useState({
-    hits: 0,
-    misses: 0,
-    totalCalls: 0,
-  });
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Ottieni cache per un utente specifico
-  const getUserCache = useCallback((userAddress: string): NFTOwnershipCache => {
-    if (!nftCache.has(userAddress)) {
-      nftCache.set(userAddress, {});
+  const getCachedNFT = useCallback((tokenId: number): NFTCacheEntry | null => {
+    const entry = nftCache[tokenId];
+    if (!entry) return null;
+
+    const isExpired = Date.now() - entry.timestamp > CACHE_TTL;
+    if (isExpired) {
+      delete nftCache[tokenId];
+      return null;
     }
-    return nftCache.get(userAddress)!;
+
+    return entry;
   }, []);
 
-  // Ottieni l'ultimo NFT ID valido dalla cache
+  const setCachedNFT = useCallback(
+    (tokenId: number, metadata: any, owner: string) => {
+      nftCache[tokenId] = {
+        tokenId,
+        metadata,
+        owner,
+        timestamp: Date.now(),
+      };
+    },
+    []
+  );
+
+  const getCachedMetadata = useCallback((uri: string): any | null => {
+    const cacheKey = `metadata_${uri}`;
+    const entry = (nftCache as any)[cacheKey] as MetadataCacheEntry;
+    if (!entry) return null;
+
+    const isExpired = Date.now() - entry.timestamp > METADATA_CACHE_TTL;
+    if (isExpired) {
+      delete (nftCache as any)[cacheKey];
+      return null;
+    }
+
+    return entry.metadata;
+  }, []);
+
+  const setCachedMetadata = useCallback((uri: string, metadata: any) => {
+    const cacheKey = `metadata_${uri}`;
+    (nftCache as any)[cacheKey] = {
+      uri,
+      metadata,
+      timestamp: Date.now(),
+    };
+  }, []);
+
   const getLastValidNFTId = useCallback(
     (userAddress: string): number | null => {
-      const cached = lastValidNFTIdCache.get(userAddress);
-      if (!cached) return null;
-
-      const now = Date.now();
-      const isExpired = now - cached > LAST_VALID_ID_CACHE_TTL;
-
-      if (isExpired) {
-        lastValidNFTIdCache.delete(userAddress);
-        return null;
-      }
-
-      return cached;
-    },
-    []
-  );
-
-  // Salva l'ultimo NFT ID valido nella cache
-  const setLastValidNFTId = useCallback(
-    (userAddress: string, tokenId: number) => {
-      lastValidNFTIdCache.set(userAddress, tokenId);
-      console.log(
-        `💾 Cached last valid NFT ID #${tokenId} for ${userAddress.slice(
-          0,
-          6
-        )}...`
-      );
-    },
-    []
-  );
-
-  // Controlla se un NFT è in cache e valido
-  const isNFTInCache = useCallback(
-    (userAddress: string, tokenId: number): boolean => {
-      const userCache = getUserCache(userAddress);
-      const entry = userCache[tokenId];
-
-      if (!entry) return false;
-
-      const now = Date.now();
-      const isExpired = now - entry.lastChecked > CACHE_TTL;
-
-      if (isExpired) {
-        delete userCache[tokenId];
-        return false;
-      }
-
-      return true;
-    },
-    [getUserCache]
-  );
-
-  // Ottieni NFT dalla cache
-  const getNFTFromCache = useCallback(
-    (userAddress: string, tokenId: number): NFTCacheEntry | null => {
-      const userCache = getUserCache(userAddress);
-      const entry = userCache[tokenId];
-
+      const entry = lastValidNFTIdCache[userAddress];
       if (!entry) return null;
 
-      const now = Date.now();
-      const isExpired = now - entry.lastChecked > CACHE_TTL;
-
+      const isExpired = Date.now() - entry.timestamp > LAST_VALID_ID_CACHE_TTL;
       if (isExpired) {
-        delete userCache[tokenId];
+        delete lastValidNFTIdCache[userAddress];
         return null;
       }
 
-      // Aggiorna statistiche cache hit
-      setCacheStats((prev) => ({
-        ...prev,
-        hits: prev.hits + 1,
-        totalCalls: prev.totalCalls + 1,
-      }));
-
-      return entry;
+      return entry.id;
     },
-    [getUserCache]
+    []
   );
 
-  // Salva NFT nella cache
-  const saveNFTToCache = useCallback(
-    (
-      userAddress: string,
-      tokenId: number,
-      owner: string,
-      tokenURI: string,
-      metadata?: any
-    ) => {
-      const userCache = getUserCache(userAddress);
-      const now = Date.now();
-
-      userCache[tokenId] = {
-        tokenId,
-        owner,
-        tokenURI,
-        metadata,
-        timestamp: now,
-        lastChecked: now,
+  const setLastValidNFTId = useCallback(
+    (userAddress: string, tokenId: number) => {
+      lastValidNFTIdCache[userAddress] = {
+        id: tokenId,
+        timestamp: Date.now(),
       };
-
-      // Aggiorna statistiche cache miss
-      setCacheStats((prev) => ({
-        ...prev,
-        misses: prev.misses + 1,
-        totalCalls: prev.totalCalls + 1,
-      }));
-
-      console.log(
-        `💾 Cached NFT #${tokenId} for ${userAddress.slice(0, 6)}...`
-      );
     },
-    [getUserCache]
+    []
   );
 
-  // Controlla se l'utente possiede un NFT (con cache)
-  const checkNFTOwnership = useCallback(
-    async (
-      userAddress: string,
-      tokenId: number
-    ): Promise<{
-      owns: boolean;
-      fromCache: boolean;
-      owner?: string;
-      tokenURI?: string;
-      metadata?: any;
-    }> => {
-      // Controlla cache prima
-      const cached = getNFTFromCache(userAddress, tokenId);
+  const fetchNFTMetadata = useCallback(
+    async (tokenId: number): Promise<any> => {
+      // Check cache first
+      const cached = getCachedNFT(tokenId);
       if (cached) {
-        const owns = cached.owner.toLowerCase() === userAddress.toLowerCase();
-        return {
-          owns,
-          fromCache: true,
-          owner: cached.owner,
-          tokenURI: cached.tokenURI,
-          metadata: cached.metadata,
-        };
-      }
-
-      // Se non in cache, chiama il contratto
-      if (!window.ethereum) {
-        return { owns: false, fromCache: false };
+        return cached.metadata;
       }
 
       try {
-        const provider = new (await import("ethers")).BrowserProvider(
-          window.ethereum
+        const provider = new ethers.JsonRpcProvider(
+          process.env.NEXT_PUBLIC_RPC_URL ||
+            "https://ethereum-sepolia.publicnode.com"
         );
-        const nftContract = new (await import("ethers")).Contract(
+
+        const nftContract = new ethers.Contract(
           contracts.MooveNFT.address,
           contracts.MooveNFT.abi,
           provider
         );
 
-        const owner = await nftContract.ownerOf(tokenId);
+        // Get token URI
         const tokenURI = await nftContract.tokenURI(tokenId);
 
-        const owns = owner.toLowerCase() === userAddress.toLowerCase();
-
-        // Salva in cache
-        saveNFTToCache(userAddress, tokenId, owner, tokenURI);
-
-        return {
-          owns,
-          fromCache: false,
-          owner,
-          tokenURI,
-        };
-      } catch (error) {
-        console.warn(`Failed to check ownership for NFT #${tokenId}:`, error);
-        return { owns: false, fromCache: false };
-      }
-    },
-    [getNFTFromCache, saveNFTToCache]
-  );
-
-  // Ottieni tutti gli NFT posseduti dall'utente (con cache intelligente + early exit)
-  const getUserNFTs = useCallback(
-    async (
-      userAddress: string,
-      maxCheck: number = 1000
-    ): Promise<{
-      nfts: Array<{
-        tokenId: number;
-        owner: string;
-        tokenURI: string;
-        metadata?: any;
-      }>;
-      fromCache: number;
-      fromContract: number;
-    }> => {
-      const userCache = getUserCache(userAddress);
-      const nfts: Array<{
-        tokenId: number;
-        owner: string;
-        tokenURI: string;
-        metadata?: any;
-      }> = [];
-
-      let fromCache = 0;
-      let fromContract = 0;
-      let consecutiveMissing = 0;
-      const maxConsecutiveMissing = 10; // Aumentiamo a 10 per essere più permissivi
-
-      // Prima controlla la cache per NFT noti
-      for (const [tokenIdStr, entry] of Object.entries(userCache)) {
-        const tokenId = parseInt(tokenIdStr);
-        if (tokenId >= maxCheck) continue;
-
-        const now = Date.now();
-        const isExpired = now - entry.lastChecked > CACHE_TTL;
-
-        if (
-          !isExpired &&
-          entry.owner.toLowerCase() === userAddress.toLowerCase()
-        ) {
-          nfts.push({
-            tokenId: entry.tokenId,
-            owner: entry.owner,
-            tokenURI: entry.tokenURI,
-            metadata: entry.metadata,
-          });
-          fromCache++;
+        // Check metadata cache
+        const cachedMetadata = getCachedMetadata(tokenURI);
+        if (cachedMetadata) {
+          return cachedMetadata;
         }
-      }
 
-      // Ottieni l'ultimo NFT ID valido dalla cache
-      const lastValidId = getLastValidNFTId(userAddress);
-      let startFrom = 0;
-      let endAt = maxCheck;
+        // Fetch metadata from IPFS
+        const IPFS_GATEWAY =
+          process.env.NEXT_PUBLIC_IPFS_GATEWAY || "https://ipfs.io/ipfs/";
+        const httpUrl = tokenURI.startsWith("ipfs://")
+          ? `${IPFS_GATEWAY}${tokenURI.slice(7)}`
+          : tokenURI;
 
-      if (lastValidId !== null) {
-        // Se abbiamo un ultimo ID valido, controlla solo da lì in poi
-        startFrom = lastValidId + 1;
-        endAt = Math.min(startFrom + 20, maxCheck); // Controlla solo i prossimi 20 NFT
-        console.log(
-          `🎯 Using cached last valid ID #${lastValidId}, checking from #${startFrom} to #${endAt}`
+        const response = await fetch(httpUrl);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch metadata: ${response.statusText}`);
+        }
+
+        const metadata = await response.json();
+
+        // Cache the metadata
+        setCachedMetadata(tokenURI, metadata);
+
+        return metadata;
+      } catch (err) {
+        console.error(
+          `❌ Error fetching NFT metadata for token ${tokenId}:`,
+          err
         );
-      } else {
-        // Se non abbiamo un ultimo ID valido, controlla i primi NFT
-        endAt = Math.min(100, maxCheck); // Controlla i primi 100 NFT
-        console.log(`🔍 No cached last ID, checking first ${endAt} NFTs...`);
-
-        // DEBUG: Controlla anche l'NFT #61 specifico che sappiamo esistere
-        console.log(`🔍 DEBUG: Checking specific NFT #61...`);
-        const debugResult = await checkNFTOwnership(userAddress, 61);
-        console.log(`🔍 DEBUG: NFT #61 ownership result:`, debugResult);
+        return {
+          name: `NFT #${tokenId}`,
+          description: "NFT metadata temporarily unavailable",
+          image: "/images/default-nft.svg",
+          attributes: [
+            { trait_type: "Category", value: "VEHICLE_DECORATION" },
+            { trait_type: "Rarity", value: "Common" },
+          ],
+        };
       }
-
-      // Controlla i tokenId mancanti con early exit intelligente
-      const checkedTokenIds = new Set(nfts.map((nft) => nft.tokenId));
-      let lastFoundTokenId = -1;
-
-      for (let tokenId = startFrom; tokenId < endAt; tokenId++) {
-        if (checkedTokenIds.has(tokenId)) continue;
-
-        const result = await checkNFTOwnership(userAddress, tokenId);
-
-        if (result.owns) {
-          nfts.push({
-            tokenId,
-            owner: result.owner!,
-            tokenURI: result.tokenURI!,
-            metadata: result.metadata,
-          });
-          consecutiveMissing = 0; // Reset counter
-          lastFoundTokenId = tokenId;
-
-          // Aggiorna l'ultimo NFT ID valido
-          setLastValidNFTId(userAddress, tokenId);
-          console.log(`✅ Found NFT #${tokenId} owned by user`);
-        } else {
-          // Solo se l'NFT non esiste affatto (errore nel contratto), incrementa il counter
-          // Se l'NFT esiste ma non è dell'utente, NON incrementare il counter
-          if (result.fromCache === false && !result.owner) {
-            consecutiveMissing++;
-            console.log(
-              `❌ NFT #${tokenId} does not exist (${consecutiveMissing}/${maxConsecutiveMissing})`
-            );
-          } else {
-            console.log(
-              `❌ NFT #${tokenId} exists but not owned by user (owner: ${result.owner})`
-            );
-            consecutiveMissing = 0; // Reset counter se l'NFT esiste
-          }
-
-          // Early exit solo se troppi NFT consecutivi NON esistono
-          if (consecutiveMissing >= maxConsecutiveMissing) {
-            console.log(
-              `🛑 Early exit: ${consecutiveMissing} consecutive non-existing NFTs after #${tokenId}`
-            );
-            break;
-          }
-        }
-
-        if (result.fromCache) {
-          fromCache++;
-        } else {
-          fromContract++;
-        }
-      }
-
-      console.log(
-        `📊 Cache stats: ${fromCache} from cache, ${fromContract} from contract, last valid ID: ${lastFoundTokenId}`
-      );
-
-      return { nfts, fromCache, fromContract };
     },
-    [getUserCache, checkNFTOwnership, getLastValidNFTId, setLastValidNFTId]
+    [getCachedNFT, getCachedMetadata, setCachedMetadata]
   );
 
-  // Pulisci cache scaduta
-  const cleanExpiredCache = useCallback(() => {
-    const now = Date.now();
-    let cleaned = 0;
-
-    // Pulisci cache NFT
-    for (const [userAddress, userCache] of nftCache.entries()) {
-      for (const [tokenIdStr, entry] of Object.entries(userCache)) {
-        if (now - entry.lastChecked > CACHE_TTL) {
-          delete userCache[parseInt(tokenIdStr)];
-          cleaned++;
-        }
+  const fetchNFT = useCallback(
+    async (tokenId: number): Promise<any> => {
+      // Check cache first
+      const cached = getCachedNFT(tokenId);
+      if (cached) {
+        return cached;
       }
-    }
 
-    // Pulisci cache ultimo NFT ID
-    for (const [userAddress, timestamp] of lastValidNFTIdCache.entries()) {
-      if (now - timestamp > LAST_VALID_ID_CACHE_TTL) {
-        lastValidNFTIdCache.delete(userAddress);
-        cleaned++;
+      try {
+        const provider = new ethers.JsonRpcProvider(
+          process.env.NEXT_PUBLIC_RPC_URL ||
+            "https://ethereum-sepolia.publicnode.com"
+        );
+
+        const nftContract = new ethers.Contract(
+          contracts.MooveNFT.address,
+          contracts.MooveNFT.abi,
+          provider
+        );
+
+        // Get owner
+        const owner = await nftContract.ownerOf(tokenId);
+
+        // Get metadata
+        const metadata = await fetchNFTMetadata(tokenId);
+
+        const nftData = {
+          tokenId,
+          metadata,
+          owner,
+          timestamp: Date.now(),
+        };
+
+        // Cache the NFT data
+        setCachedNFT(tokenId, metadata, owner);
+
+        return nftData;
+      } catch (err) {
+        console.error(`❌ Error fetching NFT ${tokenId}:`, err);
+        throw err;
       }
-    }
+    },
+    [getCachedNFT, setCachedNFT, fetchNFTMetadata]
+  );
 
-    if (cleaned > 0) {
-      console.log(`🧹 Cleaned ${cleaned} expired cache entries`);
-    }
+  const clearCache = useCallback(() => {
+    Object.keys(nftCache).forEach((key) => {
+      delete nftCache[parseInt(key)];
+    });
+    Object.keys(lastValidNFTIdCache).forEach((key) => {
+      delete lastValidNFTIdCache[key];
+    });
   }, []);
 
-  // Pulisci cache ogni 5 minuti
-  useEffect(() => {
-    const interval = setInterval(cleanExpiredCache, 5 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [cleanExpiredCache]);
-
-  // Ottieni statistiche cache
   const getCacheStats = useCallback(() => {
-    const totalEntries = Array.from(nftCache.values()).reduce(
-      (sum, userCache) => sum + Object.keys(userCache).length,
-      0
-    );
+    const now = Date.now();
+    const validNFTs = Object.values(nftCache).filter(
+      (entry) => now - entry.timestamp <= CACHE_TTL
+    ).length;
 
-    const hitRate =
-      cacheStats.totalCalls > 0
-        ? ((cacheStats.hits / cacheStats.totalCalls) * 100).toFixed(1)
-        : "0";
+    const validMetadata = Object.keys(nftCache).filter(
+      (key) =>
+        key.startsWith("metadata_") &&
+        now - (nftCache as any)[key].timestamp <= METADATA_CACHE_TTL
+    ).length;
 
     return {
-      ...cacheStats,
-      totalEntries,
-      hitRate: `${hitRate}%`,
+      total: Object.keys(nftCache).length,
+      validNFTs,
+      validMetadata,
+      lastValidIds: Object.keys(lastValidNFTIdCache).length,
     };
-  }, [cacheStats]);
+  }, []);
 
   return {
-    checkNFTOwnership,
-    getUserNFTs,
-    isNFTInCache,
-    getNFTFromCache,
-    saveNFTToCache,
-    cleanExpiredCache,
+    getCachedNFT,
+    setCachedNFT,
+    getCachedMetadata,
+    setCachedMetadata,
+    getLastValidNFTId,
+    setLastValidNFTId,
+    fetchNFTMetadata,
+    fetchNFT,
+    clearCache,
     getCacheStats,
+    isLoading,
+    error,
   };
 }

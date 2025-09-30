@@ -4,8 +4,8 @@ import React from "react";
 import { motion } from "framer-motion";
 import AuctionGrid from "@/components/auctions/AuctionGrid";
 import { AuctionType } from "@/types/auction";
-import { useAuctionsEnhanced as useAuctions } from "@/hooks/enhanced-auction-utils";
-import { useAuctionExtensionEvents } from "@/hooks/useAuctionExtensionEvents";
+import { useIncrementalAuctions } from "@/hooks/useIncrementalAuctions";
+import { useAutomaticAuctionMonitor } from "@/hooks/useAutomaticAuctionMonitor";
 
 // ============= TYPES =============
 
@@ -364,20 +364,72 @@ function FilterBar({
 
 // ============= MAIN COMPONENT =============
 export default function AuctionsPage() {
-  const {
-    auctions,
-    activeAuctions,
-    endedAuctions,
-    stats,
-    filters,
-    setFilters,
-    isLoading,
-    error,
-    isMasterAdmin,
-    canMint,
-    refetch,
-    refreshAuctionCache,
-  } = useAuctions();
+  const { auctions, isLoading, error, refetch } = useIncrementalAuctions();
+
+  // Enable automatic auction monitoring
+  useAutomaticAuctionMonitor();
+
+  // Convert AuctionData to Auction type for compatibility
+  const convertedAuctions = auctions.map((auction) => ({
+    auctionId: auction.auctionId,
+    nftId: auction.nftId,
+    nftName: auction.nftName,
+    nftImage: auction.nftImage,
+    nftCategory: auction.nftCategory,
+    seller: auction.seller,
+    auctionType: auction.auctionType,
+    status: auction.status,
+    startPrice: auction.startPrice,
+    reservePrice: auction.reservePrice || "0",
+    buyNowPrice: "0", // Not available in AuctionData
+    currentBid: auction.currentBid,
+    highestBidder: auction.highestBidder,
+    bidCount: auction.bidCount,
+    startTime: new Date(auction.startTime),
+    endTime: new Date(auction.endTime),
+    bidIncrement: auction.bidIncrement || "0.001",
+    currency: "ETH",
+    attributes: {},
+    isSettled: auction.isSettled,
+  }));
+
+  // Filter auctions
+  const activeAuctions = convertedAuctions.filter(
+    (auction) => auction.status === 1
+  );
+  const endedAuctions = convertedAuctions.filter(
+    (auction) => auction.status === 3
+  );
+
+  // Calculate stats
+  const stats = {
+    activeAuctions: activeAuctions.length,
+    endedAuctions: endedAuctions.length,
+    totalBids: convertedAuctions.reduce(
+      (sum, auction) => sum + auction.bidCount,
+      0
+    ),
+    totalVolume: convertedAuctions.reduce(
+      (sum, auction) => sum + parseFloat(auction.currentBid),
+      0
+    ),
+    totalAuctions: convertedAuctions.length,
+  };
+
+  // Filter state
+  const [filters, setFilters] = React.useState<FilterOptions>({
+    type: "all",
+    status: "all",
+    category: "all",
+    priceRange: { min: 0, max: 1000 },
+    sortBy: "time",
+    sortOrder: "desc",
+  });
+
+  const handleRefreshAuctionCache = async (auctionId: number) => {
+    console.log(`🔄 Refreshing auction ${auctionId} cache...`);
+    await refetch();
+  };
 
   // Show loading state
   if (isLoading) {
@@ -451,7 +503,7 @@ export default function AuctionsPage() {
               <AuctionGrid
                 auctions={activeAuctions}
                 onRefresh={refetch}
-                refreshAuctionCache={refreshAuctionCache}
+                refreshAuctionCache={handleRefreshAuctionCache}
               />
             </>
           ) : (

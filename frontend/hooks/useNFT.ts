@@ -100,8 +100,7 @@ export function useNFTDetails(tokenId: number): {
 }
 
 export function usePurchaseNFT() {
-  const { writeMooveNFT, isPending, isConfirming, isSuccess, error } =
-    useWriteMooveNFT();
+  const { writeMooveNFT, isPending, isSuccess, error } = useWriteMooveNFT();
 
   const purchaseNFT = (tokenId: number, price: bigint) => {
     writeMooveNFT("purchaseNFT", [tokenId], price);
@@ -110,15 +109,13 @@ export function usePurchaseNFT() {
   return {
     purchaseNFT,
     isPending,
-    isConfirming,
     isSuccess,
     error,
   };
 }
 
 export function useSetForSale() {
-  const { writeMooveNFT, isPending, isConfirming, isSuccess, error } =
-    useWriteMooveNFT();
+  const { writeMooveNFT, isPending, isSuccess, error } = useWriteMooveNFT();
 
   const setForSale = (tokenId: number, price: bigint) => {
     writeMooveNFT("setForSale", [tokenId, price]);
@@ -127,15 +124,13 @@ export function useSetForSale() {
   return {
     setForSale,
     isPending,
-    isConfirming,
     isSuccess,
     error,
   };
 }
 
 export function useRemoveFromSale() {
-  const { writeMooveNFT, isPending, isConfirming, isSuccess, error } =
-    useWriteMooveNFT();
+  const { writeMooveNFT, isPending, isSuccess, error } = useWriteMooveNFT();
 
   const removeFromSale = (tokenId: number) => {
     writeMooveNFT("removeFromSale", [tokenId]);
@@ -144,7 +139,6 @@ export function useRemoveFromSale() {
   return {
     removeFromSale,
     isPending,
-    isConfirming,
     isSuccess,
     error,
   };

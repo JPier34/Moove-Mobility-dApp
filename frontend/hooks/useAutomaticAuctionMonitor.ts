@@ -1,8 +1,9 @@
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useState } from "react";
 import { useAccount } from "wagmi";
 import { ethers } from "ethers";
 import { contracts } from "@/utils/contracts";
 import { useAuctionNotificationTriggers } from "./useUnifiedAuctionNotifications";
+// Removed contract data validation - contract works correctly
 
 /**
  * Hook per monitoraggio automatico di TUTTE le aste
@@ -11,7 +12,13 @@ import { useAuctionNotificationTriggers } from "./useUnifiedAuctionNotifications
  */
 export function useAutomaticAuctionMonitor() {
   const { address, isConnected } = useAccount();
-  const { notifyAuctionFailed } = useAuctionNotificationTriggers();
+  const { notifyAuctionFailed, notifyAuctionDeserted } =
+    useAuctionNotificationTriggers();
+
+  // Track processed auctions to prevent multiple calls
+  const [processedAuctions, setProcessedAuctions] = useState<Set<number>>(
+    new Set()
+  );
 
   const checkAndSettleExpiredAuctions = useCallback(async () => {
     if (!isConnected || !address) return;
@@ -60,22 +67,48 @@ export function useAutomaticAuctionMonitor() {
       for (let i = 0; i < totalAuctions; i++) {
         try {
           const auction = await auctionContract.getAuction(i);
+
           const auctionType = Number(auction.auctionType);
           const status = Number(auction.status);
           const endTime = Number(auction.endTime);
           const isSettled = auction.isSettled;
 
           // Check if auction is expired and not settled
-          if (status === 1 && currentTime >= endTime && !isSettled) {
-            console.log(
-              `⏰ Auction ${i} expired (Type: ${auctionType}), starting automatic settlement...`
-            );
+          // Also handle auctions with invalid endTime (like test values in year 2286)
+          const isInvalidEndTime = endTime > 2000000000; // Year 2033+ is suspicious
+          const isExpired = status === 1 && currentTime >= endTime;
+          const shouldForceSettle =
+            isInvalidEndTime && !isSettled && status === 0; // Force settle invalid auctions with status 0
+
+          // Skip if already processed or already settled
+          if (processedAuctions.has(i) || isSettled) {
+            if (isSettled) {
+              console.log(`⏭️ Auction ${i} already settled, skipping`);
+            }
+            continue;
+          }
+
+          if ((isExpired || shouldForceSettle) && !isSettled) {
+            if (shouldForceSettle) {
+              console.log(
+                `🔧 Auction ${i} has invalid endTime (${new Date(
+                  endTime * 1000
+                ).toISOString()}), forcing settlement...`
+              );
+            } else {
+              console.log(
+                `⏰ Auction ${i} expired (Type: ${auctionType}), starting automatic settlement...`
+              );
+            }
 
             // Call settleAuction() to determine winner and settle
             const signer = await provider.getSigner();
             const auctionContractWithSigner = auctionContract.connect(signer);
 
             try {
+              // Mark as processed to prevent multiple calls
+              setProcessedAuctions((prev) => new Set([...prev, i]));
+
               // Step 1: Settle the auction (determine winner, transfer NFT)
               console.log(
                 `🔄 Step 1: Calling settleAuction() for auction ${i}...`
@@ -89,6 +122,26 @@ export function useAutomaticAuctionMonitor() {
 
               await settleTx.wait();
               console.log(`✅ Auction ${i} settled successfully`);
+
+              // Check if the auction was deserted (no valid winner)
+              const settledAuction = await auctionContract.getAuction(i);
+              const hasValidWinner =
+                settledAuction.highestBidder &&
+                settledAuction.highestBidder !==
+                  "0x0000000000000000000000000000000000000000" &&
+                settledAuction.highestBidder !==
+                  "0x000000000000000000000000000000E8D4A51000" &&
+                settledAuction.highestBidder !==
+                  "0x0000000000000000000000000000000000000001";
+
+              if (!hasValidWinner) {
+                console.log(`🏠 Auction ${i} was deserted - no valid winner`);
+                // Notify the seller/admin that their NFT was returned
+                const seller = settledAuction.seller;
+                if (seller && seller.toLowerCase() === address.toLowerCase()) {
+                  notifyAuctionDeserted(i.toString());
+                }
+              }
 
               // Step 2: Process refunds for losing bidders (except Dutch auctions)
               if (auctionType !== 1) {
@@ -161,25 +214,25 @@ export function useAutomaticAuctionMonitor() {
     } catch (error) {
       console.error("❌ Error in auction monitoring:", error);
     }
-  }, [isConnected, address]);
+  }, [isConnected, address, notifyAuctionFailed, processedAuctions]);
 
-  // Monitor every 30 seconds
-  useEffect(() => {
-    if (!isConnected) return;
+  // DISABLED: Monitor every 30 seconds - causing recursive calls
+  // useEffect(() => {
+  //   if (!isConnected) return;
 
-    console.log("🔄 Starting automatic auction monitoring...");
+  //   console.log("🔄 Starting automatic auction monitoring...");
 
-    // Check immediately
-    checkAndSettleExpiredAuctions();
+  //   // Check immediately
+  //   checkAndSettleExpiredAuctions();
 
-    // Then check every 30 seconds
-    const interval = setInterval(checkAndSettleExpiredAuctions, 30000);
+  //   // Then check every 30 seconds
+  //   const interval = setInterval(checkAndSettleExpiredAuctions, 30000);
 
-    return () => {
-      console.log("🛑 Stopping automatic auction monitoring...");
-      clearInterval(interval);
-    };
-  }, [isConnected, checkAndSettleExpiredAuctions]);
+  //   return () => {
+  //     console.log("🛑 Stopping automatic auction monitoring...");
+  //     clearInterval(interval);
+  //   };
+  // }, [isConnected, checkAndSettleExpiredAuctions]);
 
   return {
     checkAndSettleExpiredAuctions,

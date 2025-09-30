@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { getAuctionStatusDebug } from "@/hooks/enhanced-auction-utils";
+import { analyzeAuctionForClaim } from "@/utils/auctionDebug";
 
 interface AuctionStatusDebugProps {
   auctionId: number;
@@ -12,7 +12,7 @@ export function AuctionStatusDebug({ auctionId }: AuctionStatusDebugProps) {
 
   useEffect(() => {
     const checkAuctionStatus = async () => {
-      const info = getAuctionStatusDebug(auctionId);
+      const info = await analyzeAuctionForClaim(auctionId, "");
       setDebugInfo(info);
     };
 

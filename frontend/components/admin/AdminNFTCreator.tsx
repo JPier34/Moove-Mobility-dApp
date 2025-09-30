@@ -386,35 +386,34 @@ function AdminNFTCreatorContent() {
       }
 
       console.log("📤 Uploading image to IPFS...");
-      const ipfsResult = await uploadNFT(nftData.image, {
+      const ipfsResult = await uploadNFT({
         name: nftData.name,
         description: nftData.description,
-        rarity: nftData.rarity,
-        isLimitedEdition: nftData.isLimitedEdition,
-        editionSize: parseInt(nftData.editionSize) || 1,
-        editionNumber: 1,
-        customizationOptions: {
-          ...nftData.customizationOptions,
-          maxTextLength:
-            parseInt(nftData.customizationOptions.maxTextLength) || 100,
+        image: URL.createObjectURL(nftData.image),
+        properties: {
+          rarity: nftData.rarity,
+          category: "VEHICLE_DECORATION",
         },
-        creator: address || "",
+        attributes: [
+          { trait_type: "Rarity", value: nftData.rarity },
+          { trait_type: "Category", value: "VEHICLE_DECORATION" },
+        ],
       });
 
-      if (!ipfsResult.imageUrl) {
-        console.error("❌ IPFS upload failed:", ipfsResult);
-        toast.error("Failed to upload image to IPFS");
+      if (!ipfsResult) {
+        console.error("❌ IPFS upload failed");
+        toast.error("Failed to upload metadata to IPFS");
         return;
       }
 
-      console.log("✅ Image uploaded to IPFS:", ipfsResult.imageUrl);
+      console.log("✅ Metadata uploaded to IPFS:", ipfsResult);
       console.log("📝 Creating NFT metadata...");
 
       // Create NFT metadata
       const nftMetadata = {
         name: nftData.name,
         description: nftData.description,
-        image: ipfsResult.imageUrl,
+        image: ipfsResult,
         external_url: `https://moove-mobility.com/nft/${Date.now()}`,
         attributes: [
           { trait_type: "Rarity", value: nftData.rarity },
@@ -826,13 +825,13 @@ function AdminNFTCreatorContent() {
           id: `nft_${Date.now()}`,
           nftName: nftData.name,
           nftDescription: nftData.description,
-          nftImage: ipfsResult.imageUrl,
+          nftImage: ipfsResult,
           tokenId: secureResult.nft.tokenId.toString(),
           transactionHash: secureResult.nft.transactionHash,
           creationDate: new Date().toISOString(),
           auctionId: secureResult.auction.auctionId.toString(),
           status: "confirmed",
-          ipfsHash: ipfsResult.imageUrl,
+          ipfsHash: ipfsResult,
         };
 
         localStorage.setItem(

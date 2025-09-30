@@ -217,43 +217,91 @@ export function useWonAuctions(): UseWonAuctionsReturn {
         ? `${IPFS_GATEWAY}${tokenURI.slice(7)}`
         : tokenURI;
 
-      const response = await fetch(httpUrl);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch metadata: ${response.statusText}`);
-      }
+      try {
+        const response = await fetch(httpUrl);
+        if (!response.ok) {
+          console.warn(
+            `⚠️ Failed to fetch metadata from IPFS: ${response.statusText}`
+          );
+          // Return fallback metadata instead of throwing error
+          return {
+            name: `NFT #${tokenId}`,
+            description: `A unique NFT with token ID ${tokenId}`,
+            image: "/images/default-nft.svg",
+            attributes: [
+              {
+                trait_type: "Category",
+                value: "VEHICLE_DECORATION",
+              },
+              {
+                trait_type: "Rarity",
+                value: "Common",
+              },
+            ],
+            properties: {
+              category: "sticker",
+              rarity: "common",
+            },
+          };
+        }
 
-      const ipfsMetadata = await response.json();
+        const ipfsMetadata = await response.json();
 
-      // Convert image IPFS URL if needed
-      let imageUrl = ipfsMetadata.image || "/images/default-nft.svg";
-      if (imageUrl.startsWith("ipfs://")) {
-        imageUrl = `${IPFS_GATEWAY}${imageUrl.slice(7)}`;
-      }
+        // Convert image IPFS URL if needed
+        let imageUrl = ipfsMetadata.image || "/images/default-nft.svg";
+        if (imageUrl.startsWith("ipfs://")) {
+          imageUrl = `${IPFS_GATEWAY}${imageUrl.slice(7)}`;
+        }
 
-      return {
-        name: ipfsMetadata.name || `NFT #${tokenId}`,
-        description:
-          ipfsMetadata.description || `A unique NFT with token ID ${tokenId}`,
-        image: imageUrl,
-        attributes: ipfsMetadata.attributes || [
-          {
-            trait_type: "Token ID",
-            value: tokenId.toString(),
+        return {
+          name: ipfsMetadata.name || `NFT #${tokenId}`,
+          description:
+            ipfsMetadata.description || `A unique NFT with token ID ${tokenId}`,
+          image: imageUrl,
+          attributes: ipfsMetadata.attributes || [
+            {
+              trait_type: "Token ID",
+              value: tokenId.toString(),
+            },
+            {
+              trait_type: "Type",
+              value: "Genesis Collection",
+            },
+          ],
+          properties: ipfsMetadata.properties || {
+            tokenId: tokenId.toString(),
+            collection: "Genesis",
           },
-          {
-            trait_type: "Type",
-            value: "Genesis Collection",
+          collection: ipfsMetadata.collection || {
+            name: "Genesis Collection",
+            description: "The original collection of Moove NFTs",
           },
-        ],
-        properties: ipfsMetadata.properties || {
-          tokenId: tokenId.toString(),
-          collection: "Genesis",
-        },
-        collection: ipfsMetadata.collection || {
-          name: "Genesis Collection",
-          description: "The original collection of Moove NFTs",
-        },
-      };
+        };
+      } catch (error) {
+        console.error(
+          `❌ Failed to fetch metadata for NFT #${tokenId}:`,
+          error
+        );
+        return {
+          name: `NFT #${tokenId}`,
+          description: `A unique NFT with token ID ${tokenId}`,
+          image: "/images/default-nft.svg",
+          attributes: [
+            {
+              trait_type: "Token ID",
+              value: tokenId.toString(),
+            },
+            {
+              trait_type: "Type",
+              value: "Genesis Collection",
+            },
+          ],
+          collection: {
+            name: "Genesis Collection",
+            description: "The original collection of Moove NFTs",
+          },
+        };
+      }
     } catch (error) {
       console.error(`❌ Failed to fetch metadata for NFT #${tokenId}:`, error);
       return {

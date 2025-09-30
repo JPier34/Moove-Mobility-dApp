@@ -107,7 +107,7 @@ export function useCurrentDutchPrice(auctionId: number) {
 // Note: useCreateAuction removed - use useSecureNFTAuctionFlow instead
 
 export function usePlaceBid() {
-  const { writeMooveAuction, isPending, isConfirming, isSuccess, error } =
+  const { writeMooveAuction, isPending, isSuccess, error, hash } =
     useWriteMooveAuction();
 
   const placeBid = (auctionId: number, bidAmount: bigint) => {
@@ -115,7 +115,6 @@ export function usePlaceBid() {
       auctionId,
       bidAmount: bidAmount.toString(),
       isPending,
-      isConfirming,
       isSuccess,
     });
     writeMooveAuction("placeBid", [auctionId], bidAmount);
@@ -124,14 +123,14 @@ export function usePlaceBid() {
   return {
     placeBid,
     isPending,
-    isConfirming,
     isSuccess,
     error,
+    hash,
   };
 }
 
 export function useEndAuction() {
-  const { writeMooveAuction, isPending, isConfirming, isSuccess, error } =
+  const { writeMooveAuction, isPending, isSuccess, error, hash } =
     useWriteMooveAuction();
 
   const endAuction = (auctionId: number) => {
@@ -141,14 +140,14 @@ export function useEndAuction() {
   return {
     endAuction,
     isPending,
-    isConfirming,
     isSuccess,
     error,
+    hash,
   };
 }
 
 export function useClaimNFT() {
-  const { writeMooveAuction, isPending, isConfirming, isSuccess, error } =
+  const { writeMooveAuction, isPending, isSuccess, error, hash } =
     useWriteMooveAuction();
 
   const claimNFT = (auctionId: number) => {
@@ -158,9 +157,9 @@ export function useClaimNFT() {
   return {
     claimNFT,
     isPending,
-    isConfirming,
     isSuccess,
     error,
+    hash,
   };
 }
 
@@ -169,7 +168,7 @@ export function useClaimNFT() {
 // ============================================================================
 
 export function useBuyNowDutch() {
-  const { writeMooveAuction, isPending, isConfirming, isSuccess, error } =
+  const { writeMooveAuction, isPending, isSuccess, error, hash } =
     useWriteMooveAuction();
 
   const buyNowDutch = (auctionId: number, value: bigint) => {
@@ -179,14 +178,14 @@ export function useBuyNowDutch() {
   return {
     buyNowDutch,
     isPending,
-    isConfirming,
     isSuccess,
     error,
+    hash,
   };
 }
 
 export function useStartRevealPhase() {
-  const { writeMooveAuction, isPending, isConfirming, isSuccess, error } =
+  const { writeMooveAuction, isPending, isSuccess, error, hash } =
     useWriteMooveAuction();
 
   const startRevealPhase = (auctionId: number) => {
@@ -196,14 +195,14 @@ export function useStartRevealPhase() {
   return {
     startRevealPhase,
     isPending,
-    isConfirming,
     isSuccess,
     error,
+    hash,
   };
 }
 
 export function useRefundRemainingBidders() {
-  const { writeMooveAuction, isPending, isConfirming, isSuccess, error } =
+  const { writeMooveAuction, isPending, isSuccess, error, hash } =
     useWriteMooveAuction();
 
   const refundRemainingBidders = (
@@ -221,9 +220,9 @@ export function useRefundRemainingBidders() {
   return {
     refundRemainingBidders,
     isPending,
-    isConfirming,
     isSuccess,
     error,
+    hash,
   };
 }
 

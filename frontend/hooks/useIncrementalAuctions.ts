@@ -133,13 +133,35 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
                   auctionData.seller ||
                   "0x0000000000000000000000000000000000000000",
                 endTime: auctionData.endTime
-                  ? new Date(Number(auctionData.endTime) * 1000).toISOString()
+                  ? (() => {
+                      const endTimeUnix = Number(auctionData.endTime);
+                      // Validate endTime - if it's corrupted (year 2033+), use current time
+                      if (endTimeUnix > 0 && endTimeUnix < 2000000000) {
+                        return new Date(endTimeUnix * 1000).toISOString();
+                      } else {
+                        console.warn(
+                          `⚠️ Auction ${i} has corrupted endTime: ${endTimeUnix}, using current time`
+                        );
+                        return new Date().toISOString();
+                      }
+                    })()
                   : new Date().toISOString(),
                 bidCount: Number(auctionData.totalBidders || 0),
                 auctionType: Number(auctionData.auctionType || 0),
                 isSettled: auctionData.isSettled || false,
                 startTime: auctionData.startTime
-                  ? new Date(Number(auctionData.startTime) * 1000).toISOString()
+                  ? (() => {
+                      const startTimeUnix = Number(auctionData.startTime);
+                      // Validate startTime - if it's corrupted (year 2033+), use current time
+                      if (startTimeUnix > 0 && startTimeUnix < 2000000000) {
+                        return new Date(startTimeUnix * 1000).toISOString();
+                      } else {
+                        console.warn(
+                          `⚠️ Auction ${i} has corrupted startTime: ${startTimeUnix}, using current time`
+                        );
+                        return new Date().toISOString();
+                      }
+                    })()
                   : new Date().toISOString(),
                 reservePrice: auctionData.reservePrice
                   ? ethers.formatEther(auctionData.reservePrice)
@@ -195,13 +217,35 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
                   auctionData.seller ||
                   "0x0000000000000000000000000000000000000000",
                 endTime: auctionData.endTime
-                  ? new Date(Number(auctionData.endTime) * 1000).toISOString()
+                  ? (() => {
+                      const endTimeUnix = Number(auctionData.endTime);
+                      // Validate endTime - if it's corrupted (year 2033+), use current time
+                      if (endTimeUnix > 0 && endTimeUnix < 2000000000) {
+                        return new Date(endTimeUnix * 1000).toISOString();
+                      } else {
+                        console.warn(
+                          `⚠️ Auction ${i} has corrupted endTime: ${endTimeUnix}, using current time`
+                        );
+                        return new Date().toISOString();
+                      }
+                    })()
                   : new Date().toISOString(),
                 bidCount: Number(auctionData.totalBidders || 0),
                 auctionType: Number(auctionData.auctionType || 0),
                 isSettled: auctionData.isSettled || false,
                 startTime: auctionData.startTime
-                  ? new Date(Number(auctionData.startTime) * 1000).toISOString()
+                  ? (() => {
+                      const startTimeUnix = Number(auctionData.startTime);
+                      // Validate startTime - if it's corrupted (year 2033+), use current time
+                      if (startTimeUnix > 0 && startTimeUnix < 2000000000) {
+                        return new Date(startTimeUnix * 1000).toISOString();
+                      } else {
+                        console.warn(
+                          `⚠️ Auction ${i} has corrupted startTime: ${startTimeUnix}, using current time`
+                        );
+                        return new Date().toISOString();
+                      }
+                    })()
                   : new Date().toISOString(),
                 reservePrice: auctionData.reservePrice
                   ? ethers.formatEther(auctionData.reservePrice)

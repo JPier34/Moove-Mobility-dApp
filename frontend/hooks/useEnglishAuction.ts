@@ -1,76 +1,47 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useAccount } from "wagmi";
-import { usePlaceBid } from "./useAuction";
-import { parseEther, formatEther } from "viem";
-import { useExtendAuction } from "./useExtendAuction";
-import { useAuctionNotificationTriggers } from "./useUnifiedAuctionNotifications";
+import { ethers } from "ethers";
+import { useWriteMooveAuction } from "./useContract";
+import { useAuctionEventListening } from "./useAuctionEventListening";
+import { useAuctionStateVerification } from "./useAuctionStateVerification";
+import { useUnifiedAuctionNotifications } from "./useUnifiedAuctionNotifications";
 
-export interface EnglishAuctionHandler {
-  placeBid: (
-    auctionId: number,
-    bidAmount: string,
-    auctionData?: {
-      startPrice: string;
-      currentBid: string;
-      bidIncrement: string;
-      endTime?: string; // Add endTime for extension logic
-      extensionThresholdMinutes?: number; // Configurable threshold
-      extensionDurationMinutes?: number; // Configurable duration
-    }
-  ) => Promise<boolean>;
-  buyNow: (auctionId: number, buyNowPrice: string) => Promise<boolean>;
-  isProcessing: boolean;
-  error: string | null;
-  step: "idle" | "bidding" | "buying" | "success" | "error";
+interface PendingBid {
+  auctionId: number;
+  bidder: string;
+  amount: string;
+  timestamp: number;
+  timeoutRef: { current: NodeJS.Timeout | null };
 }
 
-export function useEnglishAuction(): EnglishAuctionHandler {
+export function useEnglishAuction(auctionId?: number) {
   const { address, isConnected } = useAccount();
+  const { writeMooveAuction } = useWriteMooveAuction();
+  const { verifyAuctionStateWithRetry } = useAuctionStateVerification();
+  const { notifyAuctionFailed, notifyAuctionSuccess, notifyEnglishWin } =
+    useUnifiedAuctionNotifications();
+
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<
-    "idle" | "bidding" | "buying" | "success" | "error"
+    "idle" | "bidding" | "confirming" | "buying"
   >("idle");
 
-  const {
-    placeBid,
-    isPending: isBidding,
-    isConfirming,
-    isSuccess,
-    error: bidError,
-  } = usePlaceBid();
-  const { notifyEnglishWin, notifyAuctionFailed } =
-    useAuctionNotificationTriggers();
-  // Auto-extension is now handled by smart contract - no manual extension needed
+  // Track pending bids to avoid duplicate processing
+  const pendingBids = useRef<Map<number, PendingBid>>(new Map());
 
-  // Default extension settings (can be overridden)
-  const DEFAULT_EXTENSION_THRESHOLD_MINUTES = 5;
-  const DEFAULT_EXTENSION_DURATION_MINUTES = 10;
-
+  // Handle bid placement with validation
   const placeBidWithValidation = useCallback(
-    async (
-      auctionId: number,
-      bidAmount: string,
-      auctionData?: {
-        startPrice: string;
-        currentBid: string;
-        bidIncrement: string;
-        endTime?: string;
-        extensionThresholdMinutes?: number;
-        extensionDurationMinutes?: number;
-      }
-    ): Promise<boolean> => {
+    async (auctionId: number, bidAmount: string) => {
       if (!isConnected || !address) {
-        setError("Wallet not connected");
-        setStep("error");
-        notifyAuctionFailed(auctionId.toString(), "Wallet not connected");
+        setError("Please connect your wallet");
         return false;
       }
 
       if (isProcessing) {
-        console.warn("English auction already in progress");
+        setError("Transaction already in progress");
         return false;
       }
 
@@ -79,130 +50,84 @@ export function useEnglishAuction(): EnglishAuctionHandler {
       setStep("bidding");
 
       try {
-        // Validate bid amount
-        const bidAmountWei = parseEther(bidAmount);
-        if (bidAmountWei <= 0n) {
-          throw new Error("Bid amount must be greater than 0");
-        }
-
-        // Additional validation if auction data is provided
-        if (auctionData) {
-          const startPriceWei = parseEther(auctionData.startPrice);
-          const currentBidWei = parseEther(auctionData.currentBid);
-          const bidIncrementWei = parseEther(auctionData.bidIncrement);
-
-          // Check if bid is at least the start price (for first bid)
-          if (currentBidWei === 0n && bidAmountWei < startPriceWei) {
-            throw new Error(
-              `Bid must be at least the start price of ${auctionData.startPrice} ETH`
-            );
-          }
-
-          // Check if bid is higher than current bid (for subsequent bids)
-          if (currentBidWei > 0n) {
-            if (bidAmountWei <= currentBidWei) {
-              throw new Error(
-                `Bid must be higher than current bid of ${formatEther(
-                  currentBidWei
-                )} ETH`
-              );
-            }
-          }
-        }
-
         console.log(
-          `🏆 Placing bid for English auction ${auctionId}: ${bidAmount} ETH`
+          `🎯 Starting bid for auction ${auctionId} with amount ${bidAmount} ETH`
         );
 
-        // Check if we need to extend the auction (English auction specific)
-        let shouldExtend = false;
-        const extensionThreshold =
-          auctionData?.extensionThresholdMinutes ||
-          DEFAULT_EXTENSION_THRESHOLD_MINUTES;
-        const extensionDuration =
-          auctionData?.extensionDurationMinutes ||
-          DEFAULT_EXTENSION_DURATION_MINUTES;
-
-        if (auctionData?.endTime) {
-          const currentTime = Math.floor(Date.now() / 1000);
-          const endTime = parseInt(auctionData.endTime);
-          const timeUntilEnd = endTime - currentTime;
-          const thresholdSeconds = extensionThreshold * 60;
-
-          if (timeUntilEnd > 0 && timeUntilEnd <= thresholdSeconds) {
-            shouldExtend = true;
-            console.log(
-              `⏰ Bid placed in last ${extensionThreshold} minutes (${Math.floor(
-                timeUntilEnd / 60
-              )}m ${
-                timeUntilEnd % 60
-              }s remaining) - will extend auction by ${extensionDuration} minutes`
-            );
-          }
-        }
-
-        // Place the bid first
-        await new Promise<void>((resolve, reject) => {
-          const timeout = setTimeout(() => {
-            reject(new Error("Bid transaction timeout"));
-          }, 30000); // 30 second timeout
-
-          console.log("🚀 Calling placeBid - waiting for MetaMask...");
-          placeBid(auctionId, bidAmountWei);
-
-          // Listen for success/error - wait for actual transaction confirmation
-          const checkStatus = () => {
-            console.log("🔍 Checking bid status:", {
-              bidError: !!bidError,
-              isBidding,
-              isConfirming,
-              isSuccess,
-              error: bidError?.message,
-            });
-
-            if (bidError) {
-              clearTimeout(timeout);
-              console.error("❌ Bid failed with error:", bidError);
-              reject(new Error(`Bid failed: ${bidError}`));
-            } else if (isSuccess) {
-              clearTimeout(timeout);
-              console.log("✅ Bid transaction confirmed on blockchain!");
-              resolve();
-            } else if (!isBidding && !isConfirming) {
-              // If not bidding and not confirming, but no success, it might be a silent failure
-              clearTimeout(timeout);
-              console.warn("⚠️ Bid completed but no success confirmation");
-              reject(
-                new Error("Bid completed but transaction may have failed")
-              );
-            } else {
-              // Still processing - check again in 1 second
-              setTimeout(checkStatus, 1000);
-            }
-          };
-
-          setTimeout(checkStatus, 1000);
+        // Track this bid
+        const timeoutRef = { current: null as NodeJS.Timeout | null };
+        pendingBids.current.set(auctionId, {
+          auctionId,
+          bidder: address,
+          amount: bidAmount,
+          timestamp: Date.now(),
+          timeoutRef,
         });
 
-        console.log("✅ Bid placed successfully");
+        // Call the placeBid function using writeMooveAuction
+        // Convert ETH amount to wei using parseEther
+        const bidAmountWei = ethers.parseEther(bidAmount);
+        writeMooveAuction("placeBid", [auctionId], bidAmountWei);
+        setStep("confirming");
 
-        // Success handled by notification system
-        if (shouldExtend) {
+        // Wait for confirmation with timeout
+        const timeout = setTimeout(async () => {
           console.log(
-            `⏰ Bid placed in last ${extensionThreshold} minutes - smart contract will auto-extend`
+            `⏰ Bid timeout reached for auction ${auctionId}, verifying state...`
           );
-        } else {
-          console.log(`Bid of ${bidAmount} ETH placed successfully!`);
-        }
 
-        setStep("success");
+          try {
+            const verified = await verifyAuctionStateWithRetry(
+              auctionId,
+              address || "",
+              BigInt(0),
+              3,
+              2000
+            );
+            if (verified) {
+              console.log(`✅ Bid verified for auction ${auctionId}`);
+              notifyAuctionSuccess(
+                auctionId.toString(),
+                `Bid of ${bidAmount} ETH placed successfully!`
+              );
+            } else {
+              console.log(
+                `❌ Bid verification failed for auction ${auctionId}`
+              );
+              notifyAuctionFailed(
+                auctionId.toString(),
+                "Bid completed but verification failed"
+              );
+            }
+          } catch (error) {
+            console.error(
+              `❌ Bid verification error for auction ${auctionId}:`,
+              error
+            );
+            notifyAuctionFailed(
+              auctionId.toString(),
+              "Bid completed but verification failed"
+            );
+          }
+        }, 45000); // 45 second timeout
+
+        timeoutRef.current = timeout;
+
         return true;
-      } catch (error) {
-        console.error("❌ English auction bid failed:", error);
-        const errorMessage =
-          error instanceof Error ? error.message : "Unknown error";
+      } catch (error: any) {
+        console.error(`❌ Bid failed for auction ${auctionId}:`, error);
+
+        const errorMessage = error?.message || "Bid failed";
         setError(errorMessage);
-        setStep("error");
+
+        // Clean up pending bid
+        const pendingBid = pendingBids.current.get(auctionId);
+        if (pendingBid) {
+          if (pendingBid.timeoutRef.current) {
+            clearTimeout(pendingBid.timeoutRef.current);
+          }
+          pendingBids.current.delete(auctionId);
+        }
 
         // Use unified notification system for errors
         notifyAuctionFailed(auctionId.toString(), errorMessage);
@@ -213,33 +138,29 @@ export function useEnglishAuction(): EnglishAuctionHandler {
         // Reset step after a delay
         setTimeout(() => {
           setStep("idle");
-        }, 3000);
+        }, 2000);
       }
     },
     [
       isConnected,
       address,
       isProcessing,
-      placeBid,
-      isBidding,
-      bidError,
-      // Removed extendAuction dependency
-      DEFAULT_EXTENSION_THRESHOLD_MINUTES,
-      DEFAULT_EXTENSION_DURATION_MINUTES,
+      verifyAuctionStateWithRetry,
+      notifyAuctionFailed,
+      notifyAuctionSuccess,
     ]
   );
 
+  // Handle buy now functionality
   const buyNow = useCallback(
-    async (auctionId: number, buyNowPrice: string): Promise<boolean> => {
+    async (auctionId: number) => {
       if (!isConnected || !address) {
-        setError("Wallet not connected");
-        setStep("error");
-        notifyAuctionFailed(auctionId.toString(), "Wallet not connected");
+        setError("Please connect your wallet");
         return false;
       }
 
       if (isProcessing) {
-        console.warn("English auction already in progress");
+        setError("Transaction already in progress");
         return false;
       }
 
@@ -248,52 +169,79 @@ export function useEnglishAuction(): EnglishAuctionHandler {
       setStep("buying");
 
       try {
-        // Validate buy now price
-        const buyNowPriceWei = parseEther(buyNowPrice);
-        if (buyNowPriceWei <= 0n) {
-          throw new Error("Buy now price must be greater than 0");
-        }
+        console.log(`🛒 Starting buy now for auction ${auctionId}`);
 
-        console.log(
-          `💰 Buying now for English auction ${auctionId}: ${buyNowPrice} ETH`
-        );
-
-        // Place the buy now bid
-        await new Promise<void>((resolve, reject) => {
-          const timeout = setTimeout(() => {
-            reject(new Error("Buy now transaction timeout"));
-          }, 30000); // 30 second timeout
-
-          placeBid(auctionId, buyNowPriceWei);
-
-          // Listen for success/error
-          const checkStatus = () => {
-            if (bidError) {
-              clearTimeout(timeout);
-              reject(new Error(`Buy now failed: ${bidError}`));
-            } else if (!isBidding) {
-              clearTimeout(timeout);
-              resolve();
-            } else {
-              setTimeout(checkStatus, 1000);
-            }
-          };
-
-          setTimeout(checkStatus, 1000);
+        // Track this bid
+        const timeoutRef = { current: null as NodeJS.Timeout | null };
+        pendingBids.current.set(auctionId, {
+          auctionId,
+          bidder: address,
+          amount: "0", // Buy now doesn't have a specific amount
+          timestamp: Date.now(),
+          timeoutRef,
         });
 
-        console.log("✅ Buy now successful");
-        setStep("success");
-        // Notifica di vincita per buy now
-        notifyEnglishWin(auctionId.toString(), parseFloat(buyNowPrice));
+        // Call the buy now function using writeMooveAuction
+        writeMooveAuction("buyNow", [auctionId], BigInt(0));
+
+        // Wait for confirmation with timeout
+        const timeout = setTimeout(async () => {
+          console.log(
+            `⏰ Buy now timeout reached for auction ${auctionId}, verifying state...`
+          );
+
+          try {
+            const verified = await verifyAuctionStateWithRetry(
+              auctionId,
+              address || "",
+              BigInt(0),
+              3,
+              2000
+            );
+            if (verified) {
+              console.log(`✅ Buy now verified for auction ${auctionId}`);
+              notifyAuctionSuccess(
+                auctionId.toString(),
+                "Buy now completed successfully!"
+              );
+            } else {
+              console.log(
+                `❌ Buy now verification failed for auction ${auctionId}`
+              );
+              notifyAuctionFailed(
+                auctionId.toString(),
+                "Buy now completed but verification failed"
+              );
+            }
+          } catch (error) {
+            console.error(
+              `❌ Buy now verification error for auction ${auctionId}:`,
+              error
+            );
+            notifyAuctionFailed(
+              auctionId.toString(),
+              "Buy now completed but verification failed"
+            );
+          }
+        }, 45000); // 45 second timeout
+
+        timeoutRef.current = timeout;
 
         return true;
-      } catch (error) {
-        console.error("❌ English auction buy now failed:", error);
-        const errorMessage =
-          error instanceof Error ? error.message : "Unknown error";
+      } catch (error: any) {
+        console.error(`❌ Buy now failed for auction ${auctionId}:`, error);
+
+        const errorMessage = error?.message || "Buy now failed";
         setError(errorMessage);
-        setStep("error");
+
+        // Clean up pending bid
+        const pendingBid = pendingBids.current.get(auctionId);
+        if (pendingBid) {
+          if (pendingBid.timeoutRef.current) {
+            clearTimeout(pendingBid.timeoutRef.current);
+          }
+          pendingBids.current.delete(auctionId);
+        }
 
         // Use unified notification system for errors
         notifyAuctionFailed(auctionId.toString(), errorMessage);
@@ -304,21 +252,73 @@ export function useEnglishAuction(): EnglishAuctionHandler {
         // Reset step after a delay
         setTimeout(() => {
           setStep("idle");
-        }, 3000);
+        }, 2000);
       }
     },
     [
       isConnected,
       address,
       isProcessing,
-      placeBid,
-      isBidding,
-      bidError,
-      // Removed extendAuction dependency
-      DEFAULT_EXTENSION_THRESHOLD_MINUTES,
-      DEFAULT_EXTENSION_DURATION_MINUTES,
+      verifyAuctionStateWithRetry,
+      notifyAuctionFailed,
+      notifyAuctionSuccess,
     ]
   );
+
+  // Listen for BidPlaced events to confirm successful bids
+  useAuctionEventListening({
+    onBidPlaced: useCallback(
+      (event: any) => {
+        const {
+          auctionId: eventAuctionId,
+          bidder,
+          amount,
+          isHighestBid,
+        } = event;
+
+        console.log(`🎯 BidPlaced event received:`, {
+          auctionId: eventAuctionId,
+          bidder,
+          amount: ethers.formatEther(amount),
+          isHighestBid,
+        });
+
+        // Check if this is a bid we're waiting for
+        const pendingBid = pendingBids.current.get(Number(eventAuctionId));
+        if (
+          pendingBid &&
+          pendingBid.bidder.toLowerCase() === bidder.toLowerCase()
+        ) {
+          console.log(`✅ Bid confirmed for auction ${eventAuctionId}`);
+
+          // Clear the timeout since we got confirmation
+          if (pendingBid.timeoutRef.current) {
+            clearTimeout(pendingBid.timeoutRef.current);
+          }
+          pendingBids.current.delete(Number(eventAuctionId));
+
+          // Show success notification
+          notifyAuctionSuccess(
+            eventAuctionId.toString(),
+            `Bid of ${ethers.formatEther(amount)} ETH placed successfully!`
+          );
+        }
+      },
+      [notifyAuctionSuccess]
+    ),
+  });
+
+  // Cleanup pending bids on unmount
+  useEffect(() => {
+    return () => {
+      pendingBids.current.forEach((pendingBid) => {
+        if (pendingBid.timeoutRef.current) {
+          clearTimeout(pendingBid.timeoutRef.current);
+        }
+      });
+      pendingBids.current.clear();
+    };
+  }, []);
 
   return {
     placeBid: placeBidWithValidation,

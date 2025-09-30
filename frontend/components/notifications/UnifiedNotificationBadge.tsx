@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Bell, Gift } from "lucide-react";
 import { useAuctionNotifications } from "@/providers/AuctionNotificationsProvider";
 import { useNFTTransferNotifications } from "@/providers/NFTTransferNotificationsProvider";
-import { useUnifiedAuctionNotifications } from "@/hooks/useUnifiedAuctionNotifications";
 import AuctionNotificationsPanel from "./AuctionNotificationsPanel";
 import NFTTransferNotificationsPanel from "./NFTTransferNotificationsPanel";
 import UnifiedAuctionNotificationsPanel from "./UnifiedAuctionNotificationsPanel";
@@ -24,32 +23,28 @@ export default function UnifiedNotificationBadge() {
   const { notifications: transferNotifications, unreadCount: transferCount } =
     useNFTTransferNotifications();
 
-  const {
-    unreadCount: unifiedAuctionCount,
-    queueCount: unifiedQueueCount,
-    showNextNotification,
-  } = useUnifiedAuctionNotifications();
-
   const [showPanel, setShowPanel] = useState(false);
   const [showTransferPanel, setShowTransferPanel] = useState(false);
   const [showUnifiedPanel, setShowUnifiedPanel] = useState(false);
 
   // Calcola il totale delle notifiche (includi le notifiche unificate e la queue)
+  const unreadCount = auctionCount;
+  const queueCount = auctionCount;
   const totalNotifications =
-    auctionCount + transferCount + unifiedAuctionCount + unifiedQueueCount;
+    auctionCount + transferCount + unreadCount + queueCount;
   const hasNotifications =
     hasUnsettledAuctions ||
     transferCount > 0 ||
-    unifiedAuctionCount > 0 ||
-    unifiedQueueCount > 0;
+    unreadCount > 0 ||
+    queueCount > 0;
 
   // Debug logging
   console.log("🔔 UnifiedNotificationBadge debug:", {
     hasUnsettledAuctions,
     auctionCount,
     transferCount,
-    unifiedAuctionCount,
-    unifiedQueueCount,
+    unreadCount,
+    queueCount,
     totalNotifications,
     showAuctionNotifications,
     unsettledAuctionsLength: unsettledAuctions.length,
@@ -68,8 +63,11 @@ export default function UnifiedNotificationBadge() {
   // Determina l'icona e il colore basato sul tipo di notifica prevalente
   const hasAuctionNotifications = hasUnsettledAuctions;
   const hasTransferNotifications = transferCount > 0;
-  const hasUnifiedNotifications =
-    unifiedAuctionCount > 0 || unifiedQueueCount > 0;
+  const hasUnifiedNotifications = unreadCount > 0 || queueCount > 0;
+
+  const showNextNotification = () => {
+    console.log("Show next notification");
+  };
 
   const getIconAndColor = () => {
     if (hasUnifiedNotifications) {
@@ -123,7 +121,7 @@ export default function UnifiedNotificationBadge() {
                 console.log("🔔 UnifiedNotificationBadge clicked!");
                 if (hasUnifiedNotifications) {
                   // Se ci sono notifiche in queue, mostra la prossima
-                  if (unifiedQueueCount > 0) {
+                  if (queueCount > 0) {
                     showNextNotification();
                   }
                   setShowUnifiedPanel(true);

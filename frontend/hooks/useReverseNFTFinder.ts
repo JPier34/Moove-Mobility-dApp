@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAccount } from "wagmi";
-import { useReadMooveNFT } from "@/hooks/useContract";
 
 export interface UserNFT {
   tokenId: number;

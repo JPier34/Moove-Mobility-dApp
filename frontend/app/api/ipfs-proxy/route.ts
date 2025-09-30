@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 // Cache per evitare chiamate duplicate
-const ipfsCache = new Map<string, { data: any; timestamp: number }>();
+const ipfsCache = new Map<string, { data: unknown; timestamp: number }>();
 const CACHE_TTL = 30 * 60 * 1000; // 30 minuti - Increased for better performance
 
 const IPFS_GATEWAYS = [
@@ -112,7 +112,7 @@ export async function GET(request: NextRequest) {
                 "Access-Control-Allow-Headers": "Content-Type, Authorization",
               },
             });
-          } catch (parseError) {
+          } catch {
             console.log(
               `⚠️ Failed to parse JSON from ${gateway}, trying next gateway...`
             );

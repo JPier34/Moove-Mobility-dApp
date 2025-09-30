@@ -6,23 +6,27 @@ import { ethers } from "ethers";
 import { contracts } from "@/utils/contracts";
 
 export interface NFTHistoryItem {
-  type: "mint" | "transfer" | "auction_won";
+  type:
+    | "mint"
+    | "transfer"
+    | "auction_created"
+    | "auction_won"
+    | "auction_lost";
   from: string;
   to: string;
+  tokenId: string;
   transactionHash: string;
   blockNumber: number;
   timestamp: number;
-  value?: string; // ETH value transferred
-  gasPrice?: string;
-  gasUsed?: string;
+  amount?: string; // For auction events
+  auctionId?: string; // For auction events
 }
 
 export interface NFTHistory {
   tokenId: string;
-  creationType: "direct_mint" | "auction_won" | "transferred";
   history: NFTHistoryItem[];
-  originalOwner: string;
   currentOwner: string;
+  totalTransfers: number;
 }
 
 export function useNFTHistory(tokenId: string | null) {
@@ -30,128 +34,181 @@ export function useNFTHistory(tokenId: string | null) {
   const [history, setHistory] = useState<NFTHistory | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const fetchNFTHistory = useCallback(async () => {
     if (!tokenId || !address) return;
+
+    // Cancel previous request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Validate tokenId is a number
+    const tokenIdNum = parseInt(tokenId);
+    if (isNaN(tokenIdNum)) {
+      console.warn(`⚠️ [useNFTHistory] Invalid tokenId: ${tokenId}`);
+      setError(`Invalid tokenId: ${tokenId}`);
+      return;
+    }
 
     console.log(`🚀 [useNFTHistory] Starting fetch for token ${tokenId}`);
     setIsLoading(true);
     setError(null);
 
-    try {
-      console.log(`🔍 Fetching NFT history for token #${tokenId}`);
+    // Create new abort controller
+    abortControllerRef.current = new AbortController();
 
-      // Create contract instance
-      if (!window.ethereum) {
-        throw new Error("No ethereum provider available");
-      }
-      const provider = new ethers.BrowserProvider(window.ethereum as any);
+    try {
+      const provider = new ethers.JsonRpcProvider(
+        process.env.NEXT_PUBLIC_RPC_URL ||
+          "https://ethereum-sepolia.publicnode.com"
+      );
+
       const nftContract = new ethers.Contract(
         contracts.MooveNFT.address,
         contracts.MooveNFT.abi,
         provider
       );
 
-      // Get current owner
-      const currentOwner = await nftContract.ownerOf(tokenId);
-      console.log(`👤 Current owner of NFT #${tokenId}:`, currentOwner);
-
-      // Get Transfer events for this NFT
-      const filter = nftContract.filters.Transfer(null, null, tokenId);
-      const events = await nftContract.queryFilter(filter);
-
-      console.log(
-        `📜 Found ${events.length} transfer events for NFT #${tokenId}`
+      const auctionContract = new ethers.Contract(
+        contracts.MooveAuction.address,
+        contracts.MooveAuction.abi,
+        provider
       );
 
+      console.log(`🔍 [useNFTHistory] Fetching events for token ${tokenId}`);
+
+      // Get all events related to this token
+      const [transferEvents, auctionCreatedEvents, auctionSettledEvents] =
+        await Promise.all([
+          nftContract.queryFilter(
+            nftContract.filters.Transfer(null, null, tokenIdNum)
+          ),
+          auctionContract.queryFilter(
+            auctionContract.filters.AuctionCreated(null, tokenIdNum)
+          ),
+          auctionContract.queryFilter(
+            auctionContract.filters.AuctionSettled(null, tokenIdNum)
+          ),
+        ]);
+
+      console.log(`📊 [useNFTHistory] Found events:`, {
+        transfers: transferEvents.length,
+        auctionCreated: auctionCreatedEvents.length,
+        auctionSettled: auctionSettledEvents.length,
+      });
+
+      // Process events into history items
       const historyItems: NFTHistoryItem[] = [];
-      let originalOwner = "";
-      let creationType: "direct_mint" | "auction_won" | "transferred" =
-        "transferred";
 
-      for (const event of events) {
+      // Process Transfer events
+      transferEvents.forEach((event) => {
+        const args = event instanceof ethers.EventLog ? event.args : null;
+        if (args) {
+          const isMint = args.from === ethers.ZeroAddress;
+          historyItems.push({
+            type: isMint ? "mint" : "transfer",
+            from: args.from,
+            to: args.to,
+            tokenId: args.tokenId.toString(),
+            transactionHash: event.transactionHash,
+            blockNumber: event.blockNumber,
+            timestamp: Date.now(), // We'll get this from the block later
+          });
+        }
+      });
+
+      // Process AuctionCreated events
+      auctionCreatedEvents.forEach((event) => {
+        const args = event instanceof ethers.EventLog ? event.args : null;
+        if (args) {
+          historyItems.push({
+            type: "auction_created",
+            from: args.seller,
+            to: "auction_contract",
+            tokenId: args.tokenId.toString(),
+            transactionHash: event.transactionHash,
+            blockNumber: event.blockNumber,
+            timestamp: Date.now(),
+            auctionId: args.auctionId.toString(),
+          });
+        }
+      });
+
+      // Process AuctionSettled events
+      auctionSettledEvents.forEach((event) => {
+        const args = event instanceof ethers.EventLog ? event.args : null;
+        if (args) {
+          historyItems.push({
+            type: "auction_won",
+            from: "auction_contract",
+            to: args.winner,
+            tokenId: args.tokenId.toString(),
+            transactionHash: event.transactionHash,
+            blockNumber: event.blockNumber,
+            timestamp: Date.now(),
+            amount: args.finalPrice?.toString(),
+            auctionId: args.auctionId.toString(),
+          });
+        }
+      });
+
+      // Sort by block number (chronological order)
+      historyItems.sort((a, b) => a.blockNumber - b.blockNumber);
+
+      // Get timestamps from blocks
+      const uniqueBlockNumbers = [
+        ...new Set(historyItems.map((item) => item.blockNumber)),
+      ];
+
+      const blockTimestamps: Record<number, number> = {};
+      for (const blockNumber of uniqueBlockNumbers) {
         try {
-          const block = await provider.getBlock(event.blockNumber);
-          if (!block) {
-            console.warn(
-              `⚠️ Block ${event.blockNumber} not found, skipping event`
-            );
-            continue;
-          }
-
-          const eventLog = event as ethers.EventLog;
-
-          // Get transaction details to extract value
-          const tx = await provider.getTransaction(eventLog.transactionHash);
-          const txReceipt = await provider.getTransactionReceipt(
-            eventLog.transactionHash
+          const block = await provider.getBlock(blockNumber);
+          blockTimestamps[blockNumber] = block?.timestamp || Date.now();
+        } catch (err) {
+          console.warn(
+            `⚠️ [useNFTHistory] Failed to get block ${blockNumber}:`,
+            err
           );
-
-          console.log(
-            `🔍 [useNFTHistory] Transaction ${eventLog.transactionHash} details:`,
-            {
-              tokenId,
-              txValue: tx?.value?.toString(),
-              txValueETH: tx?.value ? ethers.formatEther(tx.value) : "0",
-              gasPrice: tx?.gasPrice?.toString(),
-              gasUsed: txReceipt?.gasUsed?.toString(),
-              from: eventLog.args.from,
-              to: eventLog.args.to,
-              type:
-                eventLog.args.from === ethers.ZeroAddress ? "mint" : "transfer",
-            }
-          );
-
-          const historyItem: NFTHistoryItem = {
-            type:
-              eventLog.args.from === ethers.ZeroAddress ? "mint" : "transfer",
-            from: eventLog.args.from,
-            to: eventLog.args.to,
-            transactionHash: eventLog.transactionHash,
-            blockNumber: eventLog.blockNumber,
-            timestamp: block.timestamp,
-            value: tx?.value?.toString() || "0",
-            gasPrice: tx?.gasPrice?.toString() || "0",
-            gasUsed: txReceipt?.gasUsed?.toString() || "0",
-          };
-
-          historyItems.push(historyItem);
-
-          // Determine creation type
-          if (historyItem.type === "mint") {
-            originalOwner = historyItem.to;
-            // Check if minted to auction contract or directly to user
-            if (
-              historyItem.to.toLowerCase() ===
-              contracts.MooveAuction.address.toLowerCase()
-            ) {
-              creationType = "auction_won";
-            } else {
-              creationType = "direct_mint";
-            }
-          }
-        } catch (blockError) {
-          console.warn(`⚠️ Failed to get block for event:`, blockError);
-          // Continue with other events
+          blockTimestamps[blockNumber] = Date.now();
         }
       }
 
-      // Sort by timestamp (oldest first)
-      historyItems.sort((a, b) => a.timestamp - b.timestamp);
+      // Update timestamps
+      historyItems.forEach((item) => {
+        item.timestamp = blockTimestamps[item.blockNumber] * 1000; // Convert to milliseconds
+      });
+
+      // Get current owner
+      const currentOwner = await nftContract.ownerOf(tokenIdNum);
 
       const nftHistory: NFTHistory = {
         tokenId,
-        creationType,
         history: historyItems,
-        originalOwner,
         currentOwner,
+        totalTransfers: transferEvents.length,
       };
 
-      console.log(`📊 NFT #${tokenId} history:`, nftHistory);
+      console.log(`✅ [useNFTHistory] Successfully fetched history:`, {
+        tokenId,
+        itemCount: historyItems.length,
+        currentOwner,
+        totalTransfers: transferEvents.length,
+      });
+
       setHistory(nftHistory);
     } catch (err) {
-      console.error(`❌ Error fetching NFT history for #${tokenId}:`, err);
-      setError(err instanceof Error ? err.message : "Unknown error");
+      if (err instanceof Error && err.name === "AbortError") {
+        console.log(`🛑 [useNFTHistory] Request aborted for token ${tokenId}`);
+        return;
+      }
+
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to fetch NFT history";
+      console.error(`❌ [useNFTHistory] Error:`, errorMessage);
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -159,6 +216,13 @@ export function useNFTHistory(tokenId: string | null) {
 
   useEffect(() => {
     fetchNFTHistory();
+
+    // Cleanup on unmount
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
   }, [fetchNFTHistory]);
 
   return {
@@ -171,59 +235,32 @@ export function useNFTHistory(tokenId: string | null) {
 
 export function useMultipleNFTHistory(tokenIds: string[]) {
   const { address } = useAccount();
-  const [histories, setHistories] = useState<Map<string, NFTHistory>>(
-    new Map()
-  );
+  const [histories, setHistories] = useState<NFTHistory[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const lastTokenIdsRef = useRef<string>("");
-
-  console.log(
-    `🚀 [useMultipleNFTHistory] Called with ${tokenIds.length} token IDs:`,
-    tokenIds
-  );
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const fetchAllHistories = useCallback(async () => {
-    if (tokenIds.length === 0 || !address) return;
+    if (!tokenIds.length || !address) return;
 
-    // Prevent duplicate calls for the same tokenIds
-    const tokenIdsKey = tokenIds.sort().join(",");
-    if (lastTokenIdsRef.current === tokenIdsKey) {
-      console.log(`⏭️ Same tokenIds as last call, skipping: ${tokenIdsKey}`);
-      return;
+    // Cancel previous request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
     }
 
-    if (histories.size > 0 && tokenIds.every((id) => histories.has(id))) {
-      console.log(
-        `⏭️ All histories already fetched for tokens: ${tokenIdsKey}`
-      );
-      lastTokenIdsRef.current = tokenIdsKey;
-      return;
-    }
-
+    console.log(
+      `🚀 [useMultipleNFTHistory] Starting fetch for ${tokenIds.length} tokens`
+    );
     setIsLoading(true);
     setError(null);
 
+    // Create new abort controller
+    abortControllerRef.current = new AbortController();
+
     try {
-      const newHistories = new Map<string, NFTHistory>();
-
-      // Check if ethereum is available
-      if (!window.ethereum) {
-        throw new Error("Ethereum provider not available");
-      }
-
-      // Create contract instance
-      const provider = new ethers.BrowserProvider(window.ethereum as any);
-
-      // Verify ABI is loaded
-      if (!contracts.MooveNFT.abi || !contracts.MooveNFT.abi.length) {
-        throw new Error("MooveNFT ABI not loaded");
-      }
-
-      console.log(
-        "🔧 Creating contract with ABI:",
-        contracts.MooveNFT.abi.length,
-        "functions"
+      const provider = new ethers.JsonRpcProvider(
+        process.env.NEXT_PUBLIC_RPC_URL ||
+          "https://ethereum-sepolia.publicnode.com"
       );
 
       const nftContract = new ethers.Contract(
@@ -232,135 +269,180 @@ export function useMultipleNFTHistory(tokenIds: string[]) {
         provider
       );
 
-      // Verify contract has the required methods
-      if (!nftContract.ownerOf || typeof nftContract.ownerOf !== "function") {
-        console.error("❌ Contract methods:", Object.keys(nftContract));
-        throw new Error("Contract does not have ownerOf function");
-      }
+      const auctionContract = new ethers.Contract(
+        contracts.MooveAuction.address,
+        contracts.MooveAuction.abi,
+        provider
+      );
 
-      // Test contract connection with a simple call
-      try {
-        await provider.getNetwork();
-        console.log("✅ Provider connected successfully");
-      } catch (providerError) {
-        console.error("❌ Provider connection failed:", providerError);
-        throw new Error("Failed to connect to Ethereum provider");
-      }
+      const allHistories: NFTHistory[] = [];
 
+      // Process each token ID
       for (const tokenId of tokenIds) {
-        try {
-          // Skip if already processed
-          if (histories.has(tokenId)) {
-            console.log(`⏭️ NFT #${tokenId} history already exists, skipping`);
-            continue;
-          }
-
-          console.log(`🔍 Fetching NFT history for token #${tokenId}`);
-
-          // Validate tokenId
-          if (!tokenId || tokenId === "0" || tokenId === "") {
-            console.warn(`⚠️ Invalid tokenId: ${tokenId}`);
-            continue;
-          }
-
-          // Get current owner
-          const currentOwner = await nftContract.ownerOf(tokenId);
-          console.log(`👤 Current owner of NFT #${tokenId}:`, currentOwner);
-
-          // Get Transfer events for this NFT
-          if (!nftContract.filters || !nftContract.filters.Transfer) {
-            console.warn(
-              `⚠️ Contract does not have Transfer filter for NFT #${tokenId}`
-            );
-            continue;
-          }
-
-          const filter = nftContract.filters.Transfer(null, null, tokenId);
-          const events = await nftContract.queryFilter(filter);
-
-          console.log(
-            `📜 Found ${events.length} transfer events for NFT #${tokenId}`
+        const tokenIdNum = parseInt(tokenId);
+        if (isNaN(tokenIdNum)) {
+          console.warn(
+            `⚠️ [useMultipleNFTHistory] Invalid tokenId: ${tokenId}`
           );
+          continue;
+        }
 
+        console.log(`🔍 [useMultipleNFTHistory] Processing token ${tokenId}`);
+
+        try {
+          // Get all events related to this token
+          const [transferEvents, auctionCreatedEvents, auctionSettledEvents] =
+            await Promise.all([
+              nftContract.queryFilter(
+                nftContract.filters.Transfer(null, null, tokenIdNum)
+              ),
+              auctionContract.queryFilter(
+                auctionContract.filters.AuctionCreated(null, tokenIdNum)
+              ),
+              auctionContract.queryFilter(
+                auctionContract.filters.AuctionSettled(null, tokenIdNum)
+              ),
+            ]);
+
+          // Process events into history items
           const historyItems: NFTHistoryItem[] = [];
-          let originalOwner = "";
-          let creationType: "direct_mint" | "auction_won" | "transferred" =
-            "transferred";
 
-          for (const event of events) {
+          // Process Transfer events
+          transferEvents.forEach((event) => {
+            const args = event instanceof ethers.EventLog ? event.args : null;
+            if (args) {
+              const isMint = args.from === ethers.ZeroAddress;
+              historyItems.push({
+                type: isMint ? "mint" : "transfer",
+                from: args.from,
+                to: args.to,
+                tokenId: args.tokenId.toString(),
+                transactionHash: event.transactionHash,
+                blockNumber: event.blockNumber,
+                timestamp: Date.now(),
+              });
+            }
+          });
+
+          // Process AuctionCreated events
+          auctionCreatedEvents.forEach((event) => {
+            const args = event instanceof ethers.EventLog ? event.args : null;
+            if (args) {
+              historyItems.push({
+                type: "auction_created",
+                from: args.seller,
+                to: "auction_contract",
+                tokenId: args.tokenId.toString(),
+                transactionHash: event.transactionHash,
+                blockNumber: event.blockNumber,
+                timestamp: Date.now(),
+                auctionId: args.auctionId.toString(),
+              });
+            }
+          });
+
+          // Process AuctionSettled events
+          auctionSettledEvents.forEach((event) => {
+            const args = event instanceof ethers.EventLog ? event.args : null;
+            if (args) {
+              historyItems.push({
+                type: "auction_won",
+                from: "auction_contract",
+                to: args.winner,
+                tokenId: args.tokenId.toString(),
+                transactionHash: event.transactionHash,
+                blockNumber: event.blockNumber,
+                timestamp: Date.now(),
+                amount: args.finalPrice?.toString(),
+                auctionId: args.auctionId.toString(),
+              });
+            }
+          });
+
+          // Sort by block number (chronological order)
+          historyItems.sort((a, b) => a.blockNumber - b.blockNumber);
+
+          // Get timestamps from blocks
+          const uniqueBlockNumbers = [
+            ...new Set(historyItems.map((item) => item.blockNumber)),
+          ];
+
+          const blockTimestamps: Record<number, number> = {};
+          for (const blockNumber of uniqueBlockNumbers) {
             try {
-              const block = await provider.getBlock(event.blockNumber);
-              if (!block) {
-                console.warn(
-                  `⚠️ Block ${event.blockNumber} not found, skipping event`
-                );
-                continue;
-              }
-
-              const eventLog = event as ethers.EventLog;
-              const historyItem: NFTHistoryItem = {
-                type:
-                  eventLog.args.from === ethers.ZeroAddress
-                    ? "mint"
-                    : "transfer",
-                from: eventLog.args.from,
-                to: eventLog.args.to,
-                transactionHash: eventLog.transactionHash,
-                blockNumber: eventLog.blockNumber,
-                timestamp: block.timestamp,
-              };
-
-              historyItems.push(historyItem);
-
-              // Determine creation type
-              if (historyItem.type === "mint") {
-                originalOwner = historyItem.to;
-                // Check if minted to auction contract or directly to user
-                if (
-                  historyItem.to.toLowerCase() ===
-                  contracts.MooveAuction.address.toLowerCase()
-                ) {
-                  creationType = "auction_won";
-                } else {
-                  creationType = "direct_mint";
-                }
-              }
-            } catch (blockError) {
-              console.warn(`⚠️ Failed to get block for event:`, blockError);
-              // Continue with other events
+              const block = await provider.getBlock(blockNumber);
+              blockTimestamps[blockNumber] = block?.timestamp || Date.now();
+            } catch (err) {
+              console.warn(
+                `⚠️ [useMultipleNFTHistory] Failed to get block ${blockNumber}:`,
+                err
+              );
+              blockTimestamps[blockNumber] = Date.now();
             }
           }
 
-          // Sort by timestamp (oldest first)
-          historyItems.sort((a, b) => a.timestamp - b.timestamp);
+          // Update timestamps
+          historyItems.forEach((item) => {
+            item.timestamp = blockTimestamps[item.blockNumber] * 1000; // Convert to milliseconds
+          });
+
+          // Get current owner
+          const currentOwner = await nftContract.ownerOf(tokenIdNum);
 
           const nftHistory: NFTHistory = {
             tokenId,
-            creationType,
             history: historyItems,
-            originalOwner,
             currentOwner,
+            totalTransfers: transferEvents.length,
           };
 
-          console.log(`📊 NFT #${tokenId} history:`, nftHistory);
-          newHistories.set(tokenId, nftHistory);
+          allHistories.push(nftHistory);
+
+          console.log(
+            `✅ [useMultipleNFTHistory] Processed token ${tokenId}:`,
+            {
+              itemCount: historyItems.length,
+              currentOwner,
+              totalTransfers: transferEvents.length,
+            }
+          );
         } catch (err) {
-          console.warn(`⚠️ Failed to fetch history for NFT #${tokenId}:`, err);
+          console.error(
+            `❌ [useMultipleNFTHistory] Error processing token ${tokenId}:`,
+            err
+          );
+          // Continue with other tokens even if one fails
         }
       }
 
-      setHistories(newHistories);
-      lastTokenIdsRef.current = tokenIdsKey;
+      console.log(
+        `✅ [useMultipleNFTHistory] Successfully processed ${allHistories.length} tokens`
+      );
+      setHistories(allHistories);
     } catch (err) {
-      console.error("❌ Error fetching multiple NFT histories:", err);
-      setError(err instanceof Error ? err.message : "Unknown error");
+      if (err instanceof Error && err.name === "AbortError") {
+        console.log(`🛑 [useMultipleNFTHistory] Request aborted`);
+        return;
+      }
+
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to fetch NFT histories";
+      console.error(`❌ [useMultipleNFTHistory] Error:`, errorMessage);
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
-  }, [tokenIds, address, histories]);
+  }, [tokenIds, address]);
 
   useEffect(() => {
     fetchAllHistories();
+
+    // Cleanup on unmount
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
   }, [fetchAllHistories]);
 
   return {

@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
 
     // Determine which contract to use
     let contractAddress: string;
-    let contractABI: any;
+    let contractABI: unknown;
 
     if (contract === "auction") {
       contractAddress = contracts.MooveAuction.address;
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     // Call the contract method
     const result = await client.readContract({
       address: contractAddress as `0x${string}`,
-      abi: contractABI as any,
+      abi: contractABI as readonly unknown[],
       functionName: method,
       args,
     });

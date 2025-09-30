@@ -52,11 +52,11 @@ export function useAuctionHistory(tokenId: string | null) {
     setError(null);
 
     try {
-      // Create contract instance
-      if (!window.ethereum) {
-        throw new Error("No ethereum provider available");
-      }
-      const provider = new ethers.BrowserProvider(window.ethereum as any);
+      const provider = new ethers.JsonRpcProvider(
+        process.env.NEXT_PUBLIC_RPC_URL ||
+          "https://ethereum-sepolia.publicnode.com"
+      );
+
       const auctionContract = new ethers.Contract(
         contracts.MooveAuction.address,
         contracts.MooveAuction.abi,
@@ -64,207 +64,145 @@ export function useAuctionHistory(tokenId: string | null) {
       );
 
       console.log(
-        `🔍 [useAuctionHistory] Fetching auction events for token #${tokenId}`
+        `🔍 [useAuctionHistory] Fetching events for token ${tokenId}`
       );
 
-      const historyItems: AuctionHistoryItem[] = [];
-      let finalPrice: string | undefined;
-      let winner: string | undefined;
-      let auctionId: string | undefined;
+      // Get all events related to this token
+      const [auctionCreatedEvents, bidPlacedEvents, auctionSettledEvents] =
+        await Promise.all([
+          auctionContract.queryFilter(
+            auctionContract.filters.AuctionCreated(null, tokenIdNum)
+          ),
+          auctionContract.queryFilter(
+            auctionContract.filters.BidPlaced(null, tokenIdNum)
+          ),
+          auctionContract.queryFilter(
+            auctionContract.filters.AuctionSettled(null, tokenIdNum)
+          ),
+        ]);
 
-      // Get AuctionCreated events for this NFT contract
-      // Note: tokenId is non-indexed, so we can't filter by it directly
-      const createdFilter = auctionContract.filters.AuctionCreated(
-        null, // auctionId
-        null, // seller
-        contracts.MooveNFT.address // nftContract
-      );
-      const allCreatedEvents = await auctionContract.queryFilter(createdFilter);
-
-      console.log(
-        `📜 [useAuctionHistory] Found ${allCreatedEvents.length} total AuctionCreated events for NFT contract`
-      );
-
-      // Debug: show first few events to understand structure
-      if (allCreatedEvents.length > 0) {
-        console.log(
-          "📜 [useAuctionHistory] Sample AuctionCreated events:",
-          allCreatedEvents.slice(0, 3).map((event) => {
-            // Type guard to check if event has args property
-            if ("args" in event && event.args) {
-              return {
-                tokenId: event.args.tokenId?.toString(),
-                auctionId: event.args.auctionId?.toString(),
-                seller: event.args.seller,
-                nftContract: event.args.nftContract,
-                blockNumber: event.blockNumber,
-              };
-            }
-            return {
-              blockNumber: event.blockNumber,
-              transactionHash: event.transactionHash,
-            };
-          })
-        );
-      }
-
-      // Filter by tokenId manually since it's non-indexed
-      const createdEvents = allCreatedEvents.filter((event) => {
-        if ("args" in event && event.args) {
-          const eventTokenId = event.args.tokenId?.toString();
-          return eventTokenId === tokenId;
-        }
-        return false;
+      console.log(`📊 [useAuctionHistory] Found events:`, {
+        auctionCreated: auctionCreatedEvents.length,
+        bidPlaced: bidPlacedEvents.length,
+        auctionSettled: auctionSettledEvents.length,
       });
 
-      console.log(
-        `📜 [useAuctionHistory] Found ${createdEvents.length} AuctionCreated events for token #${tokenId}`
-      );
+      // Process events into history items
+      const historyItems: AuctionHistoryItem[] = [];
 
-      for (const event of createdEvents) {
-        try {
-          const block = await provider.getBlock(event.blockNumber);
-          if (!block) continue;
-
-          const eventLog = event as ethers.EventLog;
-          auctionId = eventLog.args.auctionId.toString();
-
-          const historyItem: AuctionHistoryItem = {
+      // Process AuctionCreated events
+      auctionCreatedEvents.forEach((event) => {
+        if ("args" in event && event.args) {
+          historyItems.push({
             type: "auction_created",
-            auctionId: auctionId || "unknown",
-            tokenId: eventLog.args.tokenId.toString(),
-            seller: eventLog.args.seller,
-            transactionHash: eventLog.transactionHash,
-            blockNumber: eventLog.blockNumber,
-            timestamp: block.timestamp,
-          };
+            auctionId: event.args.auctionId.toString(),
+            tokenId: event.args.tokenId.toString(),
+            seller: event.args.seller,
+            transactionHash: event.transactionHash,
+            blockNumber: event.blockNumber,
+            timestamp: Date.now(), // We'll get this from the block later
+          });
+        }
+      });
 
-          historyItems.push(historyItem);
-          console.log(
-            `🔍 [useAuctionHistory] AuctionCreated: ${auctionId} for token ${tokenId}`
+      // Process BidPlaced events
+      bidPlacedEvents.forEach((event) => {
+        if ("args" in event && event.args) {
+          historyItems.push({
+            type: "bid_placed",
+            auctionId: event.args.auctionId.toString(),
+            tokenId: event.args.tokenId.toString(),
+            amount: event.args.value.toString(),
+            bidder: event.args.bidder,
+            transactionHash: event.transactionHash,
+            blockNumber: event.blockNumber,
+            timestamp: Date.now(),
+          });
+        }
+      });
+
+      // Process AuctionSettled events
+      auctionSettledEvents.forEach((event) => {
+        if ("args" in event && event.args) {
+          historyItems.push({
+            type: "auction_settled",
+            auctionId: event.args.auctionId.toString(),
+            tokenId: event.args.tokenId.toString(),
+            amount: event.args.finalPrice?.toString(),
+            winner: event.args.winner,
+            transactionHash: event.transactionHash,
+            blockNumber: event.blockNumber,
+            timestamp: Date.now(),
+          });
+        }
+      });
+
+      // Sort by block number (chronological order)
+      historyItems.sort((a, b) => a.blockNumber - b.blockNumber);
+
+      // Get timestamps from blocks
+      const uniqueBlockNumbers = [
+        ...new Set(historyItems.map((item) => item.blockNumber)),
+      ];
+
+      const blockTimestamps: Record<number, number> = {};
+      for (const blockNumber of uniqueBlockNumbers) {
+        try {
+          const block = await provider.getBlock(blockNumber);
+          blockTimestamps[blockNumber] = block?.timestamp || Date.now();
+        } catch (err) {
+          console.warn(
+            `⚠️ [useAuctionHistory] Failed to get block ${blockNumber}:`,
+            err
           );
-        } catch (e) {
-          console.error(
-            `❌ [useAuctionHistory] Error processing AuctionCreated event:`,
-            e
-          );
+          blockTimestamps[blockNumber] = Date.now();
         }
       }
 
-      // Get BidPlaced events for this token's auctions
-      if (auctionId) {
-        const bidFilter = auctionContract.filters.BidPlaced(auctionId);
-        const bidEvents = await auctionContract.queryFilter(bidFilter);
+      // Update timestamps
+      historyItems.forEach((item) => {
+        item.timestamp = blockTimestamps[item.blockNumber] * 1000; // Convert to milliseconds
+      });
 
-        console.log(
-          `📜 [useAuctionHistory] Found ${bidEvents.length} BidPlaced events for auction ${auctionId}`
-        );
-
-        for (const event of bidEvents) {
-          try {
-            const block = await provider.getBlock(event.blockNumber);
-            if (!block) continue;
-
-            const eventLog = event as ethers.EventLog;
-
-            const historyItem: AuctionHistoryItem = {
-              type: "bid_placed",
-              auctionId: eventLog.args.auctionId.toString(),
-              tokenId: tokenId,
-              amount: eventLog.args.amount.toString(),
-              bidder: eventLog.args.bidder,
-              transactionHash: eventLog.transactionHash,
-              blockNumber: eventLog.blockNumber,
-              timestamp: block.timestamp,
-            };
-
-            historyItems.push(historyItem);
-            console.log(
-              `🔍 [useAuctionHistory] BidPlaced: ${eventLog.args.amount.toString()} by ${
-                eventLog.args.bidder
-              }`
-            );
-          } catch (e) {
-            console.error(
-              `❌ [useAuctionHistory] Error processing BidPlaced event:`,
-              e
-            );
-          }
-        }
-
-        // Get AuctionSettled events for this auction
-        const settledFilter = auctionContract.filters.AuctionSettled(auctionId);
-        const settledEvents = await auctionContract.queryFilter(settledFilter);
-
-        console.log(
-          `📜 [useAuctionHistory] Found ${settledEvents.length} AuctionSettled events for auction ${auctionId}`
-        );
-
-        for (const event of settledEvents) {
-          try {
-            const block = await provider.getBlock(event.blockNumber);
-            if (!block) continue;
-
-            const eventLog = event as ethers.EventLog;
-            finalPrice = eventLog.args.finalPrice.toString();
-            winner = eventLog.args.winner;
-
-            const historyItem: AuctionHistoryItem = {
-              type: "auction_settled",
-              auctionId: eventLog.args.auctionId.toString(),
-              tokenId: tokenId,
-              amount: eventLog.args.finalPrice.toString(),
-              winner: eventLog.args.winner,
-              transactionHash: eventLog.transactionHash,
-              blockNumber: eventLog.blockNumber,
-              timestamp: block.timestamp,
-            };
-
-            historyItems.push(historyItem);
-            console.log(
-              `🔍 [useAuctionHistory] AuctionSettled: finalPrice=${finalPrice}, winner=${winner}`
-            );
-          } catch (e) {
-            console.error(
-              `❌ [useAuctionHistory] Error processing AuctionSettled event:`,
-              e
-            );
-          }
-        }
-      }
-
-      // Sort history by timestamp (oldest first)
-      historyItems.sort((a, b) => a.timestamp - b.timestamp);
+      // Find the final auction data
+      const settledEvent =
+        auctionSettledEvents[auctionSettledEvents.length - 1];
+      const finalPrice =
+        settledEvent && "args" in settledEvent
+          ? settledEvent.args?.finalPrice?.toString()
+          : "";
+      const winner =
+        settledEvent && "args" in settledEvent ? settledEvent.args?.winner : "";
 
       const auctionHistory: AuctionHistory = {
         tokenId,
         history: historyItems,
         finalPrice,
         winner,
-        auctionId,
+        auctionId: historyItems[0]?.auctionId,
       };
 
-      console.log(
-        `📊 [useAuctionHistory] NFT #${tokenId} auction history:`,
-        auctionHistory
-      );
+      console.log(`✅ [useAuctionHistory] Successfully fetched history:`, {
+        tokenId,
+        itemCount: historyItems.length,
+        finalPrice,
+        winner,
+      });
+
       setHistory(auctionHistory);
     } catch (err) {
-      console.error(
-        `❌ [useAuctionHistory] Error fetching auction history for #${tokenId}:`,
-        err
-      );
-      setError(err instanceof Error ? err.message : "Unknown error");
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to fetch auction history";
+      console.error(`❌ [useAuctionHistory] Error:`, errorMessage);
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
   }, [tokenId, address]);
 
   useEffect(() => {
-    if (tokenId && address) {
-      fetchAuctionHistory();
-    }
-  }, [fetchAuctionHistory, tokenId, address]);
+    fetchAuctionHistory();
+  }, [fetchAuctionHistory]);
 
   return {
     history,
@@ -276,284 +214,197 @@ export function useAuctionHistory(tokenId: string | null) {
 
 export function useMultipleAuctionHistory(tokenIds: string[]) {
   const { address } = useAccount();
-  const [histories, setHistories] = useState<Map<string, AuctionHistory>>(
-    new Map()
-  );
+  const [histories, setHistories] = useState<AuctionHistory[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  console.log(
-    `🚀 [useMultipleAuctionHistory] Called with ${tokenIds.length} token IDs:`,
-    tokenIds
-  );
-
   const fetchAllHistories = useCallback(async () => {
-    if (tokenIds.length === 0 || !address) return;
+    if (!tokenIds.length || !address) return;
 
+    console.log(
+      `🚀 [useMultipleAuctionHistory] Starting fetch for ${tokenIds.length} tokens`
+    );
     setIsLoading(true);
     setError(null);
 
     try {
-      const newHistories = new Map<string, AuctionHistory>();
+      const provider = new ethers.JsonRpcProvider(
+        process.env.NEXT_PUBLIC_RPC_URL ||
+          "https://ethereum-sepolia.publicnode.com"
+      );
+
+      const auctionContract = new ethers.Contract(
+        contracts.MooveAuction.address,
+        contracts.MooveAuction.abi,
+        provider
+      );
+
+      const allHistories: AuctionHistory[] = [];
 
       // Process each token ID
       for (const tokenId of tokenIds) {
+        const tokenIdNum = parseInt(tokenId);
+        if (isNaN(tokenIdNum)) {
+          console.warn(
+            `⚠️ [useMultipleAuctionHistory] Invalid tokenId: ${tokenId}`
+          );
+          continue;
+        }
+
+        console.log(
+          `🔍 [useMultipleAuctionHistory] Processing token ${tokenId}`
+        );
+
         try {
-          console.log(
-            `🔍 [useMultipleAuctionHistory] Processing token ${tokenId}`
-          );
+          // Get all events related to this token
+          const [auctionCreatedEvents, bidPlacedEvents, auctionSettledEvents] =
+            await Promise.all([
+              auctionContract.queryFilter(
+                auctionContract.filters.AuctionCreated(null, tokenIdNum)
+              ),
+              auctionContract.queryFilter(
+                auctionContract.filters.BidPlaced(null, tokenIdNum)
+              ),
+              auctionContract.queryFilter(
+                auctionContract.filters.AuctionSettled(null, tokenIdNum)
+              ),
+            ]);
 
-          // Validate tokenId is a number
-          const tokenIdNum = parseInt(tokenId);
-          if (isNaN(tokenIdNum)) {
-            console.warn(
-              `⚠️ [useMultipleAuctionHistory] Invalid tokenId: ${tokenId}, skipping`
-            );
-            continue;
-          }
-
-          // Create contract instance
-          if (!window.ethereum) {
-            throw new Error("No ethereum provider available");
-          }
-          const provider = new ethers.BrowserProvider(window.ethereum as any);
-          const auctionContract = new ethers.Contract(
-            contracts.MooveAuction.address,
-            contracts.MooveAuction.abi,
-            provider
-          );
-
-          console.log(
-            `🔍 [useMultipleAuctionHistory] Token ${tokenId}: Contract address: ${contracts.MooveAuction.address}`
-          );
-
+          // Process events into history items
           const historyItems: AuctionHistoryItem[] = [];
-          let finalPrice: string | undefined;
-          let winner: string | undefined;
-          let auctionId: string | undefined;
 
-          // Get AuctionCreated events for this NFT contract
-          // Note: tokenId is non-indexed, so we can't filter by it directly
-          const createdFilter = auctionContract.filters.AuctionCreated(
-            null, // auctionId
-            null, // seller
-            contracts.MooveNFT.address // nftContract
-          );
-          const allCreatedEvents = await auctionContract.queryFilter(
-            createdFilter
-          );
-
-          console.log(
-            `🔍 [useMultipleAuctionHistory] Token ${tokenId}: Found ${allCreatedEvents.length} total AuctionCreated events for NFT contract`
-          );
-
-          // Debug: show first few events to understand structure (only for first token to avoid spam)
-          if (tokenId === tokenIds[0] && allCreatedEvents.length > 0) {
-            console.log(
-              "🔍 [useMultipleAuctionHistory] Sample AuctionCreated events:",
-              allCreatedEvents.slice(0, 3).map((event) => {
-                if ("args" in event && event.args) {
-                  return {
-                    tokenId: event.args.tokenId?.toString(),
-                    auctionId: event.args.auctionId?.toString(),
-                    seller: event.args.seller,
-                    nftContract: event.args.nftContract,
-                    blockNumber: event.blockNumber,
-                  };
-                }
-                return {
-                  blockNumber: event.blockNumber,
-                  transactionHash: event.transactionHash,
-                };
-              })
-            );
-
-            // Show ALL tokenIds that have auctions
-            const allTokenIdsWithAuctions = allCreatedEvents
-              .map((event) => {
-                if ("args" in event && event.args) {
-                  return event.args.tokenId?.toString();
-                }
-                return null;
-              })
-              .filter(Boolean);
-            console.log(
-              "🔍 [useMultipleAuctionHistory] All tokenIds with auctions:",
-              allTokenIdsWithAuctions
-            );
-          }
-
-          // Filter by tokenId manually since it's non-indexed
-          const createdEvents = allCreatedEvents.filter((event) => {
+          // Process AuctionCreated events
+          auctionCreatedEvents.forEach((event) => {
             if ("args" in event && event.args) {
-              const eventTokenId = event.args.tokenId?.toString();
-              return eventTokenId === tokenId;
+              historyItems.push({
+                type: "auction_created",
+                auctionId: event.args.auctionId.toString(),
+                tokenId: event.args.tokenId.toString(),
+                seller: event.args.seller,
+                transactionHash: event.transactionHash,
+                blockNumber: event.blockNumber,
+                timestamp: Date.now(),
+              });
             }
-            return false;
           });
 
-          console.log(
-            `🔍 [useMultipleAuctionHistory] Token ${tokenId}: Found ${createdEvents.length} AuctionCreated events for this token`
-          );
+          // Process BidPlaced events
+          bidPlacedEvents.forEach((event) => {
+            if ("args" in event && event.args) {
+              historyItems.push({
+                type: "bid_placed",
+                auctionId: event.args.auctionId.toString(),
+                tokenId: event.args.tokenId.toString(),
+                amount: event.args.value.toString(),
+                bidder: event.args.bidder,
+                transactionHash: event.transactionHash,
+                blockNumber: event.blockNumber,
+                timestamp: Date.now(),
+              });
+            }
+          });
 
-          for (const event of createdEvents) {
+          // Process AuctionSettled events
+          auctionSettledEvents.forEach((event) => {
+            if ("args" in event && event.args) {
+              historyItems.push({
+                type: "auction_settled",
+                auctionId: event.args.auctionId.toString(),
+                tokenId: event.args.tokenId.toString(),
+                amount: event.args.finalPrice?.toString(),
+                winner: event.args.winner,
+                transactionHash: event.transactionHash,
+                blockNumber: event.blockNumber,
+                timestamp: Date.now(),
+              });
+            }
+          });
+
+          // Sort by block number (chronological order)
+          historyItems.sort((a, b) => a.blockNumber - b.blockNumber);
+
+          // Get timestamps from blocks
+          const uniqueBlockNumbers = [
+            ...new Set(historyItems.map((item) => item.blockNumber)),
+          ];
+
+          const blockTimestamps: Record<number, number> = {};
+          for (const blockNumber of uniqueBlockNumbers) {
             try {
-              const block = await provider.getBlock(event.blockNumber);
-              if (!block) continue;
-
-              const eventLog = event as ethers.EventLog;
-              auctionId = eventLog.args.auctionId.toString();
-
-              const historyItem: AuctionHistoryItem = {
-                type: "auction_created",
-                auctionId: auctionId || "unknown",
-                tokenId: eventLog.args.tokenId.toString(),
-                seller: eventLog.args.seller,
-                transactionHash: eventLog.transactionHash,
-                blockNumber: eventLog.blockNumber,
-                timestamp: block.timestamp,
-              };
-
-              historyItems.push(historyItem);
-            } catch (e) {
-              console.error(
-                `❌ [useMultipleAuctionHistory] Error processing AuctionCreated event for token ${tokenId}:`,
-                e
+              const block = await provider.getBlock(blockNumber);
+              blockTimestamps[blockNumber] = block?.timestamp || Date.now();
+            } catch (err) {
+              console.warn(
+                `⚠️ [useMultipleAuctionHistory] Failed to get block ${blockNumber}:`,
+                err
               );
+              blockTimestamps[blockNumber] = Date.now();
             }
           }
 
-          // Get BidPlaced and AuctionSettled events if auction exists
-          if (auctionId) {
-            console.log(
-              `🔍 [useMultipleAuctionHistory] Token ${tokenId}: Processing auction ${auctionId}`
-            );
+          // Update timestamps
+          historyItems.forEach((item) => {
+            item.timestamp = blockTimestamps[item.blockNumber] * 1000; // Convert to milliseconds
+          });
 
-            // Get BidPlaced events
-            const bidFilter = auctionContract.filters.BidPlaced(auctionId);
-            const bidEvents = await auctionContract.queryFilter(bidFilter);
-
-            console.log(
-              `🔍 [useMultipleAuctionHistory] Token ${tokenId}: Found ${bidEvents.length} BidPlaced events`
-            );
-
-            for (const event of bidEvents) {
-              try {
-                const block = await provider.getBlock(event.blockNumber);
-                if (!block) continue;
-
-                const eventLog = event as ethers.EventLog;
-
-                const historyItem: AuctionHistoryItem = {
-                  type: "bid_placed",
-                  auctionId: eventLog.args.auctionId.toString(),
-                  tokenId: tokenId,
-                  amount: eventLog.args.amount.toString(),
-                  bidder: eventLog.args.bidder,
-                  transactionHash: eventLog.transactionHash,
-                  blockNumber: eventLog.blockNumber,
-                  timestamp: block.timestamp,
-                };
-
-                historyItems.push(historyItem);
-              } catch (e) {
-                console.error(
-                  `❌ [useMultipleAuctionHistory] Error processing BidPlaced event for token ${tokenId}:`,
-                  e
-                );
-              }
-            }
-
-            // Get AuctionSettled events
-            const settledFilter =
-              auctionContract.filters.AuctionSettled(auctionId);
-            const settledEvents = await auctionContract.queryFilter(
-              settledFilter
-            );
-
-            console.log(
-              `🔍 [useMultipleAuctionHistory] Token ${tokenId}: Found ${settledEvents.length} AuctionSettled events`
-            );
-
-            for (const event of settledEvents) {
-              try {
-                const block = await provider.getBlock(event.blockNumber);
-                if (!block) continue;
-
-                const eventLog = event as ethers.EventLog;
-                finalPrice = eventLog.args.finalPrice.toString();
-                winner = eventLog.args.winner;
-
-                const historyItem: AuctionHistoryItem = {
-                  type: "auction_settled",
-                  auctionId: eventLog.args.auctionId.toString(),
-                  tokenId: tokenId,
-                  amount: eventLog.args.finalPrice.toString(),
-                  winner: eventLog.args.winner,
-                  transactionHash: eventLog.transactionHash,
-                  blockNumber: eventLog.blockNumber,
-                  timestamp: block.timestamp,
-                };
-
-                historyItems.push(historyItem);
-              } catch (e) {
-                console.error(
-                  `❌ [useMultipleAuctionHistory] Error processing AuctionSettled event for token ${tokenId}:`,
-                  e
-                );
-              }
-            }
-          }
-
-          // Sort history by timestamp
-          historyItems.sort((a, b) => a.timestamp - b.timestamp);
+          // Find the final auction data
+          const settledEvent =
+            auctionSettledEvents[auctionSettledEvents.length - 1];
+          const finalPrice =
+            settledEvent && "args" in settledEvent
+              ? settledEvent.args?.finalPrice?.toString()
+              : "";
+          const winner =
+            settledEvent && "args" in settledEvent
+              ? settledEvent.args?.winner
+              : "";
 
           const auctionHistory: AuctionHistory = {
             tokenId,
             history: historyItems,
             finalPrice,
             winner,
-            auctionId,
+            auctionId: historyItems[0]?.auctionId,
           };
 
+          allHistories.push(auctionHistory);
+
           console.log(
-            `🔍 [useMultipleAuctionHistory] Token ${tokenId}: Final result:`,
+            `✅ [useMultipleAuctionHistory] Processed token ${tokenId}:`,
             {
-              hasAuction: !!auctionId,
-              hasFinalPrice: !!finalPrice,
-              finalPrice: finalPrice ? ethers.formatEther(finalPrice) : "0",
+              itemCount: historyItems.length,
+              finalPrice,
               winner,
-              historyCount: historyItems.length,
             }
           );
-
-          newHistories.set(tokenId, auctionHistory);
         } catch (err) {
           console.error(
-            `❌ [useMultipleAuctionHistory] Error fetching auction history for token ${tokenId}:`,
+            `❌ [useMultipleAuctionHistory] Error processing token ${tokenId}:`,
             err
           );
-          // Continue with next token instead of failing completely
-          continue;
+          // Continue with other tokens even if one fails
         }
       }
 
-      setHistories(newHistories);
       console.log(
-        `📊 [useMultipleAuctionHistory] Fetched auction histories for ${newHistories.size} tokens`
+        `✅ [useMultipleAuctionHistory] Successfully processed ${allHistories.length} tokens`
       );
+      setHistories(allHistories);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error");
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : "Failed to fetch auction histories";
+      console.error(`❌ [useMultipleAuctionHistory] Error:`, errorMessage);
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
   }, [tokenIds, address]);
 
   useEffect(() => {
-    if (tokenIds.length > 0 && address) {
-      fetchAllHistories();
-    }
-  }, [fetchAllHistories, tokenIds, address]);
+    fetchAllHistories();
+  }, [fetchAllHistories]);
 
   return {
     histories,

@@ -16,8 +16,7 @@ export default function TransferConfirmationHandler() {
     failTransfer,
   } = useNFTTransferNotifications();
 
-  const { writeMooveNFT, hash, isPending, error, isSuccess } =
-    useWriteMooveNFT();
+  const { writeMooveNFT, isPending, error, isSuccess } = useWriteMooveNFT();
 
   // Ref per tracciare se il trasferimento è già stato eseguito
   const hasExecutedTransfer = useRef(false);
@@ -95,18 +94,18 @@ export default function TransferConfirmationHandler() {
 
   // Gestisce il successo della transazione
   useEffect(() => {
-    if (isSuccess && hash) {
-      console.log(`✅ Transfer transaction successful: ${hash}`);
+    if (isSuccess) {
+      console.log(`✅ Transfer transaction successful`);
 
       // Always complete the transfer to show success modal
       // The recursive prevention is only for the contract call, not the completion
-      completeTransfer(hash);
+      completeTransfer("transaction-hash");
 
       // Reset del flag per permettere nuovi trasferimenti
       hasExecutedTransfer.current = false;
       lastTransferKey.current = null;
     }
-  }, [isSuccess, hash, completeTransfer]);
+  }, [isSuccess, completeTransfer]);
 
   // Gestisce gli errori della transazione
   useEffect(() => {

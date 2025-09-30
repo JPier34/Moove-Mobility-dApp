@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAccount } from "wagmi";
 import { useUserRoles } from "@/hooks/useContract";
+import { getAdminAddress } from "@/config/admin";
 
 interface AdminGuardProps {
   children: React.ReactNode;
@@ -18,7 +19,7 @@ export default function AdminGuard({ children }: AdminGuardProps) {
   const [isReady, setIsReady] = useState(false);
 
   // Master admin wallet - always has access
-  const MASTER_WALLET = "0x777382955f33Bb8540602E914D9b650C962EF6Cc";
+  const MASTER_WALLET = getAdminAddress();
   const isMasterWallet = address?.toLowerCase() === MASTER_WALLET.toLowerCase();
 
   useEffect(() => {

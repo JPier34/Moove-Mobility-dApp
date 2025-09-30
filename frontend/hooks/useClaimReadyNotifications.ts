@@ -62,10 +62,7 @@ export function useClaimReadyNotifications() {
           );
 
           // Notifica che l'NFT è pronto al claim
-          notifyClaimReady(
-            auctionId.toString(),
-            `${auctionTypeName} Auction NFT`
-          );
+          notifyClaimReady(auctionId.toString());
         }
       } catch (error) {
         console.error(

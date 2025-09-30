@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 // Simulazione database in memoria (in produzione usare un database reale)
-let nftDatabase: Array<{
+const nftDatabase: Array<{
   name: string;
   imageHash: string;
   creator: string;
@@ -66,26 +66,4 @@ export async function GET() {
     );
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

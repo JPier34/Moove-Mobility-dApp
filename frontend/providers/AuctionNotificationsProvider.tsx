@@ -9,9 +9,10 @@ import AuctionConfirmationModal from "@/components/notifications/AuctionConfirma
 import AuctionResultModal from "@/components/notifications/AuctionResultModal";
 import { useSealedBidAutoMonitor } from "@/hooks/useSealedBidStatusManager";
 import { useAccount } from "wagmi";
-import { WonAuction } from "@/hooks/useWonAuctionsForClaim";
 import { ethers } from "ethers";
 import toast from "react-hot-toast";
+import { WonAuction } from "@/types/user";
+import { Auction } from "@/types/auction";
 
 // ============= CONTEXT =============
 
@@ -65,15 +66,36 @@ export function AuctionNotificationsProvider({
     []
   );
 
+  // Convert Auction[] to WonAuction[]
+  const convertToWonAuctions = (auctions: Auction[]): WonAuction[] => {
+    return auctions.map((auction) => ({
+      auctionId: auction.auctionId,
+      nftId: auction.nftId?.toString() || "0",
+      name: `NFT #${auction.nftId || "0"}`,
+      image: "/images/default-nft.svg",
+      category: "VEHICLE_DECORATION",
+      status: auction.status,
+      hasImage: true,
+      hasName: true,
+      finalBid: parseFloat(auction.currentBid),
+      bidders: 1,
+      isSettled: auction.isSettled || false,
+      endTime: auction.endTime ? auction.endTime.getTime() : undefined,
+      transactionHash: undefined,
+    }));
+  };
+
   // Use original simple modal management (no complex event system)
   const {
     unsettledAuctions,
     currentAuction,
     showCongratulations,
-    isSettling,
     handleSettleAuction: originalSettleAuction,
     handleCloseCongratulationsModal,
+    isSettling,
   } = useWonAuctionsManager();
+
+  const wonAuctions = convertToWonAuctions(unsettledAuctions);
 
   // Sealed bid auto-monitoring
   const {
@@ -482,7 +504,7 @@ export function AuctionNotificationsProvider({
 
   // Wrapper for CongratulationsModal compatibility
   const handleSettleAuctionWrapper = (auctionId: string) => {
-    const auction = unsettledAuctions.find((a) => a.auctionId === auctionId);
+    const auction = wonAuctions.find((a) => a.auctionId === auctionId);
     if (auction) {
       handleSettleAuction(auctionId, auction);
     }
@@ -544,12 +566,12 @@ export function AuctionNotificationsProvider({
 
   // Context value
   const contextValue: AuctionNotificationsContextType = {
-    hasUnsettledAuctions: unsettledAuctions.length > 0,
-    unsettledCount: unsettledAuctions.length,
+    hasUnsettledAuctions: wonAuctions.length > 0,
+    unsettledCount: wonAuctions.length,
     showNotifications,
     setShowNotifications,
     currentAuction,
-    unsettledAuctions,
+    unsettledAuctions: wonAuctions,
     isSettling,
     transactionHash,
     isWaitingForConfirmation,

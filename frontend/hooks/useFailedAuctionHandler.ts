@@ -6,7 +6,9 @@ import { useWriteMooveAuction } from "./useContract";
 import { ethers } from "ethers";
 
 // Master admin wallet address
-const MASTER_ADMIN_ADDRESS = "0x777382955f33Bb8540602E914D9b650C962EF6Cc";
+import { getAdminAddress } from "@/config/admin";
+
+const MASTER_ADMIN_ADDRESS = getAdminAddress();
 
 export interface FailedAuctionHandler {
   handleFailedAuction: (auctionId: number) => Promise<boolean>;

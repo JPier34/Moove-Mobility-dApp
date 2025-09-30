@@ -4,8 +4,8 @@ import React from "react";
 import { useIPFSUnified } from "@/hooks/useIPFSUnified";
 
 export function IPFSStatus() {
-  const { isPinataConfigured } = useIPFSUnified();
-  const isConfigured = isPinataConfigured;
+  const { error } = useIPFSUnified();
+  const isConfigured = !error; // Assume configured if no error
 
   return (
     <div className="bg-gray-800 rounded-lg p-4 mb-6">

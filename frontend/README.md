@@ -398,3 +398,4 @@ Feel free to fork and expand the functionality (e.g., add more auction types, im
 ---
 
 **Built with ❤️ for the decentralized mobility future** 🚗✨
+

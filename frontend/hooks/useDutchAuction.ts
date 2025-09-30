@@ -276,6 +276,7 @@ export const useDutchAuction = () => {
         }
 
         // IMMEDIATELY claim the NFT after successful purchase
+        // This is necessary for Dutch auctions since the purchase is always winning
         console.log("🔄 Claiming NFT automatically...");
         setStep("claiming");
 

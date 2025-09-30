@@ -10,7 +10,6 @@ import { AuctionType } from "@/types/auction";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { ethers } from "ethers";
-// import DynamicAuctionForm from "./DynamicAuctionForm"; // DISABLED: Uses old modular system
 import AuctionValidationModal from "./AuctionValidationModal";
 import {
   useAuctionValidationModular,
@@ -20,6 +19,7 @@ import { useAuctionFormValidation } from "@/hooks/useAuctionFormValidation";
 import { useUserRoles } from "@/hooks/useContract";
 import { ErrorBoundary, useLastError } from "./ErrorBoundary";
 import { useNFTUniquenessCheck } from "@/hooks/useNFTUniquenessCheck";
+import { getAdminAddress } from "@/config/admin";
 
 interface NFTFormData {
   name: string;
@@ -379,7 +379,7 @@ function AdminNFTCreatorUltraSimpleContent() {
   }, [getNFTValidationErrors, nftData, uniquenessResult]);
 
   // Master admin wallet - always has access
-  const MASTER_WALLET = "0x777382955f33Bb8540602E914D9b650C962EF6Cc";
+  const MASTER_WALLET = getAdminAddress();
   const isMasterWallet = address?.toLowerCase() === MASTER_WALLET.toLowerCase();
   const hasAdminAccess = isMasterWallet || canMint || isMasterAdmin;
 
@@ -479,23 +479,22 @@ function AdminNFTCreatorUltraSimpleContent() {
         return;
       }
 
-      const ipfsResult = await uploadNFT(nftData.image, {
+      const ipfsResult = await uploadNFT({
         name: nftData.name,
         description: nftData.description,
-        rarity: nftData.rarity,
-        isLimitedEdition: nftData.isLimitedEdition,
-        editionSize: parseInt(nftData.editionSize) || 1,
-        editionNumber: 1,
-        customizationOptions: {
-          ...nftData.customizationOptions,
-          maxTextLength:
-            parseInt(nftData.customizationOptions.maxTextLength) || 100,
+        image: URL.createObjectURL(nftData.image),
+        properties: {
+          rarity: nftData.rarity,
+          category: "VEHICLE_DECORATION",
         },
-        creator: address || "",
+        attributes: [
+          { trait_type: "Rarity", value: nftData.rarity },
+          { trait_type: "Category", value: "VEHICLE_DECORATION" },
+        ],
       });
 
-      if (!ipfsResult.imageUrl) {
-        toast.error("Failed to upload image to IPFS");
+      if (!ipfsResult) {
+        toast.error("Failed to upload metadata to IPFS");
         return;
       }
 
@@ -503,7 +502,7 @@ function AdminNFTCreatorUltraSimpleContent() {
       const nftMetadata = {
         name: nftData.name,
         description: nftData.description,
-        image: ipfsResult.imageUrl,
+        image: ipfsResult,
         external_url: `https://moove-mobility.com/nft/${Date.now()}`,
         attributes: [
           { trait_type: "Rarity", value: nftData.rarity },
@@ -823,13 +822,13 @@ function AdminNFTCreatorUltraSimpleContent() {
           id: `nft_${Date.now()}`,
           nftName: nftData.name,
           nftDescription: nftData.description,
-          nftImage: ipfsResult.imageUrl,
+          nftImage: ipfsResult,
           tokenId: secureResult.nft.tokenId.toString(),
           transactionHash: secureResult.nft.transactionHash,
           creationDate: new Date().toISOString(),
           auctionId: secureResult.auction.auctionId.toString(),
           status: "confirmed",
-          ipfsHash: ipfsResult.imageUrl,
+          ipfsHash: ipfsResult,
         };
 
         localStorage.setItem(

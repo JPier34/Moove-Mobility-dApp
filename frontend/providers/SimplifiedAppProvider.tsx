@@ -17,6 +17,8 @@ import { useAutomaticAuctionMonitor } from "@/hooks/useAutomaticAuctionMonitor";
 import { useClaimReadyNotifications } from "@/hooks/useClaimReadyNotifications";
 import { useBidRefundListener } from "@/hooks/useBidRefundListener";
 import UnifiedNotificationBadge from "@/components/notifications/UnifiedNotificationBadge";
+import EventBasedNotificationBadge from "@/components/notifications/EventBasedNotificationBadge";
+import EventBasedClaimPanel from "@/components/claim/EventBasedClaimPanel";
 // Removed custom wallet persistence - using Wagmi's built-in persistence
 import "@rainbow-me/rainbowkit/styles.css";
 
@@ -187,12 +189,13 @@ export default function SimplifiedAppProvider({
               borderRadius: "medium",
             }),
           }}
+          showRecentTransactions={false}
         >
           <ThemeProvider>
             <AuctionNotificationsProvider>
               <NFTTransferNotificationsProvider>
-                {/* Automatic Auction Monitor - Runs in background */}
-                <AuctionMonitor />
+                {/* DISABLED: Automatic Auction Monitor - Causing recursive calls */}
+                {/* <AuctionMonitor /> */}
 
                 {/* Claim Ready Monitor - Runs in background */}
                 <ClaimReadyMonitor />
@@ -204,6 +207,12 @@ export default function SimplifiedAppProvider({
 
                 {/* Unified Notification Badge - Rendered after both providers */}
                 <UnifiedNotificationBadge />
+
+                {/* Event-Based Notification Badge - New system that ignores corrupted timestamps */}
+                <EventBasedNotificationBadge />
+
+                {/* Event-Based Claim Panel - For claiming won auctions */}
+                <EventBasedClaimPanel />
               </NFTTransferNotificationsProvider>
             </AuctionNotificationsProvider>
           </ThemeProvider>

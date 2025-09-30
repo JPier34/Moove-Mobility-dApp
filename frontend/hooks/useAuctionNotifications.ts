@@ -42,10 +42,12 @@ export function useAuctionNotifications() {
         if (auction) {
           // Usa un tipo generico per le notifiche da collezione
           // Il tipo specifico sarà determinato dalle notifiche immediate
-          addNotification("sealed_bid_win", auctionId, {
+          addNotification({
+            type: "sealed_bid_win",
+            auctionId: auctionId,
             nftName: auction.nftName,
             price: auction.finalBid,
-            source: "collection_check", // Marca come controllo collezione per evitare toast duplicati
+            source: "collection_check",
           });
         }
       });
@@ -79,5 +81,20 @@ export function useAuctionNotifications() {
       (auction) =>
         !notificationState.lastCheckedAuctions.includes(auction.auctionId)
     ).length,
+    unreadCount: notificationState.hasNewWins ? 1 : 0,
+    queueCount: notificationState.hasNewWins ? 1 : 0,
+    showNextNotification: () => {
+      setNotificationState((prev) => ({ ...prev, hasNewWins: false }));
+    },
+    unsettledCount: wonAuctions.length,
+    showNotifications: notificationState.hasNewWins,
+    setShowNotifications: (show: boolean) => {
+      setNotificationState((prev) => ({ ...prev, hasNewWins: show }));
+    },
+    unsettledAuctions: wonAuctions,
+    handleSettleAuction: () => {
+      console.log("Settle auction called");
+    },
+    isSettling: false,
   };
 }

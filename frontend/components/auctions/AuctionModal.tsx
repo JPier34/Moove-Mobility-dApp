@@ -302,6 +302,15 @@ export default function AuctionModal({
       return;
     }
 
+    // Check if auction has ended
+    const now = new Date();
+    const endTime = new Date(localAuction.endTime);
+
+    if (now >= endTime) {
+      toast.error("❌ This auction has already ended. Cannot place bid.");
+      return;
+    }
+
     // Validate bid amount vs Buy Now price
     const bidAmount = parseFloat(amount);
     const buyNowPrice = parseFloat(auction.buyNowPrice || "0");

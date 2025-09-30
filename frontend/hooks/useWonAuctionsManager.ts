@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { useWonAuctionsForClaim } from "./useWonAuctionsForClaim";
 import { useSettleAuction } from "./useUserCollection";
 import { useStartRevealPhase } from "./useAuction";
+import { useAuctionNotificationTriggers } from "./useUnifiedAuctionNotifications";
+import { useAccount } from "wagmi";
 import { ethers } from "ethers";
 import { contracts } from "../utils/contracts";
 
@@ -30,16 +32,33 @@ async function checkAuctionStatus(auctionId: string) {
     const endTime = Number(auctionData.endTime);
     const currentTime = Math.floor(Date.now() / 1000);
 
+    // Safe date formatting for potentially corrupted endTime
+    let endTimeFormatted = "Invalid Date";
+    let timeDifference = 0;
+    let timeExpired = false;
+
+    try {
+      if (endTime && endTime > 0 && endTime < 2000000000) {
+        // Valid timestamp range
+        endTimeFormatted = new Date(endTime * 1000).toISOString();
+        timeDifference = (endTime * 1000 - Date.now()) / 1000;
+        timeExpired = currentTime >= endTime;
+      }
+    } catch (dateError) {
+      console.warn(`⚠️ Invalid endTime for auction ${auctionId}:`, endTime);
+    }
+
     console.log(`📊 Contract auction data:`, {
       auctionId: auctionData.auctionId.toString(),
       status: status,
       isSettled: auctionData.isSettled,
       highestBidder: auctionData.highestBidder,
       highestBid: ethers.formatEther(auctionData.highestBid),
-      endTime: new Date(endTime * 1000).toISOString(),
+      endTime: endTimeFormatted,
+      endTimeRaw: endTime,
       currentTime: new Date().toISOString(),
-      timeDifference: (endTime * 1000 - Date.now()) / 1000,
-      timeExpired: currentTime >= endTime,
+      timeDifference: timeDifference,
+      timeExpired: timeExpired,
       auctionType: Number(auctionData.auctionType || 0), // 0 = public, 1 = sealed bid
     });
 
@@ -48,8 +67,11 @@ async function checkAuctionStatus(auctionId: string) {
       isSettled: auctionData.isSettled,
       highestBidder: auctionData.highestBidder,
       highestBid: ethers.formatEther(auctionData.highestBid),
-      endTime: endTime * 1000,
+      endTime:
+        endTime && endTime > 0 && endTime < 2000000000 ? endTime * 1000 : 0,
       auctionType: Number(auctionData.auctionType || 0), // 0 = public, 1 = sealed bid
+      seller: auctionData.seller, // Add seller information
+      tokenId: auctionData.tokenId.toString(),
     };
   } catch (error) {
     console.error(`❌ Error checking auction ${auctionId} status:`, error);
@@ -60,6 +82,8 @@ async function checkAuctionStatus(auctionId: string) {
 export function useWonAuctionsManager() {
   const { unsettledAuctions, isLoading, refetch } = useWonAuctionsForClaim();
   const { settleAuction, isSettling, error } = useSettleAuction();
+  const { notifyAuctionDeserted } = useAuctionNotificationTriggers();
+  const { address } = useAccount();
   const {
     startRevealPhase,
     isPending: isStartingReveal,
@@ -119,15 +143,16 @@ export function useWonAuctionsManager() {
       console.log(`📊 Local auction ${auctionId} details:`, {
         status: auction.status,
         isSettled: auction.isSettled,
-        finalBid: auction.finalBid,
-        bidders: auction.bidders,
+        finalBid: auction.currentBid,
+        bidders: auction.highestBidder,
         endTime: auction.endTime
           ? new Date(auction.endTime).toISOString()
           : "undefined",
         currentTime: new Date().toISOString(),
-        timeDifference: auction.endTime
-          ? (auction.endTime - Date.now()) / 1000
-          : "undefined",
+        timeDifference:
+          auction.endTime && typeof auction.endTime === "number"
+            ? (auction.endTime - Date.now()) / 1000
+            : "undefined",
       });
 
       // Verifica diretta dal contratto per avere dati aggiornati
@@ -140,9 +165,52 @@ export function useWonAuctionsManager() {
 
       // Check if the auction is already settled
       if (contractStatus.isSettled) {
-        console.error(`❌ Auction ${auctionId} is already settled`);
-        alert(`Auction ${auctionId} is already settled`);
-        return;
+        console.log(`ℹ️ Auction ${auctionId} is already settled`);
+
+        // Check if it has a valid winner
+        if (
+          contractStatus.highestBidder &&
+          contractStatus.highestBidder !== ethers.ZeroAddress
+        ) {
+          console.log(
+            `✅ Auction ${auctionId} is settled with winner: ${contractStatus.highestBidder}`
+          );
+          // This auction is properly settled with a winner
+          return;
+        } else {
+          console.log(
+            `⚠️ Auction ${auctionId} is settled but has no valid winner - this is a deserted auction`
+          );
+
+          // Check if the current user is the admin/seller
+          const isAdmin =
+            contractStatus.seller &&
+            address &&
+            contractStatus.seller.toLowerCase() === address.toLowerCase();
+
+          if (isAdmin) {
+            console.log(
+              `🏠 Admin detected: NFT from deserted auction ${auctionId} should be returned to admin's collection`
+            );
+            // The NFT should be back in the admin's collection
+            // Trigger notification for the admin
+            notifyAuctionDeserted(auctionId);
+            alert(
+              `Auction ${auctionId} was deserted (no valid winner). The NFT has been returned to your collection.`
+            );
+          } else {
+            alert(
+              `Auction ${auctionId} is already settled but has no valid winner. This auction cannot be claimed.`
+            );
+          }
+
+          // IMPORTANT: Refresh the won auctions list to remove this auction
+          console.log(
+            `🔄 Refreshing won auctions list after deserted auction detection...`
+          );
+          refetch();
+          return;
+        }
       }
 
       // Check if the auction has a winner
