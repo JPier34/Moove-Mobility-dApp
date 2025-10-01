@@ -5,14 +5,16 @@ const ipfsCache = new Map<string, { data: unknown; timestamp: number }>();
 const CACHE_TTL = 30 * 60 * 1000; // 30 minuti - Increased for better performance
 
 const IPFS_GATEWAYS = [
-  // Primary: Most reliable gateways only
+  // Primary: Most reliable gateways
   "https://ipfs.io/ipfs/",
   "https://gateway.pinata.cloud/ipfs/",
-  "https://cloudflare-ipfs.com/ipfs/",
 
   // Secondary: Alternative gateways
   "https://dweb.link/ipfs/",
   "https://gateway.ipfs.io/ipfs/",
+
+  // Tertiary: Backup gateways
+  "https://cloudflare-ipfs.com/ipfs/",
 ];
 
 export async function GET(request: NextRequest) {
@@ -67,8 +69,8 @@ export async function GET(request: NextRequest) {
           "User-Agent":
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         },
-        // Reduce timeout to 5 seconds for faster fallback
-        signal: AbortSignal.timeout(5000),
+        // Reduce timeout to 3 seconds for faster fallback
+        signal: AbortSignal.timeout(3000),
       });
 
       if (response.ok) {

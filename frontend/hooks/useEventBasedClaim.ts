@@ -105,7 +105,7 @@ export function useEventBasedClaim() {
               amount: ethers.formatEther(amount),
               transactionHash: event.transactionHash,
               blockNumber: event.blockNumber,
-              timestamp: block.timestamp,
+              timestamp: block?.timestamp || 0,
               canClaim: true,
               claimStatus: "pending",
             });

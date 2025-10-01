@@ -125,7 +125,7 @@ export function useEventBasedNotifications() {
               amount: ethers.formatEther(amount),
               transactionHash: event.transactionHash,
               blockNumber: event.blockNumber,
-              timestamp: block.timestamp,
+              timestamp: block?.timestamp || 0,
             });
 
             if (isHighestBid) {
@@ -135,7 +135,7 @@ export function useEventBasedNotifications() {
                 message: `🎉 You won Auction ${auctionId} with bid ${ethers.formatEther(
                   amount
                 )} ETH!`,
-                timestamp: block.timestamp,
+                timestamp: block?.timestamp || 0,
                 transactionHash: event.transactionHash,
                 amount: ethers.formatEther(amount),
               });
@@ -158,14 +158,14 @@ export function useEventBasedNotifications() {
               amount: "0", // Unknown until reveal
               transactionHash: event.transactionHash,
               blockNumber: event.blockNumber,
-              timestamp: block.timestamp,
+              timestamp: block?.timestamp || 0,
             });
 
             newNotifications.push({
               auctionId: auctionId.toString(),
               type: "win",
               message: `🔒 You submitted a sealed bid for Auction ${auctionId}`,
-              timestamp: block.timestamp,
+              timestamp: block?.timestamp || 0,
               transactionHash: event.transactionHash,
             });
           }
@@ -186,7 +186,7 @@ export function useEventBasedNotifications() {
               message: `✅ Auction ${auctionId} settled! You can claim your NFT for ${ethers.formatEther(
                 finalPrice
               )} ETH`,
-              timestamp: block.timestamp,
+              timestamp: block?.timestamp || 0,
               transactionHash: event.transactionHash,
               amount: ethers.formatEther(finalPrice),
             });
@@ -208,7 +208,7 @@ export function useEventBasedNotifications() {
               message: `💰 You received a refund of ${ethers.formatEther(
                 amount
               )} ETH for Auction ${auctionId}`,
-              timestamp: block.timestamp,
+              timestamp: block?.timestamp || 0,
               transactionHash: event.transactionHash,
               amount: ethers.formatEther(amount),
             });

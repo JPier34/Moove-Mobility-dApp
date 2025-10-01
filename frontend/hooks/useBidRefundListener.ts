@@ -75,3 +75,4 @@ export function useBidRefundListener() {
     isActive: isConnected && !!address,
   };
 }
+

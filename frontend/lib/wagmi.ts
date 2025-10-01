@@ -1,6 +1,7 @@
 import { getDefaultConfig } from "@rainbow-me/rainbowkit";
 import { sepolia, localhost } from "wagmi/chains";
 import { createStorage, noopStorage } from "wagmi";
+import { http } from "viem";
 
 const projectId =
   process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID || "your-project-id";
@@ -11,10 +12,31 @@ const storage = createStorage({
   key: "wagmi.store",
 });
 
+// Custom RPC URLs for better reliability
+const customSepolia = {
+  ...sepolia,
+  rpcUrls: {
+    default: {
+      http: [
+        "https://ethereum-sepolia.publicnode.com",
+        "https://sepolia.drpc.org",
+        "https://rpc.sepolia.org",
+      ],
+    },
+    public: {
+      http: [
+        "https://ethereum-sepolia.publicnode.com",
+        "https://sepolia.drpc.org",
+        "https://rpc.sepolia.org",
+      ],
+    },
+  },
+};
+
 export const config = getDefaultConfig({
   appName: "Moove NFT Platform",
   projectId,
-  chains: [sepolia, localhost],
+  chains: [customSepolia, localhost],
   ssr: true,
   storage,
   // Optimized configuration for better performance

@@ -5,16 +5,19 @@ import { contracts } from "@/utils/contracts";
 
 const client = createPublicClient({
   chain: sepolia,
-  transport: http(
-    process.env.NEXT_PUBLIC_RPC_URL || "https://ethereum-sepolia.publicnode.com"
-  ),
+  transport: http("https://ethereum-sepolia.publicnode.com"),
 });
 
 export async function POST(request: NextRequest) {
   try {
     const { method, args, contract = "nft" } = await request.json();
 
+    console.log(
+      `🔍 API Contract Call: ${contract}.${method}(${JSON.stringify(args)})`
+    );
+
     if (!method || !Array.isArray(args)) {
+      console.error("❌ Invalid request:", { method, args });
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
 
@@ -30,6 +33,8 @@ export async function POST(request: NextRequest) {
       contractABI = contracts.MooveNFT.abi;
     }
 
+    console.log(`📋 Using contract: ${contractAddress}`);
+
     // Call the contract method
     const result = await client.readContract({
       address: contractAddress as `0x${string}`,
@@ -38,12 +43,14 @@ export async function POST(request: NextRequest) {
       args,
     });
 
+    console.log(`✅ Contract call successful:`, result);
     return NextResponse.json(result);
   } catch (error) {
-    console.error("Contract call error:", error);
-    console.error("Error details:", {
+    console.error("❌ Contract call error:", error);
+    console.error("❌ Error details:", {
       message: (error as Error).message,
       stack: (error as Error).stack,
+      name: (error as Error).name,
     });
     return NextResponse.json(
       {

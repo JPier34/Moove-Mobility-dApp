@@ -99,3 +99,5 @@ async function endAuction8() {
 endAuction8();
 
 
+
+

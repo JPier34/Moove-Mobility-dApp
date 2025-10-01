@@ -91,7 +91,7 @@ function NFTDetailsModal({
 }: NFTDetailsModalProps) {
   if (!nft || !isOpen) return null;
 
-  const rarityConfig = RARITY_CONFIG[nft.rarity];
+  const rarityConfig = RARITY_CONFIG[nft.rarity] || RARITY_CONFIG.common;
 
   return (
     <motion.div
@@ -407,7 +407,7 @@ function DecorativeNFTCard({
   nft: DecorativeNFT;
   onViewDetails: (nft: DecorativeNFT) => void;
 }) {
-  const rarityConfig = RARITY_CONFIG[nft.rarity];
+  const rarityConfig = RARITY_CONFIG[nft.rarity] || RARITY_CONFIG.common;
 
   return (
     <motion.div
@@ -542,7 +542,7 @@ export default function MyCollection() {
 
   // Smart lazy collection with reverse search
   const {
-    displayedNFTs: userNFTCollection,
+    nfts: userNFTCollection,
     allNFTs: allUserNFTs,
     isLoading: userNFTsLoading,
     isLoadingMore: isLoadingMoreNFTs,

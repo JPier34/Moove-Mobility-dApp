@@ -93,6 +93,11 @@ function useLocationWithModal(): [
         return;
       }
 
+      // Check if we're in browser environment
+      if (typeof window === "undefined") {
+        return;
+      }
+
       try {
         let permission: "granted" | "denied" | "prompt" = "prompt";
 
@@ -114,9 +119,11 @@ function useLocationWithModal(): [
         if (permission === "granted") {
           setPermissionAlreadyGranted(true);
           try {
-            const geoSystem = new VehicleGeolocationSystem();
-            const location = await geoSystem.getCurrentLocation();
-            handleLocationGranted(location);
+            if (typeof window !== "undefined") {
+              const geoSystem = new VehicleGeolocationSystem();
+              const location = await geoSystem.getCurrentLocation();
+              handleLocationGranted(location);
+            }
           } catch (error) {
             setLocationState((prev) => ({ ...prev, showLocationModal: true }));
           }
@@ -143,27 +150,29 @@ function useLocationWithModal(): [
     }));
 
     try {
-      const geoSystem = new VehicleGeolocationSystem();
-      const cityCheck = geoSystem.checkCitySupport(location);
+      if (typeof window !== "undefined") {
+        const geoSystem = new VehicleGeolocationSystem();
+        const cityCheck = geoSystem.checkCitySupport(location);
 
-      let currentCity = null;
-      let canRent = false;
+        let currentCity = null;
+        let canRent = false;
 
-      if (cityCheck.inCity && cityCheck.cityName) {
-        currentCity = EUROPEAN_CITIES.find(
-          (city) => city.id === cityCheck.cityName
-        );
-        canRent = true;
+        if (cityCheck.inCity && cityCheck.cityName) {
+          currentCity = EUROPEAN_CITIES.find(
+            (city) => city.id === cityCheck.cityName
+          );
+          canRent = true;
+        }
+
+        setLocationState((prev) => ({
+          ...prev,
+          currentCity,
+          location,
+          canRent,
+          isLoading: false,
+          error: null,
+        }));
       }
-
-      setLocationState((prev) => ({
-        ...prev,
-        currentCity,
-        location,
-        canRent,
-        isLoading: false,
-        error: null,
-      }));
     } catch (error: any) {
       setLocationState((prev) => ({
         ...prev,
@@ -231,6 +240,8 @@ function HeroContent({
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
     const handleMouseMove = (e: { clientX: number; clientY: number }) => {
       setMousePosition({
         x: (e.clientX / window.innerWidth) * 100,
@@ -531,6 +542,8 @@ export default function RentalHomepage() {
   }, [preloadAllCityImages]);
 
   const handleRentVehicle = (vehicle: VehicleOption) => {
+    if (typeof window === "undefined") return;
+
     if (locationState.canRent) {
       const cityParam = locationState.currentCity?.id
         ? `&city=${locationState.currentCity.id}`
@@ -601,13 +614,29 @@ export default function RentalHomepage() {
                   key={i}
                   className="absolute w-1 h-1 bg-white/40 rounded-full"
                   initial={{
-                    x: Math.random() * window.innerWidth,
-                    y: Math.random() * window.innerHeight,
+                    x:
+                      Math.random() *
+                      (typeof window !== "undefined"
+                        ? window.innerWidth
+                        : 1920),
+                    y:
+                      Math.random() *
+                      (typeof window !== "undefined"
+                        ? window.innerHeight
+                        : 1080),
                     opacity: 0,
                   }}
                   animate={{
-                    x: Math.random() * window.innerWidth,
-                    y: Math.random() * window.innerHeight,
+                    x:
+                      Math.random() *
+                      (typeof window !== "undefined"
+                        ? window.innerWidth
+                        : 1920),
+                    y:
+                      Math.random() *
+                      (typeof window !== "undefined"
+                        ? window.innerHeight
+                        : 1080),
                     opacity: [0, 1],
                   }}
                   transition={{
