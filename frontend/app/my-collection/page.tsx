@@ -14,8 +14,8 @@ import { useAccount } from "wagmi";
 import { toast } from "react-hot-toast";
 import OptimizedNFTImage from "@/components/collection/OptimizedNFTImage";
 import TransferNFTModalV2 from "@/components/TransferNFTModalV2";
-import CacheStats from "@/components/CacheStats";
 import InfiniteScrollTrigger from "@/components/collection/InfiniteScrollTrigger";
+import CacheStats from "@/components/CacheStats";
 import { WonAuction } from "@/types/user";
 
 // ============= TYPES =============
@@ -540,7 +540,7 @@ export default function MyCollection() {
 
   // Removed wallet debug - using Wagmi's built-in persistence
 
-  // Smart lazy collection with reverse search
+  // Smart lazy collection with original behavior (12 + 8)
   const {
     nfts: userNFTCollection,
     allNFTs: allUserNFTs,
@@ -671,6 +671,22 @@ export default function MyCollection() {
     refreshUserNFTs();
     toast.success("NFT transferred successfully!");
   }, [refreshUserNFTs]);
+
+  // Convert userNFTs to DecorativeNFT format
+  const convertToDecorative = useCallback((nft: any): DecorativeNFT => {
+    return {
+      id: nft.id || `nft_${nft.tokenId}`,
+      tokenId: nft.tokenId,
+      name: nft.name || `NFT #${nft.tokenId}`,
+      description: nft.description || "Moove Mobility NFT",
+      image: nft.image || "/images/placeholder-nft.png",
+      rarity: nft.rarity || "common",
+      purchaseDate: nft.purchaseDate || new Date(),
+      price: nft.price || 0,
+      transactionHash: nft.transactionHash || "",
+      auctionWon: nft.auctionWon,
+    };
+  }, []);
 
   // Use the decorative NFTs directly from the hook
   const decorativeNFTs = userNFTCollection;
@@ -861,7 +877,7 @@ export default function MyCollection() {
             </div>
           </motion.div>
         ) : userNFTCollection.filter(
-            (nft) => (nft as any).isFromAuction && (nft as any).status === "3"
+            (nft) => (nft as any).isFromAuction && (nft as any).status === "4" // SETTLED (includes both won auctions and deserted auctions returned to seller)
           ).length > 0 ? (
           <motion.div
             className="mb-8"
@@ -881,13 +897,13 @@ export default function MyCollection() {
                 {
                   userNFTCollection.filter(
                     (nft) =>
-                      (nft as any).isFromAuction && (nft as any).status === "3"
+                      (nft as any).isFromAuction && (nft as any).status === "4" // SETTLED
                   ).length
                 }{" "}
                 auction
                 {userNFTCollection.filter(
                   (nft) =>
-                    (nft as any).isFromAuction && (nft as any).status === "3"
+                    (nft as any).isFromAuction && (nft as any).status === "4" // SETTLED
                 ).length > 1
                   ? "e"
                   : ""}{" "}

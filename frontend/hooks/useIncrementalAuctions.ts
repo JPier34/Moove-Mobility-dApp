@@ -24,6 +24,11 @@ interface AuctionData {
   bidIncrement?: string;
   extensionThreshold?: string;
   extensionDuration?: string;
+  revealEndTime?: string;
+  revealPhaseStarted?: boolean;
+  minBidders?: number;
+  totalBidders?: number;
+  allowPartialFulfillment?: boolean;
 }
 
 interface UseIncrementalAuctionsReturn {
@@ -33,6 +38,69 @@ interface UseIncrementalAuctionsReturn {
   refetch: () => void;
   lastFetchedCount: number;
 }
+
+// Helper function to parse auction data from contract response
+const parseAuctionData = (rawData: any) => {
+  // First, let's check if the data is already an object with named fields
+  if (rawData && typeof rawData === "object" && !Array.isArray(rawData)) {
+    // If it's an object, use the named fields directly
+    console.log("📋 Using named fields from contract object");
+    return {
+      auctionId: rawData.auctionId,
+      nftContract: rawData.nftContract,
+      tokenId: rawData.tokenId,
+      seller: rawData.seller,
+      auctionType: rawData.auctionType,
+      status: rawData.status,
+      allowPartialFulfillment: rawData.allowPartialFulfillment,
+      isSettled: rawData.isSettled,
+      revealPhaseStarted: rawData.revealPhaseStarted,
+      startingPrice: rawData.startingPrice,
+      reservePrice: rawData.reservePrice,
+      buyNowPrice: rawData.buyNowPrice,
+      currentPrice: rawData.currentPrice,
+      bidIncrement: rawData.bidIncrement,
+      highestBid: rawData.highestBid,
+      startTime: rawData.startTime,
+      endTime: rawData.endTime,
+      extensionThreshold: rawData.extensionThreshold,
+      extensionDuration: rawData.extensionDuration,
+      revealEndTime: rawData.revealEndTime,
+      highestBidder: rawData.highestBidder,
+      minBidders: rawData.minBidders,
+      totalBidders: rawData.totalBidders,
+    };
+  }
+
+  // Fallback to array access if it's a tuple
+  // Based on the latest contract ABI, there are 23 fields (0-22)
+  console.log("📋 Using array index access for contract tuple");
+  return {
+    auctionId: rawData[0],
+    nftContract: rawData[1],
+    tokenId: rawData[2],
+    seller: rawData[3],
+    auctionType: rawData[4],
+    status: rawData[5],
+    allowPartialFulfillment: rawData[6],
+    isSettled: rawData[7],
+    revealPhaseStarted: rawData[8],
+    startingPrice: rawData[9],
+    reservePrice: rawData[10],
+    buyNowPrice: rawData[11],
+    currentPrice: rawData[12],
+    bidIncrement: rawData[13],
+    highestBid: rawData[14],
+    startTime: rawData[15],
+    endTime: rawData[16],
+    extensionThreshold: rawData[17],
+    extensionDuration: rawData[18],
+    revealEndTime: rawData[19],
+    highestBidder: rawData[20],
+    minBidders: rawData[21],
+    totalBidders: rawData[22],
+  };
+};
 
 export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
   const { address, isConnected } = useAccount();
@@ -104,7 +172,8 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
           console.log("🔄 Fetching all auctions");
           for (let i = 0; i < totalCount; i++) {
             try {
-              const auctionData = await auctionContract.getAuction(i);
+              const rawAuctionData = await auctionContract.getAuction(i);
+              const auctionData = parseAuctionData(rawAuctionData);
 
               // Check if auction data is valid
               if (!auctionData || auctionData.tokenId === undefined) {
@@ -112,13 +181,40 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
                 continue;
               }
 
+              console.log(`🔍 Auction ${i} RAW data:`, rawAuctionData);
+        console.log(`🔍 Auction ${i} parsed data:`, {
+          startTime: auctionData.startTime,
+          endTime: auctionData.endTime,
+          startingPrice: auctionData.startingPrice,
+          tokenId: auctionData.tokenId,
+          status: auctionData.status,
+          isSettled: auctionData.isSettled,
+          totalBidders: auctionData.totalBidders,
+        });
+
+        // Check if auction is expired but still ACTIVE - needs to be ended
+        const currentTime = Math.floor(Date.now() / 1000);
+        const endTime = Number(auctionData.endTime);
+        const isExpired = currentTime >= endTime;
+        const isActive = Number(auctionData.status) === 1; // ACTIVE
+        
+        if (isExpired && isActive) {
+          console.log(`⚠️ Auction ${i} is expired but still ACTIVE. Should call endAuction.`, {
+            auctionId: i,
+            currentTime,
+            endTime,
+            status: auctionData.status,
+            timeExpired: isExpired,
+            isActive,
+          });
+        }
+
               const auction: AuctionData = {
                 auctionId: i.toString(),
                 nftId: auctionData.tokenId?.toString() || "0",
-                nftName:
-                  auctionData.nftName || `NFT #${auctionData.tokenId || i}`,
-                nftImage: auctionData.nftImage || "/images/default-nft.svg",
-                nftCategory: auctionData.nftCategory || "sticker",
+                nftName: `NFT #${auctionData.tokenId || i}`,
+                nftImage: "/images/default-nft.svg",
+                nftCategory: "sticker",
                 status: Number(auctionData.status || 0),
                 startPrice: auctionData.startingPrice
                   ? ethers.formatEther(auctionData.startingPrice)
@@ -135,29 +231,44 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
                 endTime: auctionData.endTime
                   ? (() => {
                       const endTimeUnix = Number(auctionData.endTime);
-                      // Validate endTime - if it's corrupted (year 2033+), use current time
-                      if (endTimeUnix > 0 && endTimeUnix < 2000000000) {
+                      // Enhanced validation for endTime
+                      const now = Math.floor(Date.now() / 1000);
+                      const maxReasonableTime = now + 365 * 24 * 60 * 60; // 1 year from now
+
+                      if (endTimeUnix > 0 && endTimeUnix < maxReasonableTime) {
                         return new Date(endTimeUnix * 1000).toISOString();
                       } else {
                         console.warn(
-                          `⚠️ Auction ${i} has corrupted endTime: ${endTimeUnix}, using current time`
+                          `⚠️ Auction ${i} has corrupted endTime: ${endTimeUnix} (now: ${now}), using current time + 5min`
                         );
-                        return new Date().toISOString();
+                        // Use current time + 5 minutes as fallback (typical auction duration)
+                        return new Date((now + 300) * 1000).toISOString();
                       }
                     })()
-                  : new Date().toISOString(),
-                bidCount: Number(auctionData.totalBidders || 0),
+                  : new Date(Date.now() + 300000).toISOString(), // Default: now + 5min
+                bidCount: (() => {
+                  const totalBidders = Number(auctionData.totalBidders || 0);
+                  // Only use totalBidders if it's a reasonable number (< 100)
+                  // Otherwise, it might be corrupted data
+                  return totalBidders < 100 ? totalBidders : 0;
+                })(),
                 auctionType: Number(auctionData.auctionType || 0),
                 isSettled: auctionData.isSettled || false,
                 startTime: auctionData.startTime
                   ? (() => {
                       const startTimeUnix = Number(auctionData.startTime);
-                      // Validate startTime - if it's corrupted (year 2033+), use current time
-                      if (startTimeUnix > 0 && startTimeUnix < 2000000000) {
+                      // Enhanced validation for startTime
+                      const now = Math.floor(Date.now() / 1000);
+                      const maxReasonableTime = now + 365 * 24 * 60 * 60; // 1 year from now
+
+                      if (
+                        startTimeUnix > 0 &&
+                        startTimeUnix < maxReasonableTime
+                      ) {
                         return new Date(startTimeUnix * 1000).toISOString();
                       } else {
                         console.warn(
-                          `⚠️ Auction ${i} has corrupted startTime: ${startTimeUnix}, using current time`
+                          `⚠️ Auction ${i} has corrupted startTime: ${startTimeUnix} (now: ${now}), using current time`
                         );
                         return new Date().toISOString();
                       }
@@ -175,6 +286,16 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
                 extensionDuration: auctionData.extensionDuration
                   ? auctionData.extensionDuration.toString()
                   : undefined,
+                revealEndTime: auctionData.revealEndTime
+                  ? new Date(
+                      Number(auctionData.revealEndTime) * 1000
+                    ).toISOString()
+                  : undefined,
+                revealPhaseStarted: auctionData.revealPhaseStarted || false,
+                minBidders: Number(auctionData.minBidders || 0),
+                totalBidders: Number(auctionData.totalBidders || 0),
+                allowPartialFulfillment:
+                  auctionData.allowPartialFulfillment || false,
               };
               auctionsToFetch.push(auction);
             } catch (err) {
@@ -188,7 +309,8 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
           );
           for (let i = lastFetchedCount; i < totalCount; i++) {
             try {
-              const auctionData = await auctionContract.getAuction(i);
+              const rawAuctionData = await auctionContract.getAuction(i);
+              const auctionData = parseAuctionData(rawAuctionData);
 
               // Check if auction data is valid
               if (!auctionData || auctionData.tokenId === undefined) {
@@ -196,13 +318,23 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
                 continue;
               }
 
+              console.log(
+                `🔍 Auction ${i} RAW data (incremental):`,
+                rawAuctionData
+              );
+              console.log(`🔍 Auction ${i} parsed data (incremental):`, {
+                startTime: auctionData.startTime,
+                endTime: auctionData.endTime,
+                startingPrice: auctionData.startingPrice,
+                tokenId: auctionData.tokenId,
+              });
+
               const auction: AuctionData = {
                 auctionId: i.toString(),
                 nftId: auctionData.tokenId?.toString() || "0",
-                nftName:
-                  auctionData.nftName || `NFT #${auctionData.tokenId || i}`,
-                nftImage: auctionData.nftImage || "/images/default-nft.svg",
-                nftCategory: auctionData.nftCategory || "sticker",
+                nftName: `NFT #${auctionData.tokenId || i}`,
+                nftImage: "/images/default-nft.svg",
+                nftCategory: "sticker",
                 status: Number(auctionData.status || 0),
                 startPrice: auctionData.startingPrice
                   ? ethers.formatEther(auctionData.startingPrice)
@@ -219,29 +351,44 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
                 endTime: auctionData.endTime
                   ? (() => {
                       const endTimeUnix = Number(auctionData.endTime);
-                      // Validate endTime - if it's corrupted (year 2033+), use current time
-                      if (endTimeUnix > 0 && endTimeUnix < 2000000000) {
+                      // Enhanced validation for endTime
+                      const now = Math.floor(Date.now() / 1000);
+                      const maxReasonableTime = now + 365 * 24 * 60 * 60; // 1 year from now
+
+                      if (endTimeUnix > 0 && endTimeUnix < maxReasonableTime) {
                         return new Date(endTimeUnix * 1000).toISOString();
                       } else {
                         console.warn(
-                          `⚠️ Auction ${i} has corrupted endTime: ${endTimeUnix}, using current time`
+                          `⚠️ Auction ${i} has corrupted endTime: ${endTimeUnix} (now: ${now}), using current time + 5min`
                         );
-                        return new Date().toISOString();
+                        // Use current time + 5 minutes as fallback (typical auction duration)
+                        return new Date((now + 300) * 1000).toISOString();
                       }
                     })()
-                  : new Date().toISOString(),
-                bidCount: Number(auctionData.totalBidders || 0),
+                  : new Date(Date.now() + 300000).toISOString(), // Default: now + 5min
+                bidCount: (() => {
+                  const totalBidders = Number(auctionData.totalBidders || 0);
+                  // Only use totalBidders if it's a reasonable number (< 100)
+                  // Otherwise, it might be corrupted data
+                  return totalBidders < 100 ? totalBidders : 0;
+                })(),
                 auctionType: Number(auctionData.auctionType || 0),
                 isSettled: auctionData.isSettled || false,
                 startTime: auctionData.startTime
                   ? (() => {
                       const startTimeUnix = Number(auctionData.startTime);
-                      // Validate startTime - if it's corrupted (year 2033+), use current time
-                      if (startTimeUnix > 0 && startTimeUnix < 2000000000) {
+                      // Enhanced validation for startTime
+                      const now = Math.floor(Date.now() / 1000);
+                      const maxReasonableTime = now + 365 * 24 * 60 * 60; // 1 year from now
+
+                      if (
+                        startTimeUnix > 0 &&
+                        startTimeUnix < maxReasonableTime
+                      ) {
                         return new Date(startTimeUnix * 1000).toISOString();
                       } else {
                         console.warn(
-                          `⚠️ Auction ${i} has corrupted startTime: ${startTimeUnix}, using current time`
+                          `⚠️ Auction ${i} has corrupted startTime: ${startTimeUnix} (now: ${now}), using current time`
                         );
                         return new Date().toISOString();
                       }
@@ -259,6 +406,16 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
                 extensionDuration: auctionData.extensionDuration
                   ? auctionData.extensionDuration.toString()
                   : undefined,
+                revealEndTime: auctionData.revealEndTime
+                  ? new Date(
+                      Number(auctionData.revealEndTime) * 1000
+                    ).toISOString()
+                  : undefined,
+                revealPhaseStarted: auctionData.revealPhaseStarted || false,
+                minBidders: Number(auctionData.minBidders || 0),
+                totalBidders: Number(auctionData.totalBidders || 0),
+                allowPartialFulfillment:
+                  auctionData.allowPartialFulfillment || false,
               };
               auctionsToFetch.push(auction);
             } catch (err) {

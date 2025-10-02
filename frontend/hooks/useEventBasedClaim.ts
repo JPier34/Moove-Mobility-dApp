@@ -151,19 +151,40 @@ export function useEventBasedClaim() {
         }
       }
 
-      // Check for auctions that should be claimable based on time
+      // Check for auctions that should be claimable based on actual auction end time
       const currentTime = Math.floor(Date.now() / 1000);
-      const AUCTION_TIMEOUT = 300; // 5 minutes
 
       for (const [auctionId, win] of userWins) {
-        const timeSinceBid = currentTime - win.timestamp;
+        try {
+          // Get auction data to check actual end time
+          const auctionContract = new ethers.Contract(
+            contracts.MooveAuction.address,
+            contracts.MooveAuction.abi,
+            provider
+          );
 
-        // If it's been more than 5 minutes since the bid and not settled, consider it claimable
-        if (timeSinceBid > AUCTION_TIMEOUT && !settledAuctions.has(auctionId)) {
-          userWins.set(auctionId, {
-            ...win,
-            canClaim: true,
-          });
+          const auction = await auctionContract.getAuction(parseInt(auctionId));
+          const endTime = Number(auction.endTime);
+          const status = Number(auction.status);
+          const highestBidder = auction.highestBidder;
+
+          // Only mark as claimable if auction is actually ended AND user is winner AND time has passed
+          if (
+            status === 3 && // ENDED status
+            highestBidder.toLowerCase() === address.toLowerCase() &&
+            currentTime >= endTime &&
+            !settledAuctions.has(auctionId)
+          ) {
+            userWins.set(auctionId, {
+              ...win,
+              canClaim: true,
+            });
+          }
+        } catch (error) {
+          console.warn(
+            `⚠️ Could not check auction ${auctionId} status for claim:`,
+            error
+          );
         }
       }
 
@@ -269,6 +290,13 @@ export function useEventBasedClaim() {
 
         // Refresh the list
         fetchClaimableAuctions();
+
+        // Trigger collection refresh for all collection hooks
+        window.dispatchEvent(
+          new CustomEvent("nftClaimed", {
+            detail: { auctionId: currentAuctionId },
+          })
+        );
       }
     }
 

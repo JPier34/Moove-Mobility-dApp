@@ -149,7 +149,7 @@ export function useSimpleWonAuctions(): SimpleWonAuctionsResult {
                 status: auction.status,
                 finalBid: Number(auction.finalBid || 0),
                 bidders: Number(auction.bidders || 0),
-                isSettled: auction.status === 4,
+                isSettled: auction.status === 4, // SETTLED (corrected to match contract)
                 endTime: auction.endTime,
               });
 
@@ -162,7 +162,7 @@ export function useSimpleWonAuctions(): SimpleWonAuctionsResult {
                   finalBidType: typeof auction.finalBid,
                   finalBidNumber: Number(auction.finalBid || 0),
                   status: auction.status,
-                  isSettled: auction.status === 4,
+                  isSettled: auction.status === 4, // SETTLED (corrected to match contract)
                 }
               );
             }

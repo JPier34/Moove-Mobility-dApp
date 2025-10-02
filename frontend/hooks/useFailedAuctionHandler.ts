@@ -78,7 +78,7 @@ export function useFailedAuctionHandler(): FailedAuctionHandler {
 
         // Check if auction is actually failed (ended but no winner)
         const isEnded =
-          status === 2 || (status === 1 && currentTime >= endTime);
+          status === 3 || (status === 1 && currentTime >= endTime); // ENDED or ACTIVE but time expired (corrected to match contract)
         const hasWinner =
           auctionData.highestBidder &&
           auctionData.highestBidder !== ethers.ZeroAddress;
@@ -152,8 +152,8 @@ export function useAutoFailedAuctionHandler() {
 
       const failedAuctions = auctions.filter((auction) => {
         const isEnded =
-          auction.status === 2 ||
-          (auction.status === 1 &&
+          auction.status === 3 || // ENDED (corrected to match contract)
+          (auction.status === 1 && // ACTIVE but time expired
             auction.endTime &&
             new Date(auction.endTime).getTime() <= Date.now());
         const hasWinner =

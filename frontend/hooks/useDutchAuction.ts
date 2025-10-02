@@ -144,7 +144,7 @@ export const useDutchAuction = () => {
             "  - Is Dutch auction?",
             Number(auctionData.auctionType) === 1
           );
-          console.log("  - Is active?", Number(auctionData.status) === 1);
+          console.log("  - Is active?", Number(auctionData.status) === 1); // ACTIVE (corrected to match contract)
           console.log("  - Is not seller?", auctionData.seller !== address);
           console.log("  - Is not settled?", !auctionData.isSettled);
           console.log(
@@ -165,7 +165,7 @@ export const useDutchAuction = () => {
         }
 
         const isDutchAuction = Number(auctionData.auctionType) === 1;
-        const isActive = Number(auctionData.status) === 1;
+        const isActive = Number(auctionData.status) === 1; // ACTIVE (corrected to match contract)
         const isNotSeller = auctionData.seller !== address;
         const isNotSettled = !auctionData.isSettled;
 

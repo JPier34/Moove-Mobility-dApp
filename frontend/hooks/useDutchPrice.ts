@@ -34,7 +34,7 @@ export function useDutchPrice(
 
     // Check if auction is still active
     const auctionActive =
-      auction.status === 1 && elapsed >= 0 && elapsed < duration;
+      auction.status === 1 && elapsed >= 0 && elapsed < duration; // ACTIVE (corrected to match contract)
     setIsActive(auctionActive);
 
     // Calculate time remaining

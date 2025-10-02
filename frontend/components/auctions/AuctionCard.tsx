@@ -199,7 +199,13 @@ export default function AuctionCard({
   // All auction interactions are handled in the modal
 
   const getTimeStatus = () => {
-    if (showEndedState || localAuction.status !== AuctionStatus.ACTIVE) {
+    // If explicitly showing ended state, show as ended
+    if (showEndedState) {
+      return { color: "text-gray-500", label: "Ended", canExtend: false };
+    }
+
+    // If auction status is not ACTIVE, show as ended
+    if (localAuction.status !== AuctionStatus.ACTIVE) {
       return { color: "text-gray-500", label: "Ended", canExtend: false };
     }
 

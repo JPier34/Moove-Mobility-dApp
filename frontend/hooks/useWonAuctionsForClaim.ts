@@ -7,7 +7,11 @@ import { Auction } from "@/types/auction";
 
 export function useWonAuctionsForClaim() {
   const { address } = useAccount();
-  const { auctions, isLoading: auctionsLoading, error: auctionsError } = useAuctionsEnhanced();
+  const {
+    auctions,
+    isLoading: auctionsLoading,
+    error: auctionsError,
+  } = useAuctionsEnhanced();
   const [wonAuctions, setWonAuctions] = useState<Auction[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,16 +24,21 @@ export function useWonAuctionsForClaim() {
       setError(null);
 
       // Filter auctions where user is the highest bidder and auction is ended/settled
+      // CORRECTED STATUS VALUES FROM CONTRACT: 0=PENDING, 1=ACTIVE, 2=REVEAL, 3=ENDED, 4=SETTLED, 5=CANCELLED
       const userWonAuctions = auctions.filter((auction) => {
-        const isWinner = auction.highestBidder?.toLowerCase() === address.toLowerCase();
-        const isEnded = auction.status === 3; // ENDED
-        const isSettled = auction.status === 4; // SETTLED
-        const isTimeExpired = auction.endTime && new Date(auction.endTime).getTime() <= Date.now();
-        
+        const isWinner =
+          auction.highestBidder?.toLowerCase() === address.toLowerCase();
+        const isEnded = auction.status === 3; // ENDED (corrected to match contract)
+        const isSettled = auction.status === 4 || auction.isSettled; // SETTLED or isSettled field
+        const isTimeExpired =
+          auction.endTime && new Date(auction.endTime).getTime() <= Date.now();
+
         return isWinner && (isEnded || isSettled || isTimeExpired);
       });
 
-      console.log(`🎯 Found ${userWonAuctions.length} won auctions for user ${address}`);
+      console.log(
+        `🎯 Found ${userWonAuctions.length} won auctions for user ${address}`
+      );
       setWonAuctions(userWonAuctions);
     } catch (err) {
       console.error("Error loading won auctions:", err);
@@ -56,4 +65,3 @@ export function useWonAuctionsForClaim() {
     refetch,
   };
 }
-

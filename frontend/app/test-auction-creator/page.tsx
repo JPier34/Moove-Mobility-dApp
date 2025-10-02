@@ -43,9 +43,25 @@ export default function TestAuctionCreator() {
       console.log("📝 Step 1: Creating test NFT...");
       setResult("📝 Step 1: Creating test NFT...");
 
+      // Create real metadata for the NFT
+      const metadata = {
+        name: `Moove Test NFT #${Date.now()}`,
+        description: "Test NFT created for auction testing - Moove Mobility",
+        image: "https://ipfs.io/ipfs/QmYourRealImageHash", // Replace with real IPFS hash
+        attributes: [
+          { trait_type: "Rarity", value: "test" },
+          { trait_type: "Type", value: "Auction Test" },
+          { trait_type: "Collection", value: "Moove Mobility" },
+          { trait_type: "Created", value: new Date().toISOString() },
+        ],
+      };
+
+      // For now, use a simple string metadata (you should upload to IPFS in production)
+      const metadataString = JSON.stringify(metadata);
+
       const mintTx = await nftContract.mintNFT(
         address,
-        "ipfs://QmMockMetadataHashForTesting123456789"
+        metadataString // Use real metadata instead of mock hash
       );
 
       console.log("📡 NFT mint transaction:", mintTx.hash);
@@ -129,20 +145,81 @@ export default function TestAuctionCreator() {
       const auctionId = auctionEvents[0].args.auctionId;
       console.log("🆔 Auction created with ID:", auctionId.toString());
 
-      // Step 4: Verify auction data
-      console.log("📝 Step 4: Verifying auction data...");
-      setResult("📝 Step 4: Verifying auction data...");
+      // Step 4: Verify auction data with detailed type checking
+      console.log("📝 Step 4: Verifying auction data with type analysis...");
+      setResult("📝 Step 4: Verifying auction data with type analysis...");
 
       const auctionData = await auctionContract.getAuction(auctionId);
-      console.log("📊 Auction data:", {
-        auctionId: auctionData.auctionId.toString(),
-        seller: auctionData.seller,
-        highestBidder: auctionData.highestBidder,
-        status: auctionData.status.toString(),
-        isSettled: auctionData.isSettled,
-        tokenId: auctionData.tokenId.toString(),
-        auctionType: auctionData.auctionType.toString(),
+
+      // Detailed type analysis and logging
+      console.log("🔍 DETAILED AUCTION DATA ANALYSIS:");
+      console.log("📊 Raw contract data structure:", {
+        totalFields: auctionData.length,
+        fieldTypes: auctionData.map((field: any, index: number) => ({
+          index,
+          value: field.toString(),
+          type: typeof field,
+          isBigInt: typeof field === "bigint",
+          isString: typeof field === "string",
+          isNumber: typeof field === "number",
+          isBoolean: typeof field === "boolean",
+        })),
       });
+
+      // Map to our unified types for verification
+      const mappedData = {
+        auctionId: auctionData[0].toString(),
+        nftContract: auctionData[1],
+        tokenId: auctionData[2].toString(),
+        seller: auctionData[3],
+        auctionType: Number(auctionData[4]),
+        status: Number(auctionData[5]),
+        allowPartialFulfillment: auctionData[6],
+        isSettled: auctionData[7],
+        revealPhaseStarted: auctionData[8],
+        startingPrice: ethers.formatEther(auctionData[9]),
+        reservePrice: ethers.formatEther(auctionData[10]),
+        buyNowPrice: ethers.formatEther(auctionData[11]),
+        currentPrice: ethers.formatEther(auctionData[12]),
+        bidIncrement: ethers.formatEther(auctionData[13]),
+        highestBid: ethers.formatEther(auctionData[14]),
+        startTime: Number(auctionData[15]),
+        endTime: Number(auctionData[16]),
+        extensionThreshold: ethers.formatEther(auctionData[17]),
+        extensionDuration: Number(auctionData[18]),
+        revealEndTime: Number(auctionData[19]),
+        highestBidder: auctionData[20],
+        minBidders: Number(auctionData[21]),
+        totalBidders: Number(auctionData[22]),
+      };
+
+      console.log("🎯 MAPPED DATA (Frontend Format):", mappedData);
+      console.log("✅ Type compatibility check:", {
+        auctionIdType: typeof mappedData.auctionId,
+        tokenIdType: typeof mappedData.tokenId,
+        pricesType: typeof mappedData.startingPrice,
+        timestampsType: typeof mappedData.startTime,
+        numbersType: typeof mappedData.auctionType,
+      });
+
+      // Verify data integrity
+      const integrityCheck = {
+        auctionIdMatches: mappedData.auctionId === auctionId.toString(),
+        tokenIdMatches: mappedData.tokenId === tokenId.toString(),
+        sellerMatches:
+          mappedData.seller.toLowerCase() === address.toLowerCase(),
+        auctionTypeValid:
+          mappedData.auctionType >= 0 && mappedData.auctionType <= 3,
+        pricesValid: parseFloat(mappedData.startingPrice) > 0,
+        timestampsValid:
+          mappedData.startTime > 0 && mappedData.endTime > mappedData.startTime,
+      };
+
+      console.log("🔍 DATA INTEGRITY CHECK:", integrityCheck);
+      console.log(
+        "📈 All checks passed:",
+        Object.values(integrityCheck).every((check) => check)
+      );
 
       setResult(
         "✅ Test auction created successfully! Check console for details."
@@ -275,4 +352,3 @@ export default function TestAuctionCreator() {
     </div>
   );
 }
-

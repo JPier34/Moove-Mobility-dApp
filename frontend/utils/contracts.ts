@@ -3,10 +3,10 @@
 
 // Contract Addresses (Updated with deployed contracts)
 export const CONTRACT_ADDRESSES = {
-  MooveAccessControl: "0x93b6F6F4b28cd61F68c16A85c9FC107Bf8f47e42",
+  MooveAccessControl: "0x005672EcC14b09A958742B960Ebb76eBE52Be44A",
   MooveNFT: "0x40E455515bf712144C1A5D859F19d64b537754f7",
   MooveAuction: "0x463a4fff0796AF7C69788463629AeF046A2fc211",
-  MooveRentalPass: "0x52d95a8Fd4D8c0Ad210DCAD3BA8EBd533EB5420a",
+  MooveRentalPass: "0x74aAb47A0439B728A5956A1d7faAc6716F1F18Df",
 } as const;
 
 // Auction Types

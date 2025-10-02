@@ -10,6 +10,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@apollo/client": "^4.0.7",
     "@headlessui/react": "^2.2.4",
     "@heroicons/react": "^2.2.0",
     "@hookform/resolvers": "^3.3.2",
@@ -24,6 +25,7 @@
     "date-fns": "^4.1.0",
     "ethers": "^6.15.0",
     "framer-motion": "^12.23.11",
+    "graphql": "^16.11.0",
     "ipfs-http-client": "^60.0.1",
     "lucide-react": "^0.525.0",
     "next": "^14.2.30",

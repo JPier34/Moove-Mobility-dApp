@@ -1,0 +1,71 @@
+type Auction @entity {
+  id: ID!
+  auctionId: BigInt!
+  tokenId: BigInt!
+  auctionType: Int!
+  startPrice: BigInt!
+  endTime: BigInt!
+  winner: Bytes!
+  finalBid: BigInt!
+  settled: Boolean!
+  createdAt: BigInt!
+  settledAt: BigInt
+  transactionHash: Bytes!
+  blockNumber: BigInt!
+}
+
+type AuctionSettled @entity {
+  id: ID!
+  auctionId: BigInt!
+  tokenId: BigInt!
+  winner: Bytes!
+  finalBid: BigInt!
+  timestamp: BigInt!
+  transactionHash: Bytes!
+  blockNumber: BigInt!
+}
+
+type AuctionCreated @entity {
+  id: ID!
+  auctionId: BigInt!
+  tokenId: BigInt!
+  auctionType: Int!
+  startPrice: BigInt!
+  endTime: BigInt!
+  timestamp: BigInt!
+  transactionHash: Bytes!
+  blockNumber: BigInt!
+}
+
+type NFT @entity {
+  id: ID!
+  tokenId: BigInt!
+  owner: Bytes!
+  tokenURI: String!
+  createdAt: BigInt!
+  transactionHash: Bytes!
+  blockNumber: BigInt!
+}
+
+type Transfer @entity {
+  id: ID!
+  tokenId: BigInt!
+  from: Bytes!
+  to: Bytes!
+  timestamp: BigInt!
+  transactionHash: Bytes!
+  blockNumber: BigInt!
+}
+
+type UserCollection @entity {
+  id: ID!
+  user: Bytes!
+  tokenId: BigInt!
+  nft: NFT!
+  acquiredAt: BigInt!
+  acquisitionMethod: String! # "auction", "transfer", "mint"
+  auctionId: BigInt
+  price: BigInt
+  transactionHash: Bytes!
+  blockNumber: BigInt!
+}

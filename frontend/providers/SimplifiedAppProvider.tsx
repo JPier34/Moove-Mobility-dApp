@@ -13,12 +13,13 @@ import { config } from "@/lib/wagmi";
 import { ThemeProvider } from "@/providers/ThemeProvider";
 import { AuctionNotificationsProvider } from "@/providers/AuctionNotificationsProvider";
 import { NFTTransferNotificationsProvider } from "@/providers/NFTTransferNotificationsProvider";
-import { useAutomaticAuctionMonitor } from "@/hooks/useAutomaticAuctionMonitor";
-import { useClaimReadyNotifications } from "@/hooks/useClaimReadyNotifications";
-import { useBidRefundListener } from "@/hooks/useBidRefundListener";
+// DISABLED: Separate monitors - Using only event-based system
+// import { useAutomaticAuctionMonitor } from "@/hooks/useAutomaticAuctionMonitor";
+// import { useClaimReadyNotifications } from "@/hooks/useClaimReadyNotifications";
+// import { useBidRefundListener } from "@/hooks/useBidRefundListener";
 import UnifiedNotificationBadge from "@/components/notifications/UnifiedNotificationBadge";
-import EventBasedNotificationBadge from "@/components/notifications/EventBasedNotificationBadge";
 import EventBasedClaimPanel from "@/components/claim/EventBasedClaimPanel";
+import AutomaticRefundHandler from "@/components/refunds/AutomaticRefundHandler";
 // Removed custom wallet persistence - using Wagmi's built-in persistence
 import "@rainbow-me/rainbowkit/styles.css";
 
@@ -56,21 +57,21 @@ interface SimplifiedAppProviderProps {
   children: ReactNode;
 }
 
-// Component to handle automatic auction monitoring
-function AuctionMonitor() {
-  useAutomaticAuctionMonitor();
-  return null; // This component doesn't render anything
-}
+// DISABLED: Separate monitor functions - Using only event-based system
+// function AuctionMonitor() {
+//   useAutomaticAuctionMonitor();
+//   return null;
+// }
 
-function ClaimReadyMonitor() {
-  useClaimReadyNotifications();
-  return null; // This component doesn't render anything
-}
+// function ClaimReadyMonitor() {
+//   useClaimReadyNotifications();
+//   return null;
+// }
 
-function BidRefundMonitor() {
-  useBidRefundListener();
-  return null; // This component doesn't render anything
-}
+// function BidRefundMonitor() {
+//   useBidRefundListener();
+//   return null;
+// }
 
 // Removed WalletPersistenceWrapper - using Wagmi's built-in persistence
 
@@ -194,25 +195,21 @@ export default function SimplifiedAppProvider({
           <ThemeProvider>
             <AuctionNotificationsProvider>
               <NFTTransferNotificationsProvider>
-                {/* DISABLED: Automatic Auction Monitor - Causing recursive calls */}
+                {/* DISABLED: All separate monitors - Using only event-based system */}
                 {/* <AuctionMonitor /> */}
-
-                {/* Claim Ready Monitor - Runs in background */}
-                <ClaimReadyMonitor />
-
-                {/* Bid Refund Monitor - Runs in background */}
-                <BidRefundMonitor />
+                {/* <ClaimReadyMonitor /> */}
+                {/* <BidRefundMonitor /> */}
 
                 {children}
 
-                {/* Unified Notification Badge - Rendered after both providers */}
+                {/* Unified Notification Badge - Single system for claim notifications */}
                 <UnifiedNotificationBadge />
-
-                {/* Event-Based Notification Badge - New system that ignores corrupted timestamps */}
-                <EventBasedNotificationBadge />
 
                 {/* Event-Based Claim Panel - For claiming won auctions */}
                 <EventBasedClaimPanel />
+
+                {/* Automatic Refund Handler - Processes refunds when auctions are settled */}
+                <AutomaticRefundHandler />
               </NFTTransferNotificationsProvider>
             </AuctionNotificationsProvider>
           </ThemeProvider>

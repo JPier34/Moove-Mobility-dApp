@@ -76,9 +76,9 @@ export function useAutomaticAuctionMonitor() {
           // Check if auction is expired and not settled
           // Also handle auctions with invalid endTime (like test values in year 2286)
           const isInvalidEndTime = endTime > 2000000000; // Year 2033+ is suspicious
-          const isExpired = status === 1 && currentTime >= endTime;
+          const isExpired = status === 1 && currentTime >= endTime; // ACTIVE but time expired
           const shouldForceSettle =
-            isInvalidEndTime && !isSettled && status === 0; // Force settle invalid auctions with status 0
+            isInvalidEndTime && !isSettled && status === 0; // Force settle invalid auctions with PENDING status
 
           // Skip if already processed or already settled
           if (processedAuctions.has(i) || isSettled) {

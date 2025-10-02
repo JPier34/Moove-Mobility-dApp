@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useReadContract } from "wagmi";
 import { contracts } from "@/utils/contracts";
+import { useNFTDataCorrections } from "./useNFTDataCorrections";
 
 export interface NFTMetadata {
   name: string;
@@ -23,6 +24,7 @@ export function useNFTMetadata(tokenId: number) {
   const [metadata, setMetadata] = useState<NFTMetadata | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { applyCorrections, hasCorrections } = useNFTDataCorrections();
 
   // Use Wagmi to read tokenURI from contract
   const { data: tokenURI, isLoading: uriLoading } = useReadContract({
@@ -148,7 +150,16 @@ export function useNFTMetadata(tokenId: number) {
         );
 
         if (fetchedMetadata) {
-          setMetadata(fetchedMetadata);
+          // Apply corrections if available
+          const correctedMetadata = applyCorrections(tokenId, fetchedMetadata);
+          setMetadata(correctedMetadata);
+
+          if (hasCorrections(tokenId)) {
+            console.log(
+              `🔧 Applied corrections for NFT #${tokenId}:`,
+              correctedMetadata._corrections
+            );
+          }
         } else {
           // Fallback metadata if IPFS fetch fails
           setMetadata({

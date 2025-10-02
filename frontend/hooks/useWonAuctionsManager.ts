@@ -250,6 +250,7 @@ export function useWonAuctionsManager() {
 
       // If the auction has ended in time but still has status ACTIVE, call endAuction first
       if (contractStatus.status === 1) {
+        // ACTIVE
         console.log(
           `🔄 Auction ${auctionId} is ACTIVE but time-expired. Calling endAuction first...`
         );
@@ -305,6 +306,7 @@ export function useWonAuctionsManager() {
           return;
         }
       } else if (contractStatus.status === 2) {
+        // REVEAL
         console.log(
           `🔍 Auction ${auctionId} is in REVEAL phase. Checking auction type...`
         );
@@ -336,6 +338,7 @@ export function useWonAuctionsManager() {
           return;
         }
       } else if (contractStatus.status === 3) {
+        // ENDED
         console.log(
           `✅ Auction ${auctionId} is already ENDED. Ready for settlement.`
         );

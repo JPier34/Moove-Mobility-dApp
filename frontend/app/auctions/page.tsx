@@ -3,9 +3,10 @@
 import React from "react";
 import { motion } from "framer-motion";
 import AuctionGrid from "@/components/auctions/AuctionGrid";
-import { AuctionType } from "@/types/auction";
+import { AuctionType, AuctionStatus } from "@/types/auction";
 import { useIncrementalAuctions } from "@/hooks/useIncrementalAuctions";
 import { useAutomaticAuctionMonitor } from "@/hooks/useAutomaticAuctionMonitor";
+import { useAuctionExpirationHandler } from "@/hooks/useAuctionExpirationHandler";
 
 // ============= TYPES =============
 
@@ -369,6 +370,9 @@ export default function AuctionsPage() {
   // Enable automatic auction monitoring
   useAutomaticAuctionMonitor();
 
+  // Handle expired auctions that need to be ended
+  const { processedAuctions } = useAuctionExpirationHandler();
+
   // Convert AuctionData to Auction type for compatibility
   const convertedAuctions = auctions.map((auction) => ({
     auctionId: auction.auctionId,
@@ -393,26 +397,59 @@ export default function AuctionsPage() {
     isSettled: auction.isSettled,
   }));
 
-  // Filter auctions
-  const activeAuctions = convertedAuctions.filter(
-    (auction) => auction.status === 1
-  );
-  const endedAuctions = convertedAuctions.filter(
-    (auction) => auction.status === 3
+  // Filter auctions - CORRECTED STATUS VALUES FROM CONTRACT
+  // Contract enum: 0=PENDING, 1=ACTIVE, 2=REVEAL, 3=ENDED, 4=SETTLED, 5=CANCELLED
+  console.log(
+    "🔍 All auctions status values:",
+    convertedAuctions.map((a) => ({
+      id: a.auctionId,
+      status: a.status,
+      endTime: a.endTime,
+    }))
   );
 
-  // Calculate stats
+  const activeAuctions = convertedAuctions.filter(
+    (auction) => auction.status === AuctionStatus.ACTIVE // Use enum instead of hardcoded value
+  );
+  const endedAuctions = convertedAuctions.filter(
+    (auction) => auction.status === AuctionStatus.ENDED // Use enum instead of hardcoded value
+  );
+
+  console.log(
+    `🔍 Filtered auctions: ${activeAuctions.length} active, ${endedAuctions.length} ended`
+  );
+
+  // Calculate stats - CORRECTED CALCULATIONS
+  console.log(
+    "🔍 Debug auction data for stats:",
+    convertedAuctions.map((a) => ({
+      id: a.auctionId,
+      bidCount: a.bidCount,
+      currentBid: a.currentBid,
+      startPrice: a.startPrice,
+      status: a.status,
+    }))
+  );
+
   const stats = {
     activeAuctions: activeAuctions.length,
     endedAuctions: endedAuctions.length,
-    totalBids: convertedAuctions.reduce(
-      (sum, auction) => sum + auction.bidCount,
-      0
-    ),
-    totalVolume: convertedAuctions.reduce(
-      (sum, auction) => sum + parseFloat(auction.currentBid),
-      0
-    ),
+    totalBids: convertedAuctions.reduce((sum, auction) => {
+      const bidCount = auction.bidCount || 0;
+      console.log(`🔍 Auction ${auction.auctionId} bidCount: ${bidCount}`);
+      return sum + bidCount;
+    }, 0),
+    totalVolume: convertedAuctions.reduce((sum, auction) => {
+      // Use currentBid if available, otherwise use startPrice
+      const bidAmount =
+        auction.currentBid && auction.currentBid !== "0"
+          ? parseFloat(auction.currentBid)
+          : parseFloat(auction.startPrice || "0");
+      console.log(
+        `🔍 Auction ${auction.auctionId} volume: ${bidAmount} (currentBid: ${auction.currentBid}, startPrice: ${auction.startPrice})`
+      );
+      return sum + bidAmount;
+    }, 0),
     totalAuctions: convertedAuctions.length,
   };
 

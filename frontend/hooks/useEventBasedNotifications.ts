@@ -216,29 +216,49 @@ export function useEventBasedNotifications() {
         }
       }
 
-      // Check for auctions that should be claimable (based on time since last bid)
+      // Check for auctions that should be claimable (based on actual auction end time)
       const currentTime = Math.floor(Date.now() / 1000);
-      const AUCTION_TIMEOUT = 300; // 5 minutes - consider auction ended if no activity
 
       for (const [auctionId, bidData] of userBids) {
-        const timeSinceBid = currentTime - bidData.timestamp;
-
-        // If it's been more than 5 minutes since the bid, consider it claimable
-        if (timeSinceBid > AUCTION_TIMEOUT) {
-          // Check if we already have a settlement notification for this auction
-          const hasSettlement = newNotifications.some(
-            (n) => n.auctionId === auctionId && n.type === "claim_ready"
+        try {
+          // Get auction data to check actual end time
+          const auctionContract = new ethers.Contract(
+            contracts.MooveAuction.address,
+            contracts.MooveAuction.abi,
+            provider
           );
 
-          if (!hasSettlement) {
-            newNotifications.push({
-              auctionId,
-              type: "claim_ready",
-              message: `⏰ Auction ${auctionId} appears to be ended. Check if you can claim your NFT!`,
-              timestamp: currentTime,
-              amount: bidData.amount,
-            });
+          const auction = await auctionContract.getAuction(parseInt(auctionId));
+          const endTime = Number(auction.endTime);
+          const status = Number(auction.status);
+          const highestBidder = auction.highestBidder;
+
+          // Only notify if auction is actually ended (status = 3) AND user is winner AND time has passed
+          if (
+            status === 3 && // ENDED status
+            highestBidder.toLowerCase() === address.toLowerCase() &&
+            currentTime >= endTime
+          ) {
+            // Check if we already have a settlement notification for this auction
+            const hasSettlement = newNotifications.some(
+              (n) => n.auctionId === auctionId && n.type === "claim_ready"
+            );
+
+            if (!hasSettlement) {
+              newNotifications.push({
+                auctionId,
+                type: "claim_ready",
+                message: `🎉 Auction ${auctionId} ended! You can now claim your NFT!`,
+                timestamp: currentTime,
+                amount: bidData.amount,
+              });
+            }
           }
+        } catch (error) {
+          console.warn(
+            `⚠️ Could not check auction ${auctionId} status:`,
+            error
+          );
         }
       }
 

@@ -62,7 +62,7 @@ export function useUserCollection(): UserCollection {
       );
 
       // Get all ended auctions where user is the winner
-      const endedAuctions = auctions.filter((auction) => auction.status === 2); // ENDED
+      const endedAuctions = auctions.filter((auction) => auction.status === 3); // ENDED (corrected to match contract)
       console.log(`🔍 Found ${endedAuctions.length} ended auctions`);
 
       const userWonAuctions: WonAuction[] = [];

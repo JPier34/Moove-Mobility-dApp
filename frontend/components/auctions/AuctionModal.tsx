@@ -1017,6 +1017,7 @@ export default function AuctionModal({
                           isSubmittingBid ||
                           !bidAmount ||
                           (!!auction.buyNowPrice &&
+                            parseFloat(auction.buyNowPrice) > 0 &&
                             parseFloat(bidAmount || "0") >=
                               parseFloat(auction.buyNowPrice))
                         }
@@ -1032,6 +1033,74 @@ export default function AuctionModal({
                           `Place Bid: ${bidAmount || "0.0000"} ETH`
                         )}
                       </Button>
+
+                      {/* Debug info for bid button */}
+                      {process.env.NODE_ENV === "development" && (
+                        <div className="mt-2 p-2 bg-gray-100 rounded text-xs">
+                          <div>Debug Bid Button State:</div>
+                          <div>isConnected: {isConnected ? "✅" : "❌"}</div>
+                          <div>
+                            isSubmittingBid: {isSubmittingBid ? "✅" : "❌"}
+                          </div>
+                          <div>bidAmount: {bidAmount || "empty"}</div>
+                          <div>
+                            buyNowPrice: {auction.buyNowPrice || "none"} (type:{" "}
+                            {typeof auction.buyNowPrice})
+                          </div>
+                          <div>
+                            bidAmount &gt;= buyNowPrice:{" "}
+                            {!!auction.buyNowPrice &&
+                            parseFloat(bidAmount || "0") >=
+                              parseFloat(auction.buyNowPrice)
+                              ? "✅"
+                              : "❌"}
+                          </div>
+                          <div>
+                            auctionEnded:{" "}
+                            {new Date() >= new Date(localAuction.endTime)
+                              ? "✅ YES"
+                              : "❌ NO"}
+                          </div>
+                          <div>currentTime: {new Date().toISOString()}</div>
+                          <div>
+                            endTime:{" "}
+                            {new Date(localAuction.endTime).toISOString()}
+                          </div>
+                          <div>
+                            !!auction.buyNowPrice:{" "}
+                            {!!auction.buyNowPrice ? "true" : "false"}
+                          </div>
+                          <div>
+                            parseFloat(bidAmount):{" "}
+                            {parseFloat(bidAmount || "0")}
+                          </div>
+                          <div>
+                            parseFloat(auction.buyNowPrice):{" "}
+                            {parseFloat(auction.buyNowPrice || "0")}
+                          </div>
+                          <div>
+                            Condition 1 (!isConnected):{" "}
+                            {!isConnected ? "true" : "false"}
+                          </div>
+                          <div>
+                            Condition 2 (isSubmittingBid):{" "}
+                            {isSubmittingBid ? "true" : "false"}
+                          </div>
+                          <div>
+                            Condition 3 (!bidAmount):{" "}
+                            {!bidAmount ? "true" : "false"}
+                          </div>
+                          <div>
+                            Condition 4 (buyNowPrice check):{" "}
+                            {!!auction.buyNowPrice &&
+                            parseFloat(auction.buyNowPrice) > 0 &&
+                            parseFloat(bidAmount || "0") >=
+                              parseFloat(auction.buyNowPrice)
+                              ? "true"
+                              : "false"}
+                          </div>
+                        </div>
+                      )}
 
                       {/* Buy now option */}
                       {auction.buyNowPrice &&

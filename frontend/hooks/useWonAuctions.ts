@@ -96,9 +96,9 @@ async function filterAuctionsByOwnership(
       typeof auction.highestBidder === "string" &&
       auction.highestBidder.toLowerCase() === address.toLowerCase();
 
-    // Considera l'asta "ended" se status === 3 (ENDED) OPPURE status === 4 (SETTLED) OPPURE se status === 1 ma tempo scaduto
-    const isEnded = auction.status === 3;
-    const isSettled = auction.status === 4;
+    // CORRECTED STATUS VALUES FROM CONTRACT: 0=PENDING, 1=ACTIVE, 2=REVEAL, 3=ENDED, 4=SETTLED, 5=CANCELLED
+    const isEnded = auction.status === 3; // ENDED
+    const isSettled = auction.status === 4; // SETTLED
     const isTimeExpired =
       auction.status === 1 &&
       auction.endTime &&
@@ -373,10 +373,10 @@ export function useWonAuctions(): UseWonAuctionsReturn {
 
       for (const auction of userWonAuctions) {
         // Determine if the auction is really finished (status 3, 4 or time expired)
-        const isEnded = auction.status === 3;
-        const isSettled = auction.status === 4; // Solo status 4 è settled per vincitori
+        const isEnded = auction.status === 3; // ENDED
+        const isSettled = auction.status === 4; // SETTLED
         const isTimeExpired =
-          auction.status === 1 &&
+          auction.status === 1 && // ACTIVE but time expired
           auction.endTime &&
           new Date(auction.endTime).getTime() <= Date.now();
         const isAuctionEnded = isEnded || isSettled || isTimeExpired;
@@ -412,7 +412,7 @@ export function useWonAuctions(): UseWonAuctionsReturn {
           hasName: !!(nftMetadata?.name || auction.nftName),
           finalBid: parseFloat(auction.currentBid) || 0,
           bidders: auction.bidCount || 0,
-          isSettled: auction.isSettled || auction.status === 4 || isCompleted, // Only status 4 is settled for winners
+          isSettled: auction.isSettled || auction.status === 4 || isCompleted, // SETTLED status or isSettled field
           endTime: auction.endTime
             ? new Date(auction.endTime).getTime()
             : undefined,
@@ -436,14 +436,14 @@ export function useWonAuctions(): UseWonAuctionsReturn {
       // Only show auctions that are ready for settlement (status 3) and not yet settled
       const confirmedAuctions = wonAuctions.filter(
         (auction) =>
-          auction.status === 3 && // Only ENDED auctions
+          auction.status === 3 && // Only ENDED auctions (corrected to match contract)
           !auction.isSettled // Not yet settled
         // Removed transaction tracker dependency - not needed for status 3 auctions
       );
 
       // For collection display, we need ALL won auctions (including settled ones)
       const allWonAuctions = wonAuctions.filter(
-        (auction) => auction.status === 3 || auction.status === 4 // ENDED or SETTLED auctions
+        (auction) => auction.status === 3 || auction.status === 4 // ENDED or SETTLED auctions (corrected to match contract)
       );
 
       // Debug logging for final filter
@@ -454,7 +454,7 @@ export function useWonAuctions(): UseWonAuctionsReturn {
           auctionId: a.auctionId,
           status: a.status,
           isSettled: a.isSettled,
-          passesFilter: a.status === 3 && !a.isSettled,
+          passesFilter: a.status === 3 && !a.isSettled, // ENDED and not settled (corrected to match contract)
         })),
       });
 

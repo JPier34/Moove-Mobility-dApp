@@ -11,14 +11,18 @@ import { useSmartRefresh } from "./useSmartRefresh";
 import { useAutoFailedAuctionHandler } from "./useFailedAuctionHandler";
 
 // Export the enhanced functions
-export const fetchAuctionFromContractEnhanced = async (auctionId: number): Promise<Auction | null> => {
+export const fetchAuctionFromContractEnhanced = async (
+  auctionId: number
+): Promise<Auction | null> => {
   return null;
 };
 
 export { getSecureNFTCount, validateAuctionData, fetchFromIPFSRobust };
 
 // Minimal implementations
-async function getSecureNFTCount(nftContract: ethers.Contract): Promise<number> {
+async function getSecureNFTCount(
+  nftContract: ethers.Contract
+): Promise<number> {
   try {
     const totalSupply = await nftContract.totalSupply();
     return Number(totalSupply);
@@ -27,7 +31,11 @@ async function getSecureNFTCount(nftContract: ethers.Contract): Promise<number> 
   }
 }
 
-function validateAuctionData(auctionData: any): { isValid: boolean; error?: string; data?: any } {
+function validateAuctionData(auctionData: any): {
+  isValid: boolean;
+  error?: string;
+  data?: any;
+} {
   try {
     if (!auctionData) {
       return { isValid: false, error: "Auction data is null or undefined" };
@@ -38,11 +46,14 @@ function validateAuctionData(auctionData: any): { isValid: boolean; error?: stri
   }
 }
 
-async function fetchFromIPFSRobust(uri: string, timeout: number = 10000): Promise<any | null> {
+async function fetchFromIPFSRobust(
+  uri: string,
+  timeout: number = 10000
+): Promise<any | null> {
   if (!uri || uri === "undefined" || uri.includes("undefined")) {
     return null;
   }
-  
+
   // Skip test hashes
   if (uri === "QmTest123" || uri === "QmMockMetadataHashForTesting123456789") {
     return {
@@ -55,7 +66,7 @@ async function fetchFromIPFSRobust(uri: string, timeout: number = 10000): Promis
       ],
     };
   }
-  
+
   return null;
 }
 
@@ -94,9 +105,10 @@ export function useAuctionsEnhanced(
     disabled: disableAutoRefresh,
   });
 
-  const activeAuctions = auctions.filter((auction) => auction.status === 1);
-  const endedAuctions = auctions.filter((auction) => auction.status === 3);
-  const pendingAuctions = auctions.filter((auction) => auction.status === 0);
+  // CORRECTED STATUS VALUES FROM CONTRACT: 0=PENDING, 1=ACTIVE, 2=REVEAL, 3=ENDED, 4=SETTLED, 5=CANCELLED
+  const activeAuctions = auctions.filter((auction) => auction.status === 1); // ACTIVE
+  const endedAuctions = auctions.filter((auction) => auction.status === 3); // ENDED
+  const pendingAuctions = auctions.filter((auction) => auction.status === 0); // PENDING
 
   const stats = {
     activeAuctions: activeAuctions.length,
@@ -139,4 +151,3 @@ export function useAuctionsEnhanced(
     processedFailedAuctions: 0,
   };
 }
-

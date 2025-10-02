@@ -1,0 +1,23 @@
+{
+  "name": "moove-auction-subgraph",
+  "version": "0.1.0",
+  "description": "Subgraph for Moove Auction Contract",
+  "repository": "https://github.com/your-org/moove-auction-subgraph",
+  "license": "MIT",
+  "scripts": {
+    "codegen": "graph codegen",
+    "build": "graph build",
+    "deploy": "graph deploy --studio moove-auction-subgraph",
+    "deploy-local": "graph deploy --node http://localhost:8020/ --ipfs http://localhost:5001 moove-auction-subgraph",
+    "create-local": "graph create --node http://localhost:8020/ moove-auction-subgraph",
+    "remove-local": "graph remove --node http://localhost:8020/ moove-auction-subgraph"
+  },
+  "dependencies": {
+    "@graphprotocol/graph-cli": "0.56.0",
+    "@graphprotocol/graph-ts": "0.31.0"
+  },
+  "devDependencies": {
+    "matchstick-as": "0.5.2"
+  }
+}
+

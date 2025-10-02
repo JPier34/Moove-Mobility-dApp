@@ -280,6 +280,19 @@ export function useRealUserCollection() {
     fetchUserNFTs();
   }, [fetchUserNFTs]);
 
+  // Listen for NFT claim events to refresh collection
+  useEffect(() => {
+    const handleNFTClaimed = () => {
+      console.log(
+        "🔄 NFT claimed event received, refreshing real collection..."
+      );
+      fetchUserNFTs();
+    };
+
+    window.addEventListener("nftClaimed", handleNFTClaimed);
+    return () => window.removeEventListener("nftClaimed", handleNFTClaimed);
+  }, [fetchUserNFTs]);
+
   // Calculate stats
   const totalItems = nfts.length;
   const totalValue = nfts.reduce((sum, nft) => sum + nft.price, 0);

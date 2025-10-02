@@ -77,17 +77,108 @@ export default function TestBiddingPage() {
     setResult("🚀 Placing bid...");
 
     try {
+      // Detailed logging before bid
+      console.log("🔍 PRE-BID ANALYSIS:");
+      console.log("📊 Selected auction data:", {
+        auctionId: selectedAuction.auctionId,
+        auctionIdType: typeof selectedAuction.auctionId,
+        currentBid: selectedAuction.currentBid,
+        currentBidType: typeof selectedAuction.currentBid,
+        bidIncrement: selectedAuction.bidIncrement,
+        bidIncrementType: typeof selectedAuction.bidIncrement,
+        highestBidder: selectedAuction.highestBidder,
+        status: selectedAuction.status,
+        endTime: selectedAuction.endTime,
+      });
+
+      console.log("💰 Bid parameters:", {
+        bidAmount: bidAmount,
+        bidAmountType: typeof bidAmount,
+        parsedBidAmount: parseFloat(bidAmount),
+        auctionIdForBid: parseInt(selectedAuctionId),
+        auctionIdType: typeof parseInt(selectedAuctionId),
+      });
+
+      // Verify bid amount is valid
+      const currentBidValue = parseFloat(
+        typeof selectedAuction.currentBid === "string" &&
+          selectedAuction.currentBid.includes(".")
+          ? selectedAuction.currentBid
+          : ethers.formatEther(selectedAuction.currentBid || "0")
+      );
+
+      const bidIncrementValue = parseFloat(
+        typeof selectedAuction.bidIncrement === "string" &&
+          selectedAuction.bidIncrement.includes(".")
+          ? selectedAuction.bidIncrement
+          : ethers.formatEther(selectedAuction.bidIncrement || "0")
+      );
+
+      const bidValidation = {
+        bidAmountValid: parseFloat(bidAmount) > 0,
+        bidAmountSufficient:
+          parseFloat(bidAmount) >= currentBidValue + bidIncrementValue,
+        auctionActive: selectedAuction.status === 1, // ACTIVE (corrected to match contract)
+        auctionNotEnded: new Date(selectedAuction.endTime) > new Date(),
+        bidderNotHighest:
+          selectedAuction.highestBidder?.toLowerCase() !==
+          address.toLowerCase(),
+        // Additional debug info
+        currentBidValue,
+        bidIncrementValue,
+        requiredMinimumBid: currentBidValue + bidIncrementValue,
+        actualBidAmount: parseFloat(bidAmount),
+      };
+
+      console.log("🔍 BID VALIDATION:", bidValidation);
+
+      // Check if bid is sufficient - allow bid if it's at least the current bid + increment
+      // OR if it's higher than current bid (for cases where increment might be wrong)
+      const isBidSufficient =
+        parseFloat(bidAmount) >= currentBidValue + bidIncrementValue ||
+        parseFloat(bidAmount) > currentBidValue;
+
+      console.log("💰 Bid sufficiency check:", {
+        currentBid: currentBidValue,
+        bidIncrement: bidIncrementValue,
+        requiredMinimum: currentBidValue + bidIncrementValue,
+        actualBid: parseFloat(bidAmount),
+        isSufficient: isBidSufficient,
+        alternativeCheck: parseFloat(bidAmount) > currentBidValue,
+      });
+
+      const coreValidations = {
+        bidAmountValid: bidValidation.bidAmountValid,
+        auctionActive: bidValidation.auctionActive,
+        auctionNotEnded: bidValidation.auctionNotEnded,
+        bidderNotHighest: bidValidation.bidderNotHighest,
+        bidAmountSufficient: isBidSufficient,
+      };
+
+      console.log("📈 Core validations:", coreValidations);
+      console.log(
+        "📈 All core validations passed:",
+        Object.values(coreValidations).every((check) => check)
+      );
+
       const success = await placeBid(parseInt(selectedAuctionId), bidAmount);
 
       if (success) {
+        console.log("✅ Bid placed successfully!");
+        console.log("📊 Post-bid verification needed - check auction data");
         setResult(
-          `✅ Bid of ${bidAmount} ETH placed successfully on Auction ${selectedAuctionId}!`
+          `✅ Bid of ${bidAmount} ETH placed successfully on Auction ${selectedAuctionId}! Check console for detailed logs.`
         );
       } else {
         setResult(`❌ Failed to place bid on Auction ${selectedAuctionId}.`);
       }
     } catch (error) {
       console.error("❌ Error placing bid:", error);
+      console.error("🔍 Error details:", {
+        errorType: typeof error,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorStack: error instanceof Error ? error.stack : undefined,
+      });
       setResult(
         `❌ Error placing bid: ${
           error instanceof Error ? error.message : String(error)
@@ -264,6 +355,35 @@ export default function TestBiddingPage() {
               >
                 {result}
               </pre>
+            </div>
+          )}
+
+          {/* Post-bid verification section */}
+          {result && result.startsWith("✅") && selectedAuctionId && (
+            <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900 border border-blue-200 dark:border-blue-700 rounded-lg">
+              <h3 className="text-lg font-semibold text-blue-800 dark:text-blue-200 mb-2">
+                🔍 Post-Bid Verification
+              </h3>
+              <p className="text-blue-700 dark:text-blue-300 text-sm mb-3">
+                Check the browser console for detailed logs about:
+              </p>
+              <ul className="text-blue-700 dark:text-blue-300 text-sm space-y-1">
+                <li>• Raw contract data structure and types</li>
+                <li>• Data mapping from contract to frontend format</li>
+                <li>• Type compatibility verification</li>
+                <li>• Data integrity checks</li>
+                <li>• Bid validation results</li>
+              </ul>
+              <button
+                onClick={() => {
+                  console.log("🔄 Refreshing auction data for verification...");
+                  // Trigger a refresh of the auction data
+                  window.location.reload();
+                }}
+                className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+              >
+                Refresh & Verify Data
+              </button>
             </div>
           )}
         </div>

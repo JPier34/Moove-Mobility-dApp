@@ -118,8 +118,8 @@ export function useClaimReadyNotifications() {
     // Controlla immediatamente
     monitorAuctionsForClaim();
 
-    // Poi controlla ogni 2 minuti
-    const interval = setInterval(monitorAuctionsForClaim, 2 * 60 * 1000);
+    // Poi controlla ogni 5 minuti (ridotto spam)
+    const interval = setInterval(monitorAuctionsForClaim, 5 * 60 * 1000);
 
     return () => {
       console.log("🛑 Stopping claim ready notifications monitoring...");

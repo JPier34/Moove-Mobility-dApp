@@ -429,7 +429,7 @@ export function useOptimizedUserCollection() {
                 transactionHash,
                 auctionWon: auctionData,
                 isFromAuction: !!auctionData,
-                status: auctionData ? "4" : "3", // 4 = SETTLED, 3 = ENDED
+                status: auctionData ? auctionData.status || "4" : "3", // Use actual auction status if available
               };
 
               userNFTs.push(userNFT);
@@ -568,6 +568,19 @@ export function useOptimizedUserCollection() {
       fetchUserNFTs(false);
     }
   }, [address, isConnected, fetchUserNFTs]);
+
+  // Listen for NFT claim events to refresh collection
+  useEffect(() => {
+    const handleNFTClaimed = () => {
+      console.log(
+        "🔄 NFT claimed event received, refreshing optimized collection..."
+      );
+      refresh();
+    };
+
+    window.addEventListener("nftClaimed", handleNFTClaimed);
+    return () => window.removeEventListener("nftClaimed", handleNFTClaimed);
+  }, [refresh]);
 
   // Calculate stats based on all NFTs (like original)
   const totalItems = allNFTs.length;
