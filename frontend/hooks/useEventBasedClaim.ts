@@ -44,8 +44,7 @@ export function useEventBasedClaim() {
       console.log("🔍 Fetching claimable auctions based on events...");
 
       const provider = new ethers.JsonRpcProvider(
-        process.env.NEXT_PUBLIC_RPC_URL ||
-          "https://ethereum-sepolia.publicnode.com"
+        process.env.NEXT_PUBLIC_RPC_URL || "https://1rpc.io/sepolia"
       );
 
       const auctionABI = [
@@ -230,14 +229,14 @@ export function useEventBasedClaim() {
 
         // Set current auction and step
         setCurrentAuctionId(auctionId);
-        setCurrentClaimStep("ending");
+        setCurrentClaimStep("settling");
 
-        // Step 1: Force end the auction (bypasses all timestamp checks)
-        console.log(`📝 Step 1: Force ending auction ${auctionId}...`);
+        // Call settleAuction directly for claim
+        console.log(`💰 Step 1: Settling auction ${auctionId} for claim...`);
         writeContract({
           address: contracts.MooveAuction.address,
           abi: contracts.MooveAuction.abi,
-          functionName: "endAuction",
+          functionName: "settleAuction",
           args: [auctionId],
         });
       } catch (error) {
@@ -265,39 +264,22 @@ export function useEventBasedClaim() {
   // Handle transaction success/failure
   useEffect(() => {
     if (isSuccess && hash && currentAuctionId) {
-      if (currentClaimStep === "ending") {
-        console.log(
-          `✅ Auction ${currentAuctionId} ended successfully, now settling...`
-        );
-        setCurrentClaimStep("settling");
+      console.log(`✅ Auction ${currentAuctionId} settled successfully!`);
+      toast.success("Auction claimed successfully!");
 
-        // Step 2: Now try to settle the auction
-        setTimeout(() => {
-          writeContract({
-            address: contracts.MooveAuction.address,
-            abi: contracts.MooveAuction.abi,
-            functionName: "settleAuction",
-            args: [currentAuctionId],
-          });
-        }, 1000); // Small delay to ensure the first transaction is processed
-      } else if (currentClaimStep === "settling") {
-        console.log(`✅ Auction ${currentAuctionId} settled successfully!`);
-        toast.success("Auction claimed successfully!");
+      // Reset state
+      setCurrentClaimStep("idle");
+      setCurrentAuctionId(null);
 
-        // Reset state
-        setCurrentClaimStep("idle");
-        setCurrentAuctionId(null);
+      // Refresh the list
+      fetchClaimableAuctions();
 
-        // Refresh the list
-        fetchClaimableAuctions();
-
-        // Trigger collection refresh for all collection hooks
-        window.dispatchEvent(
-          new CustomEvent("nftClaimed", {
-            detail: { auctionId: currentAuctionId },
-          })
-        );
-      }
+      // Trigger collection refresh for all collection hooks
+      window.dispatchEvent(
+        new CustomEvent("nftClaimed", {
+          detail: { auctionId: currentAuctionId },
+        })
+      );
     }
 
     if (error && currentAuctionId) {
@@ -306,49 +288,35 @@ export function useEventBasedClaim() {
         error
       );
 
-      if (currentClaimStep === "ending") {
-        toast.error(
-          `Failed to end auction ${currentAuctionId}. Trying to settle directly...`
-        );
-
-        // Try to settle directly (maybe auction is already ended)
-        setCurrentClaimStep("settling");
-        setTimeout(() => {
-          writeContract({
-            address: contracts.MooveAuction.address,
-            abi: contracts.MooveAuction.abi,
-            functionName: "settleAuction",
-            args: [currentAuctionId],
-          });
-        }, 1000);
-      } else {
-        toast.error(
-          `Claim failed for auction ${currentAuctionId}: ${error.message}`
-        );
-
-        // Reset claiming status
-        setClaimableAuctions((prev) =>
-          prev.map((auction) =>
-            auction.auctionId === currentAuctionId
-              ? { ...auction, claimStatus: "pending" as const }
-              : auction
-          )
-        );
-
-        // Reset state
-        setCurrentClaimStep("idle");
-        setCurrentAuctionId(null);
+      // Log detailed error information
+      if (error.message) {
+        console.error(`❌ Error message: ${error.message}`);
       }
+      if (error.code) {
+        console.error(`❌ Error code: ${error.code}`);
+      }
+      if (error.reason) {
+        console.error(`❌ Error reason: ${error.reason}`);
+      }
+
+      toast.error(
+        `Claim failed for auction ${currentAuctionId}: ${error.message}`
+      );
+
+      // Reset claiming status
+      setClaimableAuctions((prev) =>
+        prev.map((auction) =>
+          auction.auctionId === currentAuctionId
+            ? { ...auction, claimStatus: "pending" as const }
+            : auction
+        )
+      );
+
+      // Reset state
+      setCurrentClaimStep("idle");
+      setCurrentAuctionId(null);
     }
-  }, [
-    isSuccess,
-    error,
-    hash,
-    currentAuctionId,
-    currentClaimStep,
-    writeContract,
-    fetchClaimableAuctions,
-  ]);
+  }, [isSuccess, error, hash, currentAuctionId, fetchClaimableAuctions]);
 
   return {
     claimableAuctions,

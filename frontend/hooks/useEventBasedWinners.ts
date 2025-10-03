@@ -42,8 +42,7 @@ export function useEventBasedWinners() {
       console.log("🔍 Fetching all auction events for user:", address);
 
       const provider = new ethers.JsonRpcProvider(
-        process.env.NEXT_PUBLIC_RPC_URL ||
-          "https://ethereum-sepolia.publicnode.com"
+        process.env.NEXT_PUBLIC_RPC_URL || "https://1rpc.io/sepolia"
       );
 
       const auctionABI = [

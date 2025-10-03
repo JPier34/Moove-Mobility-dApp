@@ -28,7 +28,7 @@ export default function OptimizedNFTImage({
   const imgRef = useRef<HTMLImageElement>(null);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Multiple IPFS gateways for fallback
+  // Multiple IPFS gateways for fallback - Pinata first if available
   const ipfsGateways = [
     "https://gateway.pinata.cloud/ipfs/",
     "https://ipfs.io/ipfs/",
@@ -87,21 +87,24 @@ export default function OptimizedNFTImage({
       return originalSrc;
     }
 
-    // If it's not an IPFS URL, return as-is
-    if (!originalSrc.includes("ipfs://")) {
+    // Check if it's an IPFS hash (starts with Qm or bafy) without ipfs:// prefix
+    const isIPFSHash = /^(Qm[a-zA-Z0-9]{44}|bafy[a-zA-Z0-9]{50,})/.test(originalSrc);
+    
+    // If it's not an IPFS URL or hash, return as-is
+    if (!originalSrc.includes("ipfs://") && !isIPFSHash) {
       return originalSrc;
     }
 
     const cid = originalSrc.replace("ipfs://", "");
 
-    // Use proxy server as primary solution for images
-    if (currentGatewayIndex === 0) {
-      return `/api/ipfs-proxy?hash=${encodeURIComponent(originalSrc)}`;
+    // Try Pinata first (index 0), then other gateways
+    if (currentGatewayIndex < ipfsGateways.length) {
+      const currentGateway = ipfsGateways[currentGatewayIndex];
+      return `${currentGateway}${cid}`;
     }
 
-    // Fallback to direct gateway access
-    const currentGateway = ipfsGateways[currentGatewayIndex - 1]; // Adjust index since proxy is at 0
-    return `${currentGateway}${cid}`;
+    // Fallback to proxy server as last resort
+    return `/api/ipfs-proxy?hash=${encodeURIComponent(originalSrc)}`;
   };
 
   const handleLoad = () => {
@@ -115,44 +118,19 @@ export default function OptimizedNFTImage({
       `❌ Image failed to load: ${debouncedSrc} (gateway ${currentGatewayIndex})`
     );
 
-    // If it's already a proxy URL, try fallback to direct gateway
-    if (debouncedSrc.includes("/api/ipfs-proxy")) {
-      console.log(
-        `❌ Proxy server failed for: ${src}, trying direct gateway fallback`
-      );
-
-      // Extract the original IPFS hash from the proxy URL
-      const urlParams = new URLSearchParams(debouncedSrc.split("?")[1]);
-      const originalHash = urlParams.get("hash");
-
-      if (originalHash && originalHash.includes("ipfs://")) {
-        const ipfsHash = originalHash.replace("ipfs://", "");
-        const directUrl = `https://ipfs.io/ipfs/${ipfsHash}`;
-        console.log(`🔄 Trying direct gateway fallback: ${directUrl}`);
-        setDebouncedSrc(directUrl);
-        setCurrentGatewayIndex(0);
-        setHasError(false);
-        setIsLoaded(false);
-        return;
-      }
-
-      // If we can't extract the hash, show placeholder
-      console.log(`❌ Cannot extract IPFS hash, showing placeholder`);
-      setHasError(true);
-      setIsLoaded(false);
-      return;
-    }
-
-    // Try next gateway if available (including proxy + direct gateways)
-    const totalGateways = ipfsGateways.length + 1; // +1 for proxy server
-    if (currentGatewayIndex < totalGateways - 1) {
+    // Try next gateway if available
+    if (currentGatewayIndex < ipfsGateways.length - 1) {
       console.log(`🔄 Trying next gateway: ${currentGatewayIndex + 1}`);
       setCurrentGatewayIndex(currentGatewayIndex + 1);
       setHasError(false);
       setIsLoaded(false);
     } else {
-      console.log(`❌ All gateways failed for: ${src}`);
-      setHasError(true);
+      // All direct gateways failed, try proxy as last resort
+      console.log(`🔄 All direct gateways failed, trying proxy server...`);
+      const proxyUrl = `/api/ipfs-proxy?hash=${encodeURIComponent(src)}`;
+      setDebouncedSrc(proxyUrl);
+      setCurrentGatewayIndex(ipfsGateways.length); // Set to proxy index
+      setHasError(false);
       setIsLoaded(false);
     }
   };

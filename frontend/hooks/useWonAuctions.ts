@@ -99,11 +99,9 @@ async function filterAuctionsByOwnership(
     // CORRECTED STATUS VALUES FROM CONTRACT: 0=PENDING, 1=ACTIVE, 2=REVEAL, 3=ENDED, 4=SETTLED, 5=CANCELLED
     const isEnded = auction.status === 3; // ENDED
     const isSettled = auction.status === 4; // SETTLED
-    const isTimeExpired =
-      auction.status === 1 &&
-      auction.endTime &&
-      new Date(auction.endTime).getTime() <= Date.now();
-    const isAuctionEnded = isEnded || isSettled || isTimeExpired;
+
+    // ONLY consider ENDED or SETTLED auctions - NOT ACTIVE even if time-expired
+    const isAuctionEnded = isEnded || isSettled;
 
     if (!isUserWinner || !isAuctionEnded) {
       continue; // Skip se non è vincitore o asta non finita
@@ -375,11 +373,9 @@ export function useWonAuctions(): UseWonAuctionsReturn {
         // Determine if the auction is really finished (status 3, 4 or time expired)
         const isEnded = auction.status === 3; // ENDED
         const isSettled = auction.status === 4; // SETTLED
-        const isTimeExpired =
-          auction.status === 1 && // ACTIVE but time expired
-          auction.endTime &&
-          new Date(auction.endTime).getTime() <= Date.now();
-        const isAuctionEnded = isEnded || isSettled || isTimeExpired;
+
+        // ONLY consider ENDED or SETTLED auctions - NOT ACTIVE even if time-expired
+        const isAuctionEnded = isEnded || isSettled;
 
         // Transaction hash not needed for status 3 auctions - they're ready for settlement
         const txHash = undefined;

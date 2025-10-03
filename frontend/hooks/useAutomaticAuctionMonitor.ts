@@ -101,7 +101,7 @@ export function useAutomaticAuctionMonitor() {
               );
             }
 
-            // Call settleAuction() to determine winner and settle
+            // First call endAuction() if status is ACTIVE, then settleAuction()
             const signer = await provider.getSigner();
             const auctionContractWithSigner = auctionContract.connect(signer);
 
@@ -109,9 +109,29 @@ export function useAutomaticAuctionMonitor() {
               // Mark as processed to prevent multiple calls
               setProcessedAuctions((prev) => new Set([...prev, i]));
 
-              // Step 1: Settle the auction (determine winner, transfer NFT)
+              // Step 1: End the auction if it's still ACTIVE
+              if (status === 1) {
+                // ACTIVE
+                console.log(
+                  `🔄 Step 1: Calling endAuction() for auction ${i}...`
+                );
+                const endTx = await (
+                  auctionContractWithSigner as any
+                ).endAuction(i);
+                console.log(
+                  `📝 End auction transaction submitted: ${endTx.hash}`
+                );
+
+                await endTx.wait();
+                console.log(`✅ Auction ${i} ended successfully`);
+
+                // Wait longer for status to update on blockchain
+                await new Promise((resolve) => setTimeout(resolve, 5000)); // Increased to 5 seconds
+              }
+
+              // Step 2: Settle the auction (determine winner, transfer NFT)
               console.log(
-                `🔄 Step 1: Calling settleAuction() for auction ${i}...`
+                `🔄 Step 2: Calling settleAuction() for auction ${i}...`
               );
               const settleTx = await (
                 auctionContractWithSigner as any

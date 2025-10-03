@@ -736,25 +736,25 @@ export default function AuctionModal({
               {/* Current price */}
               <div className="bg-gradient-to-r from-moove-50 to-moove-100 rounded-lg p-6">
                 <div className="text-sm text-gray-600 mb-2">
-                  {auction.auctionType === AuctionType.DUTCH
+                  {localAuction.auctionType === AuctionType.DUTCH
                     ? "Current Price"
-                    : auction.auctionType === AuctionType.SEALED_BID &&
-                      auction.status === AuctionStatus.PENDING
+                    : localAuction.auctionType === AuctionType.SEALED_BID &&
+                      localAuction.status === AuctionStatus.PENDING
                     ? "Hidden Bids"
-                    : auction.currentBid === "0"
+                    : localAuction.currentBid === "0"
                     ? "Starting Price"
                     : "Current Bid"}
                 </div>
                 <div className="flex items-baseline space-x-2">
                   <span className="text-4xl font-bold text-gray-900">
-                    {auction.auctionType === AuctionType.DUTCH
+                    {localAuction.auctionType === AuctionType.DUTCH
                       ? currentDutchPrice
-                      : auction.auctionType === AuctionType.SEALED_BID &&
-                        auction.status === AuctionStatus.PENDING
+                      : localAuction.auctionType === AuctionType.SEALED_BID &&
+                        localAuction.status === AuctionStatus.PENDING
                       ? "???"
-                      : auction.currentBid === "0"
-                      ? auction.startPrice
-                      : auction.currentBid}
+                      : localAuction.currentBid === "0"
+                      ? localAuction.startPrice
+                      : localAuction.currentBid}
                   </span>
                   <span className="text-xl text-gray-600">
                     {auction.currency}
@@ -763,13 +763,13 @@ export default function AuctionModal({
                     <div className="animate-spin rounded-full h-6 w-6 border-2 border-moove-primary border-t-transparent ml-2"></div>
                   )}
                 </div>
-                {auction.currentBid !== "0" &&
-                  auction.auctionType !== AuctionType.DUTCH && (
+                {localAuction.currentBid !== "0" &&
+                  localAuction.auctionType !== AuctionType.DUTCH && (
                     <div className="text-sm text-gray-500 mt-1">
                       Minimum bid:{" "}
                       {(
-                        parseFloat(auction.currentBid) +
-                        parseFloat(auction.bidIncrement)
+                        parseFloat(localAuction.currentBid) +
+                        parseFloat(localAuction.bidIncrement)
                       ).toFixed(4)}{" "}
                       ETH
                     </div>
@@ -777,9 +777,9 @@ export default function AuctionModal({
               </div>
 
               {/* Bidding interface */}
-              {!isOwner && auction.status === AuctionStatus.ACTIVE && (
+              {!isOwner && localAuction.status === AuctionStatus.ACTIVE && (
                 <div className="space-y-4">
-                  {auction.auctionType === AuctionType.DUTCH && (
+                  {localAuction.auctionType === AuctionType.DUTCH && (
                     <Button
                       onClick={handleDutchBuy}
                       disabled={
@@ -801,8 +801,8 @@ export default function AuctionModal({
                     </Button>
                   )}
 
-                  {auction.auctionType === AuctionType.SEALED_BID &&
-                    (auction.status as AuctionStatus) ===
+                  {localAuction.auctionType === AuctionType.SEALED_BID &&
+                    (localAuction.status as AuctionStatus) ===
                       AuctionStatus.ACTIVE && (
                       <div className="space-y-4">
                         {hasSubmittedSealedBid ? (
@@ -885,8 +885,8 @@ export default function AuctionModal({
                       </div>
                     )}
 
-                  {auction.auctionType === AuctionType.SEALED_BID &&
-                    (auction.status as AuctionStatus) ===
+                  {localAuction.auctionType === AuctionType.SEALED_BID &&
+                    (localAuction.status as AuctionStatus) ===
                       AuctionStatus.REVEAL && (
                       <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                         <div className="text-yellow-800 font-medium mb-2">
@@ -906,8 +906,8 @@ export default function AuctionModal({
                       </div>
                     )}
 
-                  {(auction.auctionType === AuctionType.RESERVE ||
-                    auction.auctionType === AuctionType.ENGLISH) && (
+                  {(localAuction.auctionType === AuctionType.RESERVE ||
+                    localAuction.auctionType === AuctionType.ENGLISH) && (
                     <div className="space-y-4">
                       {/* Quick bid buttons */}
                       <div>
@@ -969,13 +969,13 @@ export default function AuctionModal({
                           Minimum:{" "}
                           {(() => {
                             const currentBid = parseFloat(
-                              auction.currentBid || "0"
+                              localAuction.currentBid || "0"
                             );
                             const startPrice = parseFloat(
-                              auction.startPrice || "0"
+                              localAuction.startPrice || "0"
                             );
                             const bidIncrement = parseFloat(
-                              auction.bidIncrement || "0"
+                              localAuction.bidIncrement || "0"
                             );
 
                             if (currentBid === 0 || isNaN(currentBid)) {
@@ -990,7 +990,7 @@ export default function AuctionModal({
                         {(() => {
                           const currentBidAmount = parseFloat(bidAmount || "0");
                           const buyNowPrice = parseFloat(
-                            auction.buyNowPrice || "0"
+                            localAuction.buyNowPrice || "0"
                           );
 
                           if (
@@ -1016,10 +1016,10 @@ export default function AuctionModal({
                           !isConnected ||
                           isSubmittingBid ||
                           !bidAmount ||
-                          (!!auction.buyNowPrice &&
-                            parseFloat(auction.buyNowPrice) > 0 &&
+                          (!!localAuction.buyNowPrice &&
+                            parseFloat(localAuction.buyNowPrice) > 0 &&
                             parseFloat(bidAmount || "0") >=
-                              parseFloat(auction.buyNowPrice))
+                              parseFloat(localAuction.buyNowPrice))
                         }
                         className="w-full"
                         size="lg"
@@ -1044,14 +1044,14 @@ export default function AuctionModal({
                           </div>
                           <div>bidAmount: {bidAmount || "empty"}</div>
                           <div>
-                            buyNowPrice: {auction.buyNowPrice || "none"} (type:{" "}
-                            {typeof auction.buyNowPrice})
+                            buyNowPrice: {localAuction.buyNowPrice || "none"}{" "}
+                            (type: {typeof localAuction.buyNowPrice})
                           </div>
                           <div>
                             bidAmount &gt;= buyNowPrice:{" "}
-                            {!!auction.buyNowPrice &&
+                            {!!localAuction.buyNowPrice &&
                             parseFloat(bidAmount || "0") >=
-                              parseFloat(auction.buyNowPrice)
+                              parseFloat(localAuction.buyNowPrice)
                               ? "✅"
                               : "❌"}
                           </div>
@@ -1067,16 +1067,16 @@ export default function AuctionModal({
                             {new Date(localAuction.endTime).toISOString()}
                           </div>
                           <div>
-                            !!auction.buyNowPrice:{" "}
-                            {!!auction.buyNowPrice ? "true" : "false"}
+                            !!localAuction.buyNowPrice:{" "}
+                            {!!localAuction.buyNowPrice ? "true" : "false"}
                           </div>
                           <div>
                             parseFloat(bidAmount):{" "}
                             {parseFloat(bidAmount || "0")}
                           </div>
                           <div>
-                            parseFloat(auction.buyNowPrice):{" "}
-                            {parseFloat(auction.buyNowPrice || "0")}
+                            parseFloat(localAuction.buyNowPrice):{" "}
+                            {parseFloat(localAuction.buyNowPrice || "0")}
                           </div>
                           <div>
                             Condition 1 (!isConnected):{" "}
@@ -1092,10 +1092,10 @@ export default function AuctionModal({
                           </div>
                           <div>
                             Condition 4 (buyNowPrice check):{" "}
-                            {!!auction.buyNowPrice &&
-                            parseFloat(auction.buyNowPrice) > 0 &&
+                            {!!localAuction.buyNowPrice &&
+                            parseFloat(localAuction.buyNowPrice) > 0 &&
                             parseFloat(bidAmount || "0") >=
-                              parseFloat(auction.buyNowPrice)
+                              parseFloat(localAuction.buyNowPrice)
                               ? "true"
                               : "false"}
                           </div>
@@ -1103,17 +1103,19 @@ export default function AuctionModal({
                       )}
 
                       {/* Buy now option */}
-                      {auction.buyNowPrice &&
-                        parseFloat(auction.buyNowPrice) > 0 && (
+                      {localAuction.buyNowPrice &&
+                        parseFloat(localAuction.buyNowPrice) > 0 && (
                           <div className="pt-4 border-t border-gray-200">
                             <Button
-                              onClick={() => handleBid(auction.buyNowPrice!)}
+                              onClick={() =>
+                                handleBid(localAuction.buyNowPrice!)
+                              }
                               disabled={!isConnected || isSubmittingBid}
                               variant="secondary"
                               className="w-full"
                               size="lg"
                             >
-                              Buy Now for {auction.buyNowPrice} ETH
+                              Buy Now for {localAuction.buyNowPrice} ETH
                             </Button>
                           </div>
                         )}
@@ -1135,7 +1137,7 @@ export default function AuctionModal({
               )}
 
               {/* Not connected message */}
-              {!isConnected && auction.status === AuctionStatus.ACTIVE && (
+              {!isConnected && localAuction.status === AuctionStatus.ACTIVE && (
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                   <div className="text-yellow-800 font-medium mb-2">
                     ⚠️ Wallet not connected
@@ -1147,21 +1149,21 @@ export default function AuctionModal({
               )}
 
               {/* Auction ended message */}
-              {auction.status !== AuctionStatus.ACTIVE && (
+              {localAuction.status !== AuctionStatus.ACTIVE && (
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                   <div className="text-gray-800 font-medium mb-2">
-                    {auction.status === AuctionStatus.ENDED
+                    {localAuction.status === AuctionStatus.ENDED
                       ? "🏁 Auction Ended"
-                      : auction.status === AuctionStatus.CANCELLED
+                      : localAuction.status === AuctionStatus.CANCELLED
                       ? "❌ Auction Cancelled"
                       : "⏸️ Auction Inactive"}
                   </div>
                   <div className="text-gray-600 text-sm">
-                    {auction.status === AuctionStatus.ENDED &&
-                    auction.highestBidder
-                      ? `Won by ${shortenAddress(auction.highestBidder)} for ${
-                          auction.currentBid
-                        } ETH`
+                    {localAuction.status === AuctionStatus.ENDED &&
+                    localAuction.highestBidder
+                      ? `Won by ${shortenAddress(
+                          localAuction.highestBidder
+                        )} for ${localAuction.currentBid} ETH`
                       : "This auction is no longer active."}
                   </div>
                 </div>
@@ -1172,11 +1174,11 @@ export default function AuctionModal({
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Auction Type</span>
                   <span className="font-medium text-gray-700">
-                    {auction.auctionType === AuctionType.RESERVE
+                    {localAuction.auctionType === AuctionType.RESERVE
                       ? "🏛️ Traditional"
-                      : auction.auctionType === AuctionType.ENGLISH
+                      : localAuction.auctionType === AuctionType.ENGLISH
                       ? "⬆️ English"
-                      : auction.auctionType === AuctionType.DUTCH
+                      : localAuction.auctionType === AuctionType.DUTCH
                       ? "⬇️ Dutch"
                       : "🔒 Sealed Bid"}
                   </span>
@@ -1184,30 +1186,30 @@ export default function AuctionModal({
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Start Price</span>
                   <span className="font-medium text-gray-700">
-                    {auction.startPrice} ETH
+                    {localAuction.startPrice} ETH
                   </span>
                 </div>
                 {/* Only show reserve price for Reserve auctions */}
-                {auction.auctionType === AuctionType.RESERVE && (
+                {localAuction.auctionType === AuctionType.RESERVE && (
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-500">Reserve Price</span>
                     <span className="font-medium text-gray-700">
-                      {auction.reservePrice} ETH
+                      {localAuction.reservePrice} ETH
                     </span>
                   </div>
                 )}
-                {auction.buyNowPrice && (
+                {localAuction.buyNowPrice && (
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-500">Buy Now</span>
                     <span className="font-medium text-gray-700">
-                      {auction.buyNowPrice} ETH
+                      {localAuction.buyNowPrice} ETH
                     </span>
                   </div>
                 )}
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Bid Increment</span>
                   <span className="font-medium text-gray-700">
-                    {auction.bidIncrement} ETH
+                    {localAuction.bidIncrement} ETH
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
@@ -1218,8 +1220,8 @@ export default function AuctionModal({
 
               {/* Refund Status - Only show for ended auctions */}
               <AuctionRefundStatus
-                auctionId={parseInt(auction.auctionId)}
-                auctionStatus={auction.status.toString()}
+                auctionId={parseInt(localAuction.auctionId)}
+                auctionStatus={localAuction.status.toString()}
               />
             </div>
           </div>

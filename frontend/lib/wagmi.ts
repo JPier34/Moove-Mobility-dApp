@@ -18,14 +18,14 @@ const customSepolia = {
   rpcUrls: {
     default: {
       http: [
-        "https://ethereum-sepolia.publicnode.com",
+        process.env.NEXT_PUBLIC_RPC_URL || "https://1rpc.io/sepolia",
         "https://sepolia.drpc.org",
         "https://rpc.sepolia.org",
       ],
     },
     public: {
       http: [
-        "https://ethereum-sepolia.publicnode.com",
+        process.env.NEXT_PUBLIC_RPC_URL || "https://1rpc.io/sepolia",
         "https://sepolia.drpc.org",
         "https://rpc.sepolia.org",
       ],

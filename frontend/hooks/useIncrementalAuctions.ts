@@ -353,9 +353,32 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
                 startPrice: auctionData.startingPrice
                   ? ethers.formatEther(auctionData.startingPrice)
                   : "0",
-                currentBid: auctionData.currentPrice
-                  ? ethers.formatEther(auctionData.currentPrice)
-                  : "0",
+                currentBid: (() => {
+                  // For English auctions, if currentPrice is 0 but there's a highestBidder,
+                  // use highestBid instead
+                  const currentPrice = auctionData.currentPrice;
+                  const highestBid = auctionData.highestBid;
+                  const hasBidder =
+                    auctionData.highestBidder &&
+                    auctionData.highestBidder !==
+                      "0x0000000000000000000000000000000000000000";
+
+                  if (currentPrice && currentPrice > 0) {
+                    return ethers.formatEther(currentPrice);
+                  } else if (highestBid && highestBid > 0 && hasBidder) {
+                    console.log(
+                      `🔄 [Auction ${i}] Using highestBid as currentBid (currentPrice was 0):`,
+                      {
+                        currentPrice: currentPrice?.toString(),
+                        highestBid: highestBid?.toString(),
+                        highestBidder: auctionData.highestBidder,
+                      }
+                    );
+                    return ethers.formatEther(highestBid);
+                  } else {
+                    return "0";
+                  }
+                })(),
                 highestBidder:
                   auctionData.highestBidder ||
                   "0x0000000000000000000000000000000000000000",
@@ -617,9 +640,32 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
                 startPrice: auctionData.startingPrice
                   ? ethers.formatEther(auctionData.startingPrice)
                   : "0",
-                currentBid: auctionData.currentPrice
-                  ? ethers.formatEther(auctionData.currentPrice)
-                  : "0",
+                currentBid: (() => {
+                  // For English auctions, if currentPrice is 0 but there's a highestBidder,
+                  // use highestBid instead
+                  const currentPrice = auctionData.currentPrice;
+                  const highestBid = auctionData.highestBid;
+                  const hasBidder =
+                    auctionData.highestBidder &&
+                    auctionData.highestBidder !==
+                      "0x0000000000000000000000000000000000000000";
+
+                  if (currentPrice && currentPrice > 0) {
+                    return ethers.formatEther(currentPrice);
+                  } else if (highestBid && highestBid > 0 && hasBidder) {
+                    console.log(
+                      `🔄 [Auction ${i}] Using highestBid as currentBid (currentPrice was 0):`,
+                      {
+                        currentPrice: currentPrice?.toString(),
+                        highestBid: highestBid?.toString(),
+                        highestBidder: auctionData.highestBidder,
+                      }
+                    );
+                    return ethers.formatEther(highestBid);
+                  } else {
+                    return "0";
+                  }
+                })(),
                 highestBidder:
                   auctionData.highestBidder ||
                   "0x0000000000000000000000000000000000000000",

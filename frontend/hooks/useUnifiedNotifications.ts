@@ -30,9 +30,27 @@ export function useUnifiedNotifications() {
   const [notifications, setNotifications] = useState<UnifiedNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastCheckedBlock, setLastCheckedBlock] = useState<number>(0);
+
+  // Initialize dismissed notifications from localStorage
   const [dismissedNotifications, setDismissedNotifications] = useState<
     Set<string>
-  >(new Set());
+  >(() => {
+    if (typeof window === "undefined") return new Set();
+
+    try {
+      const stored = localStorage.getItem("moove-dismissed-notifications");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        return new Set(parsed);
+      }
+    } catch (error) {
+      console.warn(
+        "Failed to load dismissed notifications from localStorage:",
+        error
+      );
+    }
+    return new Set();
+  });
 
   // Generate unique ID for notifications to prevent duplicates
   const generateNotificationId = (
@@ -43,6 +61,66 @@ export function useUnifiedNotifications() {
     return `${auctionId}-${type}-${timestamp}`;
   };
 
+  // Clean up old dismissed notifications (older than 7 days)
+  const cleanupOldDismissedNotifications = useCallback(() => {
+    if (typeof window === "undefined") return;
+
+    try {
+      const stored = localStorage.getItem("moove-dismissed-notifications");
+      if (!stored) return;
+
+      const dismissed = JSON.parse(stored);
+      const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+
+      // Filter out notifications older than 7 days
+      const recentDismissed = dismissed.filter((id: string) => {
+        // Extract timestamp from notification ID (format: auctionId-type-timestamp)
+        const parts = id.split("-");
+        if (parts.length >= 3) {
+          const timestamp = parseInt(parts[parts.length - 1]);
+          return timestamp > sevenDaysAgo;
+        }
+        return true; // Keep if we can't parse the timestamp
+      });
+
+      if (recentDismissed.length !== dismissed.length) {
+        localStorage.setItem(
+          "moove-dismissed-notifications",
+          JSON.stringify(recentDismissed)
+        );
+        setDismissedNotifications(new Set(recentDismissed));
+        console.log(
+          `🧹 Cleaned up ${
+            dismissed.length - recentDismissed.length
+          } old dismissed notifications`
+        );
+      }
+    } catch (error) {
+      console.warn("Failed to cleanup old dismissed notifications:", error);
+    }
+  }, []);
+
+  // Save dismissed notifications to localStorage
+  const saveDismissedNotifications = useCallback((dismissed: Set<string>) => {
+    if (typeof window === "undefined") return;
+
+    try {
+      const array = Array.from(dismissed);
+      localStorage.setItem(
+        "moove-dismissed-notifications",
+        JSON.stringify(array)
+      );
+      console.log(
+        `💾 Saved ${array.length} dismissed notifications to localStorage`
+      );
+    } catch (error) {
+      console.warn(
+        "Failed to save dismissed notifications to localStorage:",
+        error
+      );
+    }
+  }, []);
+
   const fetchAuctionEvents = useCallback(async () => {
     if (!address) return;
 
@@ -51,8 +129,7 @@ export function useUnifiedNotifications() {
       console.log("🔍 Fetching auction events for unified notifications...");
 
       const provider = new ethers.JsonRpcProvider(
-        process.env.NEXT_PUBLIC_RPC_URL ||
-          "https://ethereum-sepolia.publicnode.com"
+        process.env.NEXT_PUBLIC_RPC_URL || "https://1rpc.io/sepolia"
       );
 
       const auctionABI = [
@@ -182,9 +259,8 @@ export function useUnifiedNotifications() {
             const currentTime = Math.floor(Date.now() / 1000);
 
             // Check if auction ended, user is winner, but not yet claimed
-            // Consider both ENDED status OR ACTIVE but time-expired
-            const isAuctionEnded =
-              status === 3 || (status === 1 && currentTime >= endTime);
+            // ONLY consider ENDED status (3) - NOT ACTIVE even if time-expired
+            const isAuctionEnded = status === 3; // Only ENDED status
 
             console.log(
               `🔍 Checking auction ${auctionId} for claim notification:`,
@@ -197,6 +273,28 @@ export function useUnifiedNotifications() {
                 timeExpired: currentTime >= endTime,
               }
             );
+
+            // Special debug for auction 21
+            if (auctionId === 21) {
+              console.log(`🎯 [Auction 21] Special debug:`, {
+                auctionId,
+                status,
+                endTime: new Date(endTime * 1000).toISOString(),
+                currentTime: new Date().toISOString(),
+                timeExpired: currentTime >= endTime,
+                isAuctionEnded,
+                highestBidder,
+                userAddress: address,
+                isWinner: highestBidder.toLowerCase() === address.toLowerCase(),
+                currentBid: auction.currentBid,
+                allConditions: {
+                  isAuctionEnded,
+                  isWinner:
+                    highestBidder.toLowerCase() === address.toLowerCase(),
+                  timeExpired: currentTime >= endTime,
+                },
+              });
+            }
 
             if (
               isAuctionEnded && // ENDED status OR ACTIVE but time-expired
@@ -278,10 +376,13 @@ export function useUnifiedNotifications() {
   useEffect(() => {
     fetchAuctionEvents();
 
+    // Cleanup old dismissed notifications on mount
+    cleanupOldDismissedNotifications();
+
     // Refresh every 60 seconds (reduced frequency)
     const interval = setInterval(fetchAuctionEvents, 60000);
     return () => clearInterval(interval);
-  }, [fetchAuctionEvents]);
+  }, [fetchAuctionEvents, cleanupOldDismissedNotifications]);
 
   const hasUnreadNotifications = notifications.some((n) => !n.isRead);
   const unreadCount = notifications.filter((n) => !n.isRead).length;
@@ -292,26 +393,37 @@ export function useUnifiedNotifications() {
     );
   }, []);
 
-  const dismissNotification = useCallback((notificationId: string) => {
-    // Add to dismissed set to prevent re-appearance
-    setDismissedNotifications((prev) => new Set([...prev, notificationId]));
+  const dismissNotification = useCallback(
+    (notificationId: string) => {
+      // Add to dismissed set to prevent re-appearance
+      setDismissedNotifications((prev) => {
+        const newSet = new Set([...prev, notificationId]);
+        saveDismissedNotifications(newSet);
+        return newSet;
+      });
 
-    // Remove from notifications
-    setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
+      // Remove from notifications
+      setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
 
-    console.log(`🗑️ Dismissed notification: ${notificationId}`);
-  }, []);
+      console.log(`🗑️ Dismissed notification: ${notificationId}`);
+    },
+    [saveDismissedNotifications]
+  );
 
   const clearAllNotifications = useCallback(() => {
     // Add all current notifications to dismissed set
     const currentIds = notifications.map((n) => n.id);
-    setDismissedNotifications((prev) => new Set([...prev, ...currentIds]));
+    setDismissedNotifications((prev) => {
+      const newSet = new Set([...prev, ...currentIds]);
+      saveDismissedNotifications(newSet);
+      return newSet;
+    });
 
     // Clear notifications
     setNotifications([]);
 
     console.log(`🗑️ Cleared all notifications: ${currentIds.length} items`);
-  }, [notifications]);
+  }, [notifications, saveDismissedNotifications]);
 
   return {
     notifications,

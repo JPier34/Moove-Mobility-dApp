@@ -31,6 +31,50 @@ export function useEventBasedNotifications() {
   const [loading, setLoading] = useState(true);
   const [lastCheckedBlock, setLastCheckedBlock] = useState<number>(0);
 
+  // Initialize dismissed notifications from localStorage
+  const [dismissedNotifications, setDismissedNotifications] = useState<
+    Set<string>
+  >(() => {
+    if (typeof window === "undefined") return new Set();
+
+    try {
+      const stored = localStorage.getItem(
+        "moove-event-dismissed-notifications"
+      );
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        return new Set(parsed);
+      }
+    } catch (error) {
+      console.warn(
+        "Failed to load dismissed event notifications from localStorage:",
+        error
+      );
+    }
+    return new Set();
+  });
+
+  // Save dismissed notifications to localStorage
+  const saveDismissedNotifications = useCallback((dismissed: Set<string>) => {
+    if (typeof window === "undefined") return;
+
+    try {
+      const array = Array.from(dismissed);
+      localStorage.setItem(
+        "moove-event-dismissed-notifications",
+        JSON.stringify(array)
+      );
+      console.log(
+        `💾 Saved ${array.length} dismissed event notifications to localStorage`
+      );
+    } catch (error) {
+      console.warn(
+        "Failed to save dismissed event notifications to localStorage:",
+        error
+      );
+    }
+  }, []);
+
   const fetchAuctionEvents = useCallback(async () => {
     if (!address) return;
 
@@ -39,8 +83,7 @@ export function useEventBasedNotifications() {
       console.log("🔍 Fetching auction events for notifications...");
 
       const provider = new ethers.JsonRpcProvider(
-        process.env.NEXT_PUBLIC_RPC_URL ||
-          "https://ethereum-sepolia.publicnode.com"
+        process.env.NEXT_PUBLIC_RPC_URL || "https://1rpc.io/sepolia"
       );
 
       const auctionABI = [
@@ -262,20 +305,51 @@ export function useEventBasedNotifications() {
         }
       }
 
+      // Filter out dismissed notifications and remove duplicates
+      const filteredNotifications = newNotifications.filter(
+        (notification, index, self) => {
+          // Remove duplicates
+          const isUnique =
+            index ===
+            self.findIndex(
+              (n) =>
+                n.auctionId === notification.auctionId &&
+                n.type === notification.type
+            );
+
+          // Skip if already dismissed
+          const isDismissed = dismissedNotifications.has(
+            notification.auctionId
+          );
+
+          if (isDismissed) {
+            console.log(
+              `🚫 Skipping dismissed notification for auction ${notification.auctionId}`
+            );
+          }
+
+          return isUnique && !isDismissed;
+        }
+      );
+
       // Sort notifications by timestamp (newest first)
-      newNotifications.sort((a, b) => b.timestamp - a.timestamp);
+      filteredNotifications.sort((a, b) => b.timestamp - a.timestamp);
 
       console.log(
-        `🔔 Generated ${newNotifications.length} notifications based on events`
+        `🔔 Generated ${
+          filteredNotifications.length
+        } notifications based on events (${
+          newNotifications.length - filteredNotifications.length
+        } dismissed)`
       );
-      setNotifications(newNotifications);
+      setNotifications(filteredNotifications);
       setLastCheckedBlock(currentBlock);
     } catch (error) {
       console.error("❌ Error fetching auction events:", error);
     } finally {
       setLoading(false);
     }
-  }, [address]);
+  }, [address, dismissedNotifications]);
 
   useEffect(() => {
     fetchAuctionEvents();
@@ -288,13 +362,31 @@ export function useEventBasedNotifications() {
   const hasUnreadNotifications = notifications.length > 0;
   const unreadCount = notifications.length;
 
-  const markAsRead = useCallback((auctionId: string) => {
-    setNotifications((prev) => prev.filter((n) => n.auctionId !== auctionId));
-  }, []);
+  const markAsRead = useCallback(
+    (auctionId: string) => {
+      setNotifications((prev) => prev.filter((n) => n.auctionId !== auctionId));
+
+      // Add to dismissed set to prevent re-appearance
+      setDismissedNotifications((prev) => {
+        const newSet = new Set([...prev, auctionId]);
+        saveDismissedNotifications(newSet);
+        return newSet;
+      });
+    },
+    [saveDismissedNotifications]
+  );
 
   const clearAllNotifications = useCallback(() => {
+    // Add all current notifications to dismissed set
+    const currentIds = notifications.map((n) => n.auctionId);
+    setDismissedNotifications((prev) => {
+      const newSet = new Set([...prev, ...currentIds]);
+      saveDismissedNotifications(newSet);
+      return newSet;
+    });
+
     setNotifications([]);
-  }, []);
+  }, [notifications, saveDismissedNotifications]);
 
   return {
     notifications,

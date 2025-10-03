@@ -264,6 +264,24 @@ export function useWonAuctionsManager() {
           );
 
           console.log(`🏁 Ending auction ${auctionId}...`);
+
+          // DEBUG: Log all auction data before endAuction
+          const auctionDataBefore = await auctionContract.getAuction(auctionId);
+          console.log(`🔍 Auction ${auctionId} data BEFORE endAuction:`, {
+            status: Number(auctionDataBefore.status),
+            endTime: Number(auctionDataBefore.endTime),
+            endTimeFormatted: new Date(
+              Number(auctionDataBefore.endTime) * 1000
+            ).toISOString(),
+            currentTime: Math.floor(Date.now() / 1000),
+            currentTimeFormatted: new Date().toISOString(),
+            timeExpired:
+              Math.floor(Date.now() / 1000) >=
+              Number(auctionDataBefore.endTime),
+            auctionType: Number(auctionDataBefore.auctionType),
+            isSettled: auctionDataBefore.isSettled,
+          });
+
           const endTx = await auctionContract.endAuction(auctionId);
           console.log(`🏁 End auction transaction sent:`, endTx.hash);
 
@@ -273,15 +291,33 @@ export function useWonAuctionsManager() {
             endReceipt
           );
 
-          // Wait a bit to ensure the status is updated
-          await new Promise((resolve) => setTimeout(resolve, 2000));
+          // Wait longer to ensure the status is updated on blockchain
+          await new Promise((resolve) => setTimeout(resolve, 5000)); // Increased to 5 seconds
 
-          // Check if the auction has actually ended
+          // Check if the auction has actually ended (with retry)
           console.log(
             `🔍 Verifying auction ${auctionId} status after endAuction...`
           );
-          const updatedStatus = await checkAuctionStatus(auctionId);
-          console.log(`📊 Updated auction status:`, updatedStatus);
+
+          let updatedStatus = await checkAuctionStatus(auctionId);
+          console.log(
+            `📊 Updated auction status (first check):`,
+            updatedStatus
+          );
+
+          // Retry if status is still not ENDED
+          if (updatedStatus.status !== 3) {
+            console.log(
+              `⏳ Status not ENDED yet, waiting 3 more seconds and retrying...`
+            );
+            await new Promise((resolve) => setTimeout(resolve, 3000));
+
+            updatedStatus = await checkAuctionStatus(auctionId);
+            console.log(
+              `📊 Updated auction status (retry check):`,
+              updatedStatus
+            );
+          }
 
           if (updatedStatus.status !== 3) {
             console.error(
@@ -298,6 +334,34 @@ export function useWonAuctionsManager() {
           );
         } catch (endError) {
           console.error(`❌ Error ending auction ${auctionId}:`, endError);
+
+          // DEBUG: Detailed error analysis
+          const error = endError as any;
+          if (error.message) {
+            console.error(`❌ Error message: ${error.message}`);
+          }
+          if (error.code) {
+            console.error(`❌ Error code: ${error.code}`);
+          }
+          if (error.reason) {
+            console.error(`❌ Error reason: ${error.reason}`);
+          }
+
+          // Check if it's a contract revert
+          if (error.message?.includes("Auction not active")) {
+            console.error(
+              `❌ Auction ${auctionId} is not ACTIVE - status might be wrong`
+            );
+          }
+          if (error.message?.includes("Auction not ended yet")) {
+            console.error(
+              `❌ Auction ${auctionId} is not expired yet - timing issue`
+            );
+          }
+          if (error.message?.includes("Auction does not exist")) {
+            console.error(`❌ Auction ${auctionId} does not exist`);
+          }
+
           alert(
             `Failed to end auction: ${
               endError instanceof Error ? endError.message : "Unknown error"
