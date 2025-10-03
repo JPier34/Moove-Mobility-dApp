@@ -153,3 +153,4 @@ export function useGraphUserCollection() {
       nfts.filter((nft) => nft.acquisitionMethod === "auction"),
   };
 }
+

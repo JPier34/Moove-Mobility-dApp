@@ -12,6 +12,13 @@ import AdminNFTCreatorUltraSimple from "@/components/admin/AdminNFTCreatorUltraS
 // import AdminNFTCreatorDebug from "@/components/admin/AdminNFTCreatorDebug";
 import AdminGuard from "@/components/admin/AdminGuard";
 import AuctionTypeTester from "@/components/admin/AuctionTypeTester";
+import AuctionCreationDebug from "@/components/admin/AuctionCreationDebug";
+import RealAuctionDataViewer from "@/components/admin/RealAuctionDataViewer";
+import PinataTestComponent from "@/components/admin/PinataTestComponent";
+import ImageDebugAnalyzer from "@/components/debug/ImageDebugAnalyzer";
+import ImageCreationDebugger from "@/components/debug/ImageCreationDebugger";
+import EnvironmentSetupGuide from "@/components/admin/EnvironmentSetupGuide";
+import EnvironmentDebugger from "@/components/admin/EnvironmentDebugger";
 // Debug components removed
 // import FailedAuctionHandler from "@/components/admin/FailedAuctionHandler"; // Temporarily disabled
 
@@ -133,6 +140,69 @@ export default function AdminPage() {
             transition={{ duration: 0.6, delay: 0.6 }}
           >
             <AuctionTypeTester />
+          </motion.div>
+
+          {/* Auction Creation Debug */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.8 }}
+          >
+            <AuctionCreationDebug />
+          </motion.div>
+
+          {/* Real Auction Data Viewer */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 1.0 }}
+          >
+            <RealAuctionDataViewer />
+          </motion.div>
+
+          {/* Pinata Test Component */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 1.2 }}
+          >
+            <PinataTestComponent />
+          </motion.div>
+
+          {/* Image Debug Analyzer */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 1.4 }}
+          >
+            <ImageDebugAnalyzer />
+          </motion.div>
+
+          {/* Image Creation Debugger */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 1.6 }}
+          >
+            <ImageCreationDebugger />
+          </motion.div>
+
+          {/* Environment Setup Guide */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 1.8 }}
+          >
+            <EnvironmentSetupGuide />
+          </motion.div>
+
+          {/* Environment Debugger */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 2.0 }}
+          >
+            <EnvironmentDebugger />
           </motion.div>
 
           {/* Debug components removed */}

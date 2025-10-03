@@ -70,3 +70,4 @@ export function useAutomaticRefundHandler() {
     processedRefunds: Array.from(processedRefunds),
   };
 }
+

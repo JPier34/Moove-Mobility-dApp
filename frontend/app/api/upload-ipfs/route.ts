@@ -6,6 +6,22 @@ const PINATA_SECRET_KEY = process.env.PINATA_SECRET_KEY;
 
 export async function POST(request: NextRequest) {
   try {
+    // Debug: Log environment variables
+    console.log("🔍 API Route Environment Variables Debug:");
+    console.log(
+      "PINATA_API_KEY:",
+      process.env.PINATA_API_KEY
+        ? `${process.env.PINATA_API_KEY.substring(0, 10)}...`
+        : "undefined"
+    );
+    console.log(
+      "PINATA_SECRET_KEY:",
+      process.env.PINATA_SECRET_KEY
+        ? `${process.env.PINATA_SECRET_KEY.substring(0, 10)}...`
+        : "undefined"
+    );
+    console.log("NODE_ENV:", process.env.NODE_ENV);
+
     // Check if Pinata is configured
     if (!PINATA_API_KEY || !PINATA_SECRET_KEY) {
       // For testing purposes, return a mock response
@@ -18,6 +34,11 @@ export async function POST(request: NextRequest) {
         url: "ipfs://QmMockHashForTesting123456789",
         type: "image",
         mock: true,
+        envDebug: {
+          hasApiKey: !!PINATA_API_KEY,
+          hasSecretKey: !!PINATA_SECRET_KEY,
+          nodeEnv: process.env.NODE_ENV,
+        },
       });
     }
 
@@ -103,6 +124,21 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    // Debug: Log environment variables
+    console.log("🔍 API Route PUT Environment Variables Debug:");
+    console.log(
+      "PINATA_API_KEY:",
+      process.env.PINATA_API_KEY
+        ? `${process.env.PINATA_API_KEY.substring(0, 10)}...`
+        : "undefined"
+    );
+    console.log(
+      "PINATA_SECRET_KEY:",
+      process.env.PINATA_SECRET_KEY
+        ? `${process.env.PINATA_SECRET_KEY.substring(0, 10)}...`
+        : "undefined"
+    );
+
     // Check if Pinata is configured
     if (!PINATA_API_KEY || !PINATA_SECRET_KEY) {
       // For testing purposes, return a mock response

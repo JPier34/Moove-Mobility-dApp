@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useAccount, useWriteContract } from "wagmi";
 import { CONTRACT_ADDRESSES } from "@/utils/contracts";
 import { AuctionStatus } from "@/types/auction";
-import MooveAuctionABI from "@/src/abis/MooveAuction.json";
+import MooveAuctionArtifact from "@/src/abis/MooveAuction.json";
 import { ethers } from "ethers";
 import toast from "react-hot-toast";
 
@@ -24,8 +24,8 @@ export function useAuctionExpirationHandler() {
     if (!isConnected || !address) return;
 
     try {
-      // Check auctions 0-20 for expired ones (adjust range as needed)
-      const auctionIdsToCheck = Array.from({ length: 21 }, (_, i) => i);
+      // Check auctions from 20 onwards (as requested)
+      const auctionIdsToCheck = Array.from({ length: 50 }, (_, i) => i + 20);
 
       for (const auctionId of auctionIdsToCheck) {
         // Skip if already processed
@@ -39,7 +39,7 @@ export function useAuctionExpirationHandler() {
           );
           const contract = new ethers.Contract(
             CONTRACT_ADDRESSES.MooveAuction,
-            MooveAuctionABI,
+            MooveAuctionArtifact.abi,
             provider
           );
 
@@ -52,10 +52,11 @@ export function useAuctionExpirationHandler() {
 
             console.log(`🔍 Checking auction ${auctionId}:`, {
               currentTime,
-              endTime,
+              endTime: new Date(endTime * 1000).toISOString(),
               status,
               isExpired: currentTime >= endTime,
               isActive: status === AuctionStatus.ACTIVE,
+              timeRemaining: endTime - currentTime,
             });
 
             // Check if auction is expired but still ACTIVE
@@ -67,7 +68,7 @@ export function useAuctionExpirationHandler() {
               try {
                 await writeContractAsync({
                   address: CONTRACT_ADDRESSES.MooveAuction as `0x${string}`,
-                  abi: MooveAuctionABI,
+                  abi: MooveAuctionArtifact.abi,
                   functionName: "endAuction",
                   args: [auctionId],
                 });
@@ -97,6 +98,12 @@ export function useAuctionExpirationHandler() {
           setProcessedAuctions((prev) => new Set([...prev, auctionId]));
         }
       }
+
+      console.log(
+        `📊 Expiration check complete for auctions 20-69. Processed: ${
+          Array.from(processedAuctions).length
+        }`
+      );
     } catch (error) {
       console.error("Error processing expired auctions:", error);
     }

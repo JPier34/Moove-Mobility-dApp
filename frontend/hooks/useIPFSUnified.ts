@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { uploadJSONToPinata } from "@/utils/pinata";
 
 export interface NFTMetadata {
   name: string;
@@ -83,16 +84,28 @@ export function useIPFSUnified() {
       setError(null);
 
       try {
-        // Simulate upload progress
-        setUploadProgress(25);
+        // Check if Pinata is configured
+        const hasPinataConfig =
+          process.env.NEXT_PUBLIC_PINATA_API_KEY || process.env.PINATA_API_KEY;
 
-        // Mock IPFS upload - in production, use a real IPFS service
-        const mockHash = `QmMockMetadataHashForTesting${Date.now()}`;
+        if (hasPinataConfig) {
+          console.log("📤 Uploading to Pinata IPFS...");
+          setUploadProgress(25);
 
-        setUploadProgress(100);
+          const ipfsHash = await uploadJSONToPinata(metadata);
 
-        console.log(`📤 Mock IPFS upload: ${mockHash}`);
-        return mockHash;
+          setUploadProgress(100);
+          console.log(`✅ Pinata IPFS upload successful: ${ipfsHash}`);
+          return ipfsHash;
+        } else {
+          console.log("⚠️ Pinata not configured, using mock IPFS");
+          // Mock IPFS upload - in production, use a real IPFS service
+          const mockHash = `QmMockMetadataHashForTesting${Date.now()}`;
+
+          setUploadProgress(100);
+          console.log(`📤 Mock IPFS upload: ${mockHash}`);
+          return mockHash;
+        }
       } catch (err) {
         const error =
           err instanceof Error ? err : new Error("Failed to upload to IPFS");

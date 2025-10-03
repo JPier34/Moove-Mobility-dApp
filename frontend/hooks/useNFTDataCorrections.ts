@@ -11,10 +11,11 @@ export function useNFTDataCorrections() {
     return {
       // NFT 114 - Correzione immagine e altri dati
       114: {
-        image: "/images/default-nft.svg", // Usa immagine placeholder per ora
+        image:
+          "https://ipfs.io/ipfs/QmdfZytfB7HjY6Dn1RmX2n6TSXvWarZpFKUwGL6vLHbK53", // Prova l'immagine dal TokenURI
         // Altri dati che potrebbero essere corretti
         correctedImage: true,
-        note: "Image corrected from test hash to placeholder image",
+        note: "Image corrected from test hash to real IPFS image",
       },
       // Aggiungi altre correzioni qui se necessario
     };

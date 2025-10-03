@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useAccount } from "wagmi";
 import { ethers } from "ethers";
+import { contracts } from "@/utils/contracts";
 
 interface AuctionData {
   auctionId: string;
@@ -182,45 +183,178 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
               }
 
               console.log(`🔍 Auction ${i} RAW data:`, rawAuctionData);
-        console.log(`🔍 Auction ${i} parsed data:`, {
-          startTime: auctionData.startTime,
-          endTime: auctionData.endTime,
-          startingPrice: auctionData.startingPrice,
-          tokenId: auctionData.tokenId,
-          status: auctionData.status,
-          isSettled: auctionData.isSettled,
-          totalBidders: auctionData.totalBidders,
-        });
+              console.log(`🔍 Auction ${i} parsed data:`, {
+                startTime: auctionData.startTime,
+                endTime: auctionData.endTime,
+                startingPrice: auctionData.startingPrice,
+                currentPrice: auctionData.currentPrice,
+                highestBid: auctionData.highestBid,
+                tokenId: auctionData.tokenId,
+                status: auctionData.status,
+                isSettled: auctionData.isSettled,
+                totalBidders: auctionData.totalBidders,
+              });
 
-        // Check if auction is expired but still ACTIVE - needs to be ended
-        const currentTime = Math.floor(Date.now() / 1000);
-        const endTime = Number(auctionData.endTime);
-        const isExpired = currentTime >= endTime;
-        const isActive = Number(auctionData.status) === 1; // ACTIVE
-        
-        if (isExpired && isActive) {
-          console.log(`⚠️ Auction ${i} is expired but still ACTIVE. Should call endAuction.`, {
-            auctionId: i,
-            currentTime,
-            endTime,
-            status: auctionData.status,
-            timeExpired: isExpired,
-            isActive,
-          });
-        }
+              // Check if auction is expired but still ACTIVE - needs to be ended
+              const currentTime = Math.floor(Date.now() / 1000);
+              const endTime = Number(auctionData.endTime);
+              const isExpired = currentTime >= endTime;
+              const isActive = Number(auctionData.status) === 1; // ACTIVE
+
+              if (isExpired && isActive) {
+                console.log(
+                  `⚠️ Auction ${i} is expired but still ACTIVE. Should call endAuction.`,
+                  {
+                    auctionId: i,
+                    currentTime,
+                    endTime,
+                    status: auctionData.status,
+                    timeExpired: isExpired,
+                    isActive,
+                  }
+                );
+              }
+
+              // Fetch NFT metadata
+              let nftMetadata = {
+                name: `NFT #${auctionData.tokenId || i}`,
+                image: "/images/default-nft.svg",
+                category: "sticker",
+              };
+
+              console.log(
+                `🔍 [Auction ${i}] Starting metadata fetch for NFT ${auctionData.tokenId}`
+              );
+
+              try {
+                if (auctionData.tokenId) {
+                  console.log(
+                    `🔍 [Auction ${i}] Creating NFT contract for token ${auctionData.tokenId}`
+                  );
+                  console.log(
+                    `🔍 [Auction ${i}] NFT contract address:`,
+                    contracts.MooveNFT.address
+                  );
+
+                  const nftContract = new ethers.Contract(
+                    contracts.MooveNFT.address,
+                    contracts.MooveNFT.abi,
+                    provider
+                  );
+
+                  console.log(
+                    `🔍 [Auction ${i}] Calling tokenURI for NFT ${auctionData.tokenId}`
+                  );
+                  const tokenURI = await nftContract.tokenURI(
+                    auctionData.tokenId
+                  );
+                  console.log(`🔍 [Auction ${i}] Raw tokenURI:`, tokenURI);
+
+                  if (tokenURI) {
+                    let cleanTokenURI = tokenURI.replace(/"/g, "");
+                    // Convert ipfs:// to https://ipfs.io/ipfs/ for browser compatibility
+                    if (cleanTokenURI.startsWith("ipfs://")) {
+                      cleanTokenURI = cleanTokenURI.replace(
+                        "ipfs://",
+                        "https://ipfs.io/ipfs/"
+                      );
+                    }
+                    console.log(
+                      `🔍 [Auction ${i}] Clean tokenURI: ${cleanTokenURI}`
+                    );
+
+                    // Check if this is a mock hash before attempting fetch
+                    if (
+                      cleanTokenURI.includes("QmMockMetadataHashForTesting")
+                    ) {
+                      console.log(
+                        `🎭 [Auction ${i}] Mock hash detected, using fallback metadata`
+                      );
+                      nftMetadata = {
+                        name: `NFT #${auctionData.tokenId}`,
+                        image: "/images/default-nft.svg",
+                        category: "sticker",
+                      };
+                    } else {
+                      console.log(
+                        `🔍 [Auction ${i}] Fetching metadata from: ${cleanTokenURI}`
+                      );
+
+                      try {
+                        const response = await fetch(cleanTokenURI);
+                        console.log(
+                          `🔍 [Auction ${i}] Fetch response status:`,
+                          response.status,
+                          response.statusText
+                        );
+
+                        if (response.ok) {
+                          const metadata = await response.json();
+                          console.log(
+                            `🔍 [Auction ${i}] Raw metadata:`,
+                            metadata
+                          );
+
+                          nftMetadata = {
+                            name:
+                              metadata.name || `NFT #${auctionData.tokenId}`,
+                            image: metadata.image?.startsWith(
+                              "QmMockMetadataHashForTesting"
+                            )
+                              ? "/images/default-nft.svg" // Fallback per mock hash
+                              : metadata.image?.startsWith("Qm")
+                              ? `https://ipfs.io/ipfs/${metadata.image}` // Hash IPFS reale
+                              : metadata.image || "/images/default-nft.svg", // URL completo o fallback
+                            category:
+                              metadata.properties?.category ||
+                              metadata.category ||
+                              "sticker",
+                          };
+                          console.log(
+                            `✅ [Auction ${i}] Final metadata for NFT ${auctionData.tokenId}:`,
+                            nftMetadata
+                          );
+                        } else {
+                          console.warn(
+                            `⚠️ [Auction ${i}] Failed to fetch metadata for NFT ${auctionData.tokenId}: ${response.statusText}`
+                          );
+                        }
+                      } catch (fetchError) {
+                        console.warn(
+                          `⚠️ [Auction ${i}] Error fetching metadata for NFT ${auctionData.tokenId}:`,
+                          fetchError
+                        );
+                      }
+                    }
+                  } else {
+                    console.warn(
+                      `⚠️ [Auction ${i}] No tokenURI returned for NFT ${auctionData.tokenId}`
+                    );
+                  }
+                } else {
+                  console.warn(
+                    `⚠️ [Auction ${i}] No tokenId available for metadata fetch`
+                  );
+                }
+              } catch (metadataError) {
+                console.error(
+                  `❌ [Auction ${i}] Error fetching metadata for NFT ${auctionData.tokenId}:`,
+                  metadataError
+                );
+              }
 
               const auction: AuctionData = {
                 auctionId: i.toString(),
                 nftId: auctionData.tokenId?.toString() || "0",
-                nftName: `NFT #${auctionData.tokenId || i}`,
-                nftImage: "/images/default-nft.svg",
-                nftCategory: "sticker",
+                nftName: nftMetadata.name,
+                nftImage: nftMetadata.image,
+                nftCategory: nftMetadata.category,
                 status: Number(auctionData.status || 0),
                 startPrice: auctionData.startingPrice
                   ? ethers.formatEther(auctionData.startingPrice)
                   : "0",
-                currentBid: auctionData.highestBid
-                  ? ethers.formatEther(auctionData.highestBid)
+                currentBid: auctionData.currentPrice
+                  ? ethers.formatEther(auctionData.currentPrice)
                   : "0",
                 highestBidder:
                   auctionData.highestBidder ||
@@ -297,6 +431,22 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
                 allowPartialFulfillment:
                   auctionData.allowPartialFulfillment || false,
               };
+
+              console.log(
+                `🔍 [Auction ${i}] Final auction object (all auctions):`,
+                {
+                  auctionId: auction.auctionId,
+                  nftId: auction.nftId,
+                  nftName: auction.nftName,
+                  nftImage: auction.nftImage,
+                  nftCategory: auction.nftCategory,
+                  status: auction.status,
+                  startPrice: auction.startPrice,
+                  currentBid: auction.currentBid,
+                  highestBidder: auction.highestBidder,
+                }
+              );
+
               auctionsToFetch.push(auction);
             } catch (err) {
               console.warn(`⚠️ Failed to fetch auction ${i}:`, err);
@@ -329,18 +479,146 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
                 tokenId: auctionData.tokenId,
               });
 
+              // Fetch NFT metadata
+              let nftMetadata = {
+                name: `NFT #${auctionData.tokenId || i}`,
+                image: "/images/default-nft.svg",
+                category: "sticker",
+              };
+
+              console.log(
+                `🔍 [Auction ${i}] Starting metadata fetch for NFT ${auctionData.tokenId}`
+              );
+
+              try {
+                if (auctionData.tokenId) {
+                  console.log(
+                    `🔍 [Auction ${i}] Creating NFT contract for token ${auctionData.tokenId}`
+                  );
+                  console.log(
+                    `🔍 [Auction ${i}] NFT contract address:`,
+                    contracts.MooveNFT.address
+                  );
+
+                  const nftContract = new ethers.Contract(
+                    contracts.MooveNFT.address,
+                    contracts.MooveNFT.abi,
+                    provider
+                  );
+
+                  console.log(
+                    `🔍 [Auction ${i}] Calling tokenURI for NFT ${auctionData.tokenId}`
+                  );
+                  const tokenURI = await nftContract.tokenURI(
+                    auctionData.tokenId
+                  );
+                  console.log(`🔍 [Auction ${i}] Raw tokenURI:`, tokenURI);
+
+                  if (tokenURI) {
+                    let cleanTokenURI = tokenURI.replace(/"/g, "");
+                    // Convert ipfs:// to https://ipfs.io/ipfs/ for browser compatibility
+                    if (cleanTokenURI.startsWith("ipfs://")) {
+                      cleanTokenURI = cleanTokenURI.replace(
+                        "ipfs://",
+                        "https://ipfs.io/ipfs/"
+                      );
+                    }
+                    console.log(
+                      `🔍 [Auction ${i}] Clean tokenURI: ${cleanTokenURI}`
+                    );
+
+                    // Check if this is a mock hash before attempting fetch
+                    if (
+                      cleanTokenURI.includes("QmMockMetadataHashForTesting")
+                    ) {
+                      console.log(
+                        `🎭 [Auction ${i}] Mock hash detected, using fallback metadata`
+                      );
+                      nftMetadata = {
+                        name: `NFT #${auctionData.tokenId}`,
+                        image: "/images/default-nft.svg",
+                        category: "sticker",
+                      };
+                    } else {
+                      console.log(
+                        `🔍 [Auction ${i}] Fetching metadata from: ${cleanTokenURI}`
+                      );
+
+                      try {
+                        const response = await fetch(cleanTokenURI);
+                        console.log(
+                          `🔍 [Auction ${i}] Fetch response status:`,
+                          response.status,
+                          response.statusText
+                        );
+
+                        if (response.ok) {
+                          const metadata = await response.json();
+                          console.log(
+                            `🔍 [Auction ${i}] Raw metadata:`,
+                            metadata
+                          );
+
+                          nftMetadata = {
+                            name:
+                              metadata.name || `NFT #${auctionData.tokenId}`,
+                            image: metadata.image?.startsWith(
+                              "QmMockMetadataHashForTesting"
+                            )
+                              ? "/images/default-nft.svg" // Fallback per mock hash
+                              : metadata.image?.startsWith("Qm")
+                              ? `https://ipfs.io/ipfs/${metadata.image}` // Hash IPFS reale
+                              : metadata.image || "/images/default-nft.svg", // URL completo o fallback
+                            category:
+                              metadata.properties?.category ||
+                              metadata.category ||
+                              "sticker",
+                          };
+                          console.log(
+                            `✅ [Auction ${i}] Final metadata for NFT ${auctionData.tokenId}:`,
+                            nftMetadata
+                          );
+                        } else {
+                          console.warn(
+                            `⚠️ [Auction ${i}] Failed to fetch metadata for NFT ${auctionData.tokenId}: ${response.statusText}`
+                          );
+                        }
+                      } catch (fetchError) {
+                        console.warn(
+                          `⚠️ [Auction ${i}] Error fetching metadata for NFT ${auctionData.tokenId}:`,
+                          fetchError
+                        );
+                      }
+                    }
+                  } else {
+                    console.warn(
+                      `⚠️ [Auction ${i}] No tokenURI returned for NFT ${auctionData.tokenId}`
+                    );
+                  }
+                } else {
+                  console.warn(
+                    `⚠️ [Auction ${i}] No tokenId available for metadata fetch`
+                  );
+                }
+              } catch (metadataError) {
+                console.error(
+                  `❌ [Auction ${i}] Error fetching metadata for NFT ${auctionData.tokenId}:`,
+                  metadataError
+                );
+              }
+
               const auction: AuctionData = {
                 auctionId: i.toString(),
                 nftId: auctionData.tokenId?.toString() || "0",
-                nftName: `NFT #${auctionData.tokenId || i}`,
-                nftImage: "/images/default-nft.svg",
-                nftCategory: "sticker",
+                nftName: nftMetadata.name,
+                nftImage: nftMetadata.image,
+                nftCategory: nftMetadata.category,
                 status: Number(auctionData.status || 0),
                 startPrice: auctionData.startingPrice
                   ? ethers.formatEther(auctionData.startingPrice)
                   : "0",
-                currentBid: auctionData.highestBid
-                  ? ethers.formatEther(auctionData.highestBid)
+                currentBid: auctionData.currentPrice
+                  ? ethers.formatEther(auctionData.currentPrice)
                   : "0",
                 highestBidder:
                   auctionData.highestBidder ||
@@ -417,6 +695,16 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
                 allowPartialFulfillment:
                   auctionData.allowPartialFulfillment || false,
               };
+
+              console.log(`🔍 [Auction ${i}] Final auction object:`, {
+                auctionId: auction.auctionId,
+                nftId: auction.nftId,
+                nftName: auction.nftName,
+                nftImage: auction.nftImage,
+                nftCategory: auction.nftCategory,
+                status: auction.status,
+              });
+
               auctionsToFetch.push(auction);
             } catch (err) {
               console.warn(`⚠️ Failed to fetch auction ${i}:`, err);

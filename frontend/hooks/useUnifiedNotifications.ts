@@ -182,8 +182,24 @@ export function useUnifiedNotifications() {
             const currentTime = Math.floor(Date.now() / 1000);
 
             // Check if auction ended, user is winner, but not yet claimed
+            // Consider both ENDED status OR ACTIVE but time-expired
+            const isAuctionEnded =
+              status === 3 || (status === 1 && currentTime >= endTime);
+
+            console.log(
+              `🔍 Checking auction ${auctionId} for claim notification:`,
+              {
+                status,
+                endTime: new Date(endTime * 1000).toISOString(),
+                currentTime: new Date().toISOString(),
+                isAuctionEnded,
+                isWinner: highestBidder.toLowerCase() === address.toLowerCase(),
+                timeExpired: currentTime >= endTime,
+              }
+            );
+
             if (
-              status === 3 && // ENDED status
+              isAuctionEnded && // ENDED status OR ACTIVE but time-expired
               highestBidder.toLowerCase() === address.toLowerCase() &&
               currentTime >= endTime
             ) {
@@ -203,6 +219,17 @@ export function useUnifiedNotifications() {
                 if (dismissedNotifications.has(notificationId)) {
                   continue;
                 }
+
+                console.log(
+                  `🎉 Creating claim notification for auction ${auctionId}:`,
+                  {
+                    status,
+                    isAuctionEnded,
+                    isWinner:
+                      highestBidder.toLowerCase() === address.toLowerCase(),
+                    timeExpired: currentTime >= endTime,
+                  }
+                );
 
                 newNotifications.push({
                   id: notificationId,

@@ -4,7 +4,6 @@ import React, { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { useAccount } from "wagmi";
 import { useSecureNFTAuctionFlow } from "@/hooks/useSecureNFTAuction";
-import { useIPFSUnified } from "@/hooks/useIPFSUnified";
 import { useNFTValidationAPI } from "@/hooks/useNFTValidationAPI";
 import { AuctionType } from "@/types/auction";
 import { useRouter } from "next/navigation";
@@ -55,11 +54,6 @@ function AdminNFTCreatorUltraSimpleContent() {
   } = useSecureNFTAuctionFlow();
 
   const router = useRouter();
-  const {
-    uploadNFT,
-    isUploading: isUploadingToIPFS,
-    uploadProgress,
-  } = useIPFSUnified();
   const { validateNFT, isValidating: isValidatingNFT } = useNFTValidationAPI();
   const { isConnected } = useAccount();
   const { checkUniqueness, isLoading: isCheckingUniqueness } =
@@ -473,28 +467,52 @@ function AdminNFTCreatorUltraSimpleContent() {
     }
 
     try {
-      // Upload image to IPFS
+      // Upload image to IPFS first
       if (!nftData.image) {
         toast.error("Please upload an image first");
         return;
       }
 
-      const ipfsResult = await uploadNFT({
-        name: nftData.name,
-        description: nftData.description,
-        image: URL.createObjectURL(nftData.image),
-        properties: {
-          rarity: nftData.rarity,
-          category: "VEHICLE_DECORATION",
-        },
-        attributes: [
-          { trait_type: "Rarity", value: nftData.rarity },
-          { trait_type: "Category", value: "VEHICLE_DECORATION" },
-        ],
-      });
+      console.log("📤 Uploading image to IPFS...");
+      let imageIpfsHash: string;
 
-      if (!ipfsResult) {
-        toast.error("Failed to upload metadata to IPFS");
+      try {
+        // Upload image using API endpoint (server-side)
+        const imageFormData = new FormData();
+        imageFormData.append("file", nftData.image);
+        imageFormData.append("type", "image");
+
+        console.log("📤 Uploading image via API endpoint...");
+        const imageResponse = await fetch("/api/upload-ipfs", {
+          method: "POST",
+          body: imageFormData,
+        });
+
+        if (!imageResponse.ok) {
+          const errorText = await imageResponse.text();
+          console.error("❌ Image upload failed:", {
+            status: imageResponse.status,
+            statusText: imageResponse.statusText,
+            error: errorText,
+          });
+          throw new Error(
+            `Failed to upload image: ${imageResponse.status} - ${errorText}`
+          );
+        }
+
+        const imageResult = await imageResponse.json();
+        console.log("✅ Image upload result:", imageResult);
+
+        if (imageResult.mock) {
+          console.log("⚠️ Using mock image hash (Pinata not configured)");
+          imageIpfsHash = imageResult.hash;
+        } else {
+          console.log(`✅ Image uploaded to IPFS: ${imageResult.hash}`);
+          imageIpfsHash = imageResult.hash;
+        }
+      } catch (error) {
+        console.error("❌ Failed to upload image to IPFS:", error);
+        toast.error("Failed to upload image to IPFS");
         return;
       }
 
@@ -502,7 +520,7 @@ function AdminNFTCreatorUltraSimpleContent() {
       const nftMetadata = {
         name: nftData.name,
         description: nftData.description,
-        image: ipfsResult,
+        image: imageIpfsHash, // Use the IPFS hash directly
         external_url: `https://moove-mobility.com/nft/${Date.now()}`,
         attributes: [
           { trait_type: "Rarity", value: nftData.rarity },
@@ -519,18 +537,15 @@ function AdminNFTCreatorUltraSimpleContent() {
         ],
       };
 
-      // Upload metadata to IPFS
+      // Upload metadata to IPFS using PUT endpoint
       console.log("📤 Uploading NFT metadata to IPFS:", nftMetadata);
-      const metadataBlob = new Blob([JSON.stringify(nftMetadata, null, 2)], {
-        type: "application/json",
-      });
-
-      const metadataFormData = new FormData();
-      metadataFormData.append("file", metadataBlob, "metadata.json");
 
       const metadataResponse = await fetch("/api/upload-ipfs", {
-        method: "POST",
-        body: metadataFormData,
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ metadata: nftMetadata }),
       });
 
       if (!metadataResponse.ok) {

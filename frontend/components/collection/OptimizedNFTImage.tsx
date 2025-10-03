@@ -180,7 +180,8 @@ export default function OptimizedNFTImage({
         <>
           {!hasError &&
           debouncedSrc &&
-          debouncedSrc !== "/images/default-nft.png" ? (
+          debouncedSrc !== "/images/default-nft.png" &&
+          debouncedSrc !== "/images/default-nft.svg" ? (
             <img
               src={getCurrentGatewayUrl(debouncedSrc)}
               alt={alt}
@@ -203,7 +204,8 @@ export default function OptimizedNFTImage({
           {/* Fallback placeholder */}
           {(hasError ||
             !debouncedSrc ||
-            debouncedSrc === "/images/default-nft.png") && (
+            debouncedSrc === "/images/default-nft.png" ||
+            debouncedSrc === "/images/default-nft.svg") && (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="w-32 h-32 bg-gradient-to-br from-white/20 to-white/5 rounded-2xl border border-white/20 flex items-center justify-center">
                 <motion.div
