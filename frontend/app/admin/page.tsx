@@ -18,9 +18,10 @@ import PinataTestComponent from "@/components/admin/PinataTestComponent";
 import ImageDebugAnalyzer from "@/components/debug/ImageDebugAnalyzer";
 import ImageCreationDebugger from "@/components/debug/ImageCreationDebugger";
 import EnvironmentSetupGuide from "@/components/admin/EnvironmentSetupGuide";
-import EnvironmentDebugger from "@/components/admin/EnvironmentDebugger";
-// Debug components removed
-// import FailedAuctionHandler from "@/components/admin/FailedAuctionHandler"; // Temporarily disabled
+import TransactionDebugPanel from "@/components/admin/TransactionDebugPanel";
+import SpecificTransactionAnalyzer from "@/components/admin/SpecificTransactionAnalyzer";
+import AuctionIdRangeChecker from "@/components/admin/AuctionIdRangeChecker";
+import ServerSideAuctionManager from "@/components/admin/ServerSideAuctionManager";
 
 export default function AdminPage() {
   const { address } = useAccount();
@@ -67,6 +68,13 @@ export default function AdminPage() {
             processedFailedAuctions={processedFailedAuctions}
             onRefresh={refetchAuctions}
           /> */}
+
+          {/* Admin Debug Panel */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+          ></motion.div>
 
           {/* Admin Stats */}
           <motion.div
@@ -196,14 +204,50 @@ export default function AdminPage() {
             <EnvironmentSetupGuide />
           </motion.div>
 
-          {/* Environment Debugger */}
+          {/* Transaction Debug Panel */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 2.0 }}
           >
-            <EnvironmentDebugger />
+            <TransactionDebugPanel />
           </motion.div>
+
+          {/* Specific Transaction Analyzer */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 2.2 }}
+          >
+            <SpecificTransactionAnalyzer txHash="0x70d4d820fb8fa3c986e0ae0346555f3291dcbcbcdbffc1001a67666885d750de" />
+          </motion.div>
+
+          {/* Auction ID Range Checker */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 2.4 }}
+          >
+            <AuctionIdRangeChecker />
+          </motion.div>
+
+          {/* Server-Side Auction Manager */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 2.6 }}
+          >
+            <ServerSideAuctionManager />
+          </motion.div>
+
+          {/* Environment Debugger - Temporarily disabled */}
+          {/* <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 2.0 }}
+          >
+            <EnvironmentDebugger />
+          </motion.div> */}
 
           {/* Debug components removed */}
         </div>

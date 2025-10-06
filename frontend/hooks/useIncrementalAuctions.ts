@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useAccount } from "wagmi";
 import { ethers } from "ethers";
 import { contracts } from "@/utils/contracts";
+import { Auction, AuctionType, AuctionStatus } from "../types/auction";
 
 interface AuctionData {
   auctionId: string;
@@ -25,6 +26,8 @@ interface AuctionData {
   bidIncrement?: string;
   extensionThreshold?: number; // seconds
   extensionDuration?: number; // uint32 from contract
+  extensionThresholdMinutes?: number; // minutes
+  extensionDurationMinutes?: number; // minutes
   revealEndTime?: string;
   revealPhaseStarted?: boolean;
   minBidders?: number;
@@ -33,12 +36,61 @@ interface AuctionData {
 }
 
 interface UseIncrementalAuctionsReturn {
-  auctions: AuctionData[];
+  auctions: Auction[];
   isLoading: boolean;
   error: string | null;
   refetch: () => void;
   lastFetchedCount: number;
 }
+
+// Funzione per convertire AuctionData in Auction
+const convertAuctionDataToAuction = (data: AuctionData): Auction => {
+  return {
+    auctionId: data.auctionId,
+    nftId: data.nftId,
+    nftName: data.nftName,
+    nftImage: data.nftImage,
+    nftCategory: data.nftCategory,
+    seller: data.seller,
+    auctionType: data.auctionType as AuctionType,
+    status: data.status as AuctionStatus,
+    startPrice: data.startPrice,
+    reservePrice: data.reservePrice || "0",
+    buyNowPrice: null, // Non disponibile in AuctionData
+    currentBid: data.currentBid,
+    highestBidder: data.highestBidder || null,
+    bidCount: data.bidCount,
+    startTime: new Date(data.startTime),
+    endTime: new Date(data.endTime),
+    bidIncrement: data.bidIncrement || "0.00001",
+    currency: "ETH",
+    isSettled: data.isSettled,
+    transactionHash: undefined,
+    extensionThresholdMinutes: data.extensionThresholdMinutes,
+    extensionDurationMinutes: data.extensionDurationMinutes,
+    attributes: {
+      rarity: undefined,
+      designer: undefined,
+      collection: undefined,
+      achievement: undefined,
+      requirement: undefined,
+      holders: undefined,
+      effects: undefined,
+      compatibility: undefined,
+      special: undefined,
+      traits: undefined,
+      supply: undefined,
+      mystery: undefined,
+      unlocks: undefined,
+      community: undefined,
+      edition: undefined,
+      range: undefined,
+      speed: undefined,
+      battery: undefined,
+      condition: undefined,
+    },
+  };
+};
 
 // Helper function to parse auction data from contract response
 const parseAuctionData = (rawData: any) => {
@@ -169,12 +221,24 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
         let auctionsToFetch: AuctionData[] = [];
 
         if (auctions.length === 0 || forceRefresh) {
-          // First load or forced refresh - fetch all
-          console.log("🔄 Fetching all auctions");
-          for (let i = 0; i < totalCount; i++) {
+          // First load or forced refresh - fetch all valid auctions (starting from ID 24)
+          console.log("🔄 Fetching all valid auctions (starting from ID 24)");
+          for (let i = 24; i < totalCount; i++) {
             try {
               const rawAuctionData = await auctionContract.getAuction(i);
               const auctionData = parseAuctionData(rawAuctionData);
+              
+              // Log extension data for debugging
+              console.log(`🔍 [Auction ${i}] Extension data:`, {
+                extensionThreshold: auctionData.extensionThreshold,
+                extensionDuration: auctionData.extensionDuration,
+                extensionThresholdMinutes: auctionData.extensionThreshold 
+                  ? Math.floor(Number(auctionData.extensionThreshold) / 60) 
+                  : 5,
+                extensionDurationMinutes: auctionData.extensionDuration 
+                  ? Math.floor(Number(auctionData.extensionDuration) / 60) 
+                  : 10,
+              });
 
               // Check if auction data is valid
               if (!auctionData || auctionData.tokenId === undefined) {
@@ -393,7 +457,9 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
                       const maxReasonableTime = now + 365 * 24 * 60 * 60; // 1 year from now
 
                       if (endTimeUnix > 0 && endTimeUnix < maxReasonableTime) {
-                        return new Date(endTimeUnix * 1000).toISOString();
+                        return new Date(
+                          Number(endTimeUnix) * 1000
+                        ).toISOString();
                       } else {
                         console.warn(
                           `⚠️ Auction ${i} has corrupted endTime: ${endTimeUnix} (now: ${now}), using current time + 5min`
@@ -422,7 +488,9 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
                         startTimeUnix > 0 &&
                         startTimeUnix < maxReasonableTime
                       ) {
-                        return new Date(startTimeUnix * 1000).toISOString();
+                        return new Date(
+                          Number(startTimeUnix) * 1000
+                        ).toISOString();
                       } else {
                         console.warn(
                           `⚠️ Auction ${i} has corrupted startTime: ${startTimeUnix} (now: ${now}), using current time`
@@ -439,6 +507,12 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
                   : undefined,
                 extensionThreshold: auctionData.extensionThreshold, // Already uint32 from contract
                 extensionDuration: auctionData.extensionDuration, // Already uint32 from contract
+                extensionThresholdMinutes: auctionData.extensionThreshold
+                  ? Math.floor(Number(auctionData.extensionThreshold) / 60)
+                  : 5, // Convert seconds to minutes, default 5
+                extensionDurationMinutes: auctionData.extensionDuration
+                  ? Math.floor(Number(auctionData.extensionDuration) / 60)
+                  : 10, // Convert seconds to minutes, default 10
                 revealEndTime: auctionData.revealEndTime
                   ? new Date(
                       Number(auctionData.revealEndTime) * 1000 // Already uint32
@@ -472,11 +546,12 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
             }
           }
         } else {
-          // Incremental fetch - only get new auctions
+          // Incremental fetch - only fetch new auctions (starting from ID 24)
+          const startIndex = Math.max(lastFetchedCount, 24);
           console.log(
-            `🔄 Fetching new auctions from ${lastFetchedCount} to ${totalCount}`
+            `🔄 Fetching new auctions from ${startIndex} to ${totalCount - 1}`
           );
-          for (let i = lastFetchedCount; i < totalCount; i++) {
+          for (let i = startIndex; i < totalCount; i++) {
             try {
               const rawAuctionData = await auctionContract.getAuction(i);
               const auctionData = parseAuctionData(rawAuctionData);
@@ -676,7 +751,9 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
                       const maxReasonableTime = now + 365 * 24 * 60 * 60; // 1 year from now
 
                       if (endTimeUnix > 0 && endTimeUnix < maxReasonableTime) {
-                        return new Date(endTimeUnix * 1000).toISOString();
+                        return new Date(
+                          Number(endTimeUnix) * 1000
+                        ).toISOString();
                       } else {
                         console.warn(
                           `⚠️ Auction ${i} has corrupted endTime: ${endTimeUnix} (now: ${now}), using current time + 5min`
@@ -705,7 +782,9 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
                         startTimeUnix > 0 &&
                         startTimeUnix < maxReasonableTime
                       ) {
-                        return new Date(startTimeUnix * 1000).toISOString();
+                        return new Date(
+                          Number(startTimeUnix) * 1000
+                        ).toISOString();
                       } else {
                         console.warn(
                           `⚠️ Auction ${i} has corrupted startTime: ${startTimeUnix} (now: ${now}), using current time`
@@ -722,6 +801,12 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
                   : undefined,
                 extensionThreshold: auctionData.extensionThreshold, // Already uint32 from contract
                 extensionDuration: auctionData.extensionDuration, // Already uint32 from contract
+                extensionThresholdMinutes: auctionData.extensionThreshold
+                  ? Math.floor(Number(auctionData.extensionThreshold) / 60)
+                  : 5, // Convert seconds to minutes, default 5
+                extensionDurationMinutes: auctionData.extensionDuration
+                  ? Math.floor(Number(auctionData.extensionDuration) / 60)
+                  : 10, // Convert seconds to minutes, default 10
                 revealEndTime: auctionData.revealEndTime
                   ? new Date(
                       Number(auctionData.revealEndTime) * 1000 // Already uint32
@@ -798,7 +883,7 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
   }, [fetchAuctions]);
 
   return {
-    auctions,
+    auctions: auctions.map(convertAuctionDataToAuction),
     isLoading,
     error,
     refetch,

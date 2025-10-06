@@ -5,12 +5,14 @@ import { useAccount } from "wagmi";
 import { useClaimNFT } from "./useAuction";
 import { useSettleAuction } from "./useUserCollection";
 import { toast } from "react-hot-toast";
+import { ethers } from "ethers";
+import { contracts } from "@/utils/contracts";
 
 export interface AuctionClaimHandler {
   claimAuction: (auctionId: string) => Promise<boolean>;
   isProcessing: boolean;
   error: string | null;
-  step: "idle" | "settling" | "claiming" | "success" | "error";
+  step: "idle" | "ending" | "settling" | "claiming" | "success" | "error";
 }
 
 export function useAuctionClaim(): AuctionClaimHandler {
@@ -18,7 +20,7 @@ export function useAuctionClaim(): AuctionClaimHandler {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<
-    "idle" | "settling" | "claiming" | "success" | "error"
+    "idle" | "ending" | "settling" | "claiming" | "success" | "error"
   >("idle");
 
   const { claimNFT, isPending: isClaiming, error: claimError } = useClaimNFT();
@@ -30,6 +32,21 @@ export function useAuctionClaim(): AuctionClaimHandler {
         setError("Wallet not connected");
         setStep("error");
         toast.error("Connect wallet to claim auction");
+        return false;
+      }
+
+      // Check if automatic system is active
+      const isAutomaticSystemActive =
+        typeof window !== "undefined" &&
+        localStorage.getItem("auction-monitoring-active") === "true";
+
+      if (isAutomaticSystemActive) {
+        console.log(
+          `⏭️ Automatic system is active, skipping manual claim for auction ${auctionId}`
+        );
+        toast.success(
+          `Automatic system is processing auction ${auctionId}. Please wait...`
+        );
         return false;
       }
 
@@ -45,8 +62,51 @@ export function useAuctionClaim(): AuctionClaimHandler {
       try {
         console.log(`🏆 Starting claim process for auction ${auctionId}`);
 
-        // Step 1: Settle the auction first (if not already settled)
-        console.log("📝 Step 1: Settling auction...");
+        // Step 1: End the auction first if it's still ACTIVE
+        console.log("📝 Step 1: Ending auction...");
+        setStep("ending");
+
+        // Check auction status first
+        const provider = new ethers.BrowserProvider(window.ethereum as any);
+        const auctionContract = new ethers.Contract(
+          contracts.MooveAuction.address,
+          contracts.MooveAuction.abi,
+          provider
+        );
+
+        const auctionData = await auctionContract.getAuction(auctionId);
+        const currentStatus = Number(auctionData.status);
+        const endTime = Number(auctionData.endTime);
+        const now = Math.floor(Date.now() / 1000);
+
+        console.log(`🔍 Auction ${auctionId} status check:`, {
+          status: currentStatus,
+          endTime: endTime,
+          now: now,
+          isExpired: now > endTime,
+        });
+
+        if (currentStatus === 1 && now > endTime) {
+          // Auction is ACTIVE but expired, call endAuction first
+          console.log(
+            `🔄 Auction ${auctionId} is ACTIVE but expired. Calling endAuction...`
+          );
+
+          // Call endAuction
+          const signer = await provider.getSigner();
+          const endTx = await (
+            auctionContract.connect(signer) as any
+          ).endAuction(auctionId);
+          console.log(`📝 End auction transaction submitted: ${endTx.hash}`);
+          await endTx.wait();
+          console.log(`✅ Auction ${auctionId} ended successfully`);
+
+          // Wait for blockchain to update
+          await new Promise((resolve) => setTimeout(resolve, 3000));
+        }
+
+        // Step 2: Settle the auction
+        console.log("📝 Step 2: Settling auction...");
         setStep("settling");
 
         await new Promise<void>((resolve, reject) => {
@@ -157,28 +217,3 @@ export function useAuctionClaim(): AuctionClaimHandler {
     step,
   };
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

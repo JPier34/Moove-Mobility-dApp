@@ -41,7 +41,7 @@ export function useAutomaticAuctionMonitor() {
         );
         // Fallback: try to find auctions by checking sequential IDs
         let foundAuctions = 0;
-        for (let i = 0; i < 100; i++) {
+        for (let i = 24; i < 100; i++) {
           // Check up to 100 auctions
           try {
             const auction = await auctionContract.getAuction(i);
@@ -64,7 +64,8 @@ export function useAutomaticAuctionMonitor() {
 
       console.log(`🔍 Checking ${totalAuctions} auctions for expiration...`);
 
-      for (let i = 0; i < totalAuctions; i++) {
+      // Check auctions from 24 onwards (skip problematic auctions 0-23)
+      for (let i = 24; i < totalAuctions; i++) {
         try {
           const auction = await auctionContract.getAuction(i);
 
@@ -76,7 +77,8 @@ export function useAutomaticAuctionMonitor() {
           // Check if auction is expired and not settled
           // Also handle auctions with invalid endTime (like test values in year 2286)
           const isInvalidEndTime = endTime > 2000000000; // Year 2033+ is suspicious
-          const isExpired = status === 1 && currentTime >= endTime; // ACTIVE but time expired
+          const isExpired =
+            (status === 1 || status === 2) && currentTime >= endTime; // ACTIVE or REVEAL but time expired
           const shouldForceSettle =
             isInvalidEndTime && !isSettled && status === 0; // Force settle invalid auctions with PENDING status
 
@@ -101,7 +103,7 @@ export function useAutomaticAuctionMonitor() {
               );
             }
 
-            // First call endAuction() if status is ACTIVE, then settleAuction()
+            // Handle different auction types and statuses
             const signer = await provider.getSigner();
             const auctionContractWithSigner = auctionContract.connect(signer);
 
@@ -109,11 +111,11 @@ export function useAutomaticAuctionMonitor() {
               // Mark as processed to prevent multiple calls
               setProcessedAuctions((prev) => new Set([...prev, i]));
 
-              // Step 1: End the auction if it's still ACTIVE
+              // Step 1: End the auction based on status and type
               if (status === 1) {
-                // ACTIVE
+                // ACTIVE - can call endAuction
                 console.log(
-                  `🔄 Step 1: Calling endAuction() for auction ${i}...`
+                  `🔄 Step 1: Calling endAuction() for ACTIVE auction ${i}...`
                 );
                 const endTx = await (
                   auctionContractWithSigner as any
@@ -126,7 +128,17 @@ export function useAutomaticAuctionMonitor() {
                 console.log(`✅ Auction ${i} ended successfully`);
 
                 // Wait longer for status to update on blockchain
-                await new Promise((resolve) => setTimeout(resolve, 5000)); // Increased to 5 seconds
+                await new Promise((resolve) => setTimeout(resolve, 5000));
+              } else if (status === 2 && auctionType === 2) {
+                // REVEAL status for Sealed Bid auction - skip endAuction, go directly to settle
+                console.log(
+                  `🔄 Step 1: Sealed Bid auction ${i} in REVEAL phase, skipping endAuction...`
+                );
+              } else {
+                console.log(
+                  `⚠️ Auction ${i} has status ${status}, cannot call endAuction. Skipping automatic processing.`
+                );
+                continue;
               }
 
               // Step 2: Settle the auction (determine winner, transfer NFT)

@@ -5,7 +5,7 @@ import { contracts } from "@/utils/contracts";
 
 const client = createPublicClient({
   chain: sepolia,
-  transport: http("https://ethereum-sepolia.publicnode.com"),
+  transport: http(process.env.NEXT_PUBLIC_RPC_URL || "https://1rpc.io/sepolia"),
 });
 
 export async function POST(request: NextRequest) {

@@ -25,8 +25,7 @@ export async function verifyDeployedContract(): Promise<ContractVerificationResu
   try {
     // Connect to the contract
     const provider = new ethers.JsonRpcProvider(
-      process.env.NEXT_PUBLIC_RPC_URL ||
-        "https://sepolia.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161"
+      process.env.NEXT_PUBLIC_RPC_URL || "https://1rpc.io/sepolia"
     );
 
     const contractAddress = contracts.MooveAuction.address;
@@ -159,8 +158,7 @@ export async function analyzeBidPlacedEvents(): Promise<{
 }> {
   try {
     const provider = new ethers.JsonRpcProvider(
-      process.env.NEXT_PUBLIC_RPC_URL ||
-        "https://sepolia.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161"
+      process.env.NEXT_PUBLIC_RPC_URL || "https://1rpc.io/sepolia"
     );
 
     const contractAddress = contracts.MooveAuction.address;
@@ -342,5 +340,3 @@ export async function analyzeBidPlacedEvents(): Promise<{
     };
   }
 }
-
-

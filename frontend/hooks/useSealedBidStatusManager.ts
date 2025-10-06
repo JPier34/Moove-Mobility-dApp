@@ -265,6 +265,18 @@ export function useSealedBidStatusManager(): SealedBidStatusManager {
             // After starting reveal phase, immediately end the auction
             setTimeout(async () => {
               try {
+                // Check if automatic system is active
+                const isAutomaticSystemActive =
+                  typeof window !== "undefined" &&
+                  localStorage.getItem("auction-monitoring-active") === "true";
+
+                if (isAutomaticSystemActive) {
+                  console.log(
+                    `⏭️ Automatic system is active, skipping manual endAuction for auction ${auctionId}`
+                  );
+                  return;
+                }
+
                 console.log(
                   `🏁 Ending auction ${auctionId} after reveal phase started`
                 );
@@ -430,6 +442,18 @@ export function useSealedBidStatusManager(): SealedBidStatusManager {
               );
 
               try {
+                // Check if automatic system is active
+                const isAutomaticSystemActive =
+                  typeof window !== "undefined" &&
+                  localStorage.getItem("auction-monitoring-active") === "true";
+
+                if (isAutomaticSystemActive) {
+                  console.log(
+                    `⏭️ Automatic system is active, skipping manual endAuction for auction ${auctionId}`
+                  );
+                  return;
+                }
+
                 const signer = await provider.getSigner();
                 const auctionContractWithSigner =
                   auctionContract.connect(signer);

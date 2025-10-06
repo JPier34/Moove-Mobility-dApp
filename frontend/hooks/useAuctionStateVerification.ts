@@ -46,8 +46,7 @@ export function useAuctionStateVerification() {
         // Use direct contract call for verification
         const { ethers } = await import("ethers");
         const provider = new ethers.JsonRpcProvider(
-          process.env.NEXT_PUBLIC_RPC_URL ||
-            "https://ethereum-sepolia.publicnode.com"
+          process.env.NEXT_PUBLIC_RPC_URL || "https://1rpc.io/sepolia"
         );
 
         const auctionABI = [
@@ -162,5 +161,3 @@ export function useAuctionStateVerification() {
     verifyAuctionStateWithRetry,
   };
 }
-
-

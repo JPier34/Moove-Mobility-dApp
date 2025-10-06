@@ -8,6 +8,7 @@ import {
 } from "wagmi";
 import { useAuctionsEnhanced } from "./enhanced-auction-utils";
 import { ethers } from "ethers";
+import toast from "react-hot-toast";
 
 interface WonAuction {
   auctionId: string;
@@ -180,6 +181,21 @@ export function useSettleAuction() {
 
   const settleAuction = useCallback(
     async (auctionId: string) => {
+      // Check if automatic system is active
+      const isAutomaticSystemActive =
+        typeof window !== "undefined" &&
+        localStorage.getItem("auction-monitoring-active") === "true";
+
+      if (isAutomaticSystemActive) {
+        console.log(
+          `⏭️ Automatic system is active, skipping manual settle for auction ${auctionId}`
+        );
+        toast.success(
+          `Automatic system is processing auction ${auctionId}. Please wait...`
+        );
+        return;
+      }
+
       // Prevent multiple calls for the same auction
       if (isSettling || currentAuctionId === auctionId) {
         console.log(
@@ -196,11 +212,49 @@ export function useSettleAuction() {
 
         console.log(`🏆 Settling auction ${auctionId} using Wagmi...`);
 
+        // Check auction status first and call endAuction if needed
+        const { contracts } = await import("@/utils/contracts");
+        const provider = new ethers.BrowserProvider(window.ethereum as any);
+        const auctionContract = new ethers.Contract(
+          contracts.MooveAuction.address,
+          contracts.MooveAuction.abi,
+          provider
+        );
+
+        const auctionData = await auctionContract.getAuction(auctionId);
+        const currentStatus = Number(auctionData.status);
+        const endTime = Number(auctionData.endTime);
+        const now = Math.floor(Date.now() / 1000);
+
+        console.log(`🔍 Auction ${auctionId} status check:`, {
+          status: currentStatus,
+          endTime: endTime,
+          now: now,
+          isExpired: now > endTime,
+        });
+
+        if (currentStatus === 1 && now > endTime) {
+          // Auction is ACTIVE but expired, call endAuction first
+          console.log(
+            `🔄 Auction ${auctionId} is ACTIVE but expired. Calling endAuction...`
+          );
+
+          const signer = await provider.getSigner();
+          const endTx = await (
+            auctionContract.connect(signer) as any
+          ).endAuction(auctionId);
+          console.log(`📝 End auction transaction sent: ${endTx.hash}`);
+          await endTx.wait();
+          console.log(`✅ Auction ${auctionId} ended successfully`);
+
+          // Wait for blockchain to update
+          await new Promise((resolve) => setTimeout(resolve, 3000));
+        }
+
         // Store auctionId for events
         (window as any).currentSettlingAuctionId = auctionId;
 
         // Write the contract (non-async)
-        const { contracts } = await import("@/utils/contracts");
         writeContract({
           address: contracts.MooveAuction.address,
           abi: contracts.MooveAuction.abi,

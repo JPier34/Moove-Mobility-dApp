@@ -78,29 +78,24 @@ export default function AuctionCard({
   // Use the global auction refresh system
   const { auctions, refreshTrigger, triggerRefresh } = useAuctionRefresh();
 
-  // Update local auction when global data changes
+  // DISABLED: Automatic refresh system to prevent infinite loops
+  // The auction data will be updated only when explicitly triggered by user actions
+  // (like placing a bid, claiming, etc.)
+  
+  // Listen for manual refresh events
   useEffect(() => {
-    const updatedAuction = auctions.find(
-      (a) => a.auctionId === auction.auctionId
-    );
-    if (updatedAuction) {
-      console.log(
-        `🔄 [AuctionCard ${auction.auctionId}] Updating from global refresh:`,
-        {
-          oldStatus: localAuction.status,
-          newStatus: updatedAuction.status,
-          oldCurrentBid: localAuction.currentBid,
-          newCurrentBid: updatedAuction.currentBid,
-        }
-      );
-      setLocalAuction(updatedAuction);
-    }
-  }, [
-    auctions,
-    auction.auctionId,
-    localAuction.status,
-    localAuction.currentBid,
-  ]);
+    const handleManualRefresh = () => {
+      const updatedAuction = auctions.find((a) => a.auctionId === auction.auctionId);
+      if (updatedAuction) {
+        console.log(`🔄 [AuctionCard ${auction.auctionId}] Manual refresh triggered`);
+        setLocalAuction(updatedAuction);
+      }
+    };
+
+    // Listen for custom refresh events
+    window.addEventListener('auction-refresh', handleManualRefresh);
+    return () => window.removeEventListener('auction-refresh', handleManualRefresh);
+  }, [auctions, auction.auctionId]);
 
   // Use the unified Dutch price hook with local auction
   const { currentPrice: currentDutchPrice, isActive: isDutchActive } =
@@ -205,7 +200,7 @@ export default function AuctionCard({
     }
 
     // If auction status is not ACTIVE, show as ended
-    if (localAuction.status !== AuctionStatus.ACTIVE) {
+    if (Number(localAuction.status) !== AuctionStatus.ACTIVE) {
       return { color: "text-gray-500", label: "Ended", canExtend: false };
     }
 
@@ -287,7 +282,7 @@ export default function AuctionCard({
             {typeInfo.emoji} {typeInfo.name}
           </span>
 
-          {(localAuction.status as AuctionStatus) === AuctionStatus.PENDING && (
+          {Number(localAuction.status) === AuctionStatus.PENDING && (
             <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium animate-pulse">
               🔓 Sealed Bid Reveal
             </span>
@@ -338,9 +333,10 @@ export default function AuctionCard({
         )}
 
         {/* Bid count indicator */}
-        {auction.bidCount > 0 && (
+        {Number(auction.bidCount) > 0 && (
           <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm rounded-full px-2 py-1 text-xs font-medium text-gray-700">
-            🔥 {auction.bidCount} bid{auction.bidCount !== 1 ? "s" : ""}
+            🔥 {Number(auction.bidCount)} bid
+            {Number(auction.bidCount) !== 1 ? "s" : ""}
           </div>
         )}
       </div>
@@ -382,12 +378,12 @@ export default function AuctionCard({
           ) : auction.auctionType === AuctionType.SEALED_BID ? (
             <div>
               <div className="text-xs text-gray-500">
-                {auction.status === AuctionStatus.PENDING
+                {Number(auction.status) === AuctionStatus.PENDING
                   ? "Hidden Bids"
                   : "Starting Price"}
               </div>
               <div className="text-xl font-bold text-gray-900">
-                {auction.status === AuctionStatus.PENDING
+                {Number(auction.status) === AuctionStatus.PENDING
                   ? "???"
                   : auction.startPrice}
                 <span className="text-sm text-gray-600 ml-1">
@@ -473,7 +469,7 @@ export default function AuctionCard({
 
         {/* Quick Bid Button for English auctions with no bids */}
         {auction.auctionType === AuctionType.ENGLISH &&
-          auction.status === AuctionStatus.ACTIVE &&
+          Number(auction.status) === AuctionStatus.ACTIVE &&
           (auction.currentBid === "0" ||
             parseFloat(auction.currentBid) === 0) && (
             <button

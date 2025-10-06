@@ -53,9 +53,7 @@ export function useAuctionHistory(tokenId: string | null) {
 
     try {
       const provider = new ethers.JsonRpcProvider(
-        process.env.NEXT_PUBLIC_RPC_URL ||
-          process.env.NEXT_PUBLIC_RPC_URL ||
-          "https://1rpc.io/sepolia"
+        process.env.NEXT_PUBLIC_RPC_URL || "https://1rpc.io/sepolia"
       );
 
       const auctionContract = new ethers.Contract(
@@ -230,9 +228,7 @@ export function useMultipleAuctionHistory(tokenIds: string[]) {
 
     try {
       const provider = new ethers.JsonRpcProvider(
-        process.env.NEXT_PUBLIC_RPC_URL ||
-          process.env.NEXT_PUBLIC_RPC_URL ||
-          "https://1rpc.io/sepolia"
+        process.env.NEXT_PUBLIC_RPC_URL || "https://1rpc.io/sepolia"
       );
 
       const auctionContract = new ethers.Contract(

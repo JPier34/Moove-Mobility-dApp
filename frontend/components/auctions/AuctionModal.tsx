@@ -54,32 +54,29 @@ export default function AuctionModal({
   // Use the global auction refresh system
   const { auctions, refreshTrigger, triggerRefresh } = useAuctionRefresh();
 
-  // Update local auction when global data changes
+  // DISABLED: Automatic refresh system to prevent infinite loops
+  // The auction data will be updated only when explicitly triggered by user actions
+  // (like placing a bid, claiming, etc.)
+
+  // Listen for manual refresh events
   useEffect(() => {
-    const updatedAuction = auctions.find(
-      (a) => a.auctionId === auction.auctionId
-    );
-    if (updatedAuction) {
-      console.log(
-        `🔄 [AuctionModal ${auction.auctionId}] Updating from global refresh:`,
-        {
-          oldCurrentBid: localAuction.currentBid,
-          newCurrentBid: updatedAuction.currentBid,
-          oldStartPrice: localAuction.startPrice,
-          newStartPrice: updatedAuction.startPrice,
-          oldStatus: localAuction.status,
-          newStatus: updatedAuction.status,
-        }
+    const handleManualRefresh = () => {
+      const updatedAuction = auctions.find(
+        (a) => a.auctionId === auction.auctionId
       );
-      setLocalAuction(updatedAuction);
-    }
-  }, [
-    auctions,
-    auction.auctionId,
-    localAuction.currentBid,
-    localAuction.startPrice,
-    localAuction.status,
-  ]);
+      if (updatedAuction) {
+        console.log(
+          `🔄 [AuctionModal ${auction.auctionId}] Manual refresh triggered`
+        );
+        setLocalAuction(updatedAuction);
+      }
+    };
+
+    // Listen for custom refresh events
+    window.addEventListener("auction-refresh", handleManualRefresh);
+    return () =>
+      window.removeEventListener("auction-refresh", handleManualRefresh);
+  }, [auctions, auction.auctionId]);
 
   // Update local auction when prop changes
   useEffect(() => {
@@ -193,6 +190,12 @@ export default function AuctionModal({
       const difference = endTime - now;
 
       if (difference > 0) {
+        // Calculate auto-extend zone for English auctions
+        const extensionThresholdMinutes =
+          localAuction.extensionThresholdMinutes || 5; // Default 5 minutes
+        const extensionThreshold = extensionThresholdMinutes * 60 * 1000; // Convert to milliseconds
+        const isExtensionZone = difference <= extensionThreshold;
+
         const days = Math.floor(difference / (1000 * 60 * 60 * 24));
         const hours = Math.floor(
           (difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)
@@ -202,13 +205,26 @@ export default function AuctionModal({
         );
         const seconds = Math.floor((difference % (1000 * 60)) / 1000);
 
+        let timeString = "";
         if (days > 0) {
-          setTimeLeft(`${days}d ${hours}h ${minutes}m ${seconds}s`);
+          timeString = `${days}d ${hours}h ${minutes}m ${seconds}s`;
         } else if (hours > 0) {
-          setTimeLeft(`${hours}h ${minutes}m ${seconds}s`);
+          timeString = `${hours}h ${minutes}m ${seconds}s`;
         } else {
-          setTimeLeft(`${minutes}m ${seconds}s`);
+          timeString = `${minutes}m ${seconds}s`;
         }
+
+        // Add auto-extend indicator for English auctions in extension zone
+        if (
+          isExtensionZone &&
+          localAuction.auctionType === AuctionType.ENGLISH
+        ) {
+          timeString += ` ⏰ +${
+            localAuction.extensionDurationMinutes || 10
+          }min on bid`;
+        }
+
+        setTimeLeft(timeString);
       } else {
         setTimeLeft("Auction Ended");
       }
@@ -365,6 +381,19 @@ export default function AuctionModal({
               auctionId: localAuction.auctionId,
               bidAmount: amount,
               bidder: address,
+            },
+          })
+        );
+
+        // Trigger manual refresh for auction components
+        window.dispatchEvent(new CustomEvent("auction-refresh"));
+
+        // Trigger notification refresh after bid
+        window.dispatchEvent(
+          new CustomEvent("refreshNotifications", {
+            detail: {
+              auctionId: localAuction.auctionId,
+              bidAmount: amount,
             },
           })
         );
@@ -570,7 +599,13 @@ export default function AuctionModal({
                 <span className="text-sm text-gray-500">
                   Auction #{auction.auctionId}
                 </span>
-                <span className="text-sm font-medium text-moove-primary">
+                <span
+                  className={`text-sm font-medium ${
+                    timeLeft.includes("⏰")
+                      ? "text-orange-500 animate-pulse"
+                      : "text-moove-primary"
+                  }`}
+                >
                   {timeLeft}
                 </span>
               </div>
@@ -739,7 +774,7 @@ export default function AuctionModal({
                   {localAuction.auctionType === AuctionType.DUTCH
                     ? "Current Price"
                     : localAuction.auctionType === AuctionType.SEALED_BID &&
-                      localAuction.status === AuctionStatus.PENDING
+                      Number(localAuction.status) === AuctionStatus.PENDING
                     ? "Hidden Bids"
                     : localAuction.currentBid === "0"
                     ? "Starting Price"
@@ -750,7 +785,7 @@ export default function AuctionModal({
                     {localAuction.auctionType === AuctionType.DUTCH
                       ? currentDutchPrice
                       : localAuction.auctionType === AuctionType.SEALED_BID &&
-                        localAuction.status === AuctionStatus.PENDING
+                        Number(localAuction.status) === AuctionStatus.PENDING
                       ? "???"
                       : localAuction.currentBid === "0"
                       ? localAuction.startPrice
@@ -777,352 +812,292 @@ export default function AuctionModal({
               </div>
 
               {/* Bidding interface */}
-              {!isOwner && localAuction.status === AuctionStatus.ACTIVE && (
-                <div className="space-y-4">
-                  {localAuction.auctionType === AuctionType.DUTCH && (
-                    <Button
-                      onClick={handleDutchBuy}
-                      disabled={
-                        !isConnected ||
-                        isSubmittingBid ||
-                        isDutchProcessing ||
-                        !isDutchActive
-                      }
-                      className="w-full"
-                      size="lg"
-                    >
-                      {isSubmittingBid || isDutchProcessing
-                        ? dutchStep === "buying"
-                          ? "Buying..."
-                          : "Processing..."
-                        : !isDutchActive
-                        ? "Auction Ended"
-                        : `Buy Now for ${currentDutchPrice} ETH`}
-                    </Button>
-                  )}
-
-                  {localAuction.auctionType === AuctionType.SEALED_BID &&
-                    (localAuction.status as AuctionStatus) ===
-                      AuctionStatus.ACTIVE && (
-                      <div className="space-y-4">
-                        {hasSubmittedSealedBid ? (
-                          /* User has already submitted a sealed bid */
-                          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                            <div className="text-green-800 font-medium mb-2">
-                              ✅ Sealed Bid Submitted
-                            </div>
-                            <div className="text-green-700 text-sm mb-2">
-                              You have already submitted a sealed bid for this
-                              auction.
-                            </div>
-                            <div className="text-green-600 text-xs">
-                              Status:{" "}
-                              <span className="font-semibold">
-                                {sealedBidStatus}
-                              </span>
-                            </div>
-                            <div className="text-green-600 text-xs mt-1">
-                              Wait for the reveal phase to see the results.
-                            </div>
-                          </div>
-                        ) : (
-                          /* User can still submit a sealed bid */
-                          <>
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Bid (ETH) - Minimum: {auction.startPrice} ETH
-                              </label>
-                              <input
-                                type="number"
-                                step="0.0001"
-                                placeholder={auction.startPrice}
-                                value={sealedBidAmount}
-                                onChange={(e) =>
-                                  setSealedBidAmount(e.target.value)
-                                }
-                                className={`w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-moove-primary focus:border-moove-primary ${
-                                  sealedBidAmount &&
-                                  parseFloat(sealedBidAmount) <
-                                    parseFloat(auction.startPrice)
-                                    ? "border-red-300 bg-red-50"
-                                    : "border-gray-300"
-                                }`}
-                              />
-                              {sealedBidAmount &&
-                                parseFloat(sealedBidAmount) <
-                                  parseFloat(auction.startPrice) && (
-                                  <p className="text-red-600 text-sm mt-1">
-                                    ❌ Bid must be at least {auction.startPrice}{" "}
-                                    ETH
-                                  </p>
-                                )}
-                            </div>
-                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                              <div className="text-sm text-blue-800">
-                                🔒 <strong>Sealed Bid:</strong> Your bid amount
-                                will be hidden until the reveal phase. A secure
-                                nonce will be generated automatically.
-                              </div>
-                            </div>
-                            <Button
-                              onClick={handleSealedBid}
-                              disabled={
-                                !isConnected ||
-                                isSubmittingBid ||
-                                !sealedBidAmount ||
-                                parseFloat(sealedBidAmount) <
-                                  parseFloat(auction.startPrice)
-                              }
-                              className="w-full"
-                              size="lg"
-                            >
-                              {isSubmittingBid
-                                ? "Submitting..."
-                                : "Submit Sealed Bid"}
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    )}
-
-                  {localAuction.auctionType === AuctionType.SEALED_BID &&
-                    (localAuction.status as AuctionStatus) ===
-                      AuctionStatus.REVEAL && (
-                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                        <div className="text-yellow-800 font-medium mb-2">
-                          🔓 Reveal phase active
-                        </div>
-                        <div className="text-yellow-700 text-sm mb-4">
-                          If you have sent a sealed bid, you must reveal it now
-                          with your original amount and nonce.
-                        </div>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          className="w-full"
-                        >
-                          Reveal my bid
-                        </Button>
-                      </div>
-                    )}
-
-                  {(localAuction.auctionType === AuctionType.RESERVE ||
-                    localAuction.auctionType === AuctionType.ENGLISH) && (
-                    <div className="space-y-4">
-                      {/* Quick bid buttons */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-3">
-                          Quick bid
-                        </label>
-                        <div className="grid grid-cols-2 gap-2">
-                          {getQuickBidAmounts().map((bid, index) => (
-                            <Button
-                              key={index}
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                if (bid.amount === "custom") {
-                                  // Focus custom input
-                                  const customInput = document.querySelector(
-                                    'input[placeholder="Enter custom amount"]'
-                                  ) as HTMLInputElement;
-                                  customInput?.focus();
-                                  return;
-                                }
-                                // Set the amount in the custom bid field
-                                console.log("🚀 Quick bid clicked:", {
-                                  label: bid.label,
-                                  amount: bid.amount,
-                                  currentBidAmount: bidAmount,
-                                });
-                                setBidAmount(bid.amount);
-                                console.log("✅ BidAmount set to:", bid.amount);
-                              }}
-                              className={
-                                bidAmount === bid.amount
-                                  ? "border-moove-primary bg-moove-50"
-                                  : ""
-                              }
-                            >
-                              {bid.label}
-                            </Button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Custom bid amount */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Custom bid (ETH)
-                        </label>
-                        <input
-                          type="number"
-                          step="0.0001"
-                          placeholder="Enter custom amount"
-                          value={bidAmount}
-                          onChange={(e) => {
-                            setBidAmount(e.target.value);
-                          }}
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-moove-primary focus:border-moove-primary"
-                        />
-                        <p className="text-xs text-gray-500 mt-1">
-                          Minimum:{" "}
-                          {(() => {
-                            const currentBid = parseFloat(
-                              localAuction.currentBid || "0"
-                            );
-                            const startPrice = parseFloat(
-                              localAuction.startPrice || "0"
-                            );
-                            const bidIncrement = parseFloat(
-                              localAuction.bidIncrement || "0"
-                            );
-
-                            if (currentBid === 0 || isNaN(currentBid)) {
-                              return startPrice.toFixed(6);
-                            } else {
-                              return (currentBid + bidIncrement).toFixed(6);
-                            }
-                          })()}{" "}
-                          ETH
-                        </p>
-                        {/* Buy Now warning */}
-                        {(() => {
-                          const currentBidAmount = parseFloat(bidAmount || "0");
-                          const buyNowPrice = parseFloat(
-                            localAuction.buyNowPrice || "0"
-                          );
-
-                          if (
-                            buyNowPrice > 0 &&
-                            currentBidAmount >= buyNowPrice
-                          ) {
-                            return (
-                              <p className="text-xs text-red-600 mt-1 font-medium">
-                                ⚠️ Your bid ({currentBidAmount.toFixed(6)} ETH)
-                                is ≥ Buy Now price ({buyNowPrice.toFixed(6)}{" "}
-                                ETH). Use Buy Now instead!
-                              </p>
-                            );
-                          }
-                          return null;
-                        })()}
-                      </div>
-
-                      {/* Bid button */}
+              {!isOwner &&
+                Number(localAuction.status) === AuctionStatus.ACTIVE && (
+                  <div className="space-y-4">
+                    {localAuction.auctionType === AuctionType.DUTCH && (
                       <Button
-                        onClick={() => handleBid(bidAmount)}
+                        onClick={handleDutchBuy}
                         disabled={
                           !isConnected ||
                           isSubmittingBid ||
-                          !bidAmount ||
-                          (!!localAuction.buyNowPrice &&
-                            parseFloat(localAuction.buyNowPrice) > 0 &&
-                            parseFloat(bidAmount || "0") >=
-                              parseFloat(localAuction.buyNowPrice))
+                          isDutchProcessing ||
+                          !isDutchActive
                         }
                         className="w-full"
                         size="lg"
                       >
-                        {isSubmittingBid ? (
-                          <>
-                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
-                            Placing bid...
-                          </>
-                        ) : (
-                          `Place Bid: ${bidAmount || "0.0000"} ETH`
-                        )}
+                        {isSubmittingBid || isDutchProcessing
+                          ? dutchStep === "buying"
+                            ? "Buying..."
+                            : "Processing..."
+                          : !isDutchActive
+                          ? "Auction Ended"
+                          : `Buy Now for ${currentDutchPrice} ETH`}
                       </Button>
+                    )}
 
-                      {/* Debug info for bid button */}
-                      {process.env.NODE_ENV === "development" && (
-                        <div className="mt-2 p-2 bg-gray-100 rounded text-xs">
-                          <div>Debug Bid Button State:</div>
-                          <div>isConnected: {isConnected ? "✅" : "❌"}</div>
-                          <div>
-                            isSubmittingBid: {isSubmittingBid ? "✅" : "❌"}
-                          </div>
-                          <div>bidAmount: {bidAmount || "empty"}</div>
-                          <div>
-                            buyNowPrice: {localAuction.buyNowPrice || "none"}{" "}
-                            (type: {typeof localAuction.buyNowPrice})
-                          </div>
-                          <div>
-                            bidAmount &gt;= buyNowPrice:{" "}
-                            {!!localAuction.buyNowPrice &&
-                            parseFloat(bidAmount || "0") >=
-                              parseFloat(localAuction.buyNowPrice)
-                              ? "✅"
-                              : "❌"}
-                          </div>
-                          <div>
-                            auctionEnded:{" "}
-                            {new Date() >= new Date(localAuction.endTime)
-                              ? "✅ YES"
-                              : "❌ NO"}
-                          </div>
-                          <div>currentTime: {new Date().toISOString()}</div>
-                          <div>
-                            endTime:{" "}
-                            {new Date(localAuction.endTime).toISOString()}
-                          </div>
-                          <div>
-                            !!localAuction.buyNowPrice:{" "}
-                            {!!localAuction.buyNowPrice ? "true" : "false"}
-                          </div>
-                          <div>
-                            parseFloat(bidAmount):{" "}
-                            {parseFloat(bidAmount || "0")}
-                          </div>
-                          <div>
-                            parseFloat(localAuction.buyNowPrice):{" "}
-                            {parseFloat(localAuction.buyNowPrice || "0")}
-                          </div>
-                          <div>
-                            Condition 1 (!isConnected):{" "}
-                            {!isConnected ? "true" : "false"}
-                          </div>
-                          <div>
-                            Condition 2 (isSubmittingBid):{" "}
-                            {isSubmittingBid ? "true" : "false"}
-                          </div>
-                          <div>
-                            Condition 3 (!bidAmount):{" "}
-                            {!bidAmount ? "true" : "false"}
-                          </div>
-                          <div>
-                            Condition 4 (buyNowPrice check):{" "}
-                            {!!localAuction.buyNowPrice &&
-                            parseFloat(localAuction.buyNowPrice) > 0 &&
-                            parseFloat(bidAmount || "0") >=
-                              parseFloat(localAuction.buyNowPrice)
-                              ? "true"
-                              : "false"}
-                          </div>
+                    {localAuction.auctionType === AuctionType.SEALED_BID &&
+                      (localAuction.status as AuctionStatus) ===
+                        AuctionStatus.ACTIVE && (
+                        <div className="space-y-4">
+                          {hasSubmittedSealedBid ? (
+                            /* User has already submitted a sealed bid */
+                            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                              <div className="text-green-800 font-medium mb-2">
+                                ✅ Sealed Bid Submitted
+                              </div>
+                              <div className="text-green-700 text-sm mb-2">
+                                You have already submitted a sealed bid for this
+                                auction.
+                              </div>
+                              <div className="text-green-600 text-xs">
+                                Status:{" "}
+                                <span className="font-semibold">
+                                  {sealedBidStatus}
+                                </span>
+                              </div>
+                              <div className="text-green-600 text-xs mt-1">
+                                Wait for the reveal phase to see the results.
+                              </div>
+                            </div>
+                          ) : (
+                            /* User can still submit a sealed bid */
+                            <>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                  Bid (ETH) - Minimum: {auction.startPrice} ETH
+                                </label>
+                                <input
+                                  type="number"
+                                  step="0.0001"
+                                  placeholder={auction.startPrice}
+                                  value={sealedBidAmount}
+                                  onChange={(e) =>
+                                    setSealedBidAmount(e.target.value)
+                                  }
+                                  className={`w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-moove-primary focus:border-moove-primary ${
+                                    sealedBidAmount &&
+                                    parseFloat(sealedBidAmount) <
+                                      parseFloat(auction.startPrice)
+                                      ? "border-red-300 bg-red-50"
+                                      : "border-gray-300"
+                                  }`}
+                                />
+                                {sealedBidAmount &&
+                                  parseFloat(sealedBidAmount) <
+                                    parseFloat(auction.startPrice) && (
+                                    <p className="text-red-600 text-sm mt-1">
+                                      ❌ Bid must be at least{" "}
+                                      {auction.startPrice} ETH
+                                    </p>
+                                  )}
+                              </div>
+                              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                                <div className="text-sm text-blue-800">
+                                  🔒 <strong>Sealed Bid:</strong> Your bid
+                                  amount will be hidden until the reveal phase.
+                                  A secure nonce will be generated
+                                  automatically.
+                                </div>
+                              </div>
+                              <Button
+                                onClick={handleSealedBid}
+                                disabled={
+                                  !isConnected ||
+                                  isSubmittingBid ||
+                                  !sealedBidAmount ||
+                                  parseFloat(sealedBidAmount) <
+                                    parseFloat(auction.startPrice)
+                                }
+                                className="w-full"
+                                size="lg"
+                              >
+                                {isSubmittingBid
+                                  ? "Submitting..."
+                                  : "Submit Sealed Bid"}
+                              </Button>
+                            </>
+                          )}
                         </div>
                       )}
 
-                      {/* Buy now option */}
-                      {localAuction.buyNowPrice &&
-                        parseFloat(localAuction.buyNowPrice) > 0 && (
-                          <div className="pt-4 border-t border-gray-200">
-                            <Button
-                              onClick={() =>
-                                handleBid(localAuction.buyNowPrice!)
-                              }
-                              disabled={!isConnected || isSubmittingBid}
-                              variant="secondary"
-                              className="w-full"
-                              size="lg"
-                            >
-                              Buy Now for {localAuction.buyNowPrice} ETH
-                            </Button>
+                    {localAuction.auctionType === AuctionType.SEALED_BID &&
+                      (localAuction.status as AuctionStatus) ===
+                        AuctionStatus.REVEAL && (
+                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                          <div className="text-yellow-800 font-medium mb-2">
+                            🔓 Reveal phase active
                           </div>
-                        )}
-                    </div>
-                  )}
-                </div>
-              )}
+                          <div className="text-yellow-700 text-sm mb-4">
+                            If you have sent a sealed bid, you must reveal it
+                            now with your original amount and nonce.
+                          </div>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="w-full"
+                          >
+                            Reveal my bid
+                          </Button>
+                        </div>
+                      )}
+
+                    {(localAuction.auctionType === AuctionType.RESERVE ||
+                      localAuction.auctionType === AuctionType.ENGLISH) && (
+                      <div className="space-y-4">
+                        {/* Quick bid buttons */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-3">
+                            Quick bid
+                          </label>
+                          <div className="grid grid-cols-2 gap-2">
+                            {getQuickBidAmounts().map((bid, index) => (
+                              <Button
+                                key={index}
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  if (bid.amount === "custom") {
+                                    // Focus custom input
+                                    const customInput = document.querySelector(
+                                      'input[placeholder="Enter custom amount"]'
+                                    ) as HTMLInputElement;
+                                    customInput?.focus();
+                                    return;
+                                  }
+                                  // Set the amount in the custom bid field
+                                  console.log("🚀 Quick bid clicked:", {
+                                    label: bid.label,
+                                    amount: bid.amount,
+                                    currentBidAmount: bidAmount,
+                                  });
+                                  setBidAmount(bid.amount);
+                                  console.log(
+                                    "✅ BidAmount set to:",
+                                    bid.amount
+                                  );
+                                }}
+                                className={
+                                  bidAmount === bid.amount
+                                    ? "border-moove-primary bg-moove-50"
+                                    : ""
+                                }
+                              >
+                                {bid.label}
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Custom bid amount */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Custom bid (ETH)
+                          </label>
+                          <input
+                            type="number"
+                            step="0.0001"
+                            placeholder="Enter custom amount"
+                            value={bidAmount}
+                            onChange={(e) => {
+                              setBidAmount(e.target.value);
+                            }}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-moove-primary focus:border-moove-primary"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            Minimum:{" "}
+                            {(() => {
+                              const currentBid = parseFloat(
+                                localAuction.currentBid || "0"
+                              );
+                              const startPrice = parseFloat(
+                                localAuction.startPrice || "0"
+                              );
+                              const bidIncrement = parseFloat(
+                                localAuction.bidIncrement || "0"
+                              );
+
+                              if (currentBid === 0 || isNaN(currentBid)) {
+                                return startPrice.toFixed(6);
+                              } else {
+                                return (currentBid + bidIncrement).toFixed(6);
+                              }
+                            })()}{" "}
+                            ETH
+                          </p>
+                          {/* Buy Now warning */}
+                          {(() => {
+                            const currentBidAmount = parseFloat(
+                              bidAmount || "0"
+                            );
+                            const buyNowPrice = parseFloat(
+                              localAuction.buyNowPrice || "0"
+                            );
+
+                            if (
+                              buyNowPrice > 0 &&
+                              currentBidAmount >= buyNowPrice
+                            ) {
+                              return (
+                                <p className="text-xs text-red-600 mt-1 font-medium">
+                                  ⚠️ Your bid ({currentBidAmount.toFixed(6)}{" "}
+                                  ETH) is ≥ Buy Now price (
+                                  {buyNowPrice.toFixed(6)} ETH). Use Buy Now
+                                  instead!
+                                </p>
+                              );
+                            }
+                            return null;
+                          })()}
+                        </div>
+
+                        {/* Bid button */}
+                        <Button
+                          onClick={() => handleBid(bidAmount)}
+                          disabled={
+                            !isConnected ||
+                            isSubmittingBid ||
+                            !bidAmount ||
+                            (!!localAuction.buyNowPrice &&
+                              parseFloat(localAuction.buyNowPrice) > 0 &&
+                              parseFloat(bidAmount || "0") >=
+                                parseFloat(localAuction.buyNowPrice))
+                          }
+                          className="w-full"
+                          size="lg"
+                        >
+                          {isSubmittingBid ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
+                              Placing bid...
+                            </>
+                          ) : (
+                            `Place Bid: ${bidAmount || "0.0000"} ETH`
+                          )}
+                        </Button>
+
+                        {/* Buy now option */}
+                        {localAuction.buyNowPrice &&
+                          parseFloat(localAuction.buyNowPrice) > 0 && (
+                            <div className="pt-4 border-t border-gray-200">
+                              <Button
+                                onClick={() =>
+                                  handleBid(localAuction.buyNowPrice!)
+                                }
+                                disabled={!isConnected || isSubmittingBid}
+                                variant="secondary"
+                                className="w-full"
+                                size="lg"
+                              >
+                                Buy Now for {localAuction.buyNowPrice} ETH
+                              </Button>
+                            </div>
+                          )}
+                      </div>
+                    )}
+                  </div>
+                )}
 
               {/* Owner message */}
               {isOwner && (
@@ -1137,29 +1112,30 @@ export default function AuctionModal({
               )}
 
               {/* Not connected message */}
-              {!isConnected && localAuction.status === AuctionStatus.ACTIVE && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                  <div className="text-yellow-800 font-medium mb-2">
-                    ⚠️ Wallet not connected
+              {!isConnected &&
+                Number(localAuction.status) === AuctionStatus.ACTIVE && (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <div className="text-yellow-800 font-medium mb-2">
+                      ⚠️ Wallet not connected
+                    </div>
+                    <div className="text-yellow-700 text-sm">
+                      Connect your wallet to place a bid.
+                    </div>
                   </div>
-                  <div className="text-yellow-700 text-sm">
-                    Connect your wallet to place a bid.
-                  </div>
-                </div>
-              )}
+                )}
 
               {/* Auction ended message */}
-              {localAuction.status !== AuctionStatus.ACTIVE && (
+              {Number(localAuction.status) !== AuctionStatus.ACTIVE && (
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                   <div className="text-gray-800 font-medium mb-2">
-                    {localAuction.status === AuctionStatus.ENDED
+                    {Number(localAuction.status) === AuctionStatus.ENDED
                       ? "🏁 Auction Ended"
-                      : localAuction.status === AuctionStatus.CANCELLED
+                      : Number(localAuction.status) === AuctionStatus.CANCELLED
                       ? "❌ Auction Cancelled"
                       : "⏸️ Auction Inactive"}
                   </div>
                   <div className="text-gray-600 text-sm">
-                    {localAuction.status === AuctionStatus.ENDED &&
+                    {Number(localAuction.status) === AuctionStatus.ENDED &&
                     localAuction.highestBidder
                       ? `Won by ${shortenAddress(
                           localAuction.highestBidder

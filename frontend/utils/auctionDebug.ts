@@ -36,8 +36,7 @@ export async function analyzeAuctionForClaim(
 ): Promise<AuctionDebugInfo> {
   try {
     const provider = new ethers.JsonRpcProvider(
-      process.env.NEXT_PUBLIC_RPC_URL ||
-        "https://sepolia.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161"
+      process.env.NEXT_PUBLIC_RPC_URL || "https://1rpc.io/sepolia"
     );
 
     const contractAddress = contracts.MooveAuction.address;
@@ -127,8 +126,7 @@ export async function analyzeAllAuctionsForUser(
 ): Promise<AuctionDebugInfo[]> {
   try {
     const provider = new ethers.JsonRpcProvider(
-      process.env.NEXT_PUBLIC_RPC_URL ||
-        "https://sepolia.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161"
+      process.env.NEXT_PUBLIC_RPC_URL || "https://1rpc.io/sepolia"
     );
 
     const contractAddress = contracts.MooveAuction.address;
@@ -185,8 +183,7 @@ export async function checkNFTOwnership(
 ): Promise<boolean> {
   try {
     const provider = new ethers.JsonRpcProvider(
-      process.env.NEXT_PUBLIC_RPC_URL ||
-        "https://sepolia.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161"
+      process.env.NEXT_PUBLIC_RPC_URL || "https://1rpc.io/sepolia"
     );
 
     const nftContract = new ethers.Contract(
@@ -214,5 +211,3 @@ export async function checkNFTOwnership(
     return false;
   }
 }
-
-

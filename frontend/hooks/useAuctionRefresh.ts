@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useAccount } from "wagmi";
-import { useAuctionsEnhanced } from "./enhanced-auction-utils";
+import { useIncrementalAuctions } from "./useIncrementalAuctions";
 
 /**
  * Hook per gestire il refresh globale delle aste
@@ -13,35 +13,37 @@ export function useAuctionRefresh() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
 
-  const { auctions, refetch, isLoading } = useAuctionsEnhanced();
+  const { auctions, refetch, isLoading } = useIncrementalAuctions();
 
-  // Log when auctions data changes
+  // Log when auctions data changes - OPTIMIZED to prevent excessive logging
   useEffect(() => {
-    console.log("🔍 [useAuctionRefresh] Auctions data changed:", {
-      auctionsCount: auctions.length,
-      isLoading,
-      refreshTrigger,
-      lastRefresh: lastRefresh?.toISOString(),
-    });
-
+    // Only log when there are actual changes in count or loading state
     if (auctions.length > 0) {
-      console.log("🔍 [useAuctionRefresh] Sample auction data:", {
-        auctionId: auctions[0].auctionId,
-        currentBid: auctions[0].currentBid,
-        startPrice: auctions[0].startPrice,
-        status: auctions[0].status,
+      console.log("🔍 [useAuctionRefresh] Auctions data changed:", {
+        auctionsCount: auctions.length,
+        isLoading,
       });
-    }
-  }, [auctions, isLoading, refreshTrigger, lastRefresh]);
 
-  // Funzione per forzare il refresh
+      // Only log sample data occasionally to reduce spam
+      if (Math.random() < 0.1) {
+        // 10% chance to log sample data
+        console.log("🔍 [useAuctionRefresh] Sample auction data:", {
+          auctionId: auctions[0].auctionId,
+          currentBid: auctions[0].currentBid,
+          startPrice: auctions[0].startPrice,
+          status: auctions[0].status,
+        });
+      }
+    }
+  }, [auctions.length, isLoading]); // Only depend on length and loading state
+
+  // Funzione per forzare il refresh - SIMPLIFIED to prevent loops
   const triggerRefresh = useCallback(() => {
     console.log("🔄 Triggering global auction refresh...");
-    console.log("🔍 Current auctions before refresh:", auctions.length);
     setRefreshTrigger((prev) => prev + 1);
     setLastRefresh(new Date());
     refetch();
-  }, [refetch, auctions.length]);
+  }, [refetch]); // Only depend on refetch function
 
   // Ascolta gli eventi di sistema per refresh automatico
   useEffect(() => {

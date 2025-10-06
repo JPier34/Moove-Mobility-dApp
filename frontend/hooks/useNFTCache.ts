@@ -118,8 +118,7 @@ export function useNFTCache() {
 
       try {
         const provider = new ethers.JsonRpcProvider(
-          process.env.NEXT_PUBLIC_RPC_URL ||
-            "https://ethereum-sepolia.publicnode.com"
+          process.env.NEXT_PUBLIC_RPC_URL || "https://1rpc.io/sepolia"
         );
 
         const nftContract = new ethers.Contract(
@@ -184,8 +183,7 @@ export function useNFTCache() {
 
       try {
         const provider = new ethers.JsonRpcProvider(
-          process.env.NEXT_PUBLIC_RPC_URL ||
-            "https://ethereum-sepolia.publicnode.com"
+          process.env.NEXT_PUBLIC_RPC_URL || "https://1rpc.io/sepolia"
         );
 
         const nftContract = new ethers.Contract(

@@ -60,8 +60,7 @@ export default function NFT114DetailedDebug() {
         let auctionData = null;
         try {
           const provider = new ethers.JsonRpcProvider(
-            process.env.NEXT_PUBLIC_RPC_URL ||
-              "https://sepolia.infura.io/v3/YOUR_PROJECT_ID"
+            process.env.NEXT_PUBLIC_RPC_URL || "https://1rpc.io/sepolia"
           );
           const auctionContract = new ethers.Contract(
             contracts.MooveAuction.address,
@@ -105,8 +104,7 @@ export default function NFT114DetailedDebug() {
         let transferData = null;
         try {
           const provider = new ethers.JsonRpcProvider(
-            process.env.NEXT_PUBLIC_RPC_URL ||
-              "https://sepolia.infura.io/v3/YOUR_PROJECT_ID"
+            process.env.NEXT_PUBLIC_RPC_URL || "https://1rpc.io/sepolia"
           );
           const nftContract = new ethers.Contract(
             contracts.MooveNFT.address,

@@ -2,7 +2,12 @@
 
 import React, { useState } from "react";
 import { useConsolidatedNotifications } from "@/hooks/useConsolidatedNotifications";
-import { BellIcon, XMarkIcon, CheckIcon } from "@heroicons/react/24/outline";
+import {
+  BellIcon,
+  XMarkIcon,
+  CheckIcon,
+  GiftIcon,
+} from "@heroicons/react/24/outline";
 import { BellIcon as BellIconSolid } from "@heroicons/react/24/solid";
 
 interface ConsolidatedNotificationBadgeProps {
@@ -30,6 +35,9 @@ export default function ConsolidatedNotificationBadge({
     // Navigate to relevant page if needed
     if (notification.type === "claim_ready") {
       window.location.href = "/my-collection";
+    } else if (notification.type === "claimed") {
+      // Show success message for claimed notifications
+      console.log(`✅ NFT claimed from auction ${notification.auctionId}`);
     }
   };
 
@@ -84,6 +92,11 @@ export default function ConsolidatedNotificationBadge({
         {highPriorityCount > 0 && (
           <span className="absolute -bottom-1 -right-1 h-3 w-3 bg-orange-500 rounded-full"></span>
         )}
+
+        {/* Claim ready indicator - special pulsing indicator for claim_ready notifications */}
+        {notifications.some((n) => n.type === "claim_ready") && (
+          <span className="absolute -top-1 -left-1 h-3 w-3 bg-green-500 rounded-full animate-pulse"></span>
+        )}
       </button>
 
       {/* Dropdown */}
@@ -132,20 +145,34 @@ export default function ConsolidatedNotificationBadge({
                     onClick={() => handleNotificationClick(notification)}
                     className={`p-4 hover:bg-gray-50 cursor-pointer ${
                       !notification.isRead ? "bg-blue-50" : ""
+                    } ${
+                      notification.type === "claim_ready"
+                        ? "border-l-4 border-green-500 bg-green-50"
+                        : ""
+                    } ${
+                      notification.type === "claimed"
+                        ? "border-l-4 border-blue-500 bg-blue-50"
+                        : ""
                     }`}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center space-x-2">
-                          <div
-                            className={`w-2 h-2 rounded-full ${
-                              notification.priority === "high"
-                                ? "bg-red-500"
-                                : notification.priority === "medium"
-                                ? "bg-yellow-500"
-                                : "bg-green-500"
-                            }`}
-                          ></div>
+                          {notification.type === "claim_ready" ? (
+                            <GiftIcon className="h-4 w-4 text-green-600" />
+                          ) : notification.type === "claimed" ? (
+                            <CheckIcon className="h-4 w-4 text-blue-600" />
+                          ) : (
+                            <div
+                              className={`w-2 h-2 rounded-full ${
+                                notification.priority === "high"
+                                  ? "bg-red-500"
+                                  : notification.priority === "medium"
+                                  ? "bg-yellow-500"
+                                  : "bg-green-500"
+                              }`}
+                            ></div>
+                          )}
                           <p className="text-sm font-medium text-gray-900">
                             {notification.message}
                           </p>

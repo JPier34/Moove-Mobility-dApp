@@ -7,6 +7,7 @@ import { useWriteMooveAuction } from "./useContract";
 import { useAuctionEventListening } from "./useAuctionEventListening";
 import { useAuctionStateVerification } from "./useAuctionStateVerification";
 import { useUnifiedAuctionNotifications } from "./useUnifiedAuctionNotifications";
+import { contracts } from "@/utils/contracts";
 
 interface PendingBid {
   auctionId: number;
@@ -45,6 +46,33 @@ export function useEnglishAuction(auctionId?: number) {
         return false;
       }
 
+      // Check if user has already bid recently (within 5 minutes)
+      const existingBid = pendingBids.current.get(auctionId);
+      if (existingBid && existingBid.bidder === address) {
+        const timeSinceLastBid = Date.now() - existingBid.timestamp;
+        const fiveMinutes = 5 * 60 * 1000; // 5 minutes in milliseconds
+
+        console.log(`🔍 [English Auction] Bid interval check:`, {
+          auctionId,
+          bidder: address,
+          lastBidTime: existingBid.timestamp,
+          lastBidAmount: existingBid.amount,
+          timeSinceLastBid,
+          fiveMinutes,
+          canBid: timeSinceLastBid >= fiveMinutes,
+        });
+
+        if (timeSinceLastBid < fiveMinutes) {
+          const remainingTime = Math.ceil(
+            (fiveMinutes - timeSinceLastBid) / 1000
+          );
+          const errorMsg = `Please wait ${remainingTime} seconds before placing another bid`;
+          console.log(`❌ [English Auction] Bid blocked: ${errorMsg}`);
+          setError(errorMsg);
+          return false;
+        }
+      }
+
       setIsProcessing(true);
       setError(null);
       setStep("bidding");
@@ -67,8 +95,29 @@ export function useEnglishAuction(auctionId?: number) {
         // Call the placeBid function using writeMooveAuction
         // Convert ETH amount to wei using parseEther
         const bidAmountWei = ethers.parseEther(bidAmount);
+
+        console.log(`🔍 [English Auction] Bid attempt details:`, {
+          auctionId,
+          bidAmount,
+          bidAmountWei: bidAmountWei.toString(),
+          bidder: address,
+          timestamp: Date.now(),
+          lastBidTime: pendingBids.current.get(auctionId)?.timestamp,
+          timeSinceLastBid: pendingBids.current.get(auctionId)
+            ? Date.now() - pendingBids.current.get(auctionId)!.timestamp
+            : "N/A",
+          contractAddress: contracts.MooveAuction.address,
+          functionName: "placeBid",
+          args: [auctionId],
+          value: bidAmountWei.toString(),
+        });
+
         writeMooveAuction("placeBid", [auctionId], bidAmountWei);
         setStep("confirming");
+
+        console.log(
+          `✅ [English Auction] Bid transaction sent successfully for auction ${auctionId}`
+        );
 
         // Wait for confirmation with timeout
         const timeout = setTimeout(async () => {
@@ -116,6 +165,27 @@ export function useEnglishAuction(auctionId?: number) {
         return true;
       } catch (error: any) {
         console.error(`❌ Bid failed for auction ${auctionId}:`, error);
+
+        // Detailed error logging
+        const errorDetails = {
+          auctionId,
+          bidAmount,
+          bidder: address,
+          timestamp: Date.now(),
+          error: error?.message || "Unknown error",
+          errorStack: error?.stack,
+          errorCode: error?.code,
+          errorReason: error?.reason,
+          errorData: error?.data,
+          errorInfo: error?.info,
+          errorBody: error?.body,
+          errorStatus: error?.status,
+        };
+
+        console.log(
+          "🔍 [English Auction] Detailed error information:",
+          errorDetails
+        );
 
         const errorMessage = error?.message || "Bid failed";
         setError(errorMessage);

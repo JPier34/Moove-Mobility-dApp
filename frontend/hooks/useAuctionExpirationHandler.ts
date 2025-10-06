@@ -44,8 +44,7 @@ export function useAuctionExpirationHandler() {
         try {
           // Get auction data using the same approach as useIncrementalAuctions
           const provider = new ethers.JsonRpcProvider(
-            process.env.NEXT_PUBLIC_RPC_URL ||
-              "https://sepolia.infura.io/v3/YOUR_PROJECT_ID"
+            process.env.NEXT_PUBLIC_RPC_URL || "https://1rpc.io/sepolia"
           );
           const contract = new ethers.Contract(
             CONTRACT_ADDRESSES.MooveAuction,

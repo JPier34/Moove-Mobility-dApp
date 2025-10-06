@@ -216,6 +216,21 @@ export function useEventBasedClaim() {
       }
 
       try {
+        // Check if automatic system is active
+        const isAutomaticSystemActive =
+          typeof window !== "undefined" &&
+          localStorage.getItem("auction-monitoring-active") === "true";
+
+        if (isAutomaticSystemActive) {
+          console.log(
+            `⏭️ Automatic system is active, skipping manual claim for auction ${auctionId}`
+          );
+          toast.success(
+            `Automatic system is processing auction ${auctionId}. Please wait...`
+          );
+          return;
+        }
+
         console.log(`🎯 Starting claim process for auction ${auctionId}...`);
 
         // Update local state to show claiming status
@@ -229,14 +244,14 @@ export function useEventBasedClaim() {
 
         // Set current auction and step
         setCurrentAuctionId(auctionId);
-        setCurrentClaimStep("settling");
+        setCurrentClaimStep("ending");
 
-        // Call settleAuction directly for claim
-        console.log(`💰 Step 1: Settling auction ${auctionId} for claim...`);
+        // Step 1: Call endAuction first if auction is still ACTIVE
+        console.log(`🔄 Step 1: Ending auction ${auctionId}...`);
         writeContract({
           address: contracts.MooveAuction.address,
           abi: contracts.MooveAuction.abi,
-          functionName: "settleAuction",
+          functionName: "endAuction",
           args: [auctionId],
         });
       } catch (error) {
@@ -264,22 +279,42 @@ export function useEventBasedClaim() {
   // Handle transaction success/failure
   useEffect(() => {
     if (isSuccess && hash && currentAuctionId) {
-      console.log(`✅ Auction ${currentAuctionId} settled successfully!`);
-      toast.success("Auction claimed successfully!");
+      if (currentClaimStep === "ending") {
+        // endAuction completed, now call settleAuction
+        console.log(
+          `✅ Auction ${currentAuctionId} ended successfully! Now settling...`
+        );
+        setCurrentClaimStep("settling");
 
-      // Reset state
-      setCurrentClaimStep("idle");
-      setCurrentAuctionId(null);
+        // Wait a moment for the blockchain to update
+        setTimeout(() => {
+          console.log(`💰 Step 2: Settling auction ${currentAuctionId}...`);
+          writeContract({
+            address: contracts.MooveAuction.address,
+            abi: contracts.MooveAuction.abi,
+            functionName: "settleAuction",
+            args: [currentAuctionId],
+          });
+        }, 2000); // 2 second delay
+      } else if (currentClaimStep === "settling") {
+        // settleAuction completed
+        console.log(`✅ Auction ${currentAuctionId} settled successfully!`);
+        toast.success("Auction claimed successfully!");
 
-      // Refresh the list
-      fetchClaimableAuctions();
+        // Reset state
+        setCurrentClaimStep("idle");
+        setCurrentAuctionId(null);
 
-      // Trigger collection refresh for all collection hooks
-      window.dispatchEvent(
-        new CustomEvent("nftClaimed", {
-          detail: { auctionId: currentAuctionId },
-        })
-      );
+        // Refresh the list
+        fetchClaimableAuctions();
+
+        // Trigger collection refresh for all collection hooks
+        window.dispatchEvent(
+          new CustomEvent("nftClaimed", {
+            detail: { auctionId: currentAuctionId },
+          })
+        );
+      }
     }
 
     if (error && currentAuctionId) {
@@ -316,7 +351,15 @@ export function useEventBasedClaim() {
       setCurrentClaimStep("idle");
       setCurrentAuctionId(null);
     }
-  }, [isSuccess, error, hash, currentAuctionId, fetchClaimableAuctions]);
+  }, [
+    isSuccess,
+    error,
+    hash,
+    currentAuctionId,
+    currentClaimStep,
+    writeContract,
+    fetchClaimableAuctions,
+  ]);
 
   return {
     claimableAuctions,
@@ -324,5 +367,7 @@ export function useEventBasedClaim() {
     claimAuction,
     isPending: isPending || isConfirming,
     refetch: fetchClaimableAuctions,
+    currentClaimStep,
+    currentAuctionId,
   };
 }

@@ -367,11 +367,11 @@ function FilterBar({
 export default function AuctionsPage() {
   const { auctions, isLoading, error, refetch } = useIncrementalAuctions();
 
-  // Enable automatic auction monitoring
-  useAutomaticAuctionMonitor();
+  // Enable automatic auction monitoring - TEMPORARILY DISABLED to prevent unwanted MetaMask notifications
+  // useAutomaticAuctionMonitor();
 
-  // Handle expired auctions that need to be ended
-  const { processedAuctions } = useAuctionExpirationHandler();
+  // Handle expired auctions that need to be ended - TEMPORARILY DISABLED
+  // const { processedAuctions } = useAuctionExpirationHandler();
 
   // Convert AuctionData to Auction type for compatibility
   const convertedAuctions = auctions.map((auction) => ({
@@ -409,10 +409,10 @@ export default function AuctionsPage() {
   );
 
   const activeAuctions = convertedAuctions.filter(
-    (auction) => auction.status === AuctionStatus.ACTIVE // Use enum instead of hardcoded value
+    (auction) => Number(auction.status) === AuctionStatus.ACTIVE // Convert BigInt to number
   );
   const endedAuctions = convertedAuctions.filter(
-    (auction) => auction.status === AuctionStatus.ENDED // Use enum instead of hardcoded value
+    (auction) => Number(auction.status) === AuctionStatus.ENDED // Convert BigInt to number
   );
 
   console.log(
@@ -437,7 +437,7 @@ export default function AuctionsPage() {
     totalBids: convertedAuctions.reduce((sum, auction) => {
       const bidCount = auction.bidCount || 0;
       console.log(`🔍 Auction ${auction.auctionId} bidCount: ${bidCount}`);
-      return sum + bidCount;
+      return sum + Number(bidCount);
     }, 0),
     totalVolume: convertedAuctions.reduce((sum, auction) => {
       // Use currentBid if available, otherwise use startPrice

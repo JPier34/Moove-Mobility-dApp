@@ -5,6 +5,7 @@ import { useTransactionTracker } from "./useTransactionTracker";
 import { contracts } from "@/utils/contracts";
 import { parseEther } from "viem";
 import { useAuctionNotificationTriggers } from "./useUnifiedAuctionNotifications";
+import toast from "react-hot-toast";
 
 interface DutchAuctionSuccessData {
   auctionId: number;
@@ -39,6 +40,21 @@ export const useDutchAuction = () => {
     ): Promise<boolean> => {
       if (!isConnected || !address) {
         setError("Please connect your wallet");
+        return false;
+      }
+
+      // Check if automatic system is active
+      const isAutomaticSystemActive =
+        typeof window !== "undefined" &&
+        localStorage.getItem("auction-monitoring-active") === "true";
+
+      if (isAutomaticSystemActive) {
+        console.log(
+          `⏭️ Automatic system is active, skipping manual buy for auction ${auctionId}`
+        );
+        toast.success(
+          `Automatic system is processing auction ${auctionId}. Please wait...`
+        );
         return false;
       }
 
@@ -281,6 +297,32 @@ export const useDutchAuction = () => {
         setStep("claiming");
 
         try {
+          // Check auction status before claiming
+          const auctionData = await auctionContract.getAuction(auctionId);
+          const currentStatus = Number(auctionData.status);
+
+          console.log(`🔍 Dutch auction ${auctionId} status before claim:`, {
+            status: currentStatus,
+            isSettled: auctionData.isSettled,
+          });
+
+          // For Dutch auctions, the auction should be ENDED after purchase
+          // But let's add a safety check
+          if (currentStatus === 1) {
+            console.log(
+              `⚠️ Dutch auction ${auctionId} is still ACTIVE after purchase. This shouldn't happen.`
+            );
+            console.log(`🔄 Attempting to end auction first...`);
+
+            const endTx = await auctionContract.endAuction(auctionId);
+            console.log(`📝 End auction transaction sent: ${endTx.hash}`);
+            await endTx.wait();
+            console.log(`✅ Dutch auction ${auctionId} ended successfully`);
+
+            // Wait for blockchain to update
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+          }
+
           const claimTx = await auctionContract.settleAuction(auctionId);
           console.log("📡 Claim transaction sent:", claimTx.hash);
 
