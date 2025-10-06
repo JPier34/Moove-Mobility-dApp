@@ -24,20 +24,22 @@ export default function NFT114Debug() {
 
     const fetchMetadata = async () => {
       setLoading(true);
+      let tokenURIString = "";
       try {
         console.log("🔍 NFT 114 tokenURI:", tokenURI);
 
         // Check if this is detected as test data
+        tokenURIString = String(tokenURI);
         const isTestHash =
-          (tokenURI as string).includes("QmTest123") ||
-          (tokenURI as string).includes("QmMockMetadataHashForTesting");
+          tokenURIString.includes("QmTest123") ||
+          tokenURIString.includes("QmMockMetadataHashForTesting");
 
         console.log("🔍 Is test hash detected:", isTestHash);
 
         // Convert IPFS URL to HTTP
-        const httpUrl = (tokenURI as string).startsWith("ipfs://")
-          ? `https://ipfs.io/ipfs/${(tokenURI as string).slice(7)}`
-          : (tokenURI as string);
+        const httpUrl = tokenURIString.startsWith("ipfs://")
+          ? `https://ipfs.io/ipfs/${tokenURIString.slice(7)}`
+          : tokenURIString;
 
         console.log("🔍 Fetching from:", httpUrl);
 
@@ -53,7 +55,7 @@ export default function NFT114Debug() {
           setMetadata({
             ...correctedData,
             _debug: {
-              tokenURI: tokenURI as string,
+              tokenURI: tokenURIString,
               httpUrl,
               isTestHash,
               rawResponse: data,
@@ -65,7 +67,7 @@ export default function NFT114Debug() {
           console.error("❌ Failed to fetch metadata:", response.status);
           setMetadata({
             _debug: {
-              tokenURI: tokenURI as string,
+              tokenURI: tokenURIString,
               httpUrl,
               isTestHash,
               error: `HTTP ${response.status}`,
@@ -76,7 +78,7 @@ export default function NFT114Debug() {
         console.error("❌ Error fetching NFT 114 metadata:", error);
         setMetadata({
           _debug: {
-            tokenURI: tokenURI as string,
+            tokenURI: tokenURIString,
             error: error instanceof Error ? error.message : "Unknown error",
           },
         });

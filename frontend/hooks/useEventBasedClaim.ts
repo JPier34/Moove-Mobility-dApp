@@ -292,11 +292,11 @@ export function useEventBasedClaim() {
       if (error.message) {
         console.error(`❌ Error message: ${error.message}`);
       }
-      if (error.code) {
-        console.error(`❌ Error code: ${error.code}`);
+      if ((error as any).code) {
+        console.error(`❌ Error code: ${(error as any).code}`);
       }
-      if (error.reason) {
-        console.error(`❌ Error reason: ${error.reason}`);
+      if ((error as any).reason) {
+        console.error(`❌ Error reason: ${(error as any).reason}`);
       }
 
       toast.error(

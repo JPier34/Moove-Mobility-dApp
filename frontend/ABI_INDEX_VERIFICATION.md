@@ -120,3 +120,5 @@
 ✅ **Il sistema ora utilizza correttamente il nuovo ABI con 23 campi.**
 ✅ **Le aste dovrebbero ora passare correttamente da ACTIVE a ENDED automaticamente.**
 
+
+

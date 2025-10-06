@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { useWonAuctionsManager } from "@/hooks/useWonAuctionsManager";
 import CongratulationsModal from "@/components/collection/CongratulationsModal";
-import UnifiedNotificationBadge from "@/components/notifications/UnifiedNotificationBadge";
+import ConsolidatedNotificationBadge from "@/components/notifications/ConsolidatedNotificationBadge";
 import AuctionNotificationsDebug from "@/components/debug/AuctionNotificationsDebug";
 import AuctionConfirmationModal from "@/components/notifications/AuctionConfirmationModal";
 import AuctionResultModal from "@/components/notifications/AuctionResultModal";

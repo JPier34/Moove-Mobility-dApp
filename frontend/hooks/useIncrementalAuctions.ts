@@ -23,8 +23,8 @@ interface AuctionData {
   startTime: string;
   reservePrice?: string;
   bidIncrement?: string;
-  extensionThreshold?: string;
-  extensionDuration?: string;
+  extensionThreshold?: number; // seconds
+  extensionDuration?: number; // uint32 from contract
   revealEndTime?: string;
   revealPhaseStarted?: boolean;
   minBidders?: number;
@@ -197,9 +197,9 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
 
               // Check if auction is expired but still ACTIVE - needs to be ended
               const currentTime = Math.floor(Date.now() / 1000);
-              const endTime = Number(auctionData.endTime);
+              const endTime = auctionData.endTime; // Already uint32
               const isExpired = currentTime >= endTime;
-              const isActive = Number(auctionData.status) === 1; // ACTIVE
+              const isActive = auctionData.status === 1; // ACTIVE (Already uint8)
 
               if (isExpired && isActive) {
                 console.log(
@@ -349,7 +349,7 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
                 nftName: nftMetadata.name,
                 nftImage: nftMetadata.image,
                 nftCategory: nftMetadata.category,
-                status: Number(auctionData.status || 0),
+                status: auctionData.status || 0, // Already uint8
                 startPrice: auctionData.startingPrice
                   ? ethers.formatEther(auctionData.startingPrice)
                   : "0",
@@ -387,7 +387,7 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
                   "0x0000000000000000000000000000000000000000",
                 endTime: auctionData.endTime
                   ? (() => {
-                      const endTimeUnix = Number(auctionData.endTime);
+                      const endTimeUnix = auctionData.endTime; // Already uint32
                       // Enhanced validation for endTime
                       const now = Math.floor(Date.now() / 1000);
                       const maxReasonableTime = now + 365 * 24 * 60 * 60; // 1 year from now
@@ -404,16 +404,16 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
                     })()
                   : new Date(Date.now() + 300000).toISOString(), // Default: now + 5min
                 bidCount: (() => {
-                  const totalBidders = Number(auctionData.totalBidders || 0);
+                  const totalBidders = auctionData.totalBidders || 0; // Already uint32
                   // Only use totalBidders if it's a reasonable number (< 100)
                   // Otherwise, it might be corrupted data
                   return totalBidders < 100 ? totalBidders : 0;
                 })(),
-                auctionType: Number(auctionData.auctionType || 0),
+                auctionType: auctionData.auctionType || 0, // Already uint8
                 isSettled: auctionData.isSettled || false,
                 startTime: auctionData.startTime
                   ? (() => {
-                      const startTimeUnix = Number(auctionData.startTime);
+                      const startTimeUnix = auctionData.startTime; // Already uint32
                       // Enhanced validation for startTime
                       const now = Math.floor(Date.now() / 1000);
                       const maxReasonableTime = now + 365 * 24 * 60 * 60; // 1 year from now
@@ -437,20 +437,16 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
                 bidIncrement: auctionData.bidIncrement
                   ? ethers.formatEther(auctionData.bidIncrement)
                   : undefined,
-                extensionThreshold: auctionData.extensionThreshold
-                  ? ethers.formatEther(auctionData.extensionThreshold)
-                  : undefined,
-                extensionDuration: auctionData.extensionDuration
-                  ? auctionData.extensionDuration.toString()
-                  : undefined,
+                extensionThreshold: auctionData.extensionThreshold, // Already uint32 from contract
+                extensionDuration: auctionData.extensionDuration, // Already uint32 from contract
                 revealEndTime: auctionData.revealEndTime
                   ? new Date(
-                      Number(auctionData.revealEndTime) * 1000
+                      Number(auctionData.revealEndTime) * 1000 // Already uint32
                     ).toISOString()
                   : undefined,
                 revealPhaseStarted: auctionData.revealPhaseStarted || false,
-                minBidders: Number(auctionData.minBidders || 0),
-                totalBidders: Number(auctionData.totalBidders || 0),
+                minBidders: auctionData.minBidders || 0, // Already uint32
+                totalBidders: auctionData.totalBidders || 0, // Already uint32
                 allowPartialFulfillment:
                   auctionData.allowPartialFulfillment || false,
               };
@@ -636,7 +632,7 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
                 nftName: nftMetadata.name,
                 nftImage: nftMetadata.image,
                 nftCategory: nftMetadata.category,
-                status: Number(auctionData.status || 0),
+                status: auctionData.status || 0, // Already uint8
                 startPrice: auctionData.startingPrice
                   ? ethers.formatEther(auctionData.startingPrice)
                   : "0",
@@ -674,7 +670,7 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
                   "0x0000000000000000000000000000000000000000",
                 endTime: auctionData.endTime
                   ? (() => {
-                      const endTimeUnix = Number(auctionData.endTime);
+                      const endTimeUnix = auctionData.endTime; // Already uint32
                       // Enhanced validation for endTime
                       const now = Math.floor(Date.now() / 1000);
                       const maxReasonableTime = now + 365 * 24 * 60 * 60; // 1 year from now
@@ -691,16 +687,16 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
                     })()
                   : new Date(Date.now() + 300000).toISOString(), // Default: now + 5min
                 bidCount: (() => {
-                  const totalBidders = Number(auctionData.totalBidders || 0);
+                  const totalBidders = auctionData.totalBidders || 0; // Already uint32
                   // Only use totalBidders if it's a reasonable number (< 100)
                   // Otherwise, it might be corrupted data
                   return totalBidders < 100 ? totalBidders : 0;
                 })(),
-                auctionType: Number(auctionData.auctionType || 0),
+                auctionType: auctionData.auctionType || 0, // Already uint8
                 isSettled: auctionData.isSettled || false,
                 startTime: auctionData.startTime
                   ? (() => {
-                      const startTimeUnix = Number(auctionData.startTime);
+                      const startTimeUnix = auctionData.startTime; // Already uint32
                       // Enhanced validation for startTime
                       const now = Math.floor(Date.now() / 1000);
                       const maxReasonableTime = now + 365 * 24 * 60 * 60; // 1 year from now
@@ -724,20 +720,16 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
                 bidIncrement: auctionData.bidIncrement
                   ? ethers.formatEther(auctionData.bidIncrement)
                   : undefined,
-                extensionThreshold: auctionData.extensionThreshold
-                  ? ethers.formatEther(auctionData.extensionThreshold)
-                  : undefined,
-                extensionDuration: auctionData.extensionDuration
-                  ? auctionData.extensionDuration.toString()
-                  : undefined,
+                extensionThreshold: auctionData.extensionThreshold, // Already uint32 from contract
+                extensionDuration: auctionData.extensionDuration, // Already uint32 from contract
                 revealEndTime: auctionData.revealEndTime
                   ? new Date(
-                      Number(auctionData.revealEndTime) * 1000
+                      Number(auctionData.revealEndTime) * 1000 // Already uint32
                     ).toISOString()
                   : undefined,
                 revealPhaseStarted: auctionData.revealPhaseStarted || false,
-                minBidders: Number(auctionData.minBidders || 0),
-                totalBidders: Number(auctionData.totalBidders || 0),
+                minBidders: auctionData.minBidders || 0, // Already uint32
+                totalBidders: auctionData.totalBidders || 0, // Already uint32
                 allowPartialFulfillment:
                   auctionData.allowPartialFulfillment || false,
               };

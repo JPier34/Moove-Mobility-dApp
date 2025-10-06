@@ -28,7 +28,7 @@ export default function ImageDebugAnalyzer() {
     setDebugData([]);
 
     try {
-      const provider = new ethers.BrowserProvider(window.ethereum);
+      const provider = new ethers.BrowserProvider(window.ethereum!);
       const nftContract = new ethers.Contract(
         contracts.MooveNFT.address,
         contracts.MooveNFT.abi,

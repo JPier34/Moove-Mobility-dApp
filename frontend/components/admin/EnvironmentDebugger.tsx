@@ -2,8 +2,24 @@
 
 import React, { useState } from "react";
 
+interface DebugInfo {
+  clientSide: {
+    NEXT_PUBLIC_PINATA_API_KEY?: string;
+    NEXT_PUBLIC_PINATA_SECRET_KEY?: string;
+    PINATA_API_KEY?: string;
+    PINATA_SECRET_KEY?: string;
+    NODE_ENV?: string;
+  };
+  serverSide: {
+    response?: any;
+    hasMock?: boolean;
+    error?: string;
+    timestamp: string;
+  } | null;
+}
+
 export default function EnvironmentDebugger() {
-  const [debugInfo, setDebugInfo] = useState<any>(null);
+  const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
 
   const runDebug = () => {
     const info = {
@@ -28,20 +44,34 @@ export default function EnvironmentDebugger() {
       .then((response) => response.json())
       .then((data) => {
         console.log("🔍 Server-side environment response:", data);
-        setDebugInfo((prev) => ({
-          ...prev,
+        setDebugInfo((prev: DebugInfo | null) => ({
+          clientSide: prev?.clientSide || {
+            NEXT_PUBLIC_PINATA_API_KEY: undefined,
+            NEXT_PUBLIC_PINATA_SECRET_KEY: undefined,
+            PINATA_API_KEY: undefined,
+            PINATA_SECRET_KEY: undefined,
+            NODE_ENV: undefined,
+          },
           serverSide: {
             response: data,
             hasMock: data.mock || false,
+            timestamp: new Date().toISOString(),
           },
         }));
       })
       .catch((error) => {
         console.error("🔍 Server-side error:", error);
-        setDebugInfo((prev) => ({
-          ...prev,
+        setDebugInfo((prev: DebugInfo | null) => ({
+          clientSide: prev?.clientSide || {
+            NEXT_PUBLIC_PINATA_API_KEY: undefined,
+            NEXT_PUBLIC_PINATA_SECRET_KEY: undefined,
+            PINATA_API_KEY: undefined,
+            PINATA_SECRET_KEY: undefined,
+            NODE_ENV: undefined,
+          },
           serverSide: {
             error: error.message,
+            timestamp: new Date().toISOString(),
           },
         }));
       });

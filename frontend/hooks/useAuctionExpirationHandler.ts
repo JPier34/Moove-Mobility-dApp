@@ -145,8 +145,8 @@ export function useAuctionExpirationHandler() {
                 );
                 if (auctionId === 21) {
                   console.log(`❌ [Auction 21] endAuction failed:`, {
-                    error: endError.message,
-                    stack: endError.stack,
+                    error: (endError as any).message,
+                    stack: (endError as any).stack,
                   });
                 }
                 // Don't mark as processed if it failed, so we can retry
@@ -160,8 +160,8 @@ export function useAuctionExpirationHandler() {
           console.log(`Auction ${auctionId} not found or error:`, error);
           if (auctionId === 21) {
             console.log(`❌ [Auction 21] Error details:`, {
-              error: error.message,
-              stack: error.stack,
+              error: (error as any).message,
+              stack: (error as any).stack,
               contractAddress: CONTRACT_ADDRESSES.MooveAuction,
               rpcUrl:
                 process.env.NEXT_PUBLIC_RPC_URL ||
@@ -170,7 +170,10 @@ export function useAuctionExpirationHandler() {
           }
 
           // Handle rate limiting specifically
-          if (error.message && error.message.includes("429")) {
+          if (
+            (error as any).message &&
+            (error as any).message.includes("429")
+          ) {
             console.log(
               `⚠️ Rate limited for auction ${auctionId}, will retry later`
             );

@@ -26,12 +26,15 @@ export default function NFT114DetailedDebug() {
         console.log("🔍 NFT 114 Detailed Debug - TokenURI:", tokenURI);
 
         // 1. Fetch metadata from IPFS
-        const httpUrl = (tokenURI as string).startsWith("ipfs://")
-          ? `https://ipfs.io/ipfs/${(tokenURI as string).slice(7)}`
-          : (tokenURI as string);
+        const tokenURIString = String(tokenURI);
+        const httpUrl = tokenURIString.startsWith("ipfs://")
+          ? `https://ipfs.io/ipfs/${tokenURIString.slice(7)}`
+          : tokenURIString;
 
         const metadataResponse = await fetch(httpUrl);
-        const metadata = metadataResponse.ok ? await metadataResponse.json() : null;
+        const metadata = metadataResponse.ok
+          ? await metadataResponse.json()
+          : null;
 
         // 2. Check image URL
         let imageUrl = metadata?.image || "/images/default-nft.svg";
@@ -43,19 +46,23 @@ export default function NFT114DetailedDebug() {
         }
 
         try {
-          const imageResponse = await fetch(imageUrl, { method: 'HEAD' });
+          const imageResponse = await fetch(imageUrl, { method: "HEAD" });
           imageLoads = imageResponse.ok;
           if (!imageResponse.ok) {
             imageError = `HTTP ${imageResponse.status}`;
           }
         } catch (imgError) {
-          imageError = imgError instanceof Error ? imgError.message : "Unknown error";
+          imageError =
+            imgError instanceof Error ? imgError.message : "Unknown error";
         }
 
         // 3. Try to find auction data for this NFT
         let auctionData = null;
         try {
-          const provider = new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_RPC_URL || "https://sepolia.infura.io/v3/YOUR_PROJECT_ID");
+          const provider = new ethers.JsonRpcProvider(
+            process.env.NEXT_PUBLIC_RPC_URL ||
+              "https://sepolia.infura.io/v3/YOUR_PROJECT_ID"
+          );
           const auctionContract = new ethers.Contract(
             contracts.MooveAuction.address,
             contracts.MooveAuction.abi,
@@ -77,7 +84,9 @@ export default function NFT114DetailedDebug() {
                   status: Number(auction.status),
                   isSettled: auction.isSettled,
                   highestBidder: auction.highestBidder,
-                  currentPrice: auction.currentPrice ? ethers.formatEther(auction.currentPrice) : "0",
+                  currentPrice: auction.currentPrice
+                    ? ethers.formatEther(auction.currentPrice)
+                    : "0",
                   endTime: Number(auction.endTime),
                   seller: auction.seller,
                 };
@@ -95,7 +104,10 @@ export default function NFT114DetailedDebug() {
         // 4. Try to find transfer events
         let transferData = null;
         try {
-          const provider = new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_RPC_URL || "https://sepolia.infura.io/v3/YOUR_PROJECT_ID");
+          const provider = new ethers.JsonRpcProvider(
+            process.env.NEXT_PUBLIC_RPC_URL ||
+              "https://sepolia.infura.io/v3/YOUR_PROJECT_ID"
+          );
           const nftContract = new ethers.Contract(
             contracts.MooveNFT.address,
             contracts.MooveNFT.abi,
@@ -105,18 +117,20 @@ export default function NFT114DetailedDebug() {
           // Get Transfer events for token 114
           const filter = nftContract.filters.Transfer(null, null, 114);
           const events = await nftContract.queryFilter(filter, -10000); // Last 10000 blocks
-          
+
           if (events.length > 0) {
             const lastTransfer = events[events.length - 1];
             const block = await provider.getBlock(lastTransfer.blockNumber);
-            
+
             transferData = {
               transactionHash: lastTransfer.transactionHash,
               blockNumber: lastTransfer.blockNumber,
               timestamp: block?.timestamp,
-              from: lastTransfer.args.from,
-              to: lastTransfer.args.to,
-              date: block ? new Date(block.timestamp * 1000).toISOString() : "Unknown",
+              from: (lastTransfer as any).args?.from || "Unknown",
+              to: (lastTransfer as any).args?.to || "Unknown",
+              date: block
+                ? new Date(block.timestamp * 1000).toISOString()
+                : "Unknown",
             };
             console.log("📄 Transfer data for NFT 114:", transferData);
           }
@@ -125,7 +139,7 @@ export default function NFT114DetailedDebug() {
         }
 
         setDebugData({
-          tokenURI: tokenURI as string,
+          tokenURI: tokenURIString,
           httpUrl,
           metadata,
           imageUrl,
@@ -135,7 +149,6 @@ export default function NFT114DetailedDebug() {
           transferData,
           timestamp: new Date().toISOString(),
         });
-
       } catch (error) {
         console.error("❌ Error in detailed debug:", error);
         setDebugData({
@@ -153,18 +166,22 @@ export default function NFT114DetailedDebug() {
   return (
     <div className="p-4 bg-gray-100 rounded-lg">
       <h3 className="text-lg font-bold mb-2">NFT 114 Detailed Debug</h3>
-      
+
       <div className="mb-2">
         <strong>Status:</strong> {loading ? "Loading..." : "Complete"}
       </div>
-      
+
       {debugData && (
         <div className="mt-4 space-y-4">
           {/* TokenURI */}
           <div className="bg-white p-3 rounded border">
             <h4 className="font-semibold mb-2">📄 TokenURI</h4>
-            <div className="text-sm font-mono break-all">{debugData.tokenURI}</div>
-            <div className="text-sm text-gray-600 mt-1">HTTP URL: {debugData.httpUrl}</div>
+            <div className="text-sm font-mono break-all">
+              {debugData.tokenURI}
+            </div>
+            <div className="text-sm text-gray-600 mt-1">
+              HTTP URL: {debugData.httpUrl}
+            </div>
           </div>
 
           {/* Metadata */}
@@ -172,16 +189,26 @@ export default function NFT114DetailedDebug() {
             <div className="bg-white p-3 rounded border">
               <h4 className="font-semibold mb-2">📋 Metadata</h4>
               <div className="text-sm">
-                <div><strong>Name:</strong> {debugData.metadata.name}</div>
-                <div><strong>Description:</strong> {debugData.metadata.description}</div>
-                <div><strong>Image URL:</strong> {debugData.metadata.image}</div>
+                <div>
+                  <strong>Name:</strong> {debugData.metadata.name}
+                </div>
+                <div>
+                  <strong>Description:</strong> {debugData.metadata.description}
+                </div>
+                <div>
+                  <strong>Image URL:</strong> {debugData.metadata.image}
+                </div>
                 {debugData.metadata.attributes && (
                   <div>
                     <strong>Attributes:</strong>
                     <ul className="ml-4">
-                      {debugData.metadata.attributes.map((attr: any, index: number) => (
-                        <li key={index}>{attr.trait_type}: {attr.value}</li>
-                      ))}
+                      {debugData.metadata.attributes.map(
+                        (attr: any, index: number) => (
+                          <li key={index}>
+                            {attr.trait_type}: {attr.value}
+                          </li>
+                        )
+                      )}
                     </ul>
                   </div>
                 )}
@@ -193,10 +220,17 @@ export default function NFT114DetailedDebug() {
           <div className="bg-white p-3 rounded border">
             <h4 className="font-semibold mb-2">🖼️ Image Status</h4>
             <div className="text-sm">
-              <div><strong>Image URL:</strong> {debugData.imageUrl}</div>
-              <div><strong>Loads:</strong> {debugData.imageLoads ? "✅ YES" : "❌ NO"}</div>
+              <div>
+                <strong>Image URL:</strong> {debugData.imageUrl}
+              </div>
+              <div>
+                <strong>Loads:</strong>{" "}
+                {debugData.imageLoads ? "✅ YES" : "❌ NO"}
+              </div>
               {debugData.imageError && (
-                <div><strong>Error:</strong> {debugData.imageError}</div>
+                <div>
+                  <strong>Error:</strong> {debugData.imageError}
+                </div>
               )}
             </div>
           </div>
@@ -206,13 +240,31 @@ export default function NFT114DetailedDebug() {
             <div className="bg-white p-3 rounded border">
               <h4 className="font-semibold mb-2">🎯 Auction Data</h4>
               <div className="text-sm">
-                <div><strong>Auction ID:</strong> {debugData.auctionData.auctionId}</div>
-                <div><strong>Status:</strong> {debugData.auctionData.status}</div>
-                <div><strong>Is Settled:</strong> {debugData.auctionData.isSettled ? "✅ YES" : "❌ NO"}</div>
-                <div><strong>Current Price:</strong> {debugData.auctionData.currentPrice} ETH</div>
-                <div><strong>Highest Bidder:</strong> {debugData.auctionData.highestBidder}</div>
-                <div><strong>Seller:</strong> {debugData.auctionData.seller}</div>
-                <div><strong>End Time:</strong> {new Date(debugData.auctionData.endTime * 1000).toISOString()}</div>
+                <div>
+                  <strong>Auction ID:</strong> {debugData.auctionData.auctionId}
+                </div>
+                <div>
+                  <strong>Status:</strong> {debugData.auctionData.status}
+                </div>
+                <div>
+                  <strong>Is Settled:</strong>{" "}
+                  {debugData.auctionData.isSettled ? "✅ YES" : "❌ NO"}
+                </div>
+                <div>
+                  <strong>Current Price:</strong>{" "}
+                  {debugData.auctionData.currentPrice} ETH
+                </div>
+                <div>
+                  <strong>Highest Bidder:</strong>{" "}
+                  {debugData.auctionData.highestBidder}
+                </div>
+                <div>
+                  <strong>Seller:</strong> {debugData.auctionData.seller}
+                </div>
+                <div>
+                  <strong>End Time:</strong>{" "}
+                  {new Date(debugData.auctionData.endTime * 1000).toISOString()}
+                </div>
               </div>
             </div>
           )}
@@ -222,11 +274,23 @@ export default function NFT114DetailedDebug() {
             <div className="bg-white p-3 rounded border">
               <h4 className="font-semibold mb-2">📄 Transfer Data</h4>
               <div className="text-sm">
-                <div><strong>Transaction Hash:</strong> {debugData.transferData.transactionHash}</div>
-                <div><strong>Block Number:</strong> {debugData.transferData.blockNumber}</div>
-                <div><strong>Date:</strong> {debugData.transferData.date}</div>
-                <div><strong>From:</strong> {debugData.transferData.from}</div>
-                <div><strong>To:</strong> {debugData.transferData.to}</div>
+                <div>
+                  <strong>Transaction Hash:</strong>{" "}
+                  {debugData.transferData.transactionHash}
+                </div>
+                <div>
+                  <strong>Block Number:</strong>{" "}
+                  {debugData.transferData.blockNumber}
+                </div>
+                <div>
+                  <strong>Date:</strong> {debugData.transferData.date}
+                </div>
+                <div>
+                  <strong>From:</strong> {debugData.transferData.from}
+                </div>
+                <div>
+                  <strong>To:</strong> {debugData.transferData.to}
+                </div>
               </div>
             </div>
           )}
@@ -247,4 +311,3 @@ export default function NFT114DetailedDebug() {
     </div>
   );
 }
-

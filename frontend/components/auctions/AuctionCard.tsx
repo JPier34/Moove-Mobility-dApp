@@ -219,8 +219,10 @@ export default function AuctionCard({
 
     // English auction specific logic
     if (localAuction.auctionType === AuctionType.ENGLISH) {
-      const extensionThreshold =
-        (localAuction.extensionThresholdMinutes || 5) * 60 * 1000; // Convert to milliseconds
+      // Convert extensionThreshold from minutes to milliseconds
+      const extensionThresholdMinutes =
+        localAuction.extensionThresholdMinutes || 5; // Default 5 minutes
+      const extensionThreshold = extensionThresholdMinutes * 60 * 1000; // Convert to milliseconds
 
       if (difference <= 60000) {
         // Last minute - critical
@@ -418,7 +420,7 @@ export default function AuctionCard({
                 {/* Extension info for English auctions */}
                 {timeStatus.isExtensionZone && (
                   <span className="text-orange-600 font-medium">
-                    +{auction.extensionDurationMinutes || 10}min on bid
+                    +{localAuction.extensionDurationMinutes || 10}min on bid
                   </span>
                 )}
               </div>

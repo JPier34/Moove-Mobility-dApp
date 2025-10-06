@@ -157,3 +157,5 @@ NEXT_PUBLIC_MOOVE_NFT_ADDRESS=your_nft_contract_address_here`;
     </div>
   );
 }
+
+

@@ -3,7 +3,7 @@
 import { useAccount, useChainId, useSwitchChain } from "wagmi";
 import { sepolia } from "wagmi/chains";
 import { useEffect, useState } from "react";
-import { useNotifications } from "@/hooks/useNotification";
+import { useConsolidatedNotifications } from "@/hooks/useConsolidatedNotifications";
 
 interface ChainValidationResult {
   isValidChain: boolean;
@@ -22,7 +22,7 @@ export const useChainValidation = (): ChainValidationResult => {
     error: switchError,
   } = useSwitchChain();
   const { isConnected, chain } = useAccount();
-  const { sendNotification } = useNotifications();
+  const { notifications } = useConsolidatedNotifications();
 
   const [error, setError] = useState<string | null>(null);
   const [hasNotifiedWrongChain, setHasNotifiedWrongChain] = useState(false);
@@ -38,43 +38,18 @@ export const useChainValidation = (): ChainValidationResult => {
     try {
       setError(null);
       await switchChain({ chainId: sepolia.id });
-
-      sendNotification({
-        title: "✅ Network Switched",
-        body: "Successfully connected to Sepolia network",
-        tag: "network-switch-success",
-      });
-
       setHasNotifiedWrongChain(false);
     } catch (err: any) {
       const errorMessage = err?.message || "Failed to switch network";
       setError(errorMessage);
-
-      sendNotification({
-        title: "❌ Network Switch Failed",
-        body: errorMessage,
-        tag: "network-switch-error",
-      });
     }
   };
 
   useEffect(() => {
     if (isConnected && !isValidChain && chain && !hasNotifiedWrongChain) {
-      sendNotification({
-        title: "⚠️ Wrong Network",
-        body: `Please switch to Sepolia. Currently on: ${chain.name}`,
-        tag: "wrong-network",
-      });
-
       setHasNotifiedWrongChain(true);
     }
-  }, [
-    isConnected,
-    isValidChain,
-    chain,
-    hasNotifiedWrongChain,
-    sendNotification,
-  ]);
+  }, [isConnected, isValidChain, chain, hasNotifiedWrongChain]);
 
   useEffect(() => {
     if (switchError) {

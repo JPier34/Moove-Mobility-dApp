@@ -91,13 +91,11 @@ export function useAuctionHandler(): AuctionHandler {
                 step: englishAuction.step,
               };
             } else if (action === "buyNow" && amount) {
-              const success = await englishAuction.buyNow(
-                parseInt(auction.auctionId)
-              );
+              // Buy now functionality removed for English auctions
               return {
-                success,
-                error: success ? undefined : englishAuction.error || undefined,
-                step: englishAuction.step,
+                success: false,
+                error: "Buy now is not supported for English auctions",
+                step: "idle",
               };
             }
             break;
@@ -121,14 +119,11 @@ export function useAuctionHandler(): AuctionHandler {
                 step: reserveAuction.step,
               };
             } else if (action === "buyNow" && amount) {
-              const success = await reserveAuction.buyNow(
-                parseInt(auction.auctionId),
-                amount
-              );
+              // Buy now functionality removed for Reserve auctions
               return {
-                success,
-                error: success ? undefined : reserveAuction.error || undefined,
-                step: reserveAuction.step,
+                success: false,
+                error: "Buy now is not supported for Reserve auctions",
+                step: "idle",
               };
             }
             break;

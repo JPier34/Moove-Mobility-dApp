@@ -16,7 +16,6 @@ export interface ReserveAuctionHandler {
       reservePrice: string;
     }
   ) => Promise<boolean>;
-  buyNow: (auctionId: number, buyNowPrice: string) => Promise<boolean>;
   isProcessing: boolean;
   error: string | null;
   step: "idle" | "bidding" | "buying" | "success" | "error";
@@ -76,7 +75,9 @@ export function useReserveAuction(): ReserveAuctionHandler {
         const isUnderReservePrice = bidAmountWei < reservePriceWei;
         setIsUnderReserve(isUnderReservePrice);
 
-        console.log(`🏆 Placing bid for Reserve auction ${auctionId}: ${bidAmount} ETH`);
+        console.log(
+          `🏆 Placing bid for Reserve auction ${auctionId}: ${bidAmount} ETH`
+        );
 
         placeBid(auctionId, bidAmountWei);
 
@@ -104,63 +105,13 @@ export function useReserveAuction(): ReserveAuctionHandler {
     [isConnected, address, isProcessing, placeBid, isSuccess]
   );
 
-  const buyNow = useCallback(
-    async (auctionId: number, buyNowPrice: string): Promise<boolean> => {
-      if (!isConnected || !address) {
-        setError("Wallet not connected");
-        setStep("error");
-        return false;
-      }
-
-      if (isProcessing) {
-        console.warn("Reserve auction already in progress");
-        return false;
-      }
-
-      setIsProcessing(true);
-      setError(null);
-      setStep("buying");
-
-      try {
-        const buyNowPriceWei = parseEther(buyNowPrice);
-        if (buyNowPriceWei <= 0n) {
-          throw new Error("Buy now price must be greater than 0");
-        }
-
-        console.log(`💰 Buying now for Reserve auction ${auctionId}: ${buyNowPrice} ETH`);
-
-        placeBid(auctionId, buyNowPriceWei);
-
-        if (isSuccess) {
-          setStep("success");
-          return true;
-        }
-
-        return true;
-      } catch (error) {
-        console.error("❌ Reserve auction buy now failed:", error);
-        const errorMessage =
-          error instanceof Error ? error.message : "Unknown error";
-        setError(errorMessage);
-        setStep("error");
-        return false;
-      } finally {
-        setIsProcessing(false);
-        setTimeout(() => {
-          setStep("idle");
-        }, 3000);
-      }
-    },
-    [isConnected, address, isProcessing, placeBid, isSuccess]
-  );
+  // Buy now functionality removed - not supported for Reserve auctions
 
   return {
     placeBid: placeBidWithValidation,
-    buyNow,
     isProcessing,
     error,
     step,
     isUnderReserve,
   };
 }
-

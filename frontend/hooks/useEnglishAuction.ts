@@ -151,119 +151,7 @@ export function useEnglishAuction(auctionId?: number) {
     ]
   );
 
-  // Handle buy now functionality
-  const buyNow = useCallback(
-    async (auctionId: number) => {
-      if (!isConnected || !address) {
-        setError("Please connect your wallet");
-        return false;
-      }
-
-      if (isProcessing) {
-        setError("Transaction already in progress");
-        return false;
-      }
-
-      setIsProcessing(true);
-      setError(null);
-      setStep("buying");
-
-      try {
-        console.log(`🛒 Starting buy now for auction ${auctionId}`);
-
-        // Track this bid
-        const timeoutRef = { current: null as NodeJS.Timeout | null };
-        pendingBids.current.set(auctionId, {
-          auctionId,
-          bidder: address,
-          amount: "0", // Buy now doesn't have a specific amount
-          timestamp: Date.now(),
-          timeoutRef,
-        });
-
-        // Call the buy now function using writeMooveAuction
-        writeMooveAuction("buyNow", [auctionId], BigInt(0));
-
-        // Wait for confirmation with timeout
-        const timeout = setTimeout(async () => {
-          console.log(
-            `⏰ Buy now timeout reached for auction ${auctionId}, verifying state...`
-          );
-
-          try {
-            const verified = await verifyAuctionStateWithRetry(
-              auctionId,
-              address || "",
-              BigInt(0),
-              3,
-              2000
-            );
-            if (verified) {
-              console.log(`✅ Buy now verified for auction ${auctionId}`);
-              notifyAuctionSuccess(
-                auctionId.toString(),
-                "Buy now completed successfully!"
-              );
-            } else {
-              console.log(
-                `❌ Buy now verification failed for auction ${auctionId}`
-              );
-              notifyAuctionFailed(
-                auctionId.toString(),
-                "Buy now completed but verification failed"
-              );
-            }
-          } catch (error) {
-            console.error(
-              `❌ Buy now verification error for auction ${auctionId}:`,
-              error
-            );
-            notifyAuctionFailed(
-              auctionId.toString(),
-              "Buy now completed but verification failed"
-            );
-          }
-        }, 45000); // 45 second timeout
-
-        timeoutRef.current = timeout;
-
-        return true;
-      } catch (error: any) {
-        console.error(`❌ Buy now failed for auction ${auctionId}:`, error);
-
-        const errorMessage = error?.message || "Buy now failed";
-        setError(errorMessage);
-
-        // Clean up pending bid
-        const pendingBid = pendingBids.current.get(auctionId);
-        if (pendingBid) {
-          if (pendingBid.timeoutRef.current) {
-            clearTimeout(pendingBid.timeoutRef.current);
-          }
-          pendingBids.current.delete(auctionId);
-        }
-
-        // Use unified notification system for errors
-        notifyAuctionFailed(auctionId.toString(), errorMessage);
-
-        return false;
-      } finally {
-        setIsProcessing(false);
-        // Reset step after a delay
-        setTimeout(() => {
-          setStep("idle");
-        }, 2000);
-      }
-    },
-    [
-      isConnected,
-      address,
-      isProcessing,
-      verifyAuctionStateWithRetry,
-      notifyAuctionFailed,
-      notifyAuctionSuccess,
-    ]
-  );
+  // Buy now functionality removed - not supported for English auctions
 
   // Listen for BidPlaced events to confirm successful bids
   useAuctionEventListening({
@@ -322,7 +210,6 @@ export function useEnglishAuction(auctionId?: number) {
 
   return {
     placeBid: placeBidWithValidation,
-    buyNow,
     isProcessing,
     error,
     step,

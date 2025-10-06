@@ -87,7 +87,7 @@ function AdminNFTCreatorUltraSimpleContent() {
         // English auction: start low, go high - NO reserve needed (start price is the minimum)
         updateField("startPrice", "0.001");
         updateField("reservePrice", ""); // Not used - start price is the minimum
-        updateField("buyNowPrice", "0.01"); // Higher than start
+        updateField("buyNowPrice", ""); // Not used in English auctions
         updateField("bidIncrement", "0.001");
         // Set extension defaults
         updateField("extensionThresholdMinutes", "5");
@@ -104,7 +104,7 @@ function AdminNFTCreatorUltraSimpleContent() {
         // Reserve auction: reserve required
         updateField("startPrice", "0.001");
         updateField("reservePrice", "0.005"); // Required, higher than start
-        updateField("buyNowPrice", "0.01"); // Higher than reserve
+        updateField("buyNowPrice", ""); // Not used in Reserve auctions
         updateField("bidIncrement", "0.001");
         break;
     }
@@ -241,14 +241,7 @@ function AdminNFTCreatorUltraSimpleContent() {
 
       case AuctionType.ENGLISH:
         // English auction: start price IS the minimum, no reserve needed
-        if (auctionFormData.buyNowPrice && !isNaN(buyNowPrice)) {
-          if (buyNowPrice < startPrice) {
-            errors.push(
-              "English auction: Buy Now price must be GREATER than or equal to start price"
-            );
-          }
-        }
-        // Note: Reserve price not used in English auctions - start price is the minimum
+        // Buy now price not supported for English auctions
         break;
 
       case AuctionType.SEALED_BID:
@@ -265,13 +258,7 @@ function AdminNFTCreatorUltraSimpleContent() {
             "Reserve auction: Reserve price must be GREATER than or equal to start price"
           );
         }
-        if (auctionFormData.buyNowPrice && !isNaN(buyNowPrice)) {
-          if (buyNowPrice < Math.max(startPrice, reservePrice)) {
-            errors.push(
-              "Reserve auction: Buy Now price must be greater than reserve price"
-            );
-          }
-        }
+        // Buy now price not supported for Reserve auctions
         break;
     }
 
@@ -837,13 +824,13 @@ function AdminNFTCreatorUltraSimpleContent() {
           id: `nft_${Date.now()}`,
           nftName: nftData.name,
           nftDescription: nftData.description,
-          nftImage: ipfsResult,
+          nftImage: ipfsHash,
           tokenId: secureResult.nft.tokenId.toString(),
           transactionHash: secureResult.nft.transactionHash,
           creationDate: new Date().toISOString(),
           auctionId: secureResult.auction.auctionId.toString(),
           status: "confirmed",
-          ipfsHash: ipfsResult,
+          ipfsHash: ipfsHash,
         };
 
         localStorage.setItem(
@@ -1373,9 +1360,8 @@ function AdminNFTCreatorUltraSimpleContent() {
                   </div>
                 )}
 
-                {/* Buy Now Price - Only show for English and Reserve auctions */}
-                {(auctionFormData.auctionType === AuctionType.ENGLISH ||
-                  auctionFormData.auctionType === AuctionType.RESERVE) && (
+                {/* Buy Now Price - Only show for Dutch auctions */}
+                {auctionFormData.auctionType === AuctionType.DUTCH && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Buy Now Price (ETH)
