@@ -30,9 +30,11 @@ export function useWonAuctionsForClaim() {
           auction.highestBidder?.toLowerCase() === address.toLowerCase();
         const isEnded = auction.status === 3; // ENDED (corrected to match contract)
         const isSettled = auction.status === 4 || auction.isSettled; // SETTLED or isSettled field
+        const isActiveButExpired =
+          auction.status === 1 && Date.now() / 1000 > Number(auction.endTime); // ACTIVE but time expired
 
-        // ONLY consider ENDED or SETTLED auctions - NOT ACTIVE even if time-expired
-        return isWinner && (isEnded || isSettled);
+        // Consider ENDED, SETTLED, or ACTIVE but expired auctions
+        return isWinner && (isEnded || isSettled || isActiveButExpired);
       });
 
       console.log(

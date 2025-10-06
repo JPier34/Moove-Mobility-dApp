@@ -35,20 +35,20 @@ export function useAuctionClaim(): AuctionClaimHandler {
         return false;
       }
 
-      // Check if automatic system is active
-      const isAutomaticSystemActive =
-        typeof window !== "undefined" &&
-        localStorage.getItem("auction-monitoring-active") === "true";
+      // Check if automatic system is active - DISABLED for manual claim
+      // const isAutomaticSystemActive =
+      //   typeof window !== "undefined" &&
+      //   localStorage.getItem("auction-monitoring-active") === "true";
 
-      if (isAutomaticSystemActive) {
-        console.log(
-          `⏭️ Automatic system is active, skipping manual claim for auction ${auctionId}`
-        );
-        toast.success(
-          `Automatic system is processing auction ${auctionId}. Please wait...`
-        );
-        return false;
-      }
+      // if (isAutomaticSystemActive) {
+      //   console.log(
+      //     `⏭️ Automatic system is active, skipping manual claim for auction ${auctionId}`
+      //   );
+      //   toast.success(
+      //     `Automatic system is processing auction ${auctionId}. Please wait...`
+      //   );
+      //   return false;
+      // }
 
       if (isProcessing) {
         console.warn("Auction claim already in progress");
@@ -92,17 +92,25 @@ export function useAuctionClaim(): AuctionClaimHandler {
             `🔄 Auction ${auctionId} is ACTIVE but expired. Calling endAuction...`
           );
 
-          // Call endAuction
-          const signer = await provider.getSigner();
-          const endTx = await (
-            auctionContract.connect(signer) as any
-          ).endAuction(auctionId);
-          console.log(`📝 End auction transaction submitted: ${endTx.hash}`);
-          await endTx.wait();
-          console.log(`✅ Auction ${auctionId} ended successfully`);
+          try {
+            // Call endAuction
+            const signer = await provider.getSigner();
+            const endTx = await (
+              auctionContract.connect(signer) as any
+            ).endAuction(auctionId);
+            console.log(`📝 End auction transaction submitted: ${endTx.hash}`);
+            await endTx.wait();
+            console.log(`✅ Auction ${auctionId} ended successfully`);
 
-          // Wait for blockchain to update
-          await new Promise((resolve) => setTimeout(resolve, 3000));
+            // Wait for blockchain to update
+            await new Promise((resolve) => setTimeout(resolve, 3000));
+          } catch (endError) {
+            console.error(`❌ Failed to end auction ${auctionId}:`, endError);
+            // Continue with settleAuction anyway - the auction might be processable
+            console.log(
+              `🔄 Continuing with settleAuction despite endAuction failure...`
+            );
+          }
         }
 
         // Step 2: Settle the auction

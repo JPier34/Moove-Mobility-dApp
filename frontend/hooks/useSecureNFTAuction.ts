@@ -54,11 +54,13 @@ async function secureNFTMint(
   mintParams: any[]
 ): Promise<MintResult> {
   console.log("🎨 Starting secure NFT mint...");
+  console.log("🎨 Mint params:", mintParams);
 
   try {
     // 0. Check if caller has MINTER_ROLE
     console.log("🔍 Checking MINTER_ROLE...");
     const callerAddress = mintParams[0];
+    console.log("🔍 Caller address:", callerAddress);
 
     // Get access control contract
     if (!window.ethereum) {
@@ -73,8 +75,10 @@ async function secureNFTMint(
     );
 
     // Check MINTER_ROLE and MASTER_ADMIN_ROLE
+    console.log("🔍 Getting roles...");
     const MINTER_ROLE = await accessControlContract.MINTER_ROLE();
     const MASTER_ADMIN_ROLE = await accessControlContract.MASTER_ADMIN_ROLE();
+    console.log("🔍 Roles:", { MINTER_ROLE, MASTER_ADMIN_ROLE });
 
     const hasMinterRole = await accessControlContract.hasRole(
       MINTER_ROLE,
@@ -636,6 +640,7 @@ async function completeNFTAuctionFlow(
   try {
     // Phase 1: Mint NFT con ID tracking sicuro
     console.log("📝 Phase 1: Minting NFT...");
+    console.log("📝 Mint params:", mintParams);
     const mintResult = await secureNFTMint(nftContract, mintParams);
 
     console.log("✅ NFT minted successfully:", {
@@ -646,12 +651,18 @@ async function completeNFTAuctionFlow(
 
     // Phase 2: Approve NFT per auction contract
     console.log("🔐 Phase 2: Approving NFT...");
+    console.log("🔐 Approval details:", {
+      tokenId: mintResult.tokenId.toString(),
+      spender: auctionContract.target,
+      owner: userAddress,
+    });
     await secureNFTApproval(
       nftContract,
       mintResult.tokenId,
       auctionContract.target as string,
       userAddress
     );
+    console.log("✅ NFT approved successfully");
 
     // Phase 3: Create auction
     console.log("🏆 Phase 3: Creating auction...");
@@ -660,6 +671,7 @@ async function completeNFTAuctionFlow(
       tokenId: mintResult.tokenId,
       nftContract: nftContract.target as string,
     };
+    console.log("🏆 Auction params:", fullAuctionParams);
 
     const auctionResult = await secureAuctionCreation(
       auctionContract,
@@ -668,9 +680,14 @@ async function completeNFTAuctionFlow(
       userAddress
     );
 
+    console.log("✅ Auction created successfully:", {
+      auctionId: auctionResult.auctionId.toString(),
+      transactionHash: auctionResult.transactionHash,
+    });
+
     console.log("🎉 Complete flow finished successfully!");
 
-    return {
+    const finalResult = {
       nft: {
         tokenId: mintResult.tokenId,
         transactionHash: mintResult.transactionHash,
@@ -681,6 +698,9 @@ async function completeNFTAuctionFlow(
         transactionHash: auctionResult.transactionHash,
       },
     };
+
+    console.log("🎯 Final result:", finalResult);
+    return finalResult;
   } catch (error) {
     console.error("❌ Complete flow failed:", error);
     throw error;
@@ -745,8 +765,15 @@ export function useSecureNFTAuctionFlow() {
           address
         );
 
+        console.log("🎯 Complete flow result:", result);
+        console.log("🎯 Setting result state...");
         setResult(result);
+        console.log(
+          "🎯 Result state set, current phase:",
+          "Completed successfully!"
+        );
         setCurrentPhase("Completed successfully!");
+        console.log("🎯 All states updated successfully");
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : String(error);

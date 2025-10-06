@@ -153,6 +153,13 @@ export function useEventBasedClaim() {
       // Check for auctions that should be claimable based on actual auction end time
       const currentTime = Math.floor(Date.now() / 1000);
 
+      console.log(`🕐 Current time debug:`, {
+        currentTime,
+        currentTimeDate: new Date(currentTime * 1000).toISOString(),
+        now: Date.now(),
+        nowDate: new Date().toISOString(),
+      });
+
       for (const [auctionId, win] of userWins) {
         try {
           // Get auction data to check actual end time
@@ -167,18 +174,35 @@ export function useEventBasedClaim() {
           const status = Number(auction.status);
           const highestBidder = auction.highestBidder;
 
-          // Only mark as claimable if auction is actually ended AND user is winner AND time has passed
-          if (
-            status === 3 && // ENDED status
+          console.log(`🔍 [EventBasedClaim] Checking auction ${auctionId}:`, {
+            status,
+            endTime,
+            endTimeDate: new Date(endTime * 1000).toISOString(),
+            currentTime,
+            currentTimeDate: new Date(currentTime * 1000).toISOString(),
+            isExpired: currentTime >= endTime,
+            highestBidder: highestBidder.toLowerCase(),
+            userAddress: address.toLowerCase(),
+            isWinner: highestBidder.toLowerCase() === address.toLowerCase(),
+            isSettled: settledAuctions.has(auctionId),
+            rawAuctionEndTime: auction.endTime,
+            rawAuctionStatus: auction.status,
+          });
+
+          // Only mark as claimable if auction is actually ended AND user is winner AND time has passed AND not already settled
+          // Allow claim for ENDED status OR ACTIVE but time expired (for manual claim)
+          // BUT NEVER for SETTLED auctions (status === 4)
+          const shouldBeClaimable =
+            (status === 3 || (status === 1 && currentTime >= endTime)) && // ENDED status OR ACTIVE but expired
             highestBidder.toLowerCase() === address.toLowerCase() &&
             currentTime >= endTime &&
-            !settledAuctions.has(auctionId)
-          ) {
-            userWins.set(auctionId, {
-              ...win,
-              canClaim: true,
-            });
-          }
+            !settledAuctions.has(auctionId);
+
+          // Update the auction's claimable status based on current conditions
+          userWins.set(auctionId, {
+            ...win,
+            canClaim: shouldBeClaimable,
+          });
         } catch (error) {
           console.warn(
             `⚠️ Could not check auction ${auctionId} status for claim:`,
@@ -216,20 +240,20 @@ export function useEventBasedClaim() {
       }
 
       try {
-        // Check if automatic system is active
-        const isAutomaticSystemActive =
-          typeof window !== "undefined" &&
-          localStorage.getItem("auction-monitoring-active") === "true";
+        // Check if automatic system is active - DISABLED for manual claim
+        // const isAutomaticSystemActive =
+        //   typeof window !== "undefined" &&
+        //   localStorage.getItem("auction-monitoring-active") === "true";
 
-        if (isAutomaticSystemActive) {
-          console.log(
-            `⏭️ Automatic system is active, skipping manual claim for auction ${auctionId}`
-          );
-          toast.success(
-            `Automatic system is processing auction ${auctionId}. Please wait...`
-          );
-          return;
-        }
+        // if (isAutomaticSystemActive) {
+        //   console.log(
+        //     `⏭️ Automatic system is active, skipping manual claim for auction ${auctionId}`
+        //   );
+        //   toast.success(
+        //     `Automatic system is processing auction ${auctionId}. Please wait...`
+        //   );
+        //   return;
+        // }
 
         console.log(`🎯 Starting claim process for auction ${auctionId}...`);
 

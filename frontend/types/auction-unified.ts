@@ -99,6 +99,8 @@ export interface FrontendAuction {
   endTime: Date;
   extensionThreshold: number; // seconds
   extensionDuration: number;
+  extensionThresholdMinutes: number; // minutes
+  extensionDurationMinutes: number; // minutes
   revealEndTime: Date;
 
   // Partecipanti
@@ -214,6 +216,12 @@ export function convertContractToFrontend(
     endTime: new Date(Number(contractData.endTime) * 1000),
     extensionThreshold: Number(contractData.extensionThreshold), // uint32 from contract
     extensionDuration: Number(contractData.extensionDuration),
+    extensionThresholdMinutes: Math.floor(
+      Number(contractData.extensionThreshold) / 60
+    ),
+    extensionDurationMinutes: Math.floor(
+      Number(contractData.extensionDuration) / 60
+    ),
     revealEndTime: new Date(Number(contractData.revealEndTime) * 1000),
 
     // Partecipanti

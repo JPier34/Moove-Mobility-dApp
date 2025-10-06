@@ -81,7 +81,7 @@ export function useAuctionCreationMonitor() {
             buyNowPrice: rawAuctionData[11]
               ? ethers.formatEther(rawAuctionData[11])
               : "0", // buyNowPrice
-            duration: Number(rawAuctionData[18]), // extensionDuration (duration in seconds)
+            duration: Number(rawAuctionData[16]) - Number(rawAuctionData[15]), // endTime - startTime
             bidIncrement: rawAuctionData[13]
               ? ethers.formatEther(rawAuctionData[13])
               : "0", // bidIncrement
@@ -107,6 +107,10 @@ export function useAuctionCreationMonitor() {
             startPrice: auctionDataParsed.startPrice,
             duration: auctionDataParsed.duration,
             status: auctionDataParsed.status,
+            extensionThreshold: auctionDataParsed.extensionThreshold,
+            extensionDuration: auctionDataParsed.extensionDuration,
+            rawExtensionThreshold: rawAuctionData[17],
+            rawExtensionDuration: rawAuctionData[18],
           });
         } catch (error) {
           console.warn(`⚠️ Failed to fetch auction ${i}:`, error);

@@ -60,6 +60,44 @@ export function useReserveAuction(): ReserveAuctionHandler {
         return false;
       }
 
+      // Check if user is already the highest bidder
+      try {
+        const { ethers } = await import("ethers");
+        const { contracts } = await import("@/utils/contracts");
+
+        const provider = new ethers.JsonRpcProvider(
+          process.env.NEXT_PUBLIC_RPC_URL || "https://1rpc.io/sepolia"
+        );
+        const auctionContract = new ethers.Contract(
+          contracts.MooveAuction.address,
+          contracts.MooveAuction.abi,
+          provider
+        );
+
+        const auctionData = await auctionContract.getAuction(auctionId);
+        const currentHighestBidder = auctionData.highestBidder;
+
+        console.log(`🔍 [Reserve Auction] Highest bidder check:`, {
+          auctionId,
+          currentHighestBidder,
+          userAddress: address,
+          isAlreadyHighestBidder:
+            currentHighestBidder.toLowerCase() === address.toLowerCase(),
+        });
+
+        if (currentHighestBidder.toLowerCase() === address.toLowerCase()) {
+          const errorMsg =
+            "You are already the highest bidder. You cannot outbid yourself.";
+          console.log(`❌ [Reserve Auction] Bid blocked: ${errorMsg}`);
+          setError(errorMsg);
+          setStep("error");
+          return false;
+        }
+      } catch (error) {
+        console.warn("⚠️ Could not check highest bidder status:", error);
+        // Continue with bid if we can't check (fallback behavior)
+      }
+
       setIsProcessing(true);
       setError(null);
       setStep("bidding");

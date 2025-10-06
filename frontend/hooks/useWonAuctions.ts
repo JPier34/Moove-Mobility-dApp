@@ -99,9 +99,11 @@ async function filterAuctionsByOwnership(
     // CORRECTED STATUS VALUES FROM CONTRACT: 0=PENDING, 1=ACTIVE, 2=REVEAL, 3=ENDED, 4=SETTLED, 5=CANCELLED
     const isEnded = auction.status === 3; // ENDED
     const isSettled = auction.status === 4; // SETTLED
+    const isActiveButExpired =
+      auction.status === 1 && Date.now() / 1000 > Number(auction.endTime); // ACTIVE but time expired
 
-    // ONLY consider ENDED or SETTLED auctions - NOT ACTIVE even if time-expired
-    const isAuctionEnded = isEnded || isSettled;
+    // Consider ENDED, SETTLED, or ACTIVE but expired auctions
+    const isAuctionEnded = isEnded || isSettled || isActiveButExpired;
 
     if (!isUserWinner || !isAuctionEnded) {
       continue; // Skip se non è vincitore o asta non finita

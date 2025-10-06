@@ -1062,7 +1062,10 @@ export default function AuctionModal({
                             (!!localAuction.buyNowPrice &&
                               parseFloat(localAuction.buyNowPrice) > 0 &&
                               parseFloat(bidAmount || "0") >=
-                                parseFloat(localAuction.buyNowPrice))
+                                parseFloat(localAuction.buyNowPrice)) ||
+                            (!!localAuction.highestBidder &&
+                              localAuction.highestBidder.toLowerCase() ===
+                                address?.toLowerCase())
                           }
                           className="w-full"
                           size="lg"
@@ -1072,6 +1075,10 @@ export default function AuctionModal({
                               <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
                               Placing bid...
                             </>
+                          ) : !!localAuction.highestBidder &&
+                            localAuction.highestBidder.toLowerCase() ===
+                              address?.toLowerCase() ? (
+                            "You already are the highest bidder!"
                           ) : (
                             `Place Bid: ${bidAmount || "0.0000"} ETH`
                           )}

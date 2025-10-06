@@ -4,6 +4,9 @@ import React, { useState } from "react";
 import DutchAuctionChecker from "@/components/debug/DutchAuctionChecker";
 import NFT114Debug from "@/components/debug/NFT114Debug";
 import NFT114DetailedDebug from "@/components/debug/NFT114DetailedDebug";
+import RefundSystemTester from "@/components/debug/RefundSystemTester";
+import AdminCreationDebugger from "@/components/debug/AdminCreationDebugger";
+import Auction30Debugger from "@/components/debug/Auction30Debugger";
 // Debug components removed
 // ModularValidationTester COMPLETELY REMOVED - was causing build errors
 
@@ -21,6 +24,21 @@ export default function DebugPage() {
           <p className="text-gray-600 dark:text-gray-400">
             Comprehensive testing tools for auction system validation
           </p>
+        </div>
+
+        {/* Admin Creation Debugger */}
+        <div className="mb-8">
+          <AdminCreationDebugger />
+        </div>
+
+        {/* Auction #30 Debugger */}
+        <div className="mb-8">
+          <Auction30Debugger />
+        </div>
+
+        {/* Refund System Tester */}
+        <div className="mb-8">
+          <RefundSystemTester />
         </div>
 
         {/* NFT 114 Detailed Debug */}

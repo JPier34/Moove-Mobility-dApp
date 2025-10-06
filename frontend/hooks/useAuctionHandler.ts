@@ -64,10 +64,8 @@ export function useAuctionHandler(): AuctionHandler {
                 currentTimeUnix,
                 timeUntilEndSeconds: timeUntilEnd,
                 timeUntilEndMinutes: Math.floor(timeUntilEnd / 60),
-                extensionThresholdMinutes:
-                  auction.extensionThresholdMinutes || 5,
-                extensionDurationMinutes:
-                  auction.extensionDurationMinutes || 10,
+                extensionThresholdMinutes: auction.extensionThresholdMinutes,
+                extensionDurationMinutes: auction.extensionDurationMinutes,
               });
 
               const auctionData = {
@@ -76,10 +74,8 @@ export function useAuctionHandler(): AuctionHandler {
                 bidIncrement: auction.bidIncrement,
                 endTime: endTimeUnix.toString(), // Convert Date to Unix timestamp string
                 // Extension settings (these should come from auction metadata or form)
-                extensionThresholdMinutes:
-                  auction.extensionThresholdMinutes || 5,
-                extensionDurationMinutes:
-                  auction.extensionDurationMinutes || 10,
+                extensionThresholdMinutes: auction.extensionThresholdMinutes,
+                extensionDurationMinutes: auction.extensionDurationMinutes,
               };
               const success = await englishAuction.placeBid(
                 parseInt(auction.auctionId),

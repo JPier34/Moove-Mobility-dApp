@@ -130,7 +130,7 @@ export const useDutchAuction = () => {
             highestBid: ethers.formatEther(rawAuctionData[14]),
             startTime: Number(rawAuctionData[15]),
             endTime: Number(rawAuctionData[16]),
-            extensionThreshold: ethers.formatEther(rawAuctionData[17]),
+            extensionThreshold: Number(rawAuctionData[17]),
             extensionDuration: Number(rawAuctionData[18]),
             revealEndTime: Number(rawAuctionData[19]),
             highestBidder: rawAuctionData[20],

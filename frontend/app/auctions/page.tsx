@@ -395,6 +395,8 @@ export default function AuctionsPage() {
     currency: "ETH",
     attributes: {},
     isSettled: auction.isSettled,
+    extensionThresholdMinutes: auction.extensionThresholdMinutes,
+    extensionDurationMinutes: auction.extensionDurationMinutes,
   }));
 
   // Filter auctions - CORRECTED STATUS VALUES FROM CONTRACT

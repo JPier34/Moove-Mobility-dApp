@@ -46,6 +46,40 @@ export function useEnglishAuction(auctionId?: number) {
         return false;
       }
 
+      // Check if user is already the highest bidder
+      try {
+        const provider = new ethers.JsonRpcProvider(
+          process.env.NEXT_PUBLIC_RPC_URL || "https://1rpc.io/sepolia"
+        );
+        const auctionContract = new ethers.Contract(
+          contracts.MooveAuction.address,
+          contracts.MooveAuction.abi,
+          provider
+        );
+
+        const auctionData = await auctionContract.getAuction(auctionId);
+        const currentHighestBidder = auctionData.highestBidder;
+
+        console.log(`🔍 [English Auction] Highest bidder check:`, {
+          auctionId,
+          currentHighestBidder,
+          userAddress: address,
+          isAlreadyHighestBidder:
+            currentHighestBidder.toLowerCase() === address.toLowerCase(),
+        });
+
+        if (currentHighestBidder.toLowerCase() === address.toLowerCase()) {
+          const errorMsg =
+            "You are already the highest bidder. You cannot outbid yourself.";
+          console.log(`❌ [English Auction] Bid blocked: ${errorMsg}`);
+          setError(errorMsg);
+          return false;
+        }
+      } catch (error) {
+        console.warn("⚠️ Could not check highest bidder status:", error);
+        // Continue with bid if we can't check (fallback behavior)
+      }
+
       // Check if user has already bid recently (within 5 minutes)
       const existingBid = pendingBids.current.get(auctionId);
       if (existingBid && existingBid.bidder === address) {

@@ -238,6 +238,8 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
                 extensionDurationMinutes: auctionData.extensionDuration 
                   ? Math.floor(Number(auctionData.extensionDuration) / 60) 
                   : 10,
+                rawExtensionThreshold: rawAuctionData[17],
+                rawExtensionDuration: rawAuctionData[18],
               });
 
               // Check if auction data is valid

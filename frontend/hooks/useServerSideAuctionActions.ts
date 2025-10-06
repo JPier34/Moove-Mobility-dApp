@@ -155,8 +155,9 @@ export function useServerSideAuctionActions() {
 
         const results: AuctionActionResult[] = [];
 
-        // Step 2: End auction if ACTIVE and expired
+        // Step 2: End auction based on status and type
         if (status.status === 1 && status.isExpired) {
+          // English/Dutch/Reserve auctions in ACTIVE status
           console.log(`🔄 Ending ACTIVE auction ${auctionId}...`);
           const endResult = await endAuction(auctionId);
           results.push(endResult);
@@ -168,10 +169,14 @@ export function useServerSideAuctionActions() {
           status.auctionType === 2 &&
           status.isExpired
         ) {
-          // Sealed Bid in REVEAL phase - skip endAuction
+          // Sealed Bid auctions in REVEAL phase - CONTRACT BUG: endAuction requires ACTIVE
           console.log(
-            `🔄 Sealed Bid auction ${auctionId} in REVEAL phase, skipping endAuction...`
+            `⚠️ Sealed Bid auction ${auctionId} in REVEAL phase - CONTRACT BUG: endAuction requires ACTIVE status`
           );
+          console.log(
+            `🔄 Skipping endAuction for Sealed Bid - going directly to settleAuction`
+          );
+          // Skip endAuction due to contract bug, go directly to settleAuction
         } else {
           console.log(
             `⚠️ Auction ${auctionId} status ${status.status}, cannot end automatically`

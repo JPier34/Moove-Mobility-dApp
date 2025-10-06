@@ -288,13 +288,13 @@ export function useConsolidatedNotifications() {
         // 1. User is the winner
         // 2. Auction is not settled
         // 3. Auction is actually ended (time has passed)
-        // 4. Auction status is ENDED (3)
+        // 4. Auction status is ENDED (3) OR ACTIVE (1) - both are claimable when time expired
         if (
           winner &&
           winner.toLowerCase() === address.toLowerCase() &&
           !isSettled &&
           currentTime >= endTime &&
-          status === 3
+          (status === 3 || status === 1)
         ) {
           console.log(
             `✅ Creating claim_ready notification for auction ${auctionId}`
