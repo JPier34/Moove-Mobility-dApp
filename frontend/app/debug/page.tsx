@@ -7,6 +7,7 @@ import NFT114DetailedDebug from "@/components/debug/NFT114DetailedDebug";
 import RefundSystemTester from "@/components/debug/RefundSystemTester";
 import AdminCreationDebugger from "@/components/debug/AdminCreationDebugger";
 import Auction30Debugger from "@/components/debug/Auction30Debugger";
+import Auction31Debugger from "@/components/debug/Auction31Debugger";
 import RefundNotificationDebugger from "@/components/debug/RefundNotificationDebugger";
 import NotificationSystemTester from "@/components/debug/NotificationSystemTester";
 // Debug components removed
@@ -46,6 +47,11 @@ export default function DebugPage() {
         {/* Auction #30 Debugger */}
         <div className="mb-8">
           <Auction30Debugger />
+        </div>
+
+        {/* Auction #31 Debugger */}
+        <div className="mb-8">
+          <Auction31Debugger />
         </div>
 
         {/* Refund System Tester */}

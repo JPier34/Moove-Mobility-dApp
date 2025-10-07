@@ -18,7 +18,6 @@ import { NFTTransferNotificationsProvider } from "@/providers/NFTTransferNotific
 // import { useClaimReadyNotifications } from "@/hooks/useClaimReadyNotifications";
 // import { useBidRefundListener } from "@/hooks/useBidRefundListener";
 import ConsolidatedNotificationBadge from "@/components/notifications/ConsolidatedNotificationBadge";
-import EventBasedClaimPanel from "@/components/claim/EventBasedClaimPanel";
 import AutomaticRefundHandler from "@/components/refunds/AutomaticRefundHandler";
 // Removed custom wallet persistence - using Wagmi's built-in persistence
 import "@rainbow-me/rainbowkit/styles.css";
@@ -204,9 +203,6 @@ export default function SimplifiedAppProvider({
 
                 {/* Consolidated Notification Badge - Single system for all notifications */}
                 <ConsolidatedNotificationBadge />
-
-                {/* Event-Based Claim Panel - For claiming won auctions */}
-                <EventBasedClaimPanel />
 
                 {/* Automatic Refund Handler - Processes refunds when auctions are settled */}
                 <AutomaticRefundHandler />

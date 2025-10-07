@@ -36,21 +36,33 @@ export default function ConsolidatedNotificationBadge({
 
   const [isOpen, setIsOpen] = useState(false);
 
+  // ✅ FILTER: Remove duplicates from refund notifications
+  const uniqueRefundNotifications = refundNotifications.filter(
+    (refund, index, self) => index === self.findIndex((r) => r.id === refund.id)
+  );
+
   // Convert refund notifications to the format expected by the UI
-  const refundNotificationsFormatted = refundNotifications.map((refund) => ({
-    id: refund.id,
-    type: "refund",
-    message: refund.message,
-    timestamp: refund.timestamp,
-    isRead: refund.isRead,
-    auctionId: refund.auctionId,
-    amount: refund.amount,
-    transactionHash: refund.transactionHash,
-    priority: "medium" as const,
-  }));
+  const refundNotificationsFormatted = uniqueRefundNotifications.map(
+    (refund) => ({
+      id: refund.id,
+      type: "refund",
+      message: refund.message,
+      timestamp: refund.timestamp,
+      isRead: refund.isRead,
+      auctionId: refund.auctionId,
+      amount: refund.amount,
+      transactionHash: refund.transactionHash,
+      priority: "medium" as const,
+    })
+  );
+
+  // ✅ FILTER: Remove duplicates from claim notifications
+  const uniqueClaimNotifications = claimNotifications.filter(
+    (claim, index, self) => index === self.findIndex((c) => c.id === claim.id)
+  );
 
   // Convert claim notifications to the format expected by the UI
-  const claimNotificationsFormatted = claimNotifications.map((claim) => ({
+  const claimNotificationsFormatted = uniqueClaimNotifications.map((claim) => ({
     id: claim.id,
     type: "claim",
     message: claim.message,
@@ -62,11 +74,19 @@ export default function ConsolidatedNotificationBadge({
   }));
 
   // Combine all notifications and filter for current user
-  const notifications = [
+  const allNotifications = [
     ...refundNotificationsFormatted,
     ...claimNotificationsFormatted,
-  ].filter((notification) => {
-    // Additional safety check - ensure notifications are for current user
+  ];
+
+  // ✅ FILTER: Remove duplicates from combined notifications
+  const uniqueNotifications = allNotifications.filter(
+    (notification, index, self) =>
+      index === self.findIndex((n) => n.id === notification.id)
+  );
+
+  // Additional safety check - ensure notifications are for current user
+  const notifications = uniqueNotifications.filter((notification) => {
     // This should already be filtered in the provider, but adding extra safety
     return true; // For now, trust the provider filtering
   });
@@ -79,8 +99,114 @@ export default function ConsolidatedNotificationBadge({
   const handleNotificationClick = async (notification: any) => {
     if (notification.type === "refund") {
       markRefundAsRead(notification.id);
-      // Navigate to auctions page
-      window.location.href = "/auctions";
+
+      // Check if this is a Reserve Auction violation notification
+      if (notification.transactionHash === "reserve-violation") {
+        console.log(
+          `🔧 [Reserve Violation] Handling violation for auction ${notification.auctionId}`
+        );
+
+        try {
+          const { contracts } = await import("@/utils/contracts");
+          const { ethers } = await import("ethers");
+
+          const provider = new ethers.BrowserProvider(window.ethereum as any);
+          const signer = await provider.getSigner();
+          const auctionContract = new ethers.Contract(
+            contracts.MooveAuction.address,
+            contracts.MooveAuction.abi,
+            signer
+          );
+
+          // Get auction data to check if user is admin or seller
+          const auctionData = await auctionContract.getAuction(
+            notification.auctionId
+          );
+          const userAddress = await signer.getAddress();
+          const isAdmin =
+            userAddress.toLowerCase() ===
+            process.env.NEXT_PUBLIC_ADMIN_ADDRESS?.toLowerCase();
+          const isSeller =
+            auctionData.seller.toLowerCase() === userAddress.toLowerCase();
+
+          if (isAdmin || isSeller) {
+            console.log(
+              `🔧 [Reserve Violation] User is ${
+                isAdmin ? "admin" : "seller"
+              }, cancelling auction`
+            );
+
+            // Check auction status - can only cancel PENDING or ACTIVE auctions
+            const auctionStatus = Number(auctionData.status);
+            const canCancel = auctionStatus === 0 || auctionStatus === 1; // PENDING or ACTIVE
+
+            let cancelTx;
+            if (canCancel) {
+              // Cancel the auction (this refunds all bidders and returns NFT to seller)
+              cancelTx = await (auctionContract as any).cancelAuction(
+                notification.auctionId,
+                "Reserve price not met"
+              );
+            } else if (isAdmin) {
+              // For ENDED auctions, admin can use emergencyCancel
+              console.log(
+                `🔧 [Reserve Violation] Auction is ENDED, using emergencyCancel`
+              );
+              cancelTx = await (auctionContract as any).emergencyCancel(
+                notification.auctionId,
+                "Reserve price not met"
+              );
+            } else {
+              console.log(
+                `⚠️ [Reserve Violation] Cannot cancel ENDED auction as seller`
+              );
+              const { toast } = await import("react-hot-toast");
+              toast.error(
+                "Cannot cancel ENDED auction. Only admin can handle this."
+              );
+              return;
+            }
+            console.log(
+              `📝 [Reserve Violation] Cancel transaction sent: ${cancelTx.hash}`
+            );
+
+            const receipt = await cancelTx.wait();
+            console.log(
+              `✅ [Reserve Violation] Auction ${notification.auctionId} cancelled successfully`
+            );
+
+            const { toast } = await import("react-hot-toast");
+            toast.success(
+              `✅ Reserve Auction #${notification.auctionId} cancelled. All bidders refunded, NFT returned to seller.`
+            );
+
+            // Remove the notification after successful cancellation
+            removeRefundNotification(notification.id);
+          } else {
+            console.log(
+              `⚠️ [Reserve Violation] User is not admin or seller, cannot cancel auction`
+            );
+            const { toast } = await import("react-hot-toast");
+            toast.error(
+              "Only admin or seller can cancel Reserve Auction violations"
+            );
+          }
+        } catch (error) {
+          console.error(
+            `❌ [Reserve Violation] Error handling violation:`,
+            error
+          );
+          const { toast } = await import("react-hot-toast");
+          toast.error(
+            `Failed to cancel Reserve Auction: ${
+              error instanceof Error ? error.message : "Unknown error"
+            }`
+          );
+        }
+      } else {
+        // Normal refund notification - navigate to auctions page
+        window.location.href = "/auctions";
+      }
     } else if (notification.type === "claim") {
       markClaimAsRead(notification.id);
 
@@ -90,7 +216,7 @@ export default function ConsolidatedNotificationBadge({
           `🏆 [Claim] Starting claim process for auction ${notification.auctionId}`
         );
 
-        // Call endAuction directly
+        // First, verify the auction is actually expired and claimable
         const { contracts } = await import("@/utils/contracts");
         const { ethers } = await import("ethers");
 
@@ -101,6 +227,54 @@ export default function ConsolidatedNotificationBadge({
           contracts.MooveAuction.abi,
           signer
         );
+
+        // Check auction status and end time
+        const auctionData = await auctionContract.getAuction(notification.auctionId);
+        const currentTime = Math.floor(Date.now() / 1000);
+        const endTime = Number(auctionData.endTime);
+        const status = Number(auctionData.status);
+        const auctionType = Number(auctionData.auctionType);
+        const highestBid = Number(ethers.formatEther(auctionData.highestBid));
+        const reservePrice = Number(ethers.formatEther(auctionData.reservePrice));
+        const highestBidder = auctionData.highestBidder;
+
+        console.log(`🔍 [Claim] Auction ${notification.auctionId} status check:`, {
+          status,
+          endTime,
+          currentTime,
+          isExpired: currentTime > endTime,
+          isActive: status === 1,
+          isEnded: status === 3,
+          auctionType,
+          highestBid,
+          reservePrice,
+          highestBidder,
+          isReserveAuction: auctionType === 3,
+          isBelowReserve: auctionType === 3 && highestBid < reservePrice,
+        });
+
+        // Only allow claim if auction is expired OR already ended
+        if (status !== 1 && status !== 3) {
+          toast.error(`Auction ${notification.auctionId} is not in a claimable state (status: ${status})`);
+          return;
+        }
+
+        if (status === 1 && currentTime <= endTime) {
+          toast.error(`Auction ${notification.auctionId} is still active and not expired yet`);
+          return;
+        }
+
+        // CRITICAL: Check Reserve Auction violation
+        if (auctionType === 3 && highestBid < reservePrice) {
+          toast.error(
+            `🚨 Reserve Auction Violation! Your bid (${highestBid} ETH) is below the reserve price (${reservePrice} ETH). This auction should be cancelled.`
+          );
+          return;
+        }
+
+        console.log(`✅ [Claim] Auction ${notification.auctionId} is claimable, proceeding...`);
+
+        // Call endAuction directly
 
         console.log(
           `🔄 [Claim] Step 1: Calling endAuction for auction ${notification.auctionId}`
@@ -286,7 +460,7 @@ export default function ConsolidatedNotificationBadge({
                           notification.transactionHash !==
                             "expired-auction" && (
                             <a
-                              href={`https://sepolia.etherscan.io/tx/${notification.transactionHash}`}
+                              href={`https://sepolia.etherscan.io/tx/${notification.transactionHash}#internal`}
                               target="_blank"
                               rel="noopener noreferrer"
                               onClick={(e) => e.stopPropagation()}

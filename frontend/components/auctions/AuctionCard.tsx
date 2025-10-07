@@ -57,17 +57,16 @@ export default function AuctionCard({
   onClick,
   showEndedState = false,
 }: AuctionCardProps) {
-  // Special debug for auction #12 (NFT #47)
-  if (auction.auctionId === "12") {
-    console.log("🔍 [AUCTION CARD DEBUG] Auction #12 (NFT #47) data:", {
+  // Special debug for auction #31 (Reserve Auction issue)
+  if (auction.auctionId === "31") {
+    console.log("🔍 [AUCTION CARD DEBUG] Auction #31 (Reserve Auction) data:", {
       auctionId: auction.auctionId,
-      nftId: auction.nftId,
-      nftName: auction.nftName,
-      nftImage: auction.nftImage,
-      nftCategory: auction.nftCategory,
-      isDefaultName: auction.nftName === `NFT #${auction.nftId}`,
-      isDefaultImage: auction.nftImage === "/images/default-nft.png",
-      hasImage: !!auction.nftImage,
+      auctionType: auction.auctionType,
+      auctionTypeNumber: Number(auction.auctionType),
+      auctionTypeString: typeof auction.auctionType,
+      reservePrice: auction.reservePrice,
+      startPrice: auction.startPrice,
+      bidIncrement: auction.bidIncrement,
     });
   }
 
@@ -81,20 +80,25 @@ export default function AuctionCard({
   // DISABLED: Automatic refresh system to prevent infinite loops
   // The auction data will be updated only when explicitly triggered by user actions
   // (like placing a bid, claiming, etc.)
-  
+
   // Listen for manual refresh events
   useEffect(() => {
     const handleManualRefresh = () => {
-      const updatedAuction = auctions.find((a) => a.auctionId === auction.auctionId);
+      const updatedAuction = auctions.find(
+        (a) => a.auctionId === auction.auctionId
+      );
       if (updatedAuction) {
-        console.log(`🔄 [AuctionCard ${auction.auctionId}] Manual refresh triggered`);
+        console.log(
+          `🔄 [AuctionCard ${auction.auctionId}] Manual refresh triggered`
+        );
         setLocalAuction(updatedAuction);
       }
     };
 
     // Listen for custom refresh events
-    window.addEventListener('auction-refresh', handleManualRefresh);
-    return () => window.removeEventListener('auction-refresh', handleManualRefresh);
+    window.addEventListener("auction-refresh", handleManualRefresh);
+    return () =>
+      window.removeEventListener("auction-refresh", handleManualRefresh);
   }, [auctions, auction.auctionId]);
 
   // Use the unified Dutch price hook with local auction
@@ -268,6 +272,17 @@ export default function AuctionCard({
   const timeStatus = getTimeStatus();
   const typeInfo = auctionTypeInfo[localAuction.auctionType];
 
+  // Debug typeInfo for auction #31
+  if (auction.auctionId === "31") {
+    console.log("🔍 [AUCTION CARD DEBUG] Auction #31 typeInfo:", {
+      auctionType: localAuction.auctionType,
+      typeInfo: typeInfo,
+      typeInfoExists: !!typeInfo,
+      typeInfoEmoji: typeInfo?.emoji,
+      typeInfoName: typeInfo?.name,
+    });
+  }
+
   return (
     <div
       className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg hover:border-moove-primary/30 transition-all duration-300 cursor-pointer group"
@@ -394,7 +409,13 @@ export default function AuctionCard({
           ) : auction.auctionType === AuctionType.ENGLISH ? (
             <div>
               <div className="text-xs text-gray-500">
-                {auction.currentBid === "0" ? "Starting Price" : "Current Bid"}
+                {auction.currentBid === "0"
+                  ? "Starting Price"
+                  : auction.highestBidder &&
+                    auction.highestBidder.toLowerCase() ===
+                      address?.toLowerCase()
+                  ? "Your Bid"
+                  : "Current Bid"}
               </div>
               <div className="text-xl font-bold text-gray-900">
                 {auction.currentBid === "0"
@@ -431,7 +452,13 @@ export default function AuctionCard({
             /* Reserve auction */
             <div>
               <div className="text-xs text-gray-500">
-                {auction.currentBid === "0" ? "Starting Price" : "Current Bid"}
+                {auction.currentBid === "0"
+                  ? "Starting Price"
+                  : auction.highestBidder &&
+                    auction.highestBidder.toLowerCase() ===
+                      address?.toLowerCase()
+                  ? "Your Bid"
+                  : "Current Bid"}
               </div>
               <div className="text-xl font-bold text-gray-900">
                 {auction.currentBid === "0"

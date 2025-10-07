@@ -53,7 +53,7 @@ export default function EventBasedClaimPanel() {
   if (loading) {
     return (
       <div className="fixed top-20 right-4 z-50">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-3">
+        <div className="rounded-lg p-3">
           <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
         </div>
       </div>

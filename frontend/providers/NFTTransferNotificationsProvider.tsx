@@ -606,6 +606,11 @@ export function NFTTransferNotificationsProvider({
           provider
         );
 
+        // ✅ RATE LIMITING: Add delay before getBlockNumber
+        const delay = (ms: number) =>
+          new Promise((resolve) => setTimeout(resolve, ms));
+        await delay(500); // Wait 500ms before making RPC calls
+
         // Get current block number
         const currentBlock = await provider.getBlockNumber();
 
@@ -711,8 +716,8 @@ export function NFTTransferNotificationsProvider({
     // Initial check
     checkForNewTransfers();
 
-    // Set up periodic checking every 30 seconds
-    intervalId = setInterval(checkForNewTransfers, 30000);
+    // ✅ EMERGENCY: Disable automatic monitoring to prevent circuit breaker
+    // intervalId = setInterval(checkForNewTransfers, 300000); // 5 minutes
 
     return () => {
       if (intervalId) {

@@ -198,6 +198,11 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
           provider
         );
 
+        // ✅ RATE LIMITING: Add delay before totalAuctions call
+        const delay = (ms: number) =>
+          new Promise((resolve) => setTimeout(resolve, ms));
+        await delay(300); // Wait 300ms before making RPC calls
+
         // Get total auction count from auction contract
         const totalAuctions = await auctionContract.totalAuctions();
         const totalCount = Number(totalAuctions);
@@ -227,16 +232,19 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
             try {
               const rawAuctionData = await auctionContract.getAuction(i);
               const auctionData = parseAuctionData(rawAuctionData);
-              
+
+              // ✅ RATE LIMITING: Add delay between getAuction calls
+              await delay(100);
+
               // Log extension data for debugging
               console.log(`🔍 [Auction ${i}] Extension data:`, {
                 extensionThreshold: auctionData.extensionThreshold,
                 extensionDuration: auctionData.extensionDuration,
-                extensionThresholdMinutes: auctionData.extensionThreshold 
-                  ? Math.floor(Number(auctionData.extensionThreshold) / 60) 
+                extensionThresholdMinutes: auctionData.extensionThreshold
+                  ? Math.floor(Number(auctionData.extensionThreshold) / 60)
                   : 5,
-                extensionDurationMinutes: auctionData.extensionDuration 
-                  ? Math.floor(Number(auctionData.extensionDuration) / 60) 
+                extensionDurationMinutes: auctionData.extensionDuration
+                  ? Math.floor(Number(auctionData.extensionDuration) / 60)
                   : 10,
                 rawExtensionThreshold: rawAuctionData[17],
                 rawExtensionDuration: rawAuctionData[18],
@@ -545,6 +553,8 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
               auctionsToFetch.push(auction);
             } catch (err) {
               console.warn(`⚠️ Failed to fetch auction ${i}:`, err);
+              // ✅ RATE LIMITING: Add delay even on error
+              await delay(50);
             }
           }
         } else {
@@ -557,6 +567,9 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
             try {
               const rawAuctionData = await auctionContract.getAuction(i);
               const auctionData = parseAuctionData(rawAuctionData);
+
+              // ✅ RATE LIMITING: Add delay between getAuction calls
+              await delay(100);
 
               // Check if auction data is valid
               if (!auctionData || auctionData.tokenId === undefined) {
@@ -833,6 +846,8 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
               auctionsToFetch.push(auction);
             } catch (err) {
               console.warn(`⚠️ Failed to fetch auction ${i}:`, err);
+              // ✅ RATE LIMITING: Add delay even on error
+              await delay(50);
             }
           }
         }

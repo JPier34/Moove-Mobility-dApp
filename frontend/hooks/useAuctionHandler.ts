@@ -50,7 +50,7 @@ export function useAuctionHandler(): AuctionHandler {
       );
 
       try {
-        switch (auction.auctionType) {
+        switch (Number(auction.auctionType)) {
           case AuctionType.ENGLISH:
             if (action === "bid" && amount) {
               const endTimeUnix = Math.floor(auction.endTime.getTime() / 1000);

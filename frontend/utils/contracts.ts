@@ -19,11 +19,12 @@ export const AUCTION_TYPES = {
 
 // Auction Status
 export const AUCTION_STATUS = {
-  ACTIVE: 0,
-  REVEAL: 1,
-  ENDED: 2,
-  SETTLED: 3,
-  CANCELLED: 4,
+  PENDING: 0, // Created but not started
+  ACTIVE: 1, // Currently accepting bids
+  REVEAL: 2, // Sealed bid reveal phase
+  ENDED: 3, // Finished, awaiting settlement
+  SETTLED: 4, // Completed and settled
+  CANCELLED: 5, // Cancelled by seller or admin
 } as const;
 
 // Vehicle Types

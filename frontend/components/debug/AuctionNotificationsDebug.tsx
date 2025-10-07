@@ -2,7 +2,6 @@
 
 import React from "react";
 import { useAuctionNotifications } from "@/providers/AuctionNotificationsProvider";
-import { useWonAuctions } from "@/hooks/useWonAuctions";
 
 interface AuctionNotificationsDebugProps {
   className?: string;
@@ -23,7 +22,8 @@ export default function AuctionNotificationsDebug({
     clearAllNotifications,
   } = useAuctionNotifications();
 
-  const { unsettledAuctions, isLoading } = useWonAuctions();
+  // ✅ FIX: Remove useWonAuctions call that was causing setState during render
+  // const { unsettledAuctions, isLoading } = useWonAuctions();
 
   // Solo in development
   if (process.env.NODE_ENV !== "development") {
@@ -46,8 +46,6 @@ export default function AuctionNotificationsDebug({
         <div>• Has Unsettled: {hasUnsettledAuctions ? "✅" : "❌"}</div>
         <div>• Unsettled Count: {unsettledCount}</div>
         <div>• Show Notifications: {showNotifications ? "✅" : "❌"}</div>
-        <div>• Loading: {isLoading ? "⏳" : "✅"}</div>
-        <div>• Raw Unsettled: {unsettledAuctions.length}</div>
         <div>• Refund Notifications: {refundNotifications.length}</div>
         <div>• Claim Notifications: {claimNotifications.length}</div>
       </div>
@@ -78,17 +76,6 @@ export default function AuctionNotificationsDebug({
           Clear All
         </button>
       </div>
-
-      {unsettledAuctions.length > 0 && (
-        <div className="mt-2 pt-2 border-t border-white/20">
-          <div className="font-semibold">Unsettled Auctions:</div>
-          {unsettledAuctions.map((auction) => (
-            <div key={auction.auctionId} className="text-xs">
-              • Auction #{auction.auctionId} - Status: {auction.status}
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

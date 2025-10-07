@@ -154,6 +154,33 @@ export const AuctionNotificationsProvider: React.FC<{
     Set<string>
   >(new Set());
 
+  // ✅ Auto-save notifications to localStorage when they change
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem(
+          "moove-refund-notifications",
+          JSON.stringify(refundNotifications)
+        );
+      } catch (error) {
+        console.warn("Failed to save refund notifications:", error);
+      }
+    }
+  }, [refundNotifications]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem(
+          "moove-claim-notifications",
+          JSON.stringify(claimNotifications)
+        );
+      } catch (error) {
+        console.warn("Failed to save claim notifications:", error);
+      }
+    }
+  }, [claimNotifications]);
+
   // Refund notification functions
   const markRefundAsRead = (notificationId: string) => {
     setRefundNotifications((prev) =>
@@ -556,6 +583,52 @@ export const AuctionNotificationsProvider: React.FC<{
               continue;
             }
 
+            // ✅ FILTER: Only process auctions from #30 onwards
+            if (Number(auctionId) < 30) {
+              console.log(
+                `⏭️ [Claim] Skipping old auction ${auctionId} (only processing #30+)`
+              );
+              continue;
+            }
+
+            // ✅ CHECK: Verify auction is actually claimable by checking contract status
+            try {
+              const auctionData = await auctionContract.getAuction(auctionId);
+              const status = Number(auctionData.status);
+
+              // Skip if auction is already settled (status 4)
+              if (status === 4) {
+                console.log(
+                  `⏭️ [Claim] Skipping already settled auction ${auctionId} (status: ${status})`
+                );
+                continue;
+              }
+
+              // Skip if auction is cancelled (status 5)
+              if (status === 5) {
+                console.log(
+                  `⏭️ [Claim] Skipping cancelled auction ${auctionId} (status: ${status})`
+                );
+                continue;
+              }
+            } catch (error) {
+              console.warn(
+                `⚠️ [Claim] Could not verify auction ${auctionId} status:`,
+                error
+              );
+              continue;
+            }
+
+            // ✅ FILTER: Only process recent auctions (last 7 days)
+            const sevenDaysAgo =
+              Math.floor(Date.now() / 1000) - 7 * 24 * 60 * 60;
+            if (endTime < sevenDaysAgo) {
+              console.log(
+                `⏭️ [Claim] Skipping old auction ${auctionId} (older than 7 days)`
+              );
+              continue;
+            }
+
             // Check if auction is ACTIVE but expired and user is winner
             if (
               status === 1 &&
@@ -596,18 +669,45 @@ export const AuctionNotificationsProvider: React.FC<{
       }
 
       const allClaimableAuctions = [...allUserEvents, ...expiredWinnerAuctions];
-      console.log(
-        `👤 [Claim] Total claimable auctions: ${allClaimableAuctions.length} (${allUserEvents.length} from events + ${expiredWinnerAuctions.length} expired)`
+
+      // ✅ FILTER: Remove duplicates based on auctionId
+      const uniqueClaimableAuctions = allClaimableAuctions.filter(
+        (auction, index, self) => {
+          const auctionId =
+            "auctionId" in auction
+              ? auction.auctionId
+              : (auction as any).args?.auctionId?.toString();
+          return (
+            index ===
+            self.findIndex((a) => {
+              const aAuctionId =
+                "auctionId" in a
+                  ? a.auctionId
+                  : (a as any).args?.auctionId?.toString();
+              return aAuctionId === auctionId;
+            })
+          );
+        }
       );
 
-      if (allClaimableAuctions.length > 0) {
+      console.log(
+        `👤 [Claim] Total claimable auctions: ${
+          uniqueClaimableAuctions.length
+        } (${allUserEvents.length} from events + ${
+          expiredWinnerAuctions.length
+        } expired, ${
+          allClaimableAuctions.length - uniqueClaimableAuctions.length
+        } duplicates removed)`
+      );
+
+      if (uniqueClaimableAuctions.length > 0) {
         console.log(
-          `👤 [Claim] Processing ${allClaimableAuctions.length} claim events for current user`
+          `👤 [Claim] Processing ${uniqueClaimableAuctions.length} claim events for current user`
         );
 
         const newNotifications: ClaimNotification[] = [];
 
-        for (const auction of allClaimableAuctions) {
+        for (const auction of uniqueClaimableAuctions) {
           let auctionId: string;
 
           // Handle different auction object types

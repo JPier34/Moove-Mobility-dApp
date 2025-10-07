@@ -150,7 +150,10 @@ export default function AuctionModal({
   // Check sealed bid status when auction changes
   useEffect(() => {
     const checkSealedBidStatus = async () => {
-      if (localAuction.auctionType === AuctionType.SEALED_BID && address) {
+      if (
+        Number(localAuction.auctionType) === AuctionType.SEALED_BID &&
+        address
+      ) {
         try {
           // Check if user has already submitted a sealed bid
           const bidData = localStorage.getItem(
@@ -217,7 +220,7 @@ export default function AuctionModal({
         // Add auto-extend indicator for English auctions in extension zone
         if (
           isExtensionZone &&
-          localAuction.auctionType === AuctionType.ENGLISH
+          Number(localAuction.auctionType) === AuctionType.ENGLISH
         ) {
           timeString += ` ⏰ +${
             localAuction.extensionDurationMinutes || 10
@@ -771,20 +774,30 @@ export default function AuctionModal({
               {/* Current price */}
               <div className="bg-gradient-to-r from-moove-50 to-moove-100 rounded-lg p-6">
                 <div className="text-sm text-gray-600 mb-2">
-                  {localAuction.auctionType === AuctionType.DUTCH
+                  {Number(localAuction.auctionType) === AuctionType.DUTCH
                     ? "Current Price"
-                    : localAuction.auctionType === AuctionType.SEALED_BID &&
+                    : Number(localAuction.auctionType) ===
+                        AuctionType.SEALED_BID &&
                       Number(localAuction.status) === AuctionStatus.PENDING
                     ? "Hidden Bids"
                     : localAuction.currentBid === "0"
                     ? "Starting Price"
+                    : (Number(localAuction.auctionType) ===
+                        AuctionType.RESERVE ||
+                        Number(localAuction.auctionType) ===
+                          AuctionType.ENGLISH) &&
+                      localAuction.highestBidder &&
+                      localAuction.highestBidder.toLowerCase() ===
+                        address?.toLowerCase()
+                    ? "Your Bid"
                     : "Current Bid"}
                 </div>
                 <div className="flex items-baseline space-x-2">
                   <span className="text-4xl font-bold text-gray-900">
-                    {localAuction.auctionType === AuctionType.DUTCH
+                    {Number(localAuction.auctionType) === AuctionType.DUTCH
                       ? currentDutchPrice
-                      : localAuction.auctionType === AuctionType.SEALED_BID &&
+                      : Number(localAuction.auctionType) ===
+                          AuctionType.SEALED_BID &&
                         Number(localAuction.status) === AuctionStatus.PENDING
                       ? "???"
                       : localAuction.currentBid === "0"
@@ -815,7 +828,7 @@ export default function AuctionModal({
               {!isOwner &&
                 Number(localAuction.status) === AuctionStatus.ACTIVE && (
                   <div className="space-y-4">
-                    {localAuction.auctionType === AuctionType.DUTCH && (
+                    {Number(localAuction.auctionType) === AuctionType.DUTCH && (
                       <Button
                         onClick={handleDutchBuy}
                         disabled={
@@ -837,7 +850,8 @@ export default function AuctionModal({
                       </Button>
                     )}
 
-                    {localAuction.auctionType === AuctionType.SEALED_BID &&
+                    {Number(localAuction.auctionType) ===
+                      AuctionType.SEALED_BID &&
                       (localAuction.status as AuctionStatus) ===
                         AuctionStatus.ACTIVE && (
                         <div className="space-y-4">
@@ -922,7 +936,8 @@ export default function AuctionModal({
                         </div>
                       )}
 
-                    {localAuction.auctionType === AuctionType.SEALED_BID &&
+                    {Number(localAuction.auctionType) ===
+                      AuctionType.SEALED_BID &&
                       (localAuction.status as AuctionStatus) ===
                         AuctionStatus.REVEAL && (
                         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
@@ -943,8 +958,10 @@ export default function AuctionModal({
                         </div>
                       )}
 
-                    {(localAuction.auctionType === AuctionType.RESERVE ||
-                      localAuction.auctionType === AuctionType.ENGLISH) && (
+                    {(Number(localAuction.auctionType) ===
+                      AuctionType.RESERVE ||
+                      Number(localAuction.auctionType) ===
+                        AuctionType.ENGLISH) && (
                       <div className="space-y-4">
                         {/* Quick bid buttons */}
                         <div>
@@ -1157,11 +1174,11 @@ export default function AuctionModal({
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Auction Type</span>
                   <span className="font-medium text-gray-700">
-                    {localAuction.auctionType === AuctionType.RESERVE
+                    {Number(localAuction.auctionType) === AuctionType.RESERVE
                       ? "🏛️ Traditional"
-                      : localAuction.auctionType === AuctionType.ENGLISH
+                      : Number(localAuction.auctionType) === AuctionType.ENGLISH
                       ? "⬆️ English"
-                      : localAuction.auctionType === AuctionType.DUTCH
+                      : Number(localAuction.auctionType) === AuctionType.DUTCH
                       ? "⬇️ Dutch"
                       : "🔒 Sealed Bid"}
                   </span>
@@ -1173,7 +1190,7 @@ export default function AuctionModal({
                   </span>
                 </div>
                 {/* Only show reserve price for Reserve auctions */}
-                {localAuction.auctionType === AuctionType.RESERVE && (
+                {Number(localAuction.auctionType) === AuctionType.RESERVE && (
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-500">Reserve Price</span>
                     <span className="font-medium text-gray-700">
