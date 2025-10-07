@@ -16,6 +16,11 @@ export default function AuctionNotificationsDebug({
     unsettledCount,
     showNotifications,
     setShowNotifications,
+    refundNotifications,
+    claimNotifications,
+    resetRefundBlock,
+    resetClaimBlock,
+    clearAllNotifications,
   } = useAuctionNotifications();
 
   const { unsettledAuctions, isLoading } = useWonAuctions();
@@ -43,14 +48,34 @@ export default function AuctionNotificationsDebug({
         <div>• Show Notifications: {showNotifications ? "✅" : "❌"}</div>
         <div>• Loading: {isLoading ? "⏳" : "✅"}</div>
         <div>• Raw Unsettled: {unsettledAuctions.length}</div>
+        <div>• Refund Notifications: {refundNotifications.length}</div>
+        <div>• Claim Notifications: {claimNotifications.length}</div>
       </div>
 
       <div className="mt-2 pt-2 border-t border-white/20">
         <button
           onClick={() => setShowNotifications(!showNotifications)}
-          className="bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded text-xs"
+          className="bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded text-xs mr-1"
         >
           Toggle Notifications
+        </button>
+        <button
+          onClick={resetRefundBlock}
+          className="bg-orange-600 hover:bg-orange-700 px-2 py-1 rounded text-xs mr-1"
+        >
+          Reset Refund Block
+        </button>
+        <button
+          onClick={resetClaimBlock}
+          className="bg-green-600 hover:bg-green-700 px-2 py-1 rounded text-xs mr-1"
+        >
+          Reset Claim Block
+        </button>
+        <button
+          onClick={clearAllNotifications}
+          className="bg-red-600 hover:bg-red-700 px-2 py-1 rounded text-xs"
+        >
+          Clear All
         </button>
       </div>
 
@@ -67,20 +92,3 @@ export default function AuctionNotificationsDebug({
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

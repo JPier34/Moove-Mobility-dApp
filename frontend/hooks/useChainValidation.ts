@@ -2,8 +2,8 @@
 
 import { useAccount, useChainId, useSwitchChain } from "wagmi";
 import { sepolia } from "wagmi/chains";
-import { useEffect, useState } from "react";
-import { useConsolidatedNotifications } from "@/hooks/useConsolidatedNotifications";
+import { useEffect, useState, useContext } from "react";
+import { AuctionNotificationsContext } from "@/providers/AuctionNotificationsProvider";
 
 interface ChainValidationResult {
   isValidChain: boolean;
@@ -22,7 +22,9 @@ export const useChainValidation = (): ChainValidationResult => {
     error: switchError,
   } = useSwitchChain();
   const { isConnected, chain } = useAccount();
-  const { notifications } = useConsolidatedNotifications();
+
+  const context = useContext(AuctionNotificationsContext);
+  const notifications = context?.refundNotifications || [];
 
   const [error, setError] = useState<string | null>(null);
   const [hasNotifiedWrongChain, setHasNotifiedWrongChain] = useState(false);

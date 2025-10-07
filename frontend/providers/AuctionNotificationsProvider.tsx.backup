@@ -1,0 +1,1092 @@
+"use client";
+
+import React, { createContext, useContext, useEffect, useState } from "react";
+import { useWonAuctionsManager } from "@/hooks/useWonAuctionsManager";
+import CongratulationsModal from "@/components/collection/CongratulationsModal";
+import ConsolidatedNotificationBadge from "@/components/notifications/ConsolidatedNotificationBadge";
+import AuctionNotificationsDebug from "@/components/debug/AuctionNotificationsDebug";
+import AuctionConfirmationModal from "@/components/notifications/AuctionConfirmationModal";
+import AuctionResultModal from "@/components/notifications/AuctionResultModal";
+import { useSealedBidAutoMonitor } from "@/hooks/useSealedBidStatusManager";
+import { useAccount } from "wagmi";
+import { ethers } from "ethers";
+import toast from "react-hot-toast";
+import { WonAuction } from "@/types/user";
+import { Auction } from "@/types/auction";
+import { contracts } from "@/utils/contracts";
+
+// ============= CONTEXT =============
+
+interface TransactionResult {
+  success: boolean;
+  hash?: string;
+  error?: string;
+}
+
+interface RefundNotification {
+  id: string;
+  auctionId: string;
+  amount: string;
+  transactionHash: string;
+  timestamp: number;
+  isRead: boolean;
+  message: string;
+}
+
+
+interface AuctionNotificationsContextType {
+  hasUnsettledAuctions: boolean;
+  unsettledCount: number;
+  showNotifications: boolean;
+  setShowNotifications: (show: boolean) => void;
+  currentAuction: WonAuction | null;
+  unsettledAuctions: WonAuction[];
+  isSettling: boolean;
+  transactionHash: string | null;
+  isWaitingForConfirmation: boolean;
+  handleSettleAuction: (auctionId: string, auction: WonAuction) => void;
+  // New 3-phase system states
+  showConfirmationModal: boolean;
+  showResultModal: boolean;
+  selectedAuction: WonAuction | null;
+  transactionResult: TransactionResult | null;
+  // Sealed bid monitoring
+  addToSealedBidMonitoring: (auctionId: number) => void;
+  removeFromSealedBidMonitoring: (auctionId: number) => void;
+  monitoredSealedBidAuctions: number[];
+  isMonitoringSealedBids: boolean;
+  sealedBidError: string | null;
+  // Refund notifications
+  refundNotifications: RefundNotification[];
+  markRefundAsRead: (notificationId: string) => void;
+  clearAllRefundNotifications: () => void;
+  // Debug functions
+  resetRefundBlock: () => void;
+}
+
+const AuctionNotificationsContext =
+  createContext<AuctionNotificationsContextType | null>(null);
+
+// Export the context for use in other components
+export { AuctionNotificationsContext };
+
+// ============= PROVIDER =============
+
+interface AuctionNotificationsProviderProps {
+  children: React.ReactNode;
+}
+
+export function AuctionNotificationsProvider({
+  children,
+}: AuctionNotificationsProviderProps) {
+  const { address, isConnected } = useAccount();
+
+  // ID unique to track the provider instances
+  const providerId = React.useMemo(
+    () => Math.random().toString(36).substr(2, 9),
+    []
+  );
+
+  // Convert Auction[] to WonAuction[]
+  const convertToWonAuctions = (auctions: Auction[]): WonAuction[] => {
+    return auctions.map((auction) => ({
+      auctionId: auction.auctionId,
+      nftId: auction.nftId?.toString() || "0",
+      name: `NFT #${auction.nftId || "0"}`,
+      image: "/images/default-nft.svg",
+      category: "VEHICLE_DECORATION",
+      status: auction.status,
+      hasImage: true,
+      hasName: true,
+      finalBid: parseFloat(auction.currentBid),
+      bidders: 1,
+      isSettled: auction.isSettled || false,
+      endTime: auction.endTime ? auction.endTime.getTime() : undefined,
+      transactionHash: undefined,
+    }));
+  };
+
+  // Use original simple modal management (no complex event system)
+  const {
+    unsettledAuctions,
+    currentAuction,
+    showCongratulations,
+    handleSettleAuction: originalSettleAuction,
+    handleCloseCongratulationsModal,
+    isSettling,
+  } = useWonAuctionsManager();
+
+  const wonAuctions = convertToWonAuctions(unsettledAuctions);
+
+  // Sealed bid auto-monitoring
+  const {
+    addToMonitoring,
+    removeFromMonitoring,
+    monitoredAuctions,
+    isProcessing: isMonitoringSealedBids,
+    error: sealedBidError,
+  } = useSealedBidAutoMonitor();
+
+  // Simple transaction tracking
+  const [transactionHash, setTransactionHash] = useState<string | null>(null);
+  const [isWaitingForConfirmation, setIsWaitingForConfirmation] =
+    useState(false);
+
+  // New 3-phase system states
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+  const [showResultModal, setShowResultModal] = useState(false);
+  const [selectedAuction, setSelectedAuction] = useState<WonAuction | null>(
+    null
+  );
+  const [transactionResult, setTransactionResult] =
+    useState<TransactionResult | null>(null);
+
+  // Stato per controllare se mostrare le notifiche
+  const [showNotifications, setShowNotifications] = useState(true);
+
+  // Stato per tracciare se l'utente ha già visto le notifiche
+  const [hasSeenNotifications, setHasSeenNotifications] = useState(false);
+
+  // Refund notifications state
+  const [refundNotifications, setRefundNotifications] = useState<
+    RefundNotification[]
+  >([]);
+  const [lastCheckedBlock, setLastCheckedBlock] = useState<number>(0);
+
+  // Refund notification functions
+  const markRefundAsRead = (notificationId: string) => {
+    setRefundNotifications((prev) =>
+      prev.map((n) => (n.id === notificationId ? { ...n, isRead: true } : n))
+    );
+  };
+
+  const clearAllRefundNotifications = () => {
+    setRefundNotifications([]);
+  };
+
+  // Reset functions for debugging
+  const resetRefundBlock = () => {
+    console.log(`🔄 [Refund] Manually resetting lastCheckedBlock to 0`);
+    setLastCheckedBlock(0);
+  };
+
+  // Save/load refund notifications from localStorage
+  const saveRefundNotifications = (notifications: RefundNotification[]) => {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.setItem(
+        "moove-refund-notifications",
+        JSON.stringify(notifications)
+      );
+    } catch (error) {
+      console.warn("Failed to save refund notifications:", error);
+    }
+  };
+
+  const loadRefundNotifications = (): RefundNotification[] => {
+    if (typeof window === "undefined") return [];
+    try {
+      const stored = localStorage.getItem("moove-refund-notifications");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        return Array.isArray(parsed) ? parsed : [];
+      }
+    } catch (error) {
+      console.warn("Failed to load refund notifications:", error);
+    }
+    return [];
+  };
+
+  // Fetch refund events from blockchain
+  const fetchRefundEvents = async () => {
+    if (!address || !isConnected) {
+      console.log(
+        `🔍 [Refund] Skipping fetch - not connected (address: ${address}, connected: ${isConnected})`
+      );
+      return;
+    }
+
+    console.log(`🔍 [Refund] Starting fetch for user ${address}`);
+
+    try {
+      const provider = new ethers.JsonRpcProvider(
+        process.env.NEXT_PUBLIC_RPC_URL || "https://1rpc.io/sepolia"
+      );
+      const auctionContract = new ethers.Contract(
+        contracts.MooveAuction.address,
+        contracts.MooveAuction.abi,
+        provider
+      );
+
+      // Get current block
+      const currentBlock = await provider.getBlockNumber();
+      const fromBlock = Math.max(lastCheckedBlock, currentBlock - 10000); // Last 10000 blocks max
+
+      console.log(
+        `🔍 [Refund] Block range: ${fromBlock} → ${currentBlock} (lastChecked: ${lastCheckedBlock})`
+      );
+
+      if (fromBlock >= currentBlock) {
+        console.log(
+          `⏭️ [Refund] No new blocks to check (fromBlock: ${fromBlock}, currentBlock: ${currentBlock})`
+        );
+        return;
+      }
+
+      console.log(
+        `🔍 [Refund] Fetching refund events from block ${fromBlock} to ${currentBlock}`
+      );
+
+      // Fetch BidRefunded events
+      const refundEvents = await auctionContract.queryFilter(
+        auctionContract.filters.BidRefunded(),
+        fromBlock,
+        currentBlock
+      );
+
+      console.log(
+        `📊 [Refund] Found ${refundEvents.length} BidRefunded events`
+      );
+
+      // Process events for current user
+      const userRefundEvents = refundEvents.filter(
+        (event) =>
+          (event as any).args.bidder.toLowerCase() === address.toLowerCase()
+      );
+
+      console.log(
+        `👤 [Refund] Found ${userRefundEvents.length} refund events for current user ${address}`
+      );
+
+      if (userRefundEvents.length > 0) {
+        console.log(
+          `👤 [Refund] Processing ${userRefundEvents.length} refund events for current user`
+        );
+
+        const newNotifications: RefundNotification[] = [];
+
+        for (const event of userRefundEvents) {
+          const { auctionId, bidder, amount } = (event as any).args;
+
+          console.log(
+            `💰 [Refund] Processing refund: auction ${auctionId}, bidder ${bidder}, amount ${ethers.formatEther(
+              amount
+            )} ETH`
+          );
+
+          const notification: RefundNotification = {
+            id: `${auctionId}-refund-${event.blockNumber}`,
+            auctionId: auctionId.toString(),
+            amount: ethers.formatEther(amount),
+            transactionHash: event.transactionHash,
+            timestamp: Date.now(),
+            isRead: false,
+            message: `Your offer on auction #${auctionId} has been overcome! You received a refund of ${ethers.formatEther(
+              amount
+            )} ETH.`,
+          };
+
+          newNotifications.push(notification);
+        }
+
+        // Add new notifications to existing ones
+        setRefundNotifications((prev) => {
+          const merged = [...prev, ...newNotifications];
+          const unique = merged.filter(
+            (n, index, self) => index === self.findIndex((t) => t.id === n.id)
+          );
+          console.log(
+            `💾 [Refund] Saving ${unique.length} total notifications (${newNotifications.length} new)`
+          );
+          saveRefundNotifications(unique);
+          return unique;
+        });
+
+        // Show toast notifications for new refunds
+        newNotifications.forEach((notification) => {
+          console.log(`🔔 [Refund] Showing toast: ${notification.message}`);
+          toast.success(notification.message, {
+            duration: 5000,
+            position: "top-right",
+          });
+        });
+      } else {
+        console.log(
+          `👤 [Refund] No refund events found for current user ${address}`
+        );
+      }
+
+      // Update last checked block
+      console.log(
+        `📝 [Refund] Updating lastCheckedBlock from ${lastCheckedBlock} to ${currentBlock}`
+      );
+      setLastCheckedBlock(currentBlock);
+    } catch (error) {
+      console.error("Error fetching refund events:", error);
+    }
+  };
+
+  // Fetch claim events from blockchain
+  const fetchClaimEvents = async () => {
+    if (!address || !isConnected) {
+      console.log(
+        `🔍 [Claim] Skipping fetch - not connected (address: ${address}, connected: ${isConnected})`
+      );
+      return;
+    }
+
+    console.log(`🔍 [Claim] Starting fetch for user ${address}`);
+
+    try {
+      const provider = new ethers.JsonRpcProvider(
+        process.env.NEXT_PUBLIC_RPC_URL || "https://1rpc.io/sepolia"
+      );
+      const auctionContract = new ethers.Contract(
+        contracts.MooveAuction.address,
+        contracts.MooveAuction.abi,
+        provider
+      );
+
+      // Get current block
+      const currentBlock = await provider.getBlockNumber();
+      const fromBlock = Math.max(lastCheckedClaimBlock, currentBlock - 10000); // Last 10000 blocks max
+
+      console.log(
+        `🔍 [Claim] Block range: ${fromBlock} → ${currentBlock} (lastCheckedClaim: ${lastCheckedClaimBlock})`
+      );
+
+      if (fromBlock >= currentBlock) {
+        console.log(
+          `⏭️ [Claim] No new blocks to check (fromBlock: ${fromBlock}, currentBlock: ${currentBlock})`
+        );
+        return;
+      }
+
+      console.log(
+        `🔍 [Claim] Fetching claim events from block ${fromBlock} to ${currentBlock}`
+      );
+
+      // Fetch AuctionEnded events
+      const endedEvents = await auctionContract.queryFilter(
+        auctionContract.filters.AuctionEnded(),
+        fromBlock,
+        currentBlock
+      );
+
+      console.log(`📊 [Claim] Found ${endedEvents.length} AuctionEnded events`);
+
+      // Debug: Log all events to see what we're getting
+      if (endedEvents.length > 0) {
+        console.log(
+          `🔍 [Claim] All AuctionEnded events:`,
+          endedEvents.map((event) => ({
+            auctionId: (event as any).args?.auctionId?.toString(),
+            winner: (event as any).args?.winner,
+            blockNumber: event.blockNumber,
+            transactionHash: event.transactionHash,
+          }))
+        );
+      }
+
+      // Debug: Check specific auction #30 status
+      try {
+        const auction30Data = await auctionContract.getAuction(30);
+        console.log(`🔍 [Claim] Auction #30 status check:`, {
+          auctionId: auction30Data.auctionId.toString(),
+          status: Number(auction30Data.status),
+          endTime: Number(auction30Data.endTime),
+          currentTime: Math.floor(Date.now() / 1000),
+          isSettled: auction30Data.isSettled,
+          highestBidder: auction30Data.highestBidder,
+        });
+      } catch (error) {
+        console.warn(`⚠️ [Claim] Could not check auction #30 status:`, error);
+      }
+
+      // Process events for current user
+      const userEndedEvents = endedEvents.filter((event) => {
+        const winner = (event as any).args?.winner;
+        return winner && winner.toLowerCase() === address.toLowerCase();
+      });
+
+      console.log(
+        `👤 [Claim] Found ${userEndedEvents.length} ended events for current user ${address}`
+      );
+
+      if (userEndedEvents.length > 0) {
+        console.log(
+          `👤 [Claim] Processing ${userEndedEvents.length} claim events for current user`
+        );
+
+        const newNotifications: ClaimNotification[] = [];
+
+        for (const event of userEndedEvents) {
+          const args = (event as any).args;
+          const auctionId = args?.auctionId;
+          const winner = args?.winner;
+
+          if (!auctionId || !winner) {
+            console.warn(`⚠️ [Claim] Skipping event with missing data:`, {
+              auctionId,
+              winner,
+            });
+            continue;
+          }
+
+          console.log(
+            `🏆 [Claim] Processing claim: auction ${auctionId}, winner ${winner}`
+          );
+
+          const notification: ClaimNotification = {
+            id: `${auctionId}-claim-${event.blockNumber}`,
+            auctionId: auctionId.toString(),
+            message: `🎉 You won auction #${auctionId}! Click to claim your NFT.`,
+            timestamp: Date.now(),
+            isRead: false,
+            transactionHash: event.transactionHash,
+            priority: "high",
+          };
+
+          newNotifications.push(notification);
+        }
+
+        // Add new notifications to existing ones
+        setClaimNotifications((prev) => {
+          const merged = [...prev, ...newNotifications];
+          const unique = merged.filter(
+            (n, index, self) => index === self.findIndex((t) => t.id === n.id)
+          );
+          console.log(
+            `💾 [Claim] Saving ${unique.length} total notifications (${newNotifications.length} new)`
+          );
+          saveClaimNotifications(unique);
+          return unique;
+        });
+
+        // Show toast notifications for new claims with claim action
+        newNotifications.forEach((notification) => {
+          console.log(`🔔 [Claim] Showing toast: ${notification.message}`);
+          toast.success(notification.message, {
+            duration: 8000,
+            position: "top-right",
+            action: {
+              label: "Claim NFT",
+              onClick: () => {
+                console.log(`🎯 [Claim] User clicked claim action for auction ${notification.auctionId}`);
+                handleClaimFromNotification(notification.auctionId);
+              }
+            }
+          });
+        });
+      } else {
+        console.log(
+          `👤 [Claim] No claim events found for current user ${address}`
+        );
+      }
+
+      // Update last checked block
+      console.log(
+        `📝 [Claim] Updating lastCheckedClaimBlock from ${lastCheckedClaimBlock} to ${currentBlock}`
+      );
+      setLastCheckedClaimBlock(currentBlock);
+    } catch (error) {
+      console.error("Error fetching claim events:", error);
+    }
+  };
+
+  // Initialize refund notifications from localStorage
+  useEffect(() => {
+    const stored = loadRefundNotifications();
+    console.log(
+      `📂 [Refund] Loading ${stored.length} stored notifications from localStorage`
+    );
+    setRefundNotifications(stored);
+
+    // Reset lastCheckedBlock to fetch historical events
+    if (stored.length === 0) {
+      console.log(
+        `🔄 [Refund] No stored notifications found, resetting lastCheckedBlock to 0`
+      );
+      setLastCheckedBlock(0);
+    }
+  }, []);
+
+  // Monitor refund events periodically
+  useEffect(() => {
+    if (!isConnected || !address) {
+      console.log(
+        `🔍 [Refund] Skipping monitor setup - not connected (address: ${address}, connected: ${isConnected})`
+      );
+      return;
+    }
+
+    console.log(
+      `🔍 [Refund] Setting up monitor for user ${address} (lastCheckedBlock: ${lastCheckedBlock})`
+    );
+
+    // Initial fetch
+    fetchRefundEvents();
+
+    // Setup interval (every 30 seconds)
+    const interval = setInterval(() => {
+      console.log(`⏰ [Refund] Periodic fetch triggered`);
+      fetchRefundEvents();
+    }, 30000);
+
+    return () => {
+      console.log(`🔍 [Refund] Cleaning up monitor for user ${address}`);
+      clearInterval(interval);
+    };
+  }, [isConnected, address, lastCheckedBlock]);
+
+  // Monitor claim events periodically
+  useEffect(() => {
+    if (!isConnected || !address) {
+      console.log(
+        `🔍 [Claim] Skipping monitor setup - not connected (address: ${address}, connected: ${isConnected})`
+      );
+      return;
+    }
+
+    console.log(
+      `🔍 [Claim] Setting up monitor for user ${address} (lastCheckedClaimBlock: ${lastCheckedClaimBlock})`
+    );
+
+    // Initial fetch
+    fetchClaimEvents();
+
+    // Setup interval (every 30 seconds)
+    const interval = setInterval(() => {
+      console.log(`⏰ [Claim] Periodic fetch triggered`);
+      fetchClaimEvents();
+    }, 30000);
+
+    return () => {
+      console.log(`🔍 [Claim] Cleaning up monitor for user ${address}`);
+      clearInterval(interval);
+    };
+  }, [isConnected, address, lastCheckedClaimBlock]);
+
+  // Debug logging (solo quando cambia l'indirizzo o il numero di aste)
+  useEffect(() => {
+    if (isConnected && address && unsettledAuctions.length > 0) {
+      console.log(
+        `🔔 [${providerId}] User connected: ${address}, Unsettled auctions: ${unsettledAuctions.length}`
+      );
+    }
+  }, [isConnected, address, unsettledAuctions.length, providerId]);
+
+  // Debug sealed bid monitoring status
+  useEffect(() => {
+    console.log(`📡 [${providerId}] Sealed bid monitoring status:`, {
+      monitoredAuctions: Array.from(monitoredAuctions),
+      isMonitoringSealedBids,
+      sealedBidError,
+      providerId,
+    });
+  }, [monitoredAuctions, isMonitoringSealedBids, sealedBidError, providerId]);
+
+  // Auto-monitor all sealed bid auctions in REVEAL phase
+  useEffect(() => {
+    const checkForSealedBidsInReveal = async () => {
+      console.log(`🚀 [${providerId}] Starting sealed bid check:`, {
+        isConnected,
+        address,
+        isMonitoringSealedBids,
+        timestamp: new Date().toISOString(),
+      });
+
+      if (!isConnected || !address) {
+        console.log(`⏭️ [${providerId}] Skipping check - wallet not connected`);
+        return;
+      }
+
+      // Prevent multiple simultaneous checks
+      if (isMonitoringSealedBids) {
+        console.log(`⏸️ [${providerId}] Skipping check - already monitoring`);
+        return;
+      }
+
+      try {
+        // Get all auctions and find sealed bid auctions in REVEAL
+        const { CONTRACT_ADDRESSES, CONTRACT_ABIS } = await import(
+          "@/utils/contracts"
+        );
+        const provider = new ethers.BrowserProvider(window.ethereum as any);
+        const auctionContract = new ethers.Contract(
+          CONTRACT_ADDRESSES.MooveAuction,
+          CONTRACT_ABIS.MooveAuction,
+          provider
+        );
+
+        // Check recent auctions dynamically (start from a reasonable range)
+        const sealedBidsInReveal = [];
+        let auctionId = 1;
+        let consecutiveNotFound = 0;
+        const maxConsecutiveNotFound = 5; // Stop after 5 consecutive not found
+
+        while (consecutiveNotFound < maxConsecutiveNotFound) {
+          try {
+            const auctionData = await auctionContract.getAuction(auctionId);
+            const auctionStatus = Number(auctionData.status);
+            const auctionType = Number(auctionData.auctionType);
+            const auctionEndTime = Number(auctionData.endTime);
+            const currentTime = Math.floor(Date.now() / 1000);
+
+            // Reset consecutive not found counter
+            consecutiveNotFound = 0;
+
+            // Log ALL auctions to see what we're dealing with
+            console.log(`🔍 [${providerId}] Checking auction #${auctionId}:`, {
+              auctionId,
+              status: auctionStatus,
+              type: auctionType,
+              endTime: new Date(auctionEndTime * 1000).toISOString(),
+              currentTime: new Date().toISOString(),
+              timeExpired: Math.floor(Date.now() / 1000) >= auctionEndTime,
+              isSealedBid: auctionType === 2,
+              isInReveal: auctionStatus === 2,
+              isActive: auctionStatus === 1,
+              isEnded: auctionStatus === 3,
+            });
+
+            // Log detailed info for sealed bid auctions
+            if (auctionType === 2) {
+              console.log(
+                `🔍 [${providerId}] SEALED BID auction #${auctionId} found:`,
+                {
+                  auctionId,
+                  status: auctionStatus,
+                  type: auctionType,
+                  endTime: new Date(auctionEndTime * 1000).toISOString(),
+                  isSealedBid: auctionType === 2,
+                  isInReveal: auctionStatus === 2,
+                  currentTime: new Date().toISOString(),
+                  timeExpired: Math.floor(Date.now() / 1000) >= auctionEndTime,
+                }
+              );
+            }
+
+            // Check for sealed bid auctions that need processing
+            if (auctionType === 2) {
+              const timeExpired =
+                Math.floor(Date.now() / 1000) >= auctionEndTime;
+
+              console.log(
+                `🔍 [${providerId}] Evaluating sealed bid auction #${auctionId} for processing:`,
+                {
+                  auctionId,
+                  auctionStatus,
+                  timeExpired,
+                  endTime: new Date(auctionEndTime * 1000).toISOString(),
+                  currentTime: new Date().toISOString(),
+                  shouldProcess:
+                    auctionStatus === 2 || (auctionStatus === 1 && timeExpired),
+                  reason:
+                    auctionStatus === 2
+                      ? "REVEAL phase"
+                      : auctionStatus === 1 && timeExpired
+                      ? "ACTIVE but expired"
+                      : "No processing needed",
+                }
+              );
+
+              if (auctionStatus === 2 || (auctionStatus === 1 && timeExpired)) {
+                // SEALED_BID in REVEAL phase OR ACTIVE but time expired
+                sealedBidsInReveal.push(auctionId);
+                console.log(
+                  `✅ [${providerId}] ADDING sealed bid auction #${auctionId} to monitoring:`,
+                  {
+                    contractStatus: auctionStatus,
+                    timeExpired,
+                    endTime: new Date(auctionEndTime * 1000).toISOString(),
+                    reason:
+                      auctionStatus === 2
+                        ? "REVEAL phase"
+                        : "ACTIVE but expired",
+                  }
+                );
+                addToMonitoring(auctionId);
+              } else {
+                console.log(
+                  `⏭️ [${providerId}] SKIPPING sealed bid auction #${auctionId}:`,
+                  {
+                    auctionId,
+                    auctionStatus,
+                    timeExpired,
+                    reason: "Not in REVEAL phase and not expired",
+                  }
+                );
+              }
+            }
+          } catch (error) {
+            // Auction doesn't exist - increment counter
+            consecutiveNotFound++;
+            console.log(
+              `ℹ️ [${providerId}] Auction #${auctionId} not found (${consecutiveNotFound}/${maxConsecutiveNotFound})`
+            );
+          }
+
+          auctionId++;
+        }
+
+        console.log(
+          `📊 [${providerId}] FINAL RESULT - Found ${sealedBidsInReveal.length} sealed bid auctions needing processing:`,
+          {
+            sealedBidsInReveal,
+            totalChecked: auctionId - 1,
+            consecutiveNotFound,
+            timestamp: new Date().toISOString(),
+          }
+        );
+      } catch (error) {
+        console.error(
+          `❌ [${providerId}] Error checking for sealed bids in REVEAL:`,
+          error
+        );
+      }
+    };
+
+    // Check only once per session to avoid MetaMask spam
+    const sessionKey = `sealed_bid_check_${providerId}`;
+    const hasCheckedThisSession = sessionStorage.getItem(sessionKey);
+
+    console.log(`🔍 [${providerId}] Session check:`, {
+      sessionKey,
+      hasCheckedThisSession,
+      willRun: !hasCheckedThisSession,
+      timestamp: new Date().toISOString(),
+    });
+
+    // TEMPORARY: Force check every time for debugging
+    console.log(`🚀 [${providerId}] FORCING sealed bid check for debugging`);
+    checkForSealedBidsInReveal();
+
+    // Comment out session storage for debugging
+    // if (!hasCheckedThisSession) {
+    //   console.log(
+    //     `🚀 [${providerId}] Running sealed bid check for first time this session`
+    //   );
+    //   checkForSealedBidsInReveal();
+    //   sessionStorage.setItem(sessionKey, "true");
+    // } else {
+    //   console.log(
+    //     `⏭️ [${providerId}] Skipping sealed bid check - already done this session`
+    //   );
+    // }
+
+    // Check every 30 seconds for new sealed bid auctions
+    // DISABLED: Causing too many MetaMask requests
+    // const periodicCheck = setInterval(() => {
+    //   checkForSealedBidsInReveal();
+    // }, 30000);
+
+    return () => {
+      // No cleanup needed since we removed periodic checks
+    };
+  }, [isConnected, address, providerId, addToMonitoring]);
+
+  // Listen for new sealed bid auction creation events
+  useEffect(() => {
+    const handleSealedBidAuctionCreated = (event: CustomEvent) => {
+      const { auctionId, auctionType, endTime } = event.detail;
+
+      console.log(`🆕 [${providerId}] New sealed bid auction created:`, {
+        auctionId,
+        auctionType,
+        endTime: new Date(endTime * 1000).toISOString(),
+        timestamp: new Date().toISOString(),
+      });
+
+      // Add to monitoring immediately
+      addToMonitoring(parseInt(auctionId));
+
+      console.log(
+        `➕ [${providerId}] Added new sealed bid auction #${auctionId} to monitoring`
+      );
+    };
+
+    window.addEventListener(
+      "sealedBidAuctionCreated",
+      handleSealedBidAuctionCreated as EventListener
+    );
+
+    return () => {
+      window.removeEventListener(
+        "sealedBidAuctionCreated",
+        handleSealedBidAuctionCreated as EventListener
+      );
+    };
+  }, [providerId, addToMonitoring]);
+
+  // Listen for sealed bid winner events
+  useEffect(() => {
+    const handleSealedBidWinner = (event: CustomEvent) => {
+      const { auctionId, winningBid, winner } = event.detail;
+
+      console.log(`🏆 [${providerId}] Sealed bid winner event received:`, {
+        auctionId,
+        winningBid,
+        winner,
+        currentUser: address,
+      });
+
+      // Only show notification if it's for the current user
+      if (winner.toLowerCase() === address?.toLowerCase()) {
+        console.log(
+          `🎉 [${providerId}] Current user won sealed bid auction ${auctionId}!`
+        );
+
+        // Trigger the congratulations modal
+        // The useWonAuctionsManager should automatically detect this
+        // and show the congratulations modal
+      }
+    };
+
+    const handleSealedBidFailed = (event: CustomEvent) => {
+      const { auctionId, reason } = event.detail;
+
+      console.log(`❌ [${providerId}] Sealed bid failed event received:`, {
+        auctionId,
+        reason,
+        currentUser: address,
+      });
+
+      // Show notification for failed auction
+      toast.error(`Auction #${auctionId} failed: ${reason}`);
+    };
+
+    window.addEventListener(
+      "sealedBidWinner",
+      handleSealedBidWinner as EventListener
+    );
+
+    window.addEventListener(
+      "sealedBidFailed",
+      handleSealedBidFailed as EventListener
+    );
+
+    return () => {
+      window.removeEventListener(
+        "sealedBidWinner",
+        handleSealedBidWinner as EventListener
+      );
+      window.removeEventListener(
+        "sealedBidFailed",
+        handleSealedBidFailed as EventListener
+      );
+    };
+  }, [address, providerId]);
+
+  // Gestisci la chiusura del modal
+  const handleCloseModal = () => {
+    console.log(`🔔 [${providerId}] Closing congratulations modal`);
+    handleCloseCongratulationsModal();
+    setHasSeenNotifications(true);
+  };
+
+  // New 3-phase settlement system
+  const handleSettleAuction = (auctionId: string, auction: WonAuction) => {
+    console.log(
+      `🔔 [${providerId}] Starting 3-phase settlement for auction:`,
+      auctionId,
+      "with auction data:",
+      auction
+    );
+
+    // Phase 1: Show confirmation modal with the complete auction data
+    setSelectedAuction(auction);
+    setShowConfirmationModal(true);
+  };
+
+  const processSettlement = async () => {
+    if (!selectedAuction) return;
+
+    console.log(
+      `🔔 [${providerId}] Processing settlement for auction:`,
+      selectedAuction.auctionId
+    );
+
+    setShowConfirmationModal(false);
+    setIsWaitingForConfirmation(true);
+
+    try {
+      // Phase 2: Execute the actual settlement (non-async, just triggers transaction)
+      originalSettleAuction(selectedAuction.auctionId);
+
+      // Don't show result modal immediately - wait for transaction confirmation
+      // The result modal will be shown when we receive the transaction confirmation event
+      console.log(
+        `🔔 [${providerId}] Settlement transaction initiated, waiting for confirmation...`
+      );
+    } catch (error) {
+      console.error(`❌ [${providerId}] Settlement failed:`, error);
+
+      // Phase 3: Show error result immediately for errors
+      setTransactionResult({
+        success: false,
+        error: error instanceof Error ? error.message : "Transaction failed",
+      });
+      setShowResultModal(true);
+      setIsWaitingForConfirmation(false);
+    }
+  };
+
+  const handleCloseConfirmationModal = () => {
+    setShowConfirmationModal(false);
+    setSelectedAuction(null);
+  };
+
+  const handleCloseResultModal = () => {
+    setShowResultModal(false);
+    setSelectedAuction(null);
+    setTransactionResult(null);
+  };
+
+  // Wrapper for CongratulationsModal compatibility
+  const handleSettleAuctionWrapper = (auctionId: string) => {
+    const auction = wonAuctions.find((a) => a.auctionId === auctionId);
+    if (auction) {
+      handleSettleAuction(auctionId, auction);
+    }
+  };
+
+  // Listen for transaction confirmation events
+  useEffect(() => {
+    const handleTransactionEvent = (event: CustomEvent) => {
+      const { type, hash, auctionId } = event.detail;
+
+      if (
+        type === "transaction_confirmed" &&
+        selectedAuction?.auctionId === auctionId
+      ) {
+        console.log(
+          `✅ [${providerId}] Transaction confirmed for auction ${auctionId}:`,
+          hash
+        );
+
+        // Phase 3: Show result modal after transaction confirmation
+        setTransactionResult({
+          success: true,
+          hash: hash,
+        });
+        setShowResultModal(true);
+        setIsWaitingForConfirmation(false);
+      } else if (
+        type === "transaction_sent" &&
+        selectedAuction?.auctionId === auctionId
+      ) {
+        console.log(
+          `📤 [${providerId}] Transaction sent for auction ${auctionId}:`,
+          hash
+        );
+        // Keep waiting for confirmation
+      }
+    };
+
+    window.addEventListener(
+      "settleAuctionEvent",
+      handleTransactionEvent as EventListener
+    );
+
+    return () => {
+      window.removeEventListener(
+        "settleAuctionEvent",
+        handleTransactionEvent as EventListener
+      );
+    };
+  }, [selectedAuction, providerId]);
+
+  // Reset delle notifiche quando l'utente si disconnette
+  useEffect(() => {
+    if (!isConnected) {
+      setHasSeenNotifications(false);
+      setShowNotifications(true);
+    }
+  }, [isConnected]);
+
+  // Context value
+  const contextValue: AuctionNotificationsContextType = {
+    hasUnsettledAuctions: wonAuctions.length > 0,
+    unsettledCount: wonAuctions.length,
+    showNotifications,
+    setShowNotifications,
+    currentAuction,
+    unsettledAuctions: wonAuctions,
+    isSettling,
+    transactionHash,
+    isWaitingForConfirmation,
+    handleSettleAuction,
+    // New 3-phase system states
+    showConfirmationModal,
+    showResultModal,
+    selectedAuction,
+    transactionResult,
+    // Sealed bid monitoring
+    addToSealedBidMonitoring: addToMonitoring,
+    removeFromSealedBidMonitoring: removeFromMonitoring,
+    monitoredSealedBidAuctions: monitoredAuctions,
+    isMonitoringSealedBids,
+    sealedBidError,
+    // Refund notifications
+    refundNotifications,
+    markRefundAsRead,
+    clearAllRefundNotifications,
+    // Debug functions
+    resetRefundBlock,
+  };
+
+  return (
+    <AuctionNotificationsContext.Provider value={contextValue}>
+      {children}
+
+      {/* Unified Notification Badge - Moved to SimplifiedAppProvider */}
+
+      {/* Debug component (development only) */}
+      <AuctionNotificationsDebug />
+
+      {/* Global Modal */}
+      <CongratulationsModal
+        auction={currentAuction}
+        isOpen={showCongratulations}
+        onClose={handleCloseModal}
+        onSettle={handleSettleAuctionWrapper}
+        isSettling={isSettling}
+        transactionHash={transactionHash}
+        isWaitingForConfirmation={isWaitingForConfirmation}
+      />
+
+      {/* New 3-phase system modals */}
+      <AuctionConfirmationModal
+        isOpen={showConfirmationModal}
+        onClose={handleCloseConfirmationModal}
+        onConfirm={processSettlement}
+        auction={selectedAuction}
+        isProcessing={isWaitingForConfirmation}
+      />
+
+      <AuctionResultModal
+        isOpen={showResultModal}
+        onClose={handleCloseResultModal}
+        auction={selectedAuction}
+        result={transactionResult}
+      />
+    </AuctionNotificationsContext.Provider>
+  );
+}
+
+// ============= HOOK =============
+
+export function useAuctionNotifications() {
+  const context = useContext(AuctionNotificationsContext);
+  if (!context) {
+    throw new Error(
+      "useAuctionNotifications must be used within AuctionNotificationsProvider"
+    );
+  }
+  return context;
+}
+
+// ============= EXPORT =============
+
+export default AuctionNotificationsProvider;

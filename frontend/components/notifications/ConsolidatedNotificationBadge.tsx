@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useState } from "react";
-import { useConsolidatedNotifications } from "@/hooks/useConsolidatedNotifications";
+import React, { useState, useContext } from "react";
+import { AuctionNotificationsContext } from "@/providers/AuctionNotificationsProvider";
 import {
   BellIcon,
   XMarkIcon,
-  CheckIcon,
   GiftIcon,
+  CheckIcon,
 } from "@heroicons/react/24/outline";
 import { BellIcon as BellIconSolid } from "@heroicons/react/24/solid";
 
@@ -17,63 +17,173 @@ interface ConsolidatedNotificationBadgeProps {
 export default function ConsolidatedNotificationBadge({
   className = "",
 }: ConsolidatedNotificationBadgeProps) {
+  const context = useContext(AuctionNotificationsContext);
+
+  if (!context) {
+    return null;
+  }
+
   const {
-    notifications,
-    loading,
-    error,
-    markAsRead,
-    dismissNotification,
-    clearAllNotifications,
-    unreadCount,
-    highPriorityCount,
-  } = useConsolidatedNotifications();
+    refundNotifications,
+    markRefundAsRead,
+    clearAllRefundNotifications,
+    removeRefundNotification,
+    claimNotifications,
+    markClaimAsRead,
+    clearAllClaimNotifications,
+    removeClaimNotification,
+  } = context;
 
   const [isOpen, setIsOpen] = useState(false);
 
-  const handleNotificationClick = (notification: any) => {
-    markAsRead(notification.id);
-    // Navigate to relevant page if needed
-    if (notification.type === "claim_ready") {
-      window.location.href = "/my-collection";
-    } else if (notification.type === "claimed") {
-      // Show success message for claimed notifications
-      console.log(`✅ NFT claimed from auction ${notification.auctionId}`);
+  // Convert refund notifications to the format expected by the UI
+  const refundNotificationsFormatted = refundNotifications.map((refund) => ({
+    id: refund.id,
+    type: "refund",
+    message: refund.message,
+    timestamp: refund.timestamp,
+    isRead: refund.isRead,
+    auctionId: refund.auctionId,
+    amount: refund.amount,
+    transactionHash: refund.transactionHash,
+    priority: "medium" as const,
+  }));
+
+  // Convert claim notifications to the format expected by the UI
+  const claimNotificationsFormatted = claimNotifications.map((claim) => ({
+    id: claim.id,
+    type: "claim",
+    message: claim.message,
+    timestamp: claim.timestamp,
+    isRead: claim.isRead,
+    auctionId: claim.auctionId,
+    transactionHash: claim.transactionHash,
+    priority: claim.priority,
+  }));
+
+  // Combine all notifications and filter for current user
+  const notifications = [
+    ...refundNotificationsFormatted,
+    ...claimNotificationsFormatted,
+  ].filter((notification) => {
+    // Additional safety check - ensure notifications are for current user
+    // This should already be filtered in the provider, but adding extra safety
+    return true; // For now, trust the provider filtering
+  });
+
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
+  const highPriorityCount = notifications.filter(
+    (n) => n.priority === "high"
+  ).length;
+
+  const handleNotificationClick = async (notification: any) => {
+    if (notification.type === "refund") {
+      markRefundAsRead(notification.id);
+      // Navigate to auctions page
+      window.location.href = "/auctions";
+    } else if (notification.type === "claim") {
+      markClaimAsRead(notification.id);
+
+      // Handle claim directly
+      try {
+        console.log(
+          `🏆 [Claim] Starting claim process for auction ${notification.auctionId}`
+        );
+
+        // Call endAuction directly
+        const { contracts } = await import("@/utils/contracts");
+        const { ethers } = await import("ethers");
+
+        const provider = new ethers.BrowserProvider(window.ethereum as any);
+        const signer = await provider.getSigner();
+        const auctionContract = new ethers.Contract(
+          contracts.MooveAuction.address,
+          contracts.MooveAuction.abi,
+          signer
+        );
+
+        console.log(
+          `🔄 [Claim] Step 1: Calling endAuction for auction ${notification.auctionId}`
+        );
+        const endTx = await (auctionContract as any).endAuction(
+          notification.auctionId
+        );
+        console.log(`📝 [Claim] End auction transaction sent: ${endTx.hash}`);
+
+        // Wait for endAuction transaction to be mined
+        const endReceipt = await endTx.wait();
+        console.log(
+          `✅ [Claim] Step 1 completed: Auction ${notification.auctionId} ended successfully`
+        );
+
+        // Wait a moment for blockchain to update
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+
+        // Step 2: Call settleAuction
+        console.log(
+          `🔄 [Claim] Step 2: Calling settleAuction for auction ${notification.auctionId}`
+        );
+        const settleTx = await (auctionContract as any).settleAuction(
+          notification.auctionId
+        );
+        console.log(
+          `📝 [Claim] Settle auction transaction sent: ${settleTx.hash}`
+        );
+
+        // Wait for settleAuction transaction to be mined
+        const settleReceipt = await settleTx.wait();
+        console.log(
+          `✅ [Claim] Step 2 completed: Auction ${notification.auctionId} settled successfully`
+        );
+
+        // Show success message
+        const { toast } = await import("react-hot-toast");
+        toast.success(
+          `🎉 Auction ${notification.auctionId} claimed successfully! NFT transferred to your wallet.`
+        );
+      } catch (error) {
+        console.error(
+          `❌ [Claim] Error handling claim for auction ${notification.auctionId}:`,
+          error
+        );
+
+        // Show error message
+        const { toast } = await import("react-hot-toast");
+        toast.error(
+          `Failed to end auction ${notification.auctionId}: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`
+        );
+      }
     }
   };
 
   const handleDismiss = (e: React.MouseEvent, notificationId: string) => {
     e.stopPropagation();
-    dismissNotification(notificationId);
+    const notification = notifications.find((n) => n.id === notificationId);
+    if (notification?.type === "refund") {
+      removeRefundNotification(notificationId);
+    } else if (notification?.type === "claim") {
+      removeClaimNotification(notificationId);
+    }
   };
 
   const handleClearAll = () => {
-    clearAllNotifications();
+    clearAllRefundNotifications();
+    clearAllClaimNotifications();
     setIsOpen(false);
   };
 
-  if (loading) {
-    return (
-      <div className={`relative ${className}`}>
-        <BellIcon className="h-6 w-6 text-gray-400 animate-pulse" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className={`relative ${className}`}>
-        <BellIcon className="h-6 w-6 text-red-500" />
-        <div className="absolute -top-1 -right-1 h-3 w-3 bg-red-500 rounded-full"></div>
-      </div>
-    );
+  if (notifications.length === 0) {
+    return null;
   }
 
   return (
-    <div className={`relative ${className}`}>
+    <div className={`fixed top-20 right-4 z-[99999] ${className}`}>
       {/* Badge */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 text-gray-600 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-full"
+        className="relative p-2 text-gray-600 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-full bg-white shadow-lg border border-gray-200"
       >
         {unreadCount > 0 ? (
           <BellIconSolid className="h-6 w-6 text-blue-600" />
@@ -91,11 +201,6 @@ export default function ConsolidatedNotificationBadge({
         {/* High priority indicator */}
         {highPriorityCount > 0 && (
           <span className="absolute -bottom-1 -right-1 h-3 w-3 bg-orange-500 rounded-full"></span>
-        )}
-
-        {/* Claim ready indicator - special pulsing indicator for claim_ready notifications */}
-        {notifications.some((n) => n.type === "claim_ready") && (
-          <span className="absolute -top-1 -left-1 h-3 w-3 bg-green-500 rounded-full animate-pulse"></span>
         )}
       </button>
 
@@ -145,31 +250,19 @@ export default function ConsolidatedNotificationBadge({
                     onClick={() => handleNotificationClick(notification)}
                     className={`p-4 hover:bg-gray-50 cursor-pointer ${
                       !notification.isRead ? "bg-blue-50" : ""
-                    } ${
-                      notification.type === "claim_ready"
-                        ? "border-l-4 border-green-500 bg-green-50"
-                        : ""
-                    } ${
-                      notification.type === "claimed"
-                        ? "border-l-4 border-blue-500 bg-blue-50"
-                        : ""
                     }`}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center space-x-2">
-                          {notification.type === "claim_ready" ? (
+                          {notification.type === "claim" ? (
                             <GiftIcon className="h-4 w-4 text-green-600" />
-                          ) : notification.type === "claimed" ? (
-                            <CheckIcon className="h-4 w-4 text-blue-600" />
                           ) : (
                             <div
                               className={`w-2 h-2 rounded-full ${
-                                notification.priority === "high"
-                                  ? "bg-red-500"
-                                  : notification.priority === "medium"
+                                notification.priority === "medium"
                                   ? "bg-yellow-500"
-                                  : "bg-green-500"
+                                  : "bg-gray-500"
                               }`}
                             ></div>
                           )}
@@ -178,26 +271,35 @@ export default function ConsolidatedNotificationBadge({
                           </p>
                         </div>
 
-                        {notification.amount && (
-                          <p className="text-sm text-green-600 font-semibold mt-1">
-                            {notification.amount} ETH
-                          </p>
-                        )}
+                        {notification.type === "refund" &&
+                          (notification as any).amount && (
+                            <p className="text-sm text-green-600 font-semibold mt-1">
+                              {(notification as any).amount} ETH
+                            </p>
+                          )}
 
                         <p className="text-xs text-gray-500 mt-1">
                           {new Date(notification.timestamp).toLocaleString()}
                         </p>
 
-                        {notification.transactionHash && (
-                          <a
-                            href={`https://sepolia.etherscan.io/tx/${notification.transactionHash}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className="text-xs text-blue-600 hover:text-blue-800 mt-1 block"
-                          >
-                            View Transaction
-                          </a>
+                        {notification.transactionHash &&
+                          notification.transactionHash !==
+                            "expired-auction" && (
+                            <a
+                              href={`https://sepolia.etherscan.io/tx/${notification.transactionHash}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-xs text-blue-600 hover:text-blue-800 mt-1 block"
+                            >
+                              View Transaction
+                            </a>
+                          )}
+
+                        {notification.type === "claim" && (
+                          <div className="text-xs text-green-600 hover:text-green-800 mt-1 font-semibold">
+                            Click to Claim
+                          </div>
                         )}
                       </div>
 

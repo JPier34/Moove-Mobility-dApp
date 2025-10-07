@@ -7,6 +7,8 @@ import NFT114DetailedDebug from "@/components/debug/NFT114DetailedDebug";
 import RefundSystemTester from "@/components/debug/RefundSystemTester";
 import AdminCreationDebugger from "@/components/debug/AdminCreationDebugger";
 import Auction30Debugger from "@/components/debug/Auction30Debugger";
+import RefundNotificationDebugger from "@/components/debug/RefundNotificationDebugger";
+import NotificationSystemTester from "@/components/debug/NotificationSystemTester";
 // Debug components removed
 // ModularValidationTester COMPLETELY REMOVED - was causing build errors
 
@@ -29,6 +31,16 @@ export default function DebugPage() {
         {/* Admin Creation Debugger */}
         <div className="mb-8">
           <AdminCreationDebugger />
+        </div>
+
+        {/* Notification System Tester */}
+        <div className="mb-8">
+          <NotificationSystemTester />
+        </div>
+
+        {/* Refund Notification Debugger */}
+        <div className="mb-8">
+          <RefundNotificationDebugger />
         </div>
 
         {/* Auction #30 Debugger */}

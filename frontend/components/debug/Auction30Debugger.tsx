@@ -90,9 +90,9 @@ export default function Auction30Debugger() {
       console.log("📡 BidRefunded events for auction #30:", events);
 
       const refundDetails = events.map((event) => ({
-        auctionId: event.args.auctionId.toString(),
-        bidder: event.args.bidder,
-        amount: ethers.formatEther(event.args.amount),
+        auctionId: (event as any).args.auctionId.toString(),
+        bidder: (event as any).args.bidder,
+        amount: ethers.formatEther((event as any).args.amount),
         blockNumber: event.blockNumber,
         transactionHash: event.transactionHash,
       }));
@@ -347,3 +347,6 @@ export default function Auction30Debugger() {
     </div>
   );
 }
+
+
+

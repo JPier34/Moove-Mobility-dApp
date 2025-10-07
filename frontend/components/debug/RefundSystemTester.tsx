@@ -62,9 +62,9 @@ export default function RefundSystemTester() {
       console.log(`🔍 Found ${events.length} BidRefunded events`);
       setRefundEvents(
         events.map((event) => ({
-          auctionId: event.args.auctionId.toString(),
-          bidder: event.args.bidder,
-          amount: ethers.formatEther(event.args.amount),
+          auctionId: (event as any).args.auctionId.toString(),
+          bidder: (event as any).args.bidder,
+          amount: ethers.formatEther((event as any).args.amount),
           blockNumber: event.blockNumber,
           transactionHash: event.transactionHash,
         }))
@@ -84,9 +84,10 @@ export default function RefundSystemTester() {
 
           const unrefundedBids = bids
             .filter(
-              (bid) => !bid.isRefunded && bid.bidder !== auction.highestBidder
+              (bid: any) =>
+                !bid.isRefunded && bid.bidder !== auction.highestBidder
             )
-            .map((bid) => ({
+            .map((bid: any) => ({
               bidder: bid.bidder,
               amount: ethers.formatEther(bid.amount),
               isRefunded: bid.isRefunded,

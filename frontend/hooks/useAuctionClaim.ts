@@ -35,6 +35,60 @@ export function useAuctionClaim(): AuctionClaimHandler {
         return false;
       }
 
+      // ✅ RESERVE AUCTION PROTECTION: Check if auction ended below reserve price
+      try {
+        console.log(
+          `🔍 [Reserve Check] Checking auction ${auctionId} for reserve price violation...`
+        );
+
+        const provider = new ethers.BrowserProvider(window.ethereum as any);
+        const auctionContract = new ethers.Contract(
+          contracts.MooveAuction.address,
+          contracts.MooveAuction.abi,
+          provider
+        );
+
+        const auctionData = await auctionContract.getAuction(auctionId);
+
+        // Check if this is a Reserve Auction (type 3)
+        if (Number(auctionData.auctionType) === 3) {
+          const winningBid = BigInt(auctionData.highestBid);
+          const reservePrice = BigInt(auctionData.reservePrice);
+
+          console.log(`🔍 [Reserve Check] Reserve Auction detected:`, {
+            auctionId,
+            winningBid: ethers.formatEther(winningBid),
+            reservePrice: ethers.formatEther(reservePrice),
+            isBelowReserve: winningBid < reservePrice,
+          });
+
+          if (winningBid < reservePrice) {
+            const errorMessage = `🚫 Cannot claim Reserve Auction #${auctionId}: Winning bid (${ethers.formatEther(
+              winningBid
+            )} ETH) is below reserve price (${ethers.formatEther(
+              reservePrice
+            )} ETH). This auction should be cancelled and NFT returned to seller.`;
+
+            console.error(`❌ [Reserve Check] ${errorMessage}`);
+            setError(errorMessage);
+            setStep("error");
+            toast.error(errorMessage, { duration: 8000 });
+
+            return false;
+          }
+
+          console.log(
+            `✅ [Reserve Check] Reserve Auction #${auctionId} passed validation - reserve price met`
+          );
+        }
+      } catch (error) {
+        console.warn(
+          `⚠️ [Reserve Check] Error checking reserve price for auction ${auctionId}:`,
+          error
+        );
+        // Continue with claim if check fails (don't block legitimate claims)
+      }
+
       // Check if automatic system is active - DISABLED for manual claim
       // const isAutomaticSystemActive =
       //   typeof window !== "undefined" &&
