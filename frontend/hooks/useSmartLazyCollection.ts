@@ -59,17 +59,52 @@ export function useSmartLazyCollection() {
             `🔍 Token ${searchPoint - increment} exists, trying ${searchPoint}`
           );
         } else {
-          // Token doesn't exist, this is our upper bound
+          // Token doesn't exist or API error, this is our upper bound
           console.log(
-            `✅ Found upper bound at token ${searchPoint} (first non-existent)`
+            `✅ Found upper bound at token ${searchPoint} (first non-existent or API error)`
           );
           return searchPoint;
         }
       } catch (error) {
-        console.warn(`⚠️ Error checking token ${searchPoint}:`, error);
-        // On error, assume token doesn't exist
+        console.warn(
+          `⚠️ API call failed for token ${searchPoint}, trying direct contract call...`
+        );
+
+        // Fallback: Try direct contract call if API fails
+        try {
+          if (window.ethereum) {
+            const provider = new ethers.BrowserProvider(window.ethereum);
+            const nftContract = new ethers.Contract(
+              contracts.MooveNFT.address,
+              contracts.MooveNFT.abi,
+              provider
+            );
+
+            const owner = await nftContract.ownerOf(searchPoint);
+            if (
+              owner &&
+              owner !== "0x0000000000000000000000000000000000000000"
+            ) {
+              // Token exists, continue searching higher
+              searchPoint += increment;
+              increment += 100;
+              console.log(
+                `🔍 Token ${
+                  searchPoint - increment
+                } exists (direct call), trying ${searchPoint}`
+              );
+              continue;
+            }
+          }
+        } catch (directError) {
+          console.warn(
+            `⚠️ Direct contract call also failed for token ${searchPoint}`
+          );
+        }
+
+        // On error, assume token doesn't exist and return current search point
         console.log(
-          `✅ Found upper bound at token ${searchPoint} (error case)`
+          `✅ Found upper bound at token ${searchPoint} (both API and direct call failed)`
         );
         return searchPoint;
       }
@@ -113,8 +148,40 @@ export function useSmartLazyCollection() {
           return step - 1; // Ritorna l'ultimo token esistente
         }
       } catch (error) {
-        // Token vuoto, continua
-        continue;
+        console.warn(
+          `⚠️ API call failed for token ${step}, trying direct contract call...`
+        );
+
+        // Fallback: Try direct contract call if API fails
+        try {
+          if (window.ethereum) {
+            const provider = new ethers.BrowserProvider(window.ethereum);
+            const nftContract = new ethers.Contract(
+              contracts.MooveNFT.address,
+              contracts.MooveNFT.abi,
+              provider
+            );
+
+            const owner = await nftContract.ownerOf(step);
+            if (
+              owner &&
+              owner !== "0x0000000000000000000000000000000000000000"
+            ) {
+              // Token exists, continue
+              continue;
+            }
+          }
+        } catch (directError) {
+          console.warn(`⚠️ Direct contract call also failed for token ${step}`);
+        }
+
+        // If both API and direct call fail, assume token doesn't exist
+        console.log(
+          `✅ Found empty token at ${step} (both API and direct call failed), will search reverse from ${
+            step - 1
+          } to ${MIN_TOKEN_ID}`
+        );
+        return step - 1;
       }
     }
 
@@ -662,9 +729,21 @@ export function useSmartLazyCollection() {
                           ).toISOString()}, source=${priceSource}`
                         );
 
-                        // Trigger re-render by updating state
-                        setAllNFTs([...userNFTs]);
-                        setNfts([...userNFTs.slice(0, INITIAL_BATCH_SIZE)]);
+                        // ✅ FIX: Avoid infinite loop - only update if data actually changed
+                        setAllNFTs((prev) => {
+                          const updated = [...prev];
+                          const nftIndex = updated.findIndex(
+                            (n) => n.tokenId === currentTokenId
+                          );
+                          if (nftIndex !== -1) {
+                            updated[nftIndex] = {
+                              ...updated[nftIndex],
+                              price,
+                              purchaseDate,
+                            };
+                          }
+                          return updated;
+                        });
                       }
                     }
                   )
@@ -828,9 +907,21 @@ export function useSmartLazyCollection() {
                             ).toISOString()}, source=${priceSource}`
                           );
 
-                          // Trigger re-render by updating state
-                          setAllNFTs((prev) => [...prev]);
-                          setNfts((prev) => [...prev]);
+                          // ✅ FIX: Avoid infinite loop - only update if data actually changed
+                          setAllNFTs((prev) => {
+                            const updated = [...prev];
+                            const nftIndex = updated.findIndex(
+                              (n) => n.tokenId === tokenId
+                            );
+                            if (nftIndex !== -1) {
+                              updated[nftIndex] = {
+                                ...updated[nftIndex],
+                                price,
+                                purchaseDate,
+                              };
+                            }
+                            return updated;
+                          });
                         }
                       }
                     )
@@ -976,7 +1067,7 @@ export function useSmartLazyCollection() {
 
         try {
           const auctionData = await getAuctionDataFromContract(tokenId);
-          if (auctionData.priceSource !== "fallback") {
+          if (auctionData && auctionData.priceSource !== "fallback") {
             console.log(
               `✅ Got auction data from contract: ${auctionData.priceSource}`
             );
@@ -1043,17 +1134,19 @@ export function useSmartLazyCollection() {
                   isDesertedAuction: false,
                 };
               } else {
-                // Transaction with 0 value - likely deserted auction
+                // Transaction with 0 value - this doesn't necessarily mean deserted auction
+                // Could be a transfer without payment (gift, etc.)
                 console.log(
-                  `🏜️ Deserted auction detected for tokenId ${tokenId} (0 ETH transfer)`
+                  `💰 Transaction with 0 ETH value for tokenId ${tokenId} - using fallback pricing`
                 );
+                const fallbackPrice = getFallbackPrice(tokenId);
                 return {
-                  price: 0, // Deserted auction = 0 price
+                  price: fallbackPrice, // Use fallback pricing instead of 0
                   purchaseDate:
                     Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000, // Random date within last month
-                  priceSource: "deserted_auction",
+                  priceSource: "fallback_transfer",
                   owner,
-                  isDesertedAuction: true,
+                  isDesertedAuction: false, // Don't mark as deserted auction
                 };
               }
             } catch (txError) {
@@ -1161,6 +1254,14 @@ export function useSmartLazyCollection() {
           const status = Number(auctionData[5]); // status
           const finalPrice = auctionData[14]; // highestBid
           const endTime = Number(auctionData[16]); // endTime
+          const auctionType = Number(auctionData[4]); // auctionType
+
+          console.log(`🔍 Auction ${auctionId} data:`, {
+            status,
+            auctionType,
+            finalPrice: ethers.formatEther(finalPrice),
+            endTime: new Date(endTime * 1000).toISOString(),
+          });
 
           if (status === 4) {
             // SETTLED
@@ -1174,6 +1275,35 @@ export function useSmartLazyCollection() {
               purchaseDate: endTime * 1000, // Convert to milliseconds
               priceSource: "contract_auction",
             };
+          } else if (status === 3 && finalPrice > 0) {
+            // ENDED but not settled yet - use highest bid as price
+            const priceInEth = parseFloat(ethers.formatEther(finalPrice));
+            console.log(
+              `💰 Auction ${auctionId} ended with highest bid: ${priceInEth} ETH (status: ${status})`
+            );
+
+            return {
+              price: priceInEth,
+              purchaseDate: endTime * 1000, // Convert to milliseconds
+              priceSource: "contract_auction_ended",
+            };
+          } else if (status === 5) {
+            // CANCELLED - for Reserve Auctions, show 0 ETH (no sale occurred)
+            console.log(
+              `💰 Auction ${auctionId} was cancelled (Reserve Auction) - no sale occurred, showing 0 ETH`
+            );
+
+            return {
+              price: 0,
+              purchaseDate: endTime * 1000, // Convert to milliseconds
+              priceSource: "contract_auction_cancelled",
+            };
+          } else {
+            console.log(
+              `⚠️ Auction ${auctionId} not settled/ended or no bid (status: ${status}, price: ${ethers.formatEther(
+                finalPrice
+              )} ETH)`
+            );
           }
         }
 

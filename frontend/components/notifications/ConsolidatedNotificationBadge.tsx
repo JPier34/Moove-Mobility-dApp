@@ -9,6 +9,23 @@ import {
   CheckIcon,
 } from "@heroicons/react/24/outline";
 import { BellIcon as BellIconSolid } from "@heroicons/react/24/solid";
+import { useAccount } from "wagmi";
+import toast from "react-hot-toast";
+
+// ✅ CONFIGURATION: Centralized configuration for external URLs
+const CONFIG = {
+  // ✅ SMART: Use existing EXPLORER_URL from environment
+  get ETHERSCAN_BASE_URL() {
+    return (
+      process.env.NEXT_PUBLIC_EXPLORER_URL || "https://sepolia.etherscan.io"
+    );
+  },
+  TOAST_DURATION: 3000, // 3 seconds
+  GAS_LIMITS: {
+    END_AUCTION: 200000,
+    SETTLE_AUCTION: 300000,
+  },
+} as const;
 
 interface ConsolidatedNotificationBadgeProps {
   className?: string;
@@ -17,6 +34,7 @@ interface ConsolidatedNotificationBadgeProps {
 export default function ConsolidatedNotificationBadge({
   className = "",
 }: ConsolidatedNotificationBadgeProps) {
+  const { address } = useAccount();
   const context = useContext(AuctionNotificationsContext);
 
   if (!context) {
@@ -32,6 +50,7 @@ export default function ConsolidatedNotificationBadge({
     markClaimAsRead,
     clearAllClaimNotifications,
     removeClaimNotification,
+    removePermanentClaimNotification,
   } = context;
 
   const [isOpen, setIsOpen] = useState(false);
@@ -64,13 +83,14 @@ export default function ConsolidatedNotificationBadge({
   // Convert claim notifications to the format expected by the UI
   const claimNotificationsFormatted = uniqueClaimNotifications.map((claim) => ({
     id: claim.id,
-    type: "claim",
+    type: claim.notificationType || "claim", // Use notificationType to distinguish
     message: claim.message,
     timestamp: claim.timestamp,
     isRead: claim.isRead,
     auctionId: claim.auctionId,
     transactionHash: claim.transactionHash,
     priority: claim.priority,
+    notificationType: claim.notificationType, // Pass through the notification type
   }));
 
   // Combine all notifications and filter for current user
@@ -101,16 +121,16 @@ export default function ConsolidatedNotificationBadge({
       markRefundAsRead(notification.id);
       // Open Etherscan for refund transaction
       window.open(
-        `https://sepolia.etherscan.io/tx/${notification.transactionHash}#internal`,
+        `${CONFIG.ETHERSCAN_BASE_URL}/tx/${notification.transactionHash}#internal`,
         "_blank"
       );
-    } else if (notification.type === "claim") {
+    } else if (notification.type === "endAuction") {
       markClaimAsRead(notification.id);
 
-      // Handle claim directly
+      // Handle endAuction
       try {
         console.log(
-          `🏆 [Claim] Starting claim process for auction ${notification.auctionId}`
+          `🏁 [EndAuction] Starting endAuction process for auction ${notification.auctionId}`
         );
 
         // First, verify the auction is actually expired and claimable
@@ -125,92 +145,73 @@ export default function ConsolidatedNotificationBadge({
           signer
         );
 
-        // Check auction status and end time
-        const auctionData = await auctionContract.getAuction(
+        // ✅ SECURITY: Minimal logging to reduce information disclosure
+        console.log(`🏁 Processing auction ${notification.auctionId}...`);
+
+        // ✅ SECURITY: Atomic check - verify auction state immediately before action
+        const currentAuctionData = await auctionContract.getAuction(
           notification.auctionId
         );
+        const currentStatus = Number(currentAuctionData.status);
+        const currentEndTime = Number(currentAuctionData.endTime);
         const currentTime = Math.floor(Date.now() / 1000);
-        const endTime = Number(auctionData.endTime);
-        const status = Number(auctionData.status);
-        const auctionType = Number(auctionData.auctionType);
-        const highestBid = Number(ethers.formatEther(auctionData.highestBid));
-        const highestBidder = auctionData.highestBidder;
 
-        console.log(
-          `🔍 [Claim] Auction ${notification.auctionId} status check:`,
+        // ✅ SECURITY: Double-check auction state to prevent race conditions
+        if (currentStatus !== 1) {
+          toast.error(
+            `Auction ${notification.auctionId} status changed (now: ${currentStatus}). Cannot end auction.`
+          );
+          return;
+        }
+
+        if (currentTime <= currentEndTime) {
+          toast.error(
+            `Auction ${notification.auctionId} has not expired yet. Cannot end auction.`
+          );
+          return;
+        }
+
+        // ✅ SECURITY: Rate limiting check
+        const userAttemptsKey = `endAuction_attempts_${address}_${notification.auctionId}`;
+        const attempts = parseInt(localStorage.getItem(userAttemptsKey) || "0");
+        const MAX_ATTEMPTS = 3;
+
+        if (attempts >= MAX_ATTEMPTS) {
+          toast.error(
+            `Too many attempts for auction ${notification.auctionId}. Please wait before trying again.`
+          );
+          return;
+        }
+
+        // ✅ SECURITY: Increment attempt counter
+        localStorage.setItem(userAttemptsKey, (attempts + 1).toString());
+
+        // ✅ SECURITY: Call endAuction with gas limit to prevent griefing
+        const tx = await auctionContract.endAuction(notification.auctionId, {
+          gasLimit: CONFIG.GAS_LIMITS.END_AUCTION,
+        });
+        console.log(`🏁 [EndAuction] Transaction sent: ${tx.hash}`);
+
+        toast.success(`Ending auction ${notification.auctionId}...`, {
+          duration: CONFIG.TOAST_DURATION,
+        });
+
+        // Wait for transaction confirmation
+        const receipt = await tx.wait();
+        console.log(`🏁 [EndAuction] Transaction confirmed:`, receipt);
+
+        toast.success(
+          `Auction ${notification.auctionId} ended successfully! You can now settle it.`,
           {
-            status,
-            endTime,
-            currentTime,
-            isExpired: currentTime > endTime,
-            isActive: status === 1,
-            isEnded: status === 3,
-            auctionType,
-            highestBid,
-            highestBidder,
+            duration: 5000,
           }
         );
 
-        // Only allow claim if auction is expired OR already ended
-        if (status !== 1 && status !== 3) {
-          toast.error(
-            `Auction ${notification.auctionId} is not in a claimable state (status: ${status})`
-          );
-          return;
-        }
+        // ✅ SECURITY: Reset attempt counter on success
+        localStorage.removeItem(userAttemptsKey);
 
-        if (status === 1 && currentTime <= endTime) {
-          toast.error(
-            `Auction ${notification.auctionId} is still active and not expired yet`
-          );
-          return;
-        }
-
-        console.log(
-          `✅ [Claim] Auction ${notification.auctionId} is claimable, proceeding...`
-        );
-
-        // Call endAuction directly
-
-        console.log(
-          `🔄 [Claim] Step 1: Calling endAuction for auction ${notification.auctionId}`
-        );
-        const endTx = await (auctionContract as any).endAuction(
-          notification.auctionId
-        );
-        console.log(`📝 [Claim] End auction transaction sent: ${endTx.hash}`);
-
-        // Wait for endAuction transaction to be mined
-        const endReceipt = await endTx.wait();
-        console.log(
-          `✅ [Claim] Step 1 completed: Auction ${notification.auctionId} ended successfully`
-        );
-
-        // Wait a moment for blockchain to update
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-
-        // Step 2: Call settleAuction
-        console.log(
-          `🔄 [Claim] Step 2: Calling settleAuction for auction ${notification.auctionId}`
-        );
-        const settleTx = await (auctionContract as any).settleAuction(
-          notification.auctionId
-        );
-        console.log(
-          `📝 [Claim] Settle auction transaction sent: ${settleTx.hash}`
-        );
-
-        // Wait for settleAuction transaction to be mined
-        const settleReceipt = await settleTx.wait();
-        console.log(
-          `✅ [Claim] Step 2 completed: Auction ${notification.auctionId} settled successfully`
-        );
-
-        // Show success message
-        const { toast } = await import("react-hot-toast");
-        toast.success(
-          `🎉 Auction ${notification.auctionId} claimed successfully! NFT transferred to your wallet.`
-        );
+        // ✅ Remove the permanent notification since endAuction was successful
+        removePermanentClaimNotification(notification.id);
       } catch (error) {
         console.error(
           `❌ [Claim] Error handling claim for auction ${notification.auctionId}:`,
@@ -218,11 +219,131 @@ export default function ConsolidatedNotificationBadge({
         );
 
         // Show error message
-        const { toast } = await import("react-hot-toast");
         toast.error(
           `Failed to end auction ${notification.auctionId}: ${
             error instanceof Error ? error.message : "Unknown error"
           }`
+        );
+      }
+    } else if (notification.type === "settleAuction") {
+      markClaimAsRead(notification.id);
+
+      // Handle settleAuction
+      try {
+        console.log(
+          `🏆 [SettleAuction] Starting settleAuction process for auction ${notification.auctionId}`
+        );
+
+        // First, verify the auction is actually ended and claimable
+        const { contracts } = await import("@/utils/contracts");
+        const { ethers } = await import("ethers");
+
+        const provider = new ethers.BrowserProvider(window.ethereum as any);
+        const signer = await provider.getSigner();
+        const auctionContract = new ethers.Contract(
+          contracts.MooveAuction.address,
+          contracts.MooveAuction.abi,
+          signer
+        );
+
+        // ✅ SECURITY: Atomic check - verify auction state immediately before action
+        const currentAuctionData = await auctionContract.getAuction(
+          notification.auctionId
+        );
+        const currentStatus = Number(currentAuctionData.status);
+        const auctionType = Number(currentAuctionData.auctionType);
+
+        // ✅ SECURITY: Double-check auction state to prevent race conditions
+        if (currentStatus !== 3) {
+          toast.error(
+            `Auction ${notification.auctionId} status changed (now: ${currentStatus}). Cannot settle auction.`
+          );
+          return;
+        }
+
+        // ✅ SECURITY: Rate limiting check
+        const userAttemptsKey = `settleAuction_attempts_${address}_${notification.auctionId}`;
+        const attempts = parseInt(localStorage.getItem(userAttemptsKey) || "0");
+        const MAX_ATTEMPTS = 3;
+
+        if (attempts >= MAX_ATTEMPTS) {
+          toast.error(
+            `Too many attempts for auction ${notification.auctionId}. Please wait before trying again.`
+          );
+          return;
+        }
+
+        // ✅ SECURITY: Increment attempt counter
+        localStorage.setItem(userAttemptsKey, (attempts + 1).toString());
+
+        // ✅ SECURITY: Minimal logging to reduce information disclosure
+        console.log(
+          `🏆 Processing settlement for auction ${notification.auctionId}...`
+        );
+
+        // ✅ SECURITY: Get Reserve Auction data for later use
+        let highestBid = 0;
+        let reservePrice = 0;
+
+        if (auctionType === 3) {
+          highestBid = Number(
+            ethers.formatEther(currentAuctionData.highestBid)
+          );
+          reservePrice = Number(
+            ethers.formatEther(currentAuctionData.reservePrice)
+          );
+
+          if (highestBid < reservePrice) {
+            toast.success(
+              `Reserve Auction ${notification.auctionId} has bid below reserve. This will automatically cancel the auction and refund all bidders.`,
+              { duration: 5000 }
+            );
+          }
+        }
+
+        // ✅ SECURITY: Call settleAuction with gas limit to prevent griefing
+        const tx = await auctionContract.settleAuction(notification.auctionId, {
+          gasLimit: CONFIG.GAS_LIMITS.SETTLE_AUCTION,
+        });
+        console.log(`🏆 [SettleAuction] Transaction sent: ${tx.hash}`);
+
+        toast.success(`Settling auction ${notification.auctionId}...`, {
+          duration: CONFIG.TOAST_DURATION,
+        });
+
+        // Wait for transaction confirmation
+        const receipt = await tx.wait();
+        console.log(`🏆 [SettleAuction] Transaction confirmed:`, receipt);
+
+        // Check if it was a Reserve Auction below reserve (cancelled automatically)
+        if (auctionType === 3 && highestBid < reservePrice) {
+          toast.success(
+            `Reserve Auction ${notification.auctionId} cancelled automatically. You will receive a refund.`,
+            {
+              duration: 5000,
+            }
+          );
+        } else {
+          toast.success(
+            `Auction ${notification.auctionId} settled successfully! NFT transferred to your wallet.`,
+            {
+              duration: 5000,
+            }
+          );
+        }
+
+        // ✅ SECURITY: Reset attempt counter on success
+        localStorage.removeItem(userAttemptsKey);
+
+        // ✅ Remove the permanent notification since settleAuction was successful
+        removePermanentClaimNotification(notification.id);
+      } catch (error: any) {
+        console.error(
+          `❌ [SettleAuction] Error settling auction ${notification.auctionId}:`,
+          error
+        );
+        toast.error(
+          `Failed to settle auction ${notification.auctionId}: ${error.message}`
         );
       }
     }
@@ -233,7 +354,10 @@ export default function ConsolidatedNotificationBadge({
     const notification = notifications.find((n) => n.id === notificationId);
     if (notification?.type === "refund") {
       removeRefundNotification(notificationId);
-    } else if (notification?.type === "claim") {
+    } else if (
+      notification?.type === "endAuction" ||
+      notification?.type === "settleAuction"
+    ) {
       removeClaimNotification(notificationId);
     }
   };
@@ -325,8 +449,12 @@ export default function ConsolidatedNotificationBadge({
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center space-x-2">
-                          {notification.type === "claim" ? (
+                          {notification.type === "endAuction" ? (
+                            <CheckIcon className="h-4 w-4 text-blue-600" />
+                          ) : notification.type === "settleAuction" ? (
                             <GiftIcon className="h-4 w-4 text-green-600" />
+                          ) : notification.type === "refund" ? (
+                            <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
                           ) : (
                             <div
                               className={`w-2 h-2 rounded-full ${
@@ -356,7 +484,7 @@ export default function ConsolidatedNotificationBadge({
                           notification.transactionHash !==
                             "expired-auction" && (
                             <a
-                              href={`https://sepolia.etherscan.io/tx/${notification.transactionHash}#internal`}
+                              href={`${CONFIG.ETHERSCAN_BASE_URL}/tx/${notification.transactionHash}#internal`}
                               target="_blank"
                               rel="noopener noreferrer"
                               onClick={(e) => e.stopPropagation()}
@@ -366,9 +494,15 @@ export default function ConsolidatedNotificationBadge({
                             </a>
                           )}
 
-                        {notification.type === "claim" && (
+                        {notification.type === "endAuction" && (
+                          <div className="text-xs text-blue-600 hover:text-blue-800 mt-1 font-semibold">
+                            Click to End Auction
+                          </div>
+                        )}
+
+                        {notification.type === "settleAuction" && (
                           <div className="text-xs text-green-600 hover:text-green-800 mt-1 font-semibold">
-                            Click to Claim
+                            Click to Claim NFT
                           </div>
                         )}
                       </div>

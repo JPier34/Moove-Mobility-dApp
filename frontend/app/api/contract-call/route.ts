@@ -44,7 +44,13 @@ export async function POST(request: NextRequest) {
     });
 
     console.log(`✅ Contract call successful:`, result);
-    return NextResponse.json(result);
+    
+    // ✅ FIX: Handle BigInt serialization
+    const serializedResult = JSON.parse(JSON.stringify(result, (key, value) =>
+      typeof value === 'bigint' ? value.toString() : value
+    ));
+    
+    return NextResponse.json(serializedResult);
   } catch (error) {
     console.error("❌ Contract call error:", error);
     console.error("❌ Error details:", {
@@ -52,12 +58,32 @@ export async function POST(request: NextRequest) {
       stack: (error as Error).stack,
       name: (error as Error).name,
     });
+
+    // Provide more specific error information
+    const errorMessage = (error as Error).message;
+    let statusCode = 500;
+    let errorType = "Contract call failed";
+
+    if (errorMessage.includes("execution reverted")) {
+      errorType = "Contract execution reverted";
+      statusCode = 400;
+    } else if (errorMessage.includes("network")) {
+      errorType = "Network error";
+      statusCode = 503;
+    } else if (errorMessage.includes("timeout")) {
+      errorType = "Request timeout";
+      statusCode = 504;
+    }
+
     return NextResponse.json(
       {
-        error: "Contract call failed",
-        details: (error as Error).message,
+        error: errorType,
+        details: errorMessage,
+        method,
+        args,
+        contract,
       },
-      { status: 500 }
+      { status: statusCode }
     );
   }
 }

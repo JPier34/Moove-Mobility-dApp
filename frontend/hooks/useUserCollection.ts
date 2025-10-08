@@ -254,11 +254,11 @@ export function useSettleAuction() {
         // Store auctionId for events
         (window as any).currentSettlingAuctionId = auctionId;
 
-        // Write the contract (non-async)
-        writeContract({
-          address: contracts.MooveAuction.address,
+        // Write the contract (async)
+        const settleTx = await writeContract({
+          address: contracts.MooveAuction.address as `0x${string}`,
           abi: contracts.MooveAuction.abi,
-          functionName: "settleAuction" as any,
+          functionName: "settleAuction",
           args: [BigInt(auctionId)],
         });
       } catch (err) {
