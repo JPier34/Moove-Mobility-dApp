@@ -187,7 +187,10 @@ function NFTDetailsModal({
                     Final Bid
                   </span>
                   <span className="font-bold text-moove-primary">
-                    {nft.price} ETH
+                    {typeof nft.price === "number"
+                      ? nft.price.toFixed(6)
+                      : nft.price}{" "}
+                    ETH
                   </span>
                 </div>
               </div>
@@ -451,7 +454,7 @@ function DecorativeNFTCard({
               Final Bid
             </div>
             <div className="text-lg font-bold text-moove-primary">
-              {nft.price} ETH
+              {typeof nft.price === 'number' ? nft.price.toFixed(6) : nft.price} ETH
             </div>
           </div>
           {/* {nft.auctionWon && (

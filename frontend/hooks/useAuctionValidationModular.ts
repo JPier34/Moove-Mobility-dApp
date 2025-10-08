@@ -46,7 +46,29 @@ export function useAuctionValidationModular() {
 
   const updateField = useCallback(
     (field: keyof AuctionFormData, value: any) => {
-      setFormData((prev) => ({ ...prev, [field]: value }));
+      setFormData((prev) => {
+        const newData = { ...prev, [field]: value };
+
+        // Special handling for duration unit changes
+        if (field === "durationUnit" && value === "minutes") {
+          // If switching to minutes and current duration > 59, reset to 59
+          const currentDuration = parseInt(prev.duration);
+          if (currentDuration > 59) {
+            newData.duration = "59";
+          }
+        }
+
+        // Special handling for duration value changes
+        if (field === "duration" && prev.durationUnit === "minutes") {
+          // If duration unit is minutes and value > 59, cap it at 59
+          const durationValue = parseInt(value);
+          if (durationValue > 59) {
+            newData.duration = "59";
+          }
+        }
+
+        return newData;
+      });
     },
     []
   );

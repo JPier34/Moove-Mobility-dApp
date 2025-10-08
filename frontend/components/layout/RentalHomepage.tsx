@@ -125,9 +125,25 @@ function useLocationWithModal(): [
               handleLocationGranted(location);
             }
           } catch (error) {
-            setLocationState((prev) => ({ ...prev, showLocationModal: true }));
+            // If permission is granted but location fails, don't show modal
+            // User already granted permission, just handle the error silently
+            console.warn(
+              "Location permission granted but failed to get location:",
+              error
+            );
+            setLocationState((prev) => ({
+              ...prev,
+              showLocationModal: false,
+              error:
+                "Location permission granted but unable to get current location",
+            }));
           }
+        } else if (permission === "denied") {
+          // User explicitly denied permission, don't show modal
+          setUserExplicitlyDenied(true);
+          setLocationState((prev) => ({ ...prev, showLocationModal: false }));
         } else {
+          // Permission is "prompt" or unknown, show modal
           setLocationState((prev) => ({ ...prev, showLocationModal: true }));
         }
 
@@ -210,6 +226,8 @@ function useLocationWithModal(): [
   };
 
   const requestLocationAgain = () => {
+    // Reset the denied state to allow asking again
+    setUserExplicitlyDenied(false);
     setLocationState((prev) => ({
       ...prev,
       showLocationModal: true,

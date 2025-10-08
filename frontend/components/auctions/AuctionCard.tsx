@@ -203,16 +203,48 @@ export default function AuctionCard({
       return { color: "text-gray-500", label: "Ended", canExtend: false };
     }
 
-    // If auction status is not ACTIVE, show as ended
-    if (Number(localAuction.status) !== AuctionStatus.ACTIVE) {
+    const now = new Date().getTime();
+    // ✅ FIX: Handle both Date objects and ISO strings
+    const endTime =
+      typeof localAuction.endTime === "string"
+        ? new Date(localAuction.endTime).getTime()
+        : localAuction.endTime.getTime();
+    const difference = endTime - now;
+    const isTimeExpired = difference <= 0;
+    const isStatusActive = Number(localAuction.status) === AuctionStatus.ACTIVE;
+
+    // ✅ DEBUG: Log for auction #4
+    if (localAuction.auctionId === "4") {
+      console.log("🔍 [AuctionCard #4] getTimeStatus debug:", {
+        auctionId: localAuction.auctionId,
+        status: Number(localAuction.status),
+        statusType: typeof localAuction.status,
+        AuctionStatusACTIVE: AuctionStatus.ACTIVE,
+        AuctionStatusACTIVEType: typeof AuctionStatus.ACTIVE,
+        isStatusActive: isStatusActive,
+        now: now,
+        endTime: endTime,
+        endTimeString: localAuction.endTime,
+        difference: difference,
+        isTimeExpired: isTimeExpired,
+        showEndedState: showEndedState,
+      });
+    }
+
+    // ✅ IMPROVED: Better logic for auction status
+    if (!isStatusActive) {
+      // Status is not ACTIVE (ENDED, SETTLED, CANCELLED, etc.)
+      if (localAuction.auctionId === "4") {
+        console.log("🔍 [AuctionCard #4] Status not active, showing Ended");
+      }
       return { color: "text-gray-500", label: "Ended", canExtend: false };
     }
 
-    const now = new Date().getTime();
-    const endTime = new Date(localAuction.endTime).getTime();
-    const difference = endTime - now;
-
-    if (difference <= 0) {
+    if (isTimeExpired) {
+      // Status is ACTIVE but time expired - auction ended naturally
+      if (localAuction.auctionId === "4") {
+        console.log("🔍 [AuctionCard #4] Time expired, showing Ended");
+      }
       return { color: "text-gray-500", label: "Ended", canExtend: false };
     }
 

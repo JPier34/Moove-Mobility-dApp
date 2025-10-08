@@ -57,8 +57,8 @@ export function useAuctionRefresh() {
       triggerRefresh();
     };
 
-    const handleBidPlaced = (event: CustomEvent) => {
-      console.log("🔔 Bid placed event received:", event.detail);
+    const handleBidConfirmed = (event: CustomEvent) => {
+      console.log("🔔 Bid confirmed event received:", event.detail);
       triggerRefresh();
     };
 
@@ -77,7 +77,10 @@ export function useAuctionRefresh() {
       "auctionEnded",
       handleAuctionEnded as EventListener
     );
-    window.addEventListener("bidPlaced", handleBidPlaced as EventListener);
+    window.addEventListener(
+      "bidConfirmed",
+      handleBidConfirmed as EventListener
+    );
     window.addEventListener(
       "auctionRefresh",
       handleAuctionRefresh as EventListener
@@ -92,7 +95,10 @@ export function useAuctionRefresh() {
         "auctionEnded",
         handleAuctionEnded as EventListener
       );
-      window.removeEventListener("bidPlaced", handleBidPlaced as EventListener);
+      window.removeEventListener(
+        "bidConfirmed",
+        handleBidConfirmed as EventListener
+      );
       window.removeEventListener(
         "auctionRefresh",
         handleAuctionRefresh as EventListener

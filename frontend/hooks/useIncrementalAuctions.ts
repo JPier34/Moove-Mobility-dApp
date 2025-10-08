@@ -918,9 +918,9 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
 
   // ✅ IMPROVED: Listen for blockchain events with delay to ensure state update
   useEffect(() => {
-    const handleBidPlaced = (event: CustomEvent) => {
+    const handleBidConfirmed = (event: CustomEvent) => {
       console.log(
-        "🔔 [useIncrementalAuctions] Bid placed event received:",
+        "🔔 [useIncrementalAuctions] Bid confirmed event received:",
         event.detail
       );
       // Add a small delay to ensure blockchain state is updated
@@ -941,14 +941,20 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
     };
 
     // Register event listeners
-    window.addEventListener("bidPlaced", handleBidPlaced as EventListener);
+    window.addEventListener(
+      "bidConfirmed",
+      handleBidConfirmed as EventListener
+    );
     window.addEventListener(
       "auctionRefresh",
       handleAuctionRefresh as EventListener
     );
 
     return () => {
-      window.removeEventListener("bidPlaced", handleBidPlaced as EventListener);
+      window.removeEventListener(
+        "bidConfirmed",
+        handleBidConfirmed as EventListener
+      );
       window.removeEventListener(
         "auctionRefresh",
         handleAuctionRefresh as EventListener

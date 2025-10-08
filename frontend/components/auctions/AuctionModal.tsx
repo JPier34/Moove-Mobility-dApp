@@ -189,8 +189,25 @@ export default function AuctionModal({
 
     const updateTimeLeft = () => {
       const now = new Date().getTime();
-      const endTime = new Date(localAuction.endTime).getTime();
+      // ✅ FIX: Handle both Date objects and ISO strings
+      const endTime =
+        typeof localAuction.endTime === "string"
+          ? new Date(localAuction.endTime).getTime()
+          : localAuction.endTime.getTime();
       const difference = endTime - now;
+
+      // ✅ DEBUG: Log time calculation for auction #4
+      if (localAuction.auctionId === "4") {
+        console.log("🔍 [AuctionModal #4] Time calculation:", {
+          auctionId: localAuction.auctionId,
+          now: now,
+          endTime: endTime,
+          endTimeString: localAuction.endTime,
+          difference: difference,
+          differenceMinutes: Math.floor(difference / 60000),
+          differenceSeconds: Math.floor(difference / 1000),
+        });
+      }
 
       if (difference > 0) {
         // Calculate auto-extend zone for English auctions
@@ -227,8 +244,30 @@ export default function AuctionModal({
           }min on bid`;
         }
 
+        // ✅ DEBUG: Log timeLeft setting for auction #4
+        if (localAuction.auctionId === "4") {
+          console.log("🔍 [AuctionModal #4] Setting timeLeft:", {
+            auctionId: localAuction.auctionId,
+            difference: difference,
+            timeString: timeString,
+            isExtensionZone: isExtensionZone,
+          });
+        }
+
         setTimeLeft(timeString);
       } else {
+        // ✅ DEBUG: Log when setting "Auction Ended" for auction #4
+        if (localAuction.auctionId === "4") {
+          console.log(
+            "🔍 [AuctionModal #4] Setting timeLeft to 'Auction Ended':",
+            {
+              auctionId: localAuction.auctionId,
+              difference: difference,
+              now: now,
+              endTime: endTime,
+            }
+          );
+        }
         setTimeLeft("Auction Ended");
       }
     };
@@ -374,29 +413,20 @@ export default function AuctionModal({
           duration: 3000,
         });
 
-        // Transaction is already confirmed, refresh immediately
-        console.log("🔄 Transaction confirmed, refreshing auction data...");
+        // ✅ OPTIMIZED: Single event emission only after MetaMask confirmation
+        console.log(
+          "🔄 Transaction confirmed, emitting single refresh event..."
+        );
 
-        // Emit bid placed event for global refresh
+        // Single consolidated event for all refresh needs
         window.dispatchEvent(
-          new CustomEvent("bidPlaced", {
+          new CustomEvent("bidConfirmed", {
             detail: {
               auctionId: localAuction.auctionId,
               bidAmount: amount,
               bidder: address,
-            },
-          })
-        );
-
-        // Trigger manual refresh for auction components
-        window.dispatchEvent(new CustomEvent("auction-refresh"));
-
-        // Trigger notification refresh after bid
-        window.dispatchEvent(
-          new CustomEvent("refreshNotifications", {
-            detail: {
-              auctionId: localAuction.auctionId,
-              bidAmount: amount,
+              timestamp: Date.now(),
+              confirmed: true,
             },
           })
         );
@@ -1149,13 +1179,53 @@ export default function AuctionModal({
                 )}
 
               {/* Auction ended message */}
-              {Number(localAuction.status) !== AuctionStatus.ACTIVE && (
+              {(() => {
+                const now = new Date().getTime();
+                const endTime =
+                  typeof localAuction.endTime === "string"
+                    ? new Date(localAuction.endTime).getTime()
+                    : localAuction.endTime.getTime();
+                const isStatusNotActive =
+                  Number(localAuction.status) !== AuctionStatus.ACTIVE;
+                const isTimeExpired = now > endTime;
+                const shouldShowEnded =
+                  isStatusNotActive ||
+                  (Number(localAuction.status) === AuctionStatus.ACTIVE &&
+                    isTimeExpired);
+
+                // ✅ DEBUG: Log the values for auction #4
+                if (localAuction.auctionId === "4") {
+                  console.log(
+                    "🔍 [AuctionModal #4] Debug auction ended logic:",
+                    {
+                      auctionId: localAuction.auctionId,
+                      status: Number(localAuction.status),
+                      statusNotActive: isStatusNotActive,
+                      now: now,
+                      endTime: endTime,
+                      endTimeString: localAuction.endTime,
+                      timeExpired: isTimeExpired,
+                      shouldShowEnded: shouldShowEnded,
+                      timeRemaining: endTime - now,
+                      timeRemainingMinutes: Math.floor((endTime - now) / 60000),
+                    }
+                  );
+                }
+
+                return shouldShowEnded;
+              })() && (
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                   <div className="text-gray-800 font-medium mb-2">
                     {Number(localAuction.status) === AuctionStatus.ENDED
                       ? "🏁 Auction Ended"
                       : Number(localAuction.status) === AuctionStatus.CANCELLED
                       ? "❌ Auction Cancelled"
+                      : Number(localAuction.status) === AuctionStatus.ACTIVE &&
+                        new Date().getTime() >
+                          (typeof localAuction.endTime === "string"
+                            ? new Date(localAuction.endTime).getTime()
+                            : localAuction.endTime.getTime())
+                      ? "🏁 Auction Ended (Time Expired)"
                       : "⏸️ Auction Inactive"}
                   </div>
                   <div className="text-gray-600 text-sm">
@@ -1164,6 +1234,12 @@ export default function AuctionModal({
                       ? `Won by ${shortenAddress(
                           localAuction.highestBidder
                         )} for ${localAuction.currentBid} ETH`
+                      : Number(localAuction.status) === AuctionStatus.ACTIVE &&
+                        new Date().getTime() >
+                          (typeof localAuction.endTime === "string"
+                            ? new Date(localAuction.endTime).getTime()
+                            : localAuction.endTime.getTime())
+                      ? "Time has expired. Auction can be ended and settled."
                       : "This auction is no longer active."}
                   </div>
                 </div>
@@ -1206,12 +1282,12 @@ export default function AuctionModal({
                     </span>
                   </div>
                 )}
-                <div className="flex justify-between text-sm">
+                {/*                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Bid Increment</span>
                   <span className="font-medium text-gray-700">
                     {localAuction.bidIncrement} ETH
                   </span>
-                </div>
+                </div> */}
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Time Left</span>
                   <span className="font-medium text-gray-700">{timeLeft}</span>

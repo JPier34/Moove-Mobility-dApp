@@ -650,12 +650,11 @@ function AdminNFTCreatorContent() {
       });
 
       if (auctionFormData.auctionType === AuctionType.DUTCH) {
-        // Dutch auctions: buyNowPrice can now be >= startPrice (contract allows it)
-        // We'll set it to reservePrice to reflect the actual final price
+        // Dutch auctions: No buyNowPrice needed - price decreases automatically
         console.log(
-          "🔄 Dutch auction: buyNowPrice set to reservePrice (final price)"
+          "🔄 Dutch auction: No buyNowPrice needed - price decreases automatically"
         );
-        buyNowPrice = reservePrice; // For Dutch auctions, buyNowPrice = reservePrice (correct logic)
+        buyNowPrice = 0n; // Set to 0 for Dutch auctions (not used)
       } else if (
         auctionFormData.buyNowPrice &&
         auctionFormData.buyNowPrice.trim() !== "" &&

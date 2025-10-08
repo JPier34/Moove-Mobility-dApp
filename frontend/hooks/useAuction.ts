@@ -120,66 +120,8 @@ export function usePlaceBid() {
     writeMooveAuction("placeBid", [auctionId], bidAmount);
   };
 
-  // ✅ IMPROVED: Wait for transaction confirmation before refreshing
-  useEffect(() => {
-    if (isSuccess && hash) {
-      console.log("🎯 Bid transaction sent! Waiting for confirmation...");
-
-      // Wait for transaction confirmation
-      const waitForConfirmation = async () => {
-        try {
-          // Import ethers dynamically to avoid SSR issues
-          const { ethers } = await import("ethers");
-
-          const provider = new ethers.JsonRpcProvider(
-            process.env.NEXT_PUBLIC_RPC_URL || "https://1rpc.io/sepolia"
-          );
-
-          console.log("⏳ Waiting for transaction confirmation:", hash);
-
-          // Wait for transaction receipt (confirmation)
-          const receipt = await provider.waitForTransaction(hash);
-
-          if (receipt && receipt.status === 1) {
-            console.log("✅ Transaction confirmed! Emitting refresh events");
-
-            // Emit custom event for auction refresh
-            const bidPlacedEvent = new CustomEvent("bidPlaced", {
-              detail: {
-                auctionId: "unknown", // We don't have auctionId in this context
-                transactionHash: hash,
-                timestamp: Date.now(),
-                confirmed: true,
-              },
-            });
-
-            window.dispatchEvent(bidPlacedEvent);
-
-            // Also emit a generic refresh event
-            const refreshEvent = new CustomEvent("auctionRefresh", {
-              detail: {
-                reason: "bidPlaced",
-                timestamp: Date.now(),
-                confirmed: true,
-              },
-            });
-
-            window.dispatchEvent(refreshEvent);
-          } else {
-            console.warn("❌ Transaction failed or reverted");
-          }
-        } catch (error) {
-          console.error(
-            "❌ Error waiting for transaction confirmation:",
-            error
-          );
-        }
-      };
-
-      // Start waiting for confirmation
-      waitForConfirmation();
-    }
-  }, [isSuccess, hash]);
+  // ✅ OPTIMIZED: Removed automatic refresh events to prevent re-render loops
+  // The AuctionModal will handle refresh events only after MetaMask confirmation
 
   return {
     placeBid,

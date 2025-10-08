@@ -1273,11 +1273,21 @@ function AdminNFTCreatorUltraSimpleContent() {
                   <input
                     type="number"
                     min="1"
+                    max={
+                      auctionFormData.durationUnit === "minutes"
+                        ? "59"
+                        : undefined
+                    }
                     value={auctionFormData.duration}
                     onChange={(e) => updateField("duration", e.target.value)}
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500"
                     placeholder="24"
                   />
+                  {auctionFormData.durationUnit === "minutes" && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Maximum 59 minutes. Use "Hours" for longer durations.
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -1392,8 +1402,9 @@ function AdminNFTCreatorUltraSimpleContent() {
                   </div>
                 )}
 
-                {/* Buy Now Price - Only show for Dutch auctions */}
-                {auctionFormData.auctionType === AuctionType.DUTCH && (
+                {/* Buy Now Price - Only show for English and Reserve auctions */}
+                {(auctionFormData.auctionType === AuctionType.ENGLISH ||
+                  auctionFormData.auctionType === AuctionType.RESERVE) && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Buy Now Price (ETH)
