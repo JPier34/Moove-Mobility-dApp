@@ -9,7 +9,7 @@ async function endAuction8() {
   ];
 
   const auctionContract = new ethers.Contract(
-    "0x463a4fff0796AF7C69788463629AeF046A2fc211",
+    "0xE8f6836A0054B83b9a952e8B62D92e62f5c67606",
     auctionABI,
     provider
   );
@@ -58,7 +58,7 @@ async function endAuction8() {
   ];
 
   const auctionContract = new ethers.Contract(
-    "0x463a4fff0796AF7C69788463629AeF046A2fc211",
+    "0xE8f6836A0054B83b9a952e8B62D92e62f5c67606",
     auctionABI,
     provider
   );
@@ -97,7 +97,3 @@ async function endAuction8() {
 }
 
 endAuction8();
-
-
-
-

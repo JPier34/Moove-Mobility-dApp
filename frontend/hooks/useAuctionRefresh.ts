@@ -62,6 +62,12 @@ export function useAuctionRefresh() {
       triggerRefresh();
     };
 
+    // ✅ NEW: Handle generic auction refresh events
+    const handleAuctionRefresh = (event: CustomEvent) => {
+      console.log("🔔 Auction refresh event received:", event.detail);
+      triggerRefresh();
+    };
+
     // Registra i listener per gli eventi
     window.addEventListener(
       "auctionSettled",
@@ -72,6 +78,10 @@ export function useAuctionRefresh() {
       handleAuctionEnded as EventListener
     );
     window.addEventListener("bidPlaced", handleBidPlaced as EventListener);
+    window.addEventListener(
+      "auctionRefresh",
+      handleAuctionRefresh as EventListener
+    );
 
     return () => {
       window.removeEventListener(
@@ -83,6 +93,10 @@ export function useAuctionRefresh() {
         handleAuctionEnded as EventListener
       );
       window.removeEventListener("bidPlaced", handleBidPlaced as EventListener);
+      window.removeEventListener(
+        "auctionRefresh",
+        handleAuctionRefresh as EventListener
+      );
     };
   }, [triggerRefresh]);
 

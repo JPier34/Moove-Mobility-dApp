@@ -8,6 +8,8 @@ import RefundSystemTester from "@/components/debug/RefundSystemTester";
 import AdminCreationDebugger from "@/components/debug/AdminCreationDebugger";
 import Auction30Debugger from "@/components/debug/Auction30Debugger";
 import Auction31Debugger from "@/components/debug/Auction31Debugger";
+import ExpiredAuctionsDebugger from "@/components/debug/ExpiredAuctionsDebugger";
+import Auction2DetailedDebugger from "@/components/debug/Auction2DetailedDebugger";
 import RefundNotificationDebugger from "@/components/debug/RefundNotificationDebugger";
 import NotificationSystemTester from "@/components/debug/NotificationSystemTester";
 // Debug components removed
@@ -44,14 +46,14 @@ export default function DebugPage() {
           <RefundNotificationDebugger />
         </div>
 
-        {/* Auction #30 Debugger */}
+        {/* Expired Auctions Debugger */}
         <div className="mb-8">
-          <Auction30Debugger />
+          <ExpiredAuctionsDebugger />
         </div>
 
-        {/* Auction #31 Debugger */}
-        <div className="mb-8">
-          <Auction31Debugger />
+        {/* Auction #2 Detailed Debugger */}
+        <div className="mb-8 text-black dark:text-white">
+          <Auction2DetailedDebugger />
         </div>
 
         {/* Refund System Tester */}

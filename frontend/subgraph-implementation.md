@@ -54,7 +54,7 @@ dataSources:
     name: MooveAuction
     network: sepolia
     source:
-      address: "0x463a4fff0796AF7C69788463629AeF046A2fc211"
+      address: "0xE8f6836A0054B83b9a952e8B62D92e62f5c67606"
       abi: MooveAuction
       startBlock: 9000000 # Adjust to when your contract was deployed
     mapping:
@@ -282,12 +282,3 @@ Con il subgraph avrai:
 - **Real-time updates**: Nuovi eventi indicizzati automaticamente
 
 Vuoi che procediamo con l'implementazione del subgraph?
-
-
-
-
-
-
-
-
-

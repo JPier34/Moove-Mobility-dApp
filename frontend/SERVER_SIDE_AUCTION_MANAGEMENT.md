@@ -63,3 +63,7 @@ NEXT_PUBLIC_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com
 - No private key exposure to frontend
 - All transactions logged with details
 - Safe error handling and validation
+
+
+
+

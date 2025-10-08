@@ -6,7 +6,7 @@ async function checkAuction14() {
   );
 
   const auctionContract = new ethers.Contract(
-    "0x463a4fff0796AF7C69788463629AeF046A2fc211",
+    "0xE8f6836A0054B83b9a952e8B62D92e62f5c67606",
     [
       "function getAuction(uint256 auctionId) view returns (tuple(uint256 auctionId, address nftContract, uint256 tokenId, address seller, uint8 auctionType, uint256 startingPrice, uint256 reservePrice, uint256 buyNowPrice, uint256 currentPrice, uint256 startTime, uint256 endTime, uint256 bidIncrement, address highestBidder, uint256 highestBid, uint8 status, bool allowPartialFulfillment, uint256 minBidders, uint256 totalBidders, bool isSettled, uint256 extensionThreshold, uint256 extensionDuration, uint256 revealEndTime, bool revealPhaseStarted))",
     ],
@@ -95,4 +95,3 @@ async function checkAuction14() {
 }
 
 checkAuction14();
-

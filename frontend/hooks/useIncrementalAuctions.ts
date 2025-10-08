@@ -226,9 +226,9 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
         let auctionsToFetch: AuctionData[] = [];
 
         if (auctions.length === 0 || forceRefresh) {
-          // First load or forced refresh - fetch all valid auctions (starting from ID 24)
-          console.log("🔄 Fetching all valid auctions (starting from ID 24)");
-          for (let i = 24; i < totalCount; i++) {
+          // First load or forced refresh - fetch all valid auctions (starting from ID 0)
+          console.log("🔄 Fetching all valid auctions (starting from ID 0)");
+          for (let i = 0; i < totalCount; i++) {
             try {
               const rawAuctionData = await auctionContract.getAuction(i);
               const auctionData = parseAuctionData(rawAuctionData);
@@ -253,6 +253,27 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
               // Check if auction data is valid
               if (!auctionData || auctionData.tokenId === undefined) {
                 console.warn(`⚠️ Auction ${i} has invalid data, skipping`);
+                continue;
+              }
+
+              // ✅ FILTER: Skip auctions with invalid auction types (should be 0-3)
+              if (auctionData.auctionType > 3) {
+                console.warn(
+                  `⚠️ Auction ${i} has invalid auction type ${auctionData.auctionType}, skipping`
+                );
+                continue;
+              }
+
+              // ✅ FILTER: Skip auctions with invalid seller addresses
+              if (
+                auctionData.seller ===
+                  "0x0000000000000000000000000000000000000000" ||
+                auctionData.seller ===
+                  "0x000000000000000000000000000000000000007f"
+              ) {
+                console.warn(
+                  `⚠️ Auction ${i} has invalid seller address ${auctionData.seller}, skipping`
+                );
                 continue;
               }
 
@@ -894,6 +915,46 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
       };
     }
   }, [isConnected, address, fetchAuctions]);
+
+  // ✅ IMPROVED: Listen for blockchain events with delay to ensure state update
+  useEffect(() => {
+    const handleBidPlaced = (event: CustomEvent) => {
+      console.log(
+        "🔔 [useIncrementalAuctions] Bid placed event received:",
+        event.detail
+      );
+      // Add a small delay to ensure blockchain state is updated
+      setTimeout(() => {
+        fetchAuctions(true); // Force refresh
+      }, 2000); // 2 second delay
+    };
+
+    const handleAuctionRefresh = (event: CustomEvent) => {
+      console.log(
+        "🔔 [useIncrementalAuctions] Auction refresh event received:",
+        event.detail
+      );
+      // Add a small delay to ensure blockchain state is updated
+      setTimeout(() => {
+        fetchAuctions(true); // Force refresh
+      }, 2000); // 2 second delay
+    };
+
+    // Register event listeners
+    window.addEventListener("bidPlaced", handleBidPlaced as EventListener);
+    window.addEventListener(
+      "auctionRefresh",
+      handleAuctionRefresh as EventListener
+    );
+
+    return () => {
+      window.removeEventListener("bidPlaced", handleBidPlaced as EventListener);
+      window.removeEventListener(
+        "auctionRefresh",
+        handleAuctionRefresh as EventListener
+      );
+    };
+  }, [fetchAuctions]);
 
   const refetch = useCallback(() => {
     fetchAuctions(true);

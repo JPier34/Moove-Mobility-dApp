@@ -41,7 +41,7 @@ export function useDevelopmentFallback(): DevelopmentFallback {
               "0x40E455515bf712144C1A5D859F19d64b537754f7"
             );
             const auctionCode = await provider.getCode(
-              "0x463a4fff0796AF7C69788463629AeF046A2fc211"
+              "0xE8f6836A0054B83b9a952e8B62D92e62f5c67606"
             );
 
             contractsDeployed = nftCode !== "0x" && auctionCode !== "0x";
@@ -72,5 +72,3 @@ export function useDevelopmentFallback(): DevelopmentFallback {
 
   return fallback;
 }
-
-

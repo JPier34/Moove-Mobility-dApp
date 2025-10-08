@@ -428,6 +428,87 @@ export const AuctionNotificationsProvider: React.FC<{
         );
       }
 
+      // ✅ NEW: Fetch AuctionCancelled events for Reserve Auction automatic cancellation
+      console.log(
+        `🔍 [Reserve] Fetching AuctionCancelled events from block ${fromBlock} to ${currentBlock}`
+      );
+
+      const cancelledEvents = await auctionContract.queryFilter(
+        auctionContract.filters.AuctionCancelled(),
+        fromBlock,
+        currentBlock
+      );
+
+      console.log(
+        `📊 [Reserve] Found ${cancelledEvents.length} AuctionCancelled events`
+      );
+
+      // Process cancelled events for Reserve Auctions
+      for (const event of cancelledEvents) {
+        const args = (event as any).args;
+        const auctionId = args?.auctionId;
+        const reason = args?.reason;
+
+        if (!auctionId || !reason) {
+          console.warn(
+            `⚠️ [Reserve] Skipping cancelled event with missing data:`,
+            {
+              auctionId,
+              reason,
+            }
+          );
+          continue;
+        }
+
+        console.log(
+          `🚨 [Reserve] Processing cancelled auction ${auctionId} with reason: ${reason}`
+        );
+
+        // Check if this is a Reserve Auction cancellation due to reserve price not met
+        if (reason === "Reserve price not met") {
+          try {
+            // Get auction data to check if current user was involved
+            const auctionData = await auctionContract.getAuction(auctionId);
+            const seller = auctionData.seller;
+            const highestBidder = auctionData.highestBidder;
+            const auctionType = Number(auctionData.auctionType);
+
+            // Check if current user is the seller
+            if (seller.toLowerCase() === address.toLowerCase()) {
+              console.log(
+                `🏠 [Reserve] User is seller of cancelled Reserve Auction ${auctionId}`
+              );
+              toast.success(
+                `🏠 Reserve Auction #${auctionId} was automatically cancelled because the highest bid was below the reserve price. Your NFT has been returned to you.`,
+                {
+                  duration: 8000,
+                  position: "top-right",
+                }
+              );
+            }
+
+            // Check if current user is the highest bidder
+            if (highestBidder.toLowerCase() === address.toLowerCase()) {
+              console.log(
+                `💰 [Reserve] User is highest bidder of cancelled Reserve Auction ${auctionId}`
+              );
+              toast.success(
+                `💰 Reserve Auction #${auctionId} was automatically cancelled because your bid was below the reserve price. You will receive a refund.`,
+                {
+                  duration: 8000,
+                  position: "top-right",
+                }
+              );
+            }
+          } catch (error) {
+            console.warn(
+              `⚠️ [Reserve] Could not get auction data for cancelled auction ${auctionId}:`,
+              error
+            );
+          }
+        }
+      }
+
       // Update last checked block
       console.log(
         `📝 [Refund] Updating lastCheckedBlock from ${lastCheckedBlock} to ${currentBlock}`
@@ -562,11 +643,17 @@ export const AuctionNotificationsProvider: React.FC<{
           `📊 [Claim] Found ${totalAuctions} total auctions (checked up to ${maxCheckAuctions})`
         );
 
-        // Check recent auctions (last 50) for expired ones where user is winner
-        const startAuction = Math.max(1, totalAuctions - 50);
+        // Check ALL auctions for expired ones where user is winner
+        // Start from auction #1, but prioritize recent auctions and Reserve Auctions
+        const startAuction = 1; // Always start from 1
+        const endAuction = totalAuctions;
+
+        console.log(
+          `🔍 [Claim] Checking auctions from ${startAuction} to ${endAuction} for expired winners`
+        );
         for (
           let auctionId = startAuction;
-          auctionId <= totalAuctions;
+          auctionId <= endAuction;
           auctionId++
         ) {
           try {
@@ -577,18 +664,49 @@ export const AuctionNotificationsProvider: React.FC<{
             const auctionType = Number(auctionData.auctionType);
             const now = Math.floor(Date.now() / 1000);
 
+            // Debug logging for each auction
+            console.log(
+              `🔍 [Claim] Checking auction ${auctionId}: status=${status}, endTime=${endTime}, now=${now}, highestBidder=${highestBidder}, auctionType=${auctionType}, isExpired=${
+                now > endTime
+              }`
+            );
+
+            // Special logging for auction #2
+            if (auctionId === 2) {
+              console.log(`🎯 [Claim] SPECIAL DEBUG for Auction #2:`, {
+                auctionId,
+                status,
+                endTime,
+                now,
+                isExpired: now > endTime,
+                highestBidder,
+                userAddress: address,
+                isUserWinner:
+                  highestBidder.toLowerCase() === address.toLowerCase(),
+                auctionType,
+                endTimeFormatted: new Date(endTime * 1000).toLocaleString(),
+                nowFormatted: new Date(now * 1000).toLocaleString(),
+              });
+            }
+
             // Skip Dutch auctions (they settle immediately on purchase)
             if (auctionType === 1) {
               // Dutch auction
               continue;
             }
 
-            // ✅ FILTER: Only process auctions from #30 onwards
-            if (Number(auctionId) < 30) {
+            // ✅ FILTER: Skip very old auctions (before #30) unless they are Reserve Auctions
+            if (Number(auctionId) < 30 && auctionType !== 3) {
               console.log(
-                `⏭️ [Claim] Skipping old auction ${auctionId} (only processing #30+)`
+                `⏭️ [Claim] Skipping old auction ${auctionId} (before #30, not Reserve)`
               );
               continue;
+            }
+
+            if (Number(auctionId) < 30 && auctionType === 3) {
+              console.log(
+                `🔍 [Claim] Including old Reserve Auction ${auctionId} (before #30 but Reserve Auction)`
+              );
             }
 
             // ✅ CHECK: Verify auction is actually claimable by checking contract status
@@ -619,14 +737,22 @@ export const AuctionNotificationsProvider: React.FC<{
               continue;
             }
 
-            // ✅ FILTER: Only process recent auctions (last 7 days)
-            const sevenDaysAgo =
-              Math.floor(Date.now() / 1000) - 7 * 24 * 60 * 60;
-            if (endTime < sevenDaysAgo) {
+            // ✅ FILTER: Only process recent auctions (last 30 days) - more lenient for claim notifications
+            // BUT: Always include Reserve Auctions regardless of age (they might need special handling)
+            const thirtyDaysAgo =
+              Math.floor(Date.now() / 1000) - 30 * 24 * 60 * 60;
+
+            if (endTime < thirtyDaysAgo && auctionType !== 3) {
               console.log(
-                `⏭️ [Claim] Skipping old auction ${auctionId} (older than 7 days)`
+                `⏭️ [Claim] Skipping very old auction ${auctionId} (older than 30 days, not Reserve)`
               );
               continue;
+            }
+
+            if (endTime < thirtyDaysAgo && auctionType === 3) {
+              console.log(
+                `🔍 [Claim] Including old Reserve Auction ${auctionId} (older than 30 days but Reserve Auction)`
+              );
             }
 
             // Check if auction is ACTIVE but expired and user is winner
@@ -646,6 +772,31 @@ export const AuctionNotificationsProvider: React.FC<{
                   isExpired: now > endTime,
                 }
               );
+
+              // Special handling for Reserve Auctions with bid below reserve
+              if (auctionType === 3) {
+                const reservePrice = parseFloat(
+                  ethers.formatEther(auctionData.reservePrice)
+                );
+                const highestBidAmount = parseFloat(
+                  ethers.formatEther(auctionData.highestBid)
+                );
+
+                if (highestBidAmount < reservePrice) {
+                  console.log(
+                    `🚨 [Claim] Reserve Auction ${auctionId} has bid below reserve: ${highestBidAmount} < ${reservePrice}`
+                  );
+                  console.log(
+                    `⚠️ [Claim] This auction should be automatically cancelled by settleAuction, not claimed`
+                  );
+                  // Don't add to claimable auctions - this should be handled by Reserve Auction monitoring
+                  continue;
+                } else {
+                  console.log(
+                    `✅ [Claim] Reserve Auction ${auctionId} has bid above reserve: ${highestBidAmount} >= ${reservePrice}`
+                  );
+                }
+              }
 
               expiredWinnerAuctions.push({
                 auctionId: auctionId.toString(),
@@ -839,165 +990,6 @@ export const AuctionNotificationsProvider: React.FC<{
     }
   }, []);
 
-  // ✅ RESERVE AUCTION VIOLATION DETECTION
-  const checkReserveAuctionViolations = useCallback(async () => {
-    if (!address || !isConnected) return;
-
-    try {
-      console.log(
-        `🔍 [Reserve Monitor] Checking for Reserve Auction violations...`
-      );
-
-      const provider = new ethers.BrowserProvider(window.ethereum as any);
-      const auctionContract = new ethers.Contract(
-        contracts.MooveAuction.address,
-        contracts.MooveAuction.abi,
-        provider
-      );
-
-      // Check recent auctions (last 50)
-      const maxCheckAuctions = 50;
-      let highestAuctionId = 0;
-
-      // Find highest auction ID
-      for (let i = maxCheckAuctions; i >= 0; i--) {
-        try {
-          const auctionData = await auctionContract.getAuction(i);
-          if (
-            auctionData &&
-            auctionData.seller !== "0x0000000000000000000000000000000000000000"
-          ) {
-            highestAuctionId = i;
-            break;
-          }
-        } catch (error) {
-          // Auction doesn't exist, continue
-        }
-      }
-
-      console.log(
-        `🔍 [Reserve Monitor] Found highest auction ID: ${highestAuctionId}`
-      );
-
-      // Check last 20 auctions for violations
-      const checkRange = Math.min(20, highestAuctionId + 1);
-      for (
-        let auctionId = highestAuctionId;
-        auctionId >= Math.max(0, highestAuctionId - checkRange);
-        auctionId--
-      ) {
-        try {
-          const auctionData = await auctionContract.getAuction(auctionId);
-
-          if (
-            !auctionData ||
-            auctionData.seller === "0x0000000000000000000000000000000000000000"
-          ) {
-            continue;
-          }
-
-          // Check if this is a Reserve Auction that ended below reserve
-          if (Number(auctionData.auctionType) === 3) {
-            // Reserve Auction
-            const winningBid = BigInt(auctionData.highestBid);
-            const reservePrice = BigInt(auctionData.reservePrice);
-            const status = Number(auctionData.status);
-            const endTime = Number(auctionData.endTime);
-            const now = Math.floor(Date.now() / 1000);
-            const isEnded = status === 2; // ENDED status
-            const isExpired = status === 1 && now > endTime; // ACTIVE but expired
-            const isBelowReserve = winningBid < reservePrice;
-
-            if ((isEnded || isExpired) && isBelowReserve && winningBid > 0n) {
-              const violationType = isEnded ? "ENDED" : "EXPIRED";
-              console.warn(
-                `🚨 [Reserve Monitor] VIOLATION DETECTED: Auction #${auctionId} ${violationType} below reserve!`,
-                {
-                  auctionId,
-                  status,
-                  endTime,
-                  now,
-                  isEnded,
-                  isExpired,
-                  winningBid: ethers.formatEther(winningBid),
-                  reservePrice: ethers.formatEther(reservePrice),
-                  seller: auctionData.seller,
-                  highestBidder: auctionData.highestBidder,
-                }
-              );
-
-              // Check if current user is the seller
-              if (auctionData.seller.toLowerCase() === address.toLowerCase()) {
-                const notificationId = `reserve-violation-seller-${auctionId}`;
-
-                // Check if we already notified about this violation
-                const existingNotification = refundNotifications.find(
-                  (n) => n.id === notificationId
-                );
-                if (!existingNotification) {
-                  const violationNotification: RefundNotification = {
-                    id: notificationId,
-                    message: `🚨 CRITICAL: Reserve Auction #${auctionId} ended below reserve price! NFT should be returned to you. Contact admin immediately.`,
-                    timestamp: Date.now(),
-                    isRead: false,
-                    auctionId: auctionId.toString(),
-                    amount: ethers.formatEther(winningBid),
-                    transactionHash: "reserve-violation",
-                  };
-
-                  setRefundNotifications((prev) => [
-                    ...prev,
-                    violationNotification,
-                  ]);
-                  console.log(
-                    `📢 [Reserve Monitor] Added violation notification for seller`
-                  );
-                }
-              }
-
-              // Check if current user is the highest bidder
-              if (
-                auctionData.highestBidder.toLowerCase() ===
-                address.toLowerCase()
-              ) {
-                const notificationId = `reserve-violation-bidder-${auctionId}`;
-
-                const existingNotification = refundNotifications.find(
-                  (n) => n.id === notificationId
-                );
-                if (!existingNotification) {
-                  const violationNotification: RefundNotification = {
-                    id: notificationId,
-                    message: `⚠️ Auction #${auctionId} ended below reserve price. Your bid of ${ethers.formatEther(
-                      winningBid
-                    )} ETH will be refunded. Do NOT claim this auction.`,
-                    timestamp: Date.now(),
-                    isRead: false,
-                    auctionId: auctionId.toString(),
-                    amount: ethers.formatEther(winningBid),
-                    transactionHash: "reserve-violation",
-                  };
-
-                  setRefundNotifications((prev) => [
-                    ...prev,
-                    violationNotification,
-                  ]);
-                  console.log(
-                    `📢 [Reserve Monitor] Added violation notification for bidder`
-                  );
-                }
-              }
-            }
-          }
-        } catch (error) {
-          // Auction doesn't exist or error reading, continue
-        }
-      }
-    } catch (error) {
-      console.error(`❌ [Reserve Monitor] Error checking violations:`, error);
-    }
-  }, [address, isConnected, refundNotifications]);
-
   // Monitor refund events periodically
   useEffect(() => {
     if (!isConnected || !address) {
@@ -1013,28 +1005,18 @@ export const AuctionNotificationsProvider: React.FC<{
 
     // Initial fetch
     fetchRefundEvents();
-    // ✅ Also check for Reserve Auction violations on startup
-    checkReserveAuctionViolations();
 
     // Setup interval (every 30 seconds)
     const interval = setInterval(() => {
       console.log(`⏰ [Refund] Periodic fetch triggered`);
       fetchRefundEvents();
-      // ✅ Also check for Reserve Auction violations
-      checkReserveAuctionViolations();
     }, 30000);
 
     return () => {
       console.log(`🔍 [Refund] Cleaning up monitor for user ${address}`);
       clearInterval(interval);
     };
-  }, [
-    isConnected,
-    address,
-    lastCheckedBlock,
-    fetchRefundEvents,
-    checkReserveAuctionViolations,
-  ]);
+  }, [isConnected, address, lastCheckedBlock, fetchRefundEvents]);
 
   // Monitor claim events periodically
   useEffect(() => {

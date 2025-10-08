@@ -314,3 +314,4 @@ export function isCollectionNFT(data: any): data is CollectionNFT {
     typeof data.name === "string"
   );
 }
+

@@ -63,7 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Metadata management with IPFS integration
   - Transfer and ownership tracking
 
-- **MooveAuction** (`0x463a4fff0796AF7C69788463629AeF046A2fc211`)
+- **MooveAuction** (`0xE8f6836A0054B83b9a952e8B62D92e62f5c67606`)
 
   - Multi-type auction system
   - Bid management and settlement
@@ -225,8 +225,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details on how to contribute to this 
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-
 
 All notable changes to the Moove Mobility dApp will be documented in this file.
 
@@ -291,7 +289,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Metadata management with IPFS integration
   - Transfer and ownership tracking
 
-- **MooveAuction** (`0x463a4fff0796AF7C69788463629AeF046A2fc211`)
+- **MooveAuction** (`0xE8f6836A0054B83b9a952e8B62D92e62f5c67606`)
 
   - Multi-type auction system
   - Bid management and settlement
@@ -453,9 +451,3 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details on how to contribute to this 
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-
-
-
-
-

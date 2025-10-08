@@ -7,7 +7,7 @@ async function main() {
   console.log("🔍 Diagnosing BidPlaced event corruption...");
 
   // Contract addresses from utils/contracts.ts
-  const auctionAddress = "0x463a4fff0796AF7C69788463629AeF046A2fc211";
+  const auctionAddress = "0xE8f6836A0054B83b9a952e8B62D92e62f5c67606";
   const nftAddress = "0x40E455515bf712144C1A5D859F19d64b537754f7";
 
   // Get deployer account
@@ -180,7 +180,7 @@ async function main() {
   console.log("🔍 Diagnosing BidPlaced event corruption...");
 
   // Contract addresses from utils/contracts.ts
-  const auctionAddress = "0x463a4fff0796AF7C69788463629AeF046A2fc211";
+  const auctionAddress = "0xE8f6836A0054B83b9a952e8B62D92e62f5c67606";
   const nftAddress = "0x40E455515bf712144C1A5D859F19d64b537754f7";
 
   // Get deployer account
@@ -345,7 +345,3 @@ main()
     console.error("❌ Script failed:", error);
     process.exit(1);
   });
-
-
-
-

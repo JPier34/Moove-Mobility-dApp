@@ -73,7 +73,7 @@ The dApp is built on **4 main smart contracts** deployed on **Sepolia Testnet**:
 
 #### 3. **MooveAuction**
 
-**Address:** `0x463a4fff0796AF7C69788463629AeF046A2fc211`
+**Address:** `0xE8f6836A0054B83b9a952e8B62D92e62f5c67606`
 
 - Multi-type auction system (English, Dutch, Sealed Bid, Reserve)
 - Bid management and settlement
@@ -138,7 +138,7 @@ cp .env.example .env.local
 # Add your configuration
 NEXT_PUBLIC_MOOVE_ACCESS_CONTROL_ADDRESS=0x93b6F6F4b28cd61F68c16A85c9FC107Bf8f47e42
 NEXT_PUBLIC_MOOVE_NFT_ADDRESS=0x40E455515bf712144C1A5D859F19d64b537754f7
-NEXT_PUBLIC_MOOVE_AUCTION_ADDRESS=0x463a4fff0796AF7C69788463629AeF046A2fc211
+NEXT_PUBLIC_MOOVE_AUCTION_ADDRESS=0xE8f6836A0054B83b9a952e8B62D92e62f5c67606
 NEXT_PUBLIC_MOOVE_RENTAL_PASS_ADDRESS=0x52d95a8Fd4D8c0Ad210DCAD3BA8EBd533EB5420a
 ```
 
@@ -398,4 +398,3 @@ Feel free to fork and expand the functionality (e.g., add more auction types, im
 ---
 
 **Built with ❤️ for the decentralized mobility future** 🚗✨
-

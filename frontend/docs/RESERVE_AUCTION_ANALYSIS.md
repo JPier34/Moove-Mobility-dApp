@@ -425,3 +425,4 @@ La **Reserve Auction** è fondamentalmente un'**English Auction con un prezzo mi
 
 _Documento creato il: 07/10/2025_
 _Versione: 1.0_
+

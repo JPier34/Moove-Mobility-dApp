@@ -54,7 +54,8 @@ export default function NotificationSystemTester() {
 
       // Process events for current user
       const userRefundEvents = events.filter(
-        (event) => (event as any).args.bidder.toLowerCase() === address.toLowerCase()
+        (event) =>
+          (event as any).args.bidder.toLowerCase() === address.toLowerCase()
       );
 
       console.log(
@@ -244,7 +245,7 @@ export default function NotificationSystemTester() {
             <h3 className="text-lg font-semibold text-gray-900 mb-3">
               📊 Analysis Summary
             </h3>
-            <div className="bg-gray-50 p-4 rounded-md">
+            <div className="bg-gray-50 text-black p-4 rounded-md">
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <p>
@@ -297,7 +298,7 @@ export default function NotificationSystemTester() {
           {/* Refund Events */}
           {results.events.length > 0 && (
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">
+              <h3 className="text-lg font-semibold text-black mb-3">
                 💰 Your Refund Events ({results.events.length})
               </h3>
               <div className="space-y-2">
@@ -308,10 +309,10 @@ export default function NotificationSystemTester() {
                   >
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="font-medium">
+                        <p className="font-medium text-black">
                           Auction #{event.auctionId} - {event.amount} ETH
                         </p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-black">
                           Block: {event.blockNumber} | TX:{" "}
                           {event.transactionHash.slice(0, 10)}...
                         </p>
@@ -384,6 +385,3 @@ export default function NotificationSystemTester() {
     </div>
   );
 }
-
-
-

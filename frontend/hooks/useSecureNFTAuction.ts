@@ -507,10 +507,10 @@ async function secureAuctionCreation(
     let successWith8Params = false;
     let successWith10Params = false;
 
-    // Try with 8 parameters first (older contract version)
+    // Try with 10 parameters (newer contract version) - THIS IS THE CORRECT VERSION
     try {
       console.log(
-        "🔍 Trying createAuction with 8 parameters (older version)..."
+        "🔍 Trying createAuction with 10 parameters (correct version)..."
       );
       tx = await auctionContract.createAuction(
         params.nftContract,
@@ -520,22 +520,24 @@ async function secureAuctionCreation(
         params.reservePrice,
         params.buyNowPrice,
         params.duration,
-        params.bidIncrement
+        params.bidIncrement,
+        params.extensionThreshold,
+        params.extensionDuration
       );
-      successWith8Params = true;
-      console.log("✅ createAuction with 8 parameters succeeded!");
-    } catch (error8) {
+      successWith10Params = true;
+      console.log("✅ createAuction with 10 parameters succeeded!");
+    } catch (error10) {
       console.log(
-        "❌ createAuction with 8 parameters failed:",
-        error8 instanceof Error ? error8.message : String(error8)
+        "❌ createAuction with 10 parameters failed:",
+        error10 instanceof Error ? error10.message : String(error10)
       );
     }
 
-    // Try with 10 parameters (newer contract version)
-    if (!successWith8Params) {
+    // Try with 8 parameters (older contract version) - FALLBACK ONLY
+    if (!successWith10Params) {
       try {
         console.log(
-          "🔍 Trying createAuction with 10 parameters (newer version)..."
+          "🔍 Trying createAuction with 8 parameters (fallback version)..."
         );
         tx = await auctionContract.createAuction(
           params.nftContract,
@@ -545,16 +547,14 @@ async function secureAuctionCreation(
           params.reservePrice,
           params.buyNowPrice,
           params.duration,
-          params.bidIncrement,
-          params.extensionThreshold,
-          params.extensionDuration
+          params.bidIncrement
         );
-        successWith10Params = true;
-        console.log("✅ createAuction with 10 parameters succeeded!");
-      } catch (error10) {
+        successWith8Params = true;
+        console.log("✅ createAuction with 8 parameters succeeded!");
+      } catch (error8) {
         console.log(
-          "❌ createAuction with 10 parameters failed:",
-          error10 instanceof Error ? error10.message : String(error10)
+          "❌ createAuction with 8 parameters failed:",
+          error8 instanceof Error ? error8.message : String(error8)
         );
       }
     }
