@@ -11,6 +11,7 @@ import Auction31Debugger from "@/components/debug/Auction31Debugger";
 import ExpiredAuctionsDebugger from "@/components/debug/ExpiredAuctionsDebugger";
 import Auction2DetailedDebugger from "@/components/debug/Auction2DetailedDebugger";
 import Auction4Debugger from "@/components/debug/Auction4Debugger";
+import RaceConditionTest from "@/components/debug/RaceConditionTest";
 import RefundNotificationDebugger from "@/components/debug/RefundNotificationDebugger";
 import NotificationSystemTester from "@/components/debug/NotificationSystemTester";
 // Debug components removed
@@ -60,6 +61,17 @@ export default function DebugPage() {
         {/* Auction #4 Debugger */}
         <div className="mb-8 text-black dark:text-white">
           <Auction4Debugger />
+
+          {/* Race Condition Test */}
+          <div className="justify-end items-start bg-white rounded-lg shadow-lg p-6">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">
+              🧪 Race Condition Test
+            </h2>
+            <p className="text-gray-600 mb-4">
+              Test the new useLocalStorage hook for race condition fixes
+            </p>
+            <RaceConditionTest />
+          </div>
         </div>
 
         {/* Refund System Tester */}
