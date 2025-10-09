@@ -19,12 +19,8 @@ import { contracts } from "@/utils/contracts";
 
 // ✅ CONFIGURATION: Centralized configuration for external URLs
 const CONFIG = {
-  // ✅ SMART: Use existing EXPLORER_URL from environment
-  get ETHERSCAN_BASE_URL() {
-    return (
-      process.env.NEXT_PUBLIC_EXPLORER_URL || "https://sepolia.etherscan.io"
-    );
-  },
+  ETHERSCAN_BASE_URL:
+    process.env.NEXT_PUBLIC_ETHERSCAN_URL || "https://sepolia.etherscan.io",
   NOTIFICATION_COOLDOWN: 5 * 60 * 1000, // 5 minutes
   REFUND_TOAST_DURATION: 5000, // 5 seconds
   CLAIM_TOAST_DURATION: 8000, // 8 seconds
@@ -161,21 +157,7 @@ export const AuctionNotificationsProvider: React.FC<{
   // Refund notifications state
   const [refundNotifications, setRefundNotifications] = useState<
     RefundNotification[]
-  >(() => {
-    // ✅ PERSISTENCE: Load refund notifications from localStorage
-    if (typeof window !== "undefined") {
-      try {
-        const stored = localStorage.getItem("moove-refund-notifications");
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          return Array.isArray(parsed) ? parsed : [];
-        }
-      } catch (error) {
-        console.warn("Failed to load refund notifications:", error);
-      }
-    }
-    return [];
-  });
+  >([]);
   const [lastCheckedBlock, setLastCheckedBlock] = useState<number>(() => {
     // ✅ PERSISTENCE: Load lastCheckedBlock from localStorage
     if (typeof window !== "undefined") {
@@ -188,21 +170,7 @@ export const AuctionNotificationsProvider: React.FC<{
   // Claim notifications state
   const [claimNotifications, setClaimNotifications] = useState<
     ClaimNotification[]
-  >(() => {
-    // ✅ PERSISTENCE: Load claim notifications from localStorage
-    if (typeof window !== "undefined") {
-      try {
-        const stored = localStorage.getItem("moove-claim-notifications");
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          return Array.isArray(parsed) ? parsed : [];
-        }
-      } catch (error) {
-        console.warn("Failed to load claim notifications:", error);
-      }
-    }
-    return [];
-  });
+  >([]);
   const [lastCheckedClaimBlock, setLastCheckedClaimBlock] = useState<number>(
     () => {
       // ✅ PERSISTENCE: Load lastCheckedClaimBlock from localStorage
@@ -224,24 +192,7 @@ export const AuctionNotificationsProvider: React.FC<{
       if (stored) {
         try {
           const parsed = JSON.parse(stored);
-          const processedSet = new Set(Array.isArray(parsed) ? parsed : []);
-
-          // ✅ MIGRATION: Convert old format (just auctionId) to new format (auctionId-notificationType)
-          const migratedSet = new Set<string>();
-          for (const item of processedSet) {
-            if (typeof item === "string" && !item.includes("-")) {
-              // Old format: just auctionId, assume it was for endAuction
-              migratedSet.add(`${item}-endAuction`);
-              console.log(
-                `🔄 [Migration] Converted old processed auction ${item} to ${item}-endAuction`
-              );
-            } else {
-              // New format: already has notification type
-              migratedSet.add(item);
-            }
-          }
-
-          return migratedSet;
+          return new Set(Array.isArray(parsed) ? parsed : []);
         } catch (error) {
           console.warn("Failed to parse processedClaimAuctions:", error);
         }
@@ -645,18 +596,8 @@ export const AuctionNotificationsProvider: React.FC<{
         const RESERVE_PRICE_NOT_MET_REASON = "Reserve price not met";
         if (reason === RESERVE_PRICE_NOT_MET_REASON) {
           try {
-            // ✅ FIX: Check if auction still exists before getting data
-            let auctionData;
-            try {
-              auctionData = await auctionContract.getAuction(auctionId);
-            } catch (auctionError) {
-              console.warn(
-                `⚠️ [Reserve] Could not get auction data for cancelled auction ${auctionId}: ${auctionError}`
-              );
-              // Skip this auction if it doesn't exist or is corrupted
-              return;
-            }
-
+            // Get auction data to check if current user was involved
+            const auctionData = await auctionContract.getAuction(auctionId);
             const seller = auctionData.seller;
             const highestBidder = auctionData.highestBidder;
             const auctionType = Number(auctionData.auctionType);
@@ -681,11 +622,7 @@ export const AuctionNotificationsProvider: React.FC<{
                 `💰 [Reserve] User is highest bidder of cancelled Reserve Auction ${auctionId}`
               );
               toast.success(
-                `💰 Reserve Auction #${auctionId} was automatically cancelled because your bid (${ethers.formatEther(
-                  auctionData.highestBid
-                )} ETH) was below the reserve price (${ethers.formatEther(
-                  auctionData.reservePrice
-                )} ETH). You will receive a refund.`,
+                `💰 Reserve Auction #${auctionId} was automatically cancelled because your bid was below the reserve price. You will receive a refund.`,
                 {
                   duration: 8000,
                   position: "top-right",
@@ -845,22 +782,13 @@ export const AuctionNotificationsProvider: React.FC<{
             // ✅ NO TIME FILTER: Check all auctions regardless of age
 
             // ✅ SECURITY: Rate limiting check for notification generation
-            // But allow endAuction -> settleAuction flow without cooldown
             const notificationKey = `notification_${address}_${auctionId}`;
             const lastNotificationTime = parseInt(
               localStorage.getItem(notificationKey) || "0"
             );
             const NOTIFICATION_COOLDOWN = CONFIG.NOTIFICATION_COOLDOWN;
 
-            // ✅ SMART: Allow immediate settleAuction after endAuction
-            const isEndAuctionFlow = status === 1 && now > endTime;
-            const isSettleAuctionFlow = status === 3;
-
-            if (
-              !isEndAuctionFlow &&
-              !isSettleAuctionFlow &&
-              Date.now() - lastNotificationTime < NOTIFICATION_COOLDOWN
-            ) {
+            if (Date.now() - lastNotificationTime < NOTIFICATION_COOLDOWN) {
               console.log(
                 `⏭️ [Security] Skipping notification for auction ${auctionId} - cooldown active`
               );
@@ -883,10 +811,8 @@ export const AuctionNotificationsProvider: React.FC<{
                   }
                 );
 
-                // ✅ SECURITY: Set notification timestamp only for endAuction to allow settleAuction flow
-                if (isEndAuctionFlow) {
-                  localStorage.setItem(notificationKey, Date.now().toString());
-                }
+                // ✅ SECURITY: Set notification timestamp to prevent spam
+                localStorage.setItem(notificationKey, Date.now().toString());
 
                 expiredWinnerAuctions.push({
                   auctionId: auctionId.toString(),
@@ -934,10 +860,8 @@ export const AuctionNotificationsProvider: React.FC<{
                   }
                 }
 
-                // ✅ SECURITY: Set notification timestamp only for settleAuction to prevent future spam
-                if (isSettleAuctionFlow) {
-                  localStorage.setItem(notificationKey, Date.now().toString());
-                }
+                // ✅ SECURITY: Set notification timestamp to prevent spam
+                localStorage.setItem(notificationKey, Date.now().toString());
 
                 expiredWinnerAuctions.push({
                   auctionId: auctionId.toString(),
@@ -1031,15 +955,10 @@ export const AuctionNotificationsProvider: React.FC<{
             continue;
           }
 
-          // Check if we already processed this auction for this specific notification type
-          const processedKey = `${auctionId}-${
-            notificationType || "settleAuction"
-          }`;
-          if (processedClaimAuctions.has(processedKey)) {
+          // Check if we already processed this auction
+          if (processedClaimAuctions.has(auctionId)) {
             console.log(
-              `⏭️ [Claim] Skipping already processed auction ${auctionId} for ${
-                notificationType || "settleAuction"
-              }`
+              `⏭️ [Claim] Skipping already processed auction ${auctionId}`
             );
             continue;
           }
@@ -1077,8 +996,8 @@ export const AuctionNotificationsProvider: React.FC<{
 
           newNotifications.push(notification);
 
-          // Mark auction as processed for this specific notification type
-          setProcessedClaimAuctions((prev) => new Set([...prev, processedKey]));
+          // Mark auction as processed
+          setProcessedClaimAuctions((prev) => new Set([...prev, auctionId]));
         }
 
         // Add new notifications to existing ones (avoid duplicates)

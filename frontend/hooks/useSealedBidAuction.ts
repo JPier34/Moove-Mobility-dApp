@@ -119,9 +119,20 @@ export function useSealedBidAuction(): SealedBidAuctionHandler {
 
         // Call submitSealedBid function with ETH value
         // The contract expects ETH to be sent with the transaction for validation
-        const tx = await auctionContract.submitSealedBid(auctionId, bidHash, {
-          value: bidAmountWei, // Send ETH with the transaction
+        console.log("🔍 Debug bidAmountWei:", {
+          bidAmountWei,
+          type: typeof bidAmountWei,
+          toString: bidAmountWei.toString(),
         });
+
+        const tx = await auctionContract.submitSealedBid(
+          auctionId,
+          bidHash,
+          bidAmountWei, // Third parameter: bidAmount (ignored by contract)
+          {
+            value: bidAmountWei, // ETH sent with transaction
+          }
+        );
         console.log(`📝 Submit sealed bid transaction submitted: ${tx.hash}`);
 
         await tx.wait();

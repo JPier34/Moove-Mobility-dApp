@@ -649,7 +649,9 @@ export default function MyCollection() {
       category: "VEHICLE_DECORATION",
       finalBid: nft.price,
       bidders: nft.auctionWon?.bidders || 0,
-      endTime: nft.purchaseDate.getTime(),
+      endTime: nft.purchaseDate
+        ? new Date(nft.purchaseDate).getTime()
+        : Date.now(),
       transactionHash: nft.transactionHash,
       status: 4, // SETTLED
       isSettled: true,
@@ -657,7 +659,7 @@ export default function MyCollection() {
       hasName: true,
       // Legacy fields for compatibility
       nftName: nft.name,
-      nftImage: nft.image,
+      nftImage: nft.image, // ✅ CORRETTO: nftImage per il modal
       isClaimed: true,
     };
 

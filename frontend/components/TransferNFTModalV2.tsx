@@ -10,6 +10,23 @@ import { toast } from "react-hot-toast";
 import { nftEvents } from "@/utils/nftEvents";
 import { ArrowRight, CheckCircle, XCircle, Loader2 } from "lucide-react";
 
+// ✅ Helper function to convert IPFS hash to full URL
+const convertIPFSToURL = (src: string): string => {
+  if (!src) return "/images/default-nft.svg";
+
+  // If it's already a full URL, return as-is
+  if (src.startsWith("http")) return src;
+
+  // If it's an IPFS hash (starts with Qm or bafy), convert to URL
+  const isIPFSHash = /^(Qm[a-zA-Z0-9]{44}|bafy[a-zA-Z0-9]{50,})/.test(src);
+  if (isIPFSHash) {
+    return `https://ipfs.io/ipfs/${src}`;
+  }
+
+  // Fallback
+  return src;
+};
+
 interface TransferNFTModalV2Props {
   nft: WonAuction | null;
   isOpen: boolean;
@@ -55,10 +72,16 @@ export default function TransferNFTModalV2({
     }
   }, [isOpen, resetTransferState]);
 
-  // Gestione successo trasferimento
+  // ✅ Gestione successo trasferimento - ora aspetta la conferma
   useEffect(() => {
-    if (isSuccess && transferState.transactionHash && nft) {
-      console.log(`🎉 NFT transfer successful: ${nft.nftId}`);
+    if (
+      transferState.status === "success" &&
+      transferState.transactionHash &&
+      nft
+    ) {
+      console.log(
+        `🎉 NFT transfer confirmed: ${nft.nftId}, tx: ${transferState.transactionHash}`
+      );
 
       // Close modal and let the success modal handle the reload
       onSuccess?.();
@@ -66,7 +89,7 @@ export default function TransferNFTModalV2({
       // NO automatic reload here - handled by success modal
     }
   }, [
-    isSuccess,
+    transferState.status,
     transferState.transactionHash,
     nft?.nftId,
     onSuccess,
@@ -187,7 +210,7 @@ export default function TransferNFTModalV2({
               {/* NFT Preview */}
               <div className="flex items-center space-x-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
                 <img
-                  src={nft.nftImage || "/images/default-nft.svg"}
+                  src={convertIPFSToURL(nft.nftImage || "")}
                   alt={nft.nftName}
                   className="w-16 h-16 rounded-lg object-cover"
                 />

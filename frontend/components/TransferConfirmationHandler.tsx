@@ -3,7 +3,7 @@
 import React, { useEffect, useRef } from "react";
 import { useNFTTransferNotifications } from "@/providers/NFTTransferNotificationsProvider";
 import { useWriteMooveNFT } from "@/hooks/useContract";
-import { useAccount } from "wagmi";
+import { useAccount, useWaitForTransactionReceipt } from "wagmi";
 
 export default function TransferConfirmationHandler() {
   const { address } = useAccount();
@@ -16,7 +16,19 @@ export default function TransferConfirmationHandler() {
     failTransfer,
   } = useNFTTransferNotifications();
 
-  const { writeMooveNFT, isPending, error, isSuccess } = useWriteMooveNFT();
+  const {
+    writeMooveNFT,
+    isPending,
+    error,
+    isSuccess,
+    hash: transactionHash,
+  } = useWriteMooveNFT();
+
+  // ✅ Hook per aspettare la conferma della transazione
+  const { isLoading: isConfirming, isSuccess: isConfirmed } =
+    useWaitForTransactionReceipt({
+      hash: transactionHash,
+    });
 
   // Ref per tracciare se il trasferimento è già stato eseguito
   const hasExecutedTransfer = useRef(false);
@@ -92,20 +104,20 @@ export default function TransferConfirmationHandler() {
     failTransfer,
   ]);
 
-  // Gestisce il successo della transazione
+  // ✅ Gestisce la conferma della transazione (non solo l'invio)
   useEffect(() => {
-    if (isSuccess) {
-      console.log(`✅ Transfer transaction successful`);
+    if (isConfirmed && transactionHash) {
+      console.log(`✅ Transfer transaction confirmed: ${transactionHash}`);
 
       // Always complete the transfer to show success modal
       // The recursive prevention is only for the contract call, not the completion
-      completeTransfer("transaction-hash");
+      completeTransfer(transactionHash);
 
       // Reset del flag per permettere nuovi trasferimenti
       hasExecutedTransfer.current = false;
       lastTransferKey.current = null;
     }
-  }, [isSuccess, completeTransfer]);
+  }, [isConfirmed, transactionHash, completeTransfer]);
 
   // Gestisce gli errori della transazione
   useEffect(() => {

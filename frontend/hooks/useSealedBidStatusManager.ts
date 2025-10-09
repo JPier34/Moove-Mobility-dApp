@@ -21,7 +21,7 @@ export function useSealedBidStatusManager(): SealedBidStatusManager {
     isPending,
     error: revealError,
   } = useStartRevealPhase();
-  const { notifySealedBidWin, notifyAuctionFailed, notifyClaimReady } =
+  const { notifySealedBidWin, notifySealedBidLoss, notifyAuctionFailed, notifyClaimReady } =
     useAuctionNotificationTriggers();
 
   // Check if current user is the winner of a sealed bid auction
@@ -128,6 +128,28 @@ export function useSealedBidStatusManager(): SealedBidStatusManager {
             userAddress: address,
             timestamp: new Date().toISOString(),
           });
+
+          // ✅ ADD: Notify user they lost the sealed bid auction
+          notifySealedBidLoss(
+            auctionId.toString(),
+            highestBidder,
+            parseFloat(ethers.formatEther(highestBid))
+          );
+
+          // Emit custom event for loser notification
+          const loserEvent = new CustomEvent("sealedBidLoser", {
+            detail: {
+              auctionId,
+              winner: highestBidder,
+              winningBid: ethers.formatEther(highestBid),
+              userAddress: address,
+              auctionStatus,
+              timestamp: new Date().toISOString(),
+            },
+          });
+          window.dispatchEvent(loserEvent);
+
+          console.log(`✅ Loser notification sent for auction ${auctionId}`);
         }
       } catch (error) {
         console.error(`❌ Error checking winner for auction ${auctionId}:`, {

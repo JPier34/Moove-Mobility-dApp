@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useAccount } from "wagmi";
 import { ethers } from "ethers";
+import { useQueryClient } from "@tanstack/react-query";
 import { useWriteMooveAuction } from "./useContract";
 import { useAuctionEventListening } from "./useAuctionEventListening";
 import { useAuctionStateVerification } from "./useAuctionStateVerification";
@@ -19,6 +20,7 @@ interface PendingBid {
 
 export function useEnglishAuction(auctionId?: number) {
   const { address, isConnected } = useAccount();
+  const queryClient = useQueryClient();
   const { writeMooveAuction } = useWriteMooveAuction();
   const { verifyAuctionStateWithRetry } = useAuctionStateVerification();
   const { notifyAuctionFailed, notifyAuctionSuccess, notifyEnglishWin } =
@@ -169,6 +171,18 @@ export function useEnglishAuction(auctionId?: number) {
             );
             if (verified) {
               console.log(`✅ Bid verified for auction ${auctionId}`);
+
+              // ✅ Invalidate queries to refresh auction data
+              queryClient.invalidateQueries({
+                queryKey: ["auction", auctionId.toString()],
+              });
+              queryClient.invalidateQueries({
+                queryKey: ["auctions"],
+              });
+              queryClient.invalidateQueries({
+                queryKey: ["auctionBids", auctionId.toString()],
+              });
+
               notifyAuctionSuccess(
                 auctionId.toString(),
                 `Bid of ${bidAmount} ETH placed successfully!`
@@ -289,6 +303,17 @@ export function useEnglishAuction(auctionId?: number) {
           }
           pendingBids.current.delete(Number(eventAuctionId));
 
+          // ✅ Invalidate queries to refresh auction data
+          queryClient.invalidateQueries({
+            queryKey: ["auction", eventAuctionId.toString()],
+          });
+          queryClient.invalidateQueries({
+            queryKey: ["auctions"],
+          });
+          queryClient.invalidateQueries({
+            queryKey: ["auctionBids", eventAuctionId.toString()],
+          });
+
           // Show success notification
           notifyAuctionSuccess(
             eventAuctionId.toString(),
@@ -296,7 +321,7 @@ export function useEnglishAuction(auctionId?: number) {
           );
         }
       },
-      [notifyAuctionSuccess]
+      [notifyAuctionSuccess, queryClient]
     ),
   });
 

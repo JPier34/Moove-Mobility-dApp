@@ -7,8 +7,9 @@ import { useSecureNFTAuctionFlow } from "@/hooks/useSecureNFTAuction";
 import { useNFTValidationAPI } from "@/hooks/useNFTValidationAPI";
 import { AuctionType } from "@/types/auction";
 import { useRouter } from "next/navigation";
-import { toast } from "react-hot-toast";
 import { ethers } from "ethers";
+import { contracts } from "@/utils/contracts";
+import { toast } from "react-hot-toast";
 import AuctionValidationModal from "./AuctionValidationModal";
 import {
   useAuctionValidationModular,
@@ -875,8 +876,47 @@ function AdminNFTCreatorUltraSimpleContent() {
             window.location.href = successUrl;
           }
         } else {
-          // Fallback redirect when secureResult is null
-          console.log("🎯 Using fallback redirect to /auctions");
+          // ✅ NEW: Check if auction was created but failed security validation
+          console.log(
+            "🔍 secureResult is null - checking if auction was created..."
+          );
+
+          // Try to get the latest auction ID to see if creation succeeded
+          try {
+            const provider = new ethers.BrowserProvider(window.ethereum as any);
+            const auctionContract = new ethers.Contract(
+              contracts.MooveAuction.address,
+              contracts.MooveAuction.abi,
+              provider
+            );
+
+            // Get total auction count to find the latest auction
+            const totalAuctions = await auctionContract.getTotalAuctions();
+            const latestAuctionId = Number(totalAuctions) - 1;
+
+            if (latestAuctionId >= 0) {
+              // Auction was created, but failed security validation
+              console.log(
+                `⚠️ Auction #${latestAuctionId} was created but failed security validation`
+              );
+
+              // Show modal with security validation details
+              toast.error(
+                `Auction #${latestAuctionId} was created but failed security validation. Please check the Auction Security Validator for details.`,
+                { duration: 8000 }
+              );
+
+              // Don't redirect - let user see the validation results
+              return;
+            }
+          } catch (error) {
+            console.warn("Could not check auction creation status:", error);
+          }
+
+          // ✅ FALLBACK: Only redirect if auction creation actually failed
+          console.log(
+            "🎯 Auction creation failed - using fallback redirect to /auctions"
+          );
           setTimeout(() => {
             router.push("/auctions");
           }, 2000);
@@ -1402,9 +1442,8 @@ function AdminNFTCreatorUltraSimpleContent() {
                   </div>
                 )}
 
-                {/* Buy Now Price - Only show for English and Reserve auctions */}
-                {(auctionFormData.auctionType === AuctionType.ENGLISH ||
-                  auctionFormData.auctionType === AuctionType.RESERVE) && (
+                {/* Buy Now Price - Only show for Dutch auctions */}
+                {auctionFormData.auctionType === AuctionType.DUTCH && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Buy Now Price (ETH)

@@ -273,7 +273,7 @@ export function useEventBasedClaim() {
         // Step 1: Call endAuction first if auction is still ACTIVE
         console.log(`🔄 Step 1: Ending auction ${auctionId}...`);
         writeContract({
-          address: contracts.MooveAuction.address,
+          address: contracts.MooveAuction.address as `0x${string}`,
           abi: contracts.MooveAuction.abi,
           functionName: "endAuction",
           args: [auctionId],
@@ -314,7 +314,7 @@ export function useEventBasedClaim() {
         setTimeout(() => {
           console.log(`💰 Step 2: Settling auction ${currentAuctionId}...`);
           writeContract({
-            address: contracts.MooveAuction.address,
+            address: contracts.MooveAuction.address as `0x${string}`,
             abi: contracts.MooveAuction.abi,
             functionName: "settleAuction",
             args: [currentAuctionId],

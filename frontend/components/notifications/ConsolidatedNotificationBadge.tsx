@@ -93,6 +93,7 @@ export default function ConsolidatedNotificationBadge({
     notificationType: claim.notificationType, // Pass through the notification type
   }));
 
+
   // Combine all notifications and filter for current user
   const allNotifications = [
     ...refundNotificationsFormatted,
@@ -128,6 +129,18 @@ export default function ConsolidatedNotificationBadge({
       markClaimAsRead(notification.id);
 
       // Handle endAuction
+      // ✅ SECURITY: Rate limiting check (moved outside try block for error handling)
+      const userAttemptsKey = `endAuction_attempts_${address}_${notification.auctionId}`;
+      const attempts = parseInt(localStorage.getItem(userAttemptsKey) || "0");
+      const MAX_ATTEMPTS = 3;
+
+      if (attempts >= MAX_ATTEMPTS) {
+        toast.error(
+          `Too many attempts for auction ${notification.auctionId}. Please wait before trying again.`
+        );
+        return;
+      }
+
       try {
         console.log(
           `🏁 [EndAuction] Starting endAuction process for auction ${notification.auctionId}`
@@ -171,21 +184,6 @@ export default function ConsolidatedNotificationBadge({
           return;
         }
 
-        // ✅ SECURITY: Rate limiting check
-        const userAttemptsKey = `endAuction_attempts_${address}_${notification.auctionId}`;
-        const attempts = parseInt(localStorage.getItem(userAttemptsKey) || "0");
-        const MAX_ATTEMPTS = 3;
-
-        if (attempts >= MAX_ATTEMPTS) {
-          toast.error(
-            `Too many attempts for auction ${notification.auctionId}. Please wait before trying again.`
-          );
-          return;
-        }
-
-        // ✅ SECURITY: Increment attempt counter
-        localStorage.setItem(userAttemptsKey, (attempts + 1).toString());
-
         // ✅ SECURITY: Call endAuction with gas limit to prevent griefing
         const tx = await auctionContract.endAuction(notification.auctionId, {
           gasLimit: CONFIG.GAS_LIMITS.END_AUCTION,
@@ -199,6 +197,9 @@ export default function ConsolidatedNotificationBadge({
         // Wait for transaction confirmation
         const receipt = await tx.wait();
         console.log(`🏁 [EndAuction] Transaction confirmed:`, receipt);
+
+        // ✅ SECURITY: Only increment counter AFTER successful confirmation
+        localStorage.setItem(userAttemptsKey, (attempts + 1).toString());
 
         toast.success(
           `Auction ${notification.auctionId} ended successfully! You can now settle it.`,
@@ -214,21 +215,56 @@ export default function ConsolidatedNotificationBadge({
         removePermanentClaimNotification(notification.id);
       } catch (error) {
         console.error(
-          `❌ [Claim] Error handling claim for auction ${notification.auctionId}:`,
+          `❌ [EndAuction] Error handling endAuction for auction ${notification.auctionId}:`,
           error
         );
 
-        // Show error message
+        // ✅ SECURITY: Don't penalize users for network errors
+        const errorMessage = (error as Error).message;
+        if (
+          errorMessage.includes("network") ||
+          errorMessage.includes("timeout") ||
+          errorMessage.includes("connection")
+        ) {
+          toast.error(
+            `Network error ending auction ${notification.auctionId}. Please check your connection and try again.`
+          );
+          return; // Don't increment counter for network errors
+        }
+
+        // ✅ SECURITY: Only increment counter for real errors (revert, invalid state, etc.)
+        localStorage.setItem(userAttemptsKey, (attempts + 1).toString());
         toast.error(
           `Failed to end auction ${notification.auctionId}: ${
             error instanceof Error ? error.message : "Unknown error"
           }`
         );
       }
+    } else if (
+      notification.type === "settleAuction" &&
+      notification.auctionType === "SEALED_BID"
+    ) {
+      // Per Sealed Bid, rimuovi direttamente la notifica senza chiamare settleAuction
+      // perché endAuction() ha già fatto tutto automaticamente
+      removePermanentClaimNotification(notification.id);
+      markClaimAsRead(notification.id);
+      return;
     } else if (notification.type === "settleAuction") {
       markClaimAsRead(notification.id);
 
       // Handle settleAuction
+      // ✅ SECURITY: Rate limiting check (moved outside try block for error handling)
+      const userAttemptsKey = `settleAuction_attempts_${address}_${notification.auctionId}`;
+      const attempts = parseInt(localStorage.getItem(userAttemptsKey) || "0");
+      const MAX_ATTEMPTS = 3;
+
+      if (attempts >= MAX_ATTEMPTS) {
+        toast.error(
+          `Too many attempts for auction ${notification.auctionId}. Please wait before trying again.`
+        );
+        return;
+      }
+
       try {
         console.log(
           `🏆 [SettleAuction] Starting settleAuction process for auction ${notification.auctionId}`
@@ -260,21 +296,6 @@ export default function ConsolidatedNotificationBadge({
           );
           return;
         }
-
-        // ✅ SECURITY: Rate limiting check
-        const userAttemptsKey = `settleAuction_attempts_${address}_${notification.auctionId}`;
-        const attempts = parseInt(localStorage.getItem(userAttemptsKey) || "0");
-        const MAX_ATTEMPTS = 3;
-
-        if (attempts >= MAX_ATTEMPTS) {
-          toast.error(
-            `Too many attempts for auction ${notification.auctionId}. Please wait before trying again.`
-          );
-          return;
-        }
-
-        // ✅ SECURITY: Increment attempt counter
-        localStorage.setItem(userAttemptsKey, (attempts + 1).toString());
 
         // ✅ SECURITY: Minimal logging to reduce information disclosure
         console.log(
@@ -315,6 +336,9 @@ export default function ConsolidatedNotificationBadge({
         const receipt = await tx.wait();
         console.log(`🏆 [SettleAuction] Transaction confirmed:`, receipt);
 
+        // ✅ SECURITY: Only increment counter AFTER successful confirmation
+        localStorage.setItem(userAttemptsKey, (attempts + 1).toString());
+
         // Check if it was a Reserve Auction below reserve (cancelled automatically)
         if (auctionType === 3 && highestBid < reservePrice) {
           toast.success(
@@ -342,6 +366,22 @@ export default function ConsolidatedNotificationBadge({
           `❌ [SettleAuction] Error settling auction ${notification.auctionId}:`,
           error
         );
+
+        // ✅ SECURITY: Don't penalize users for network errors
+        const errorMessage = error.message || "";
+        if (
+          errorMessage.includes("network") ||
+          errorMessage.includes("timeout") ||
+          errorMessage.includes("connection")
+        ) {
+          toast.error(
+            `Network error settling auction ${notification.auctionId}. Please check your connection and try again.`
+          );
+          return; // Don't increment counter for network errors
+        }
+
+        // ✅ SECURITY: Only increment counter for real errors (revert, invalid state, etc.)
+        localStorage.setItem(userAttemptsKey, (attempts + 1).toString());
         toast.error(
           `Failed to settle auction ${notification.auctionId}: ${error.message}`
         );
@@ -364,7 +404,7 @@ export default function ConsolidatedNotificationBadge({
 
   const handleClearAll = () => {
     clearAllRefundNotifications();
-    clearAllClaimNotifications();
+    clearAllClaimNotificationsSafe(); // ✅ PROTECTION: Use safe version to preserve permanent notifications
     setIsOpen(false);
   };
 
@@ -480,9 +520,11 @@ export default function ConsolidatedNotificationBadge({
                           {new Date(notification.timestamp).toLocaleString()}
                         </p>
 
-                        {notification.transactionHash &&
-                          notification.transactionHash !==
-                            "expired-auction" && (
+                        {"transactionHash" in notification &&
+                          notification.transactionHash &&
+                          notification.transactionHash !== "expired-auction" &&
+                          notification.type !== "sealedBidWin" &&
+                          notification.type !== "sealedBidLoss" && (
                             <a
                               href={`${CONFIG.ETHERSCAN_BASE_URL}/tx/${notification.transactionHash}#internal`}
                               target="_blank"

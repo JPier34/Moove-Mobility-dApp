@@ -1,9 +1,9 @@
 "use client";
 
-
 import React, { useState } from "react";
 import { useAccount } from "wagmi";
 import { ethers } from "ethers";
+import { EventLog } from "ethers";
 import { contracts } from "@/utils/contracts";
 import Button from "../ui/Button";
 
@@ -90,13 +90,15 @@ export default function Auction30Debugger() {
 
       console.log("📡 BidRefunded events for auction #30:", events);
 
-      const refundDetails = events.map((event) => ({
-        auctionId: event.args.auctionId.toString(),
-        bidder: event.args.bidder,
-        amount: ethers.formatEther(event.args.amount),
-        blockNumber: event.blockNumber,
-        transactionHash: event.transactionHash,
-      }));
+      const refundDetails = events
+        .filter((event): event is EventLog => "args" in event)
+        .map((event) => ({
+          auctionId: event.args.auctionId.toString(),
+          bidder: event.args.bidder,
+          amount: ethers.formatEther(event.args.amount),
+          blockNumber: event.blockNumber,
+          transactionHash: event.transactionHash,
+        }));
 
       setRefundEvents(refundDetails);
 
@@ -348,9 +350,3 @@ export default function Auction30Debugger() {
     </div>
   );
 }
-
-
-
-
-
-

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useAccount } from "wagmi";
+import { useQueryClient } from "@tanstack/react-query";
 import { usePlaceBid } from "./useAuction";
 import { parseEther, formatEther } from "viem";
 
@@ -24,6 +25,7 @@ export interface ReserveAuctionHandler {
 
 export function useReserveAuction(): ReserveAuctionHandler {
   const { address, isConnected } = useAccount();
+  const queryClient = useQueryClient();
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<
@@ -144,6 +146,23 @@ export function useReserveAuction(): ReserveAuctionHandler {
   );
 
   // Buy now functionality removed - not supported for Reserve auctions
+
+  // ✅ Handle successful bid and invalidate queries
+  useEffect(() => {
+    if (isSuccess) {
+      console.log("✅ Reserve auction bid successful, invalidating queries");
+
+      // Invalidate queries to refresh auction data
+      queryClient.invalidateQueries({
+        queryKey: ["auctions"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["auctionBids"],
+      });
+
+      setStep("success");
+    }
+  }, [isSuccess, queryClient]);
 
   return {
     placeBid: placeBidWithValidation,

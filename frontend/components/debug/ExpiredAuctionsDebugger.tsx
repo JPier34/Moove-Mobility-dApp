@@ -78,7 +78,7 @@ export default function ExpiredAuctionsDebugger() {
 
           const isExpired = now > endTime;
           const isUserWinner =
-            highestBidder.toLowerCase() === address.toLowerCase();
+            address && highestBidder.toLowerCase() === address.toLowerCase();
 
           // Check if auction is expired and user is winner
           if (isExpired && isUserWinner && status === 1) {
@@ -231,5 +231,3 @@ export default function ExpiredAuctionsDebugger() {
     </div>
   );
 }
-
-

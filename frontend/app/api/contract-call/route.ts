@@ -9,8 +9,15 @@ const client = createPublicClient({
 });
 
 export async function POST(request: NextRequest) {
+  let method: string = "unknown";
+  let args: unknown[] = [];
+  let contract: string = "unknown";
+
   try {
-    const { method, args, contract = "nft" } = await request.json();
+    const requestData = await request.json();
+    method = requestData.method;
+    args = requestData.args;
+    contract = requestData.contract || "nft";
 
     console.log(
       `🔍 API Contract Call: ${contract}.${method}(${JSON.stringify(args)})`
@@ -44,12 +51,14 @@ export async function POST(request: NextRequest) {
     });
 
     console.log(`✅ Contract call successful:`, result);
-    
+
     // ✅ FIX: Handle BigInt serialization
-    const serializedResult = JSON.parse(JSON.stringify(result, (key, value) =>
-      typeof value === 'bigint' ? value.toString() : value
-    ));
-    
+    const serializedResult = JSON.parse(
+      JSON.stringify(result, (key, value) =>
+        typeof value === "bigint" ? value.toString() : value
+      )
+    );
+
     return NextResponse.json(serializedResult);
   } catch (error) {
     console.error("❌ Contract call error:", error);

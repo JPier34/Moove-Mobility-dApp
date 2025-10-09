@@ -5,7 +5,9 @@
 export const CONTRACT_ADDRESSES = {
   MooveAccessControl: "0x005672EcC14b09A958742B960Ebb76eBE52Be44A",
   MooveNFT: "0x40E455515bf712144C1A5D859F19d64b537754f7",
-  MooveAuction: process.env.NEXT_PUBLIC_MOOVE_AUCTION_ADDRESS || "0xE8f6836A0054B83b9a952e8B62D92e62f5c67606",
+  MooveAuction:
+    process.env.NEXT_PUBLIC_MOOVE_AUCTION_ADDRESS ||
+    "0xE8f6836A0054B83b9a952e8B62D92e62f5c67606",
   MooveRentalPass: "0x74aAb47A0439B728A5956A1d7faAc6716F1F18Df",
 } as const;
 
@@ -97,22 +99,22 @@ export const contracts = {
 
 // Wagmi Contract Configurations
 export const auctionContractConfig = {
-  address: CONTRACT_ADDRESSES.MooveAuction,
+  address: CONTRACT_ADDRESSES.MooveAuction as `0x${string}`,
   abi: extractABI(MooveAuctionABI),
 } as const;
 
 export const nftContractConfig = {
-  address: CONTRACT_ADDRESSES.MooveNFT,
+  address: CONTRACT_ADDRESSES.MooveNFT as `0x${string}`,
   abi: extractABI(MooveNFTABI),
 } as const;
 
 export const accessControlContractConfig = {
-  address: CONTRACT_ADDRESSES.MooveAccessControl,
+  address: CONTRACT_ADDRESSES.MooveAccessControl as `0x${string}`,
   abi: extractABI(MooveAccessControlABI),
 } as const;
 
 export const rentalPassContractConfig = {
-  address: CONTRACT_ADDRESSES.MooveRentalPass,
+  address: CONTRACT_ADDRESSES.MooveRentalPass as `0x${string}`,
   abi: extractABI(MooveRentalPassABI),
 } as const;
 

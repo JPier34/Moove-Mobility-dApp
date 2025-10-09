@@ -74,7 +74,7 @@ export function useReadMooveAuction<T = any>(
   options?: { enabled?: boolean }
 ) {
   return useReadContract({
-    address: contracts.MooveAuction.address,
+    address: contracts.MooveAuction.address as `0x${string}`,
     abi: contracts.MooveAuction.abi,
     functionName: functionName as any,
     args: args as any,
@@ -95,7 +95,7 @@ export function useReadMooveNFT<T = any>(
   options?: { enabled?: boolean }
 ) {
   return useReadContract({
-    address: contracts.MooveNFT.address,
+    address: contracts.MooveNFT.address as `0x${string}`,
     abi: contracts.MooveNFT.abi,
     functionName: functionName as any,
     args: args as any,
@@ -121,7 +121,7 @@ export function useWriteMooveAuction() {
   const writeMooveAuction = useCallback(
     (functionName: string, args: readonly unknown[], value?: bigint) => {
       writeContract({
-        address: contracts.MooveAuction.address,
+        address: contracts.MooveAuction.address as `0x${string}`,
         abi: contracts.MooveAuction.abi,
         functionName: functionName as any,
         args: args as any,
@@ -147,7 +147,7 @@ export function useWriteMooveNFT() {
   const writeMooveNFT = useCallback(
     (functionName: string, args: readonly unknown[], value?: bigint) => {
       writeContract({
-        address: contracts.MooveNFT.address,
+        address: contracts.MooveNFT.address as `0x${string}`,
         abi: contracts.MooveNFT.abi,
         functionName: functionName as any,
         args: args as any,

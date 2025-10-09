@@ -78,7 +78,10 @@ export default function Auction31Debugger() {
       console.log("🔍 Auction Type Analysis:", {
         rawAuctionType: auction.auctionType,
         parsedAuctionType: Number(auction.auctionType),
-        typeName: auctionTypeNames[Number(auction.auctionType)],
+        typeName:
+          auctionTypeNames[
+            Number(auction.auctionType) as keyof typeof auctionTypeNames
+          ] || "UNKNOWN",
         expectedForReserve: 3,
         isCorrect: Number(auction.auctionType) === 3,
       });
@@ -237,6 +240,3 @@ export default function Auction31Debugger() {
     </div>
   );
 }
-
-
-
