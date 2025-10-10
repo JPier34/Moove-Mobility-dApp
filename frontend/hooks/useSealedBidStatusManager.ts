@@ -10,19 +10,29 @@ interface SealedBidStatusManager {
   startRevealPhaseForNewAuction: (auctionId: number) => Promise<boolean>;
   isProcessing: boolean;
   error: string | null;
+  setRemoveFromMonitoringCallback: (
+    callback: (auctionId: number) => void
+  ) => void;
 }
 
 export function useSealedBidStatusManager(): SealedBidStatusManager {
   const { address, isConnected } = useAccount();
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [removeFromMonitoringCallback, setRemoveFromMonitoringCallback] =
+    useState<((auctionId: number) => void) | null>(null);
+
   const {
     startRevealPhase,
     isPending,
     error: revealError,
   } = useStartRevealPhase();
-  const { notifySealedBidWin, notifySealedBidLoss, notifyAuctionFailed, notifyClaimReady } =
-    useAuctionNotificationTriggers();
+  const {
+    notifySealedBidWin,
+    notifySealedBidLoss,
+    notifyAuctionFailed,
+    notifyClaimReady,
+  } = useAuctionNotificationTriggers();
 
   // Check if current user is the winner of a sealed bid auction
   const checkForWinner = useCallback(
@@ -32,24 +42,153 @@ export function useSealedBidStatusManager(): SealedBidStatusManager {
       try {
         // Get auction data to find the winner
         const auctionData = await auctionContract.getAuction(auctionId);
-        const highestBidder = auctionData.highestBidder;
-        const highestBid = auctionData.highestBid;
-
-        // Get auction status for detailed logging
+        const auctionType = Number(auctionData.auctionType);
         const auctionStatus = Number(auctionData.status);
 
         console.log(`🔍 Checking winner for auction ${auctionId}:`, {
           auctionStatus,
-          highestBidder,
-          highestBid: ethers.formatEther(highestBid),
+          auctionType,
           currentUser: address,
-          isWinner:
-            typeof highestBidder === "string" &&
-            highestBidder.toLowerCase() === address.toLowerCase(),
-          isZeroAddress: highestBidder === ethers.ZeroAddress,
-          isZeroBid: highestBid === 0n,
           timestamp: new Date().toISOString(),
         });
+
+        // For sealed bid auctions, check actual bids instead of highestBidder
+        if (auctionType === 2) {
+          console.log(`🔒 Checking sealed bid auction ${auctionId} bids...`);
+
+          try {
+            // Get all bids for this auction
+            const bids = await auctionContract.getAuctionBids(auctionId);
+            console.log(
+              `📋 Found ${bids.length} bids for auction ${auctionId}:`,
+              bids
+            );
+
+            if (bids.length === 0) {
+              console.log(`❌ Auction ${auctionId} FAILED - No bids found`);
+              notifyAuctionFailed(auctionId.toString(), "no bids were placed");
+
+              // ✅ STOP MONITORING: Remove from monitoring to prevent recursive notifications
+              console.log(
+                `🛑 [SealedBid] Stopping monitoring for auction ${auctionId} - no bids found`
+              );
+              if (removeFromMonitoringCallback) {
+                removeFromMonitoringCallback(auctionId);
+              }
+              return;
+            }
+
+            // Find the highest bid
+            let highestBid = 0n;
+            let highestBidder = "";
+            let userBid = 0n;
+            let userIsWinner = false;
+
+            for (const bid of bids) {
+              const bidAmount = bid.amount || bid.bidAmount || 0n;
+              const bidder = bid.bidder || bid.bidderAddress || "";
+
+              console.log(
+                `💰 Bid: ${ethers.formatEther(bidAmount)} ETH from ${bidder}`
+              );
+
+              if (bidAmount > highestBid) {
+                highestBid = bidAmount;
+                highestBidder = bidder;
+              }
+
+              if (bidder.toLowerCase() === address.toLowerCase()) {
+                userBid = bidAmount;
+              }
+            }
+
+            userIsWinner =
+              highestBidder.toLowerCase() === address.toLowerCase();
+
+            console.log(`🏆 Sealed bid auction ${auctionId} results:`, {
+              totalBids: bids.length,
+              highestBid: ethers.formatEther(highestBid),
+              highestBidder,
+              userBid: ethers.formatEther(userBid),
+              userIsWinner,
+            });
+
+            if (highestBid === 0n) {
+              console.log(`❌ Auction ${auctionId} FAILED - All bids are zero`);
+              notifyAuctionFailed(auctionId.toString(), "all bids were zero");
+
+              // ✅ STOP MONITORING: Remove from monitoring to prevent recursive notifications
+              console.log(
+                `🛑 [SealedBid] Stopping monitoring for auction ${auctionId} - auction failed`
+              );
+              if (removeFromMonitoringCallback) {
+                removeFromMonitoringCallback(auctionId);
+              }
+              return;
+            }
+
+            if (userIsWinner) {
+              console.log(`🏆 USER WON sealed bid auction ${auctionId}:`, {
+                winningBid: ethers.formatEther(highestBid),
+                winner: address,
+              });
+              notifySealedBidWin(
+                auctionId.toString(),
+                parseFloat(ethers.formatEther(highestBid))
+              );
+
+              // ✅ ADD CLAIM FUNCTIONALITY: Also add a claim notification
+              // This will allow the user to claim their sealed bid win
+              notifyClaimReady(auctionId.toString());
+
+              // ✅ STOP MONITORING: Remove from monitoring to prevent recursive notifications
+              console.log(
+                `🛑 [SealedBid] Stopping monitoring for auction ${auctionId} - user won`
+              );
+              if (removeFromMonitoringCallback) {
+                removeFromMonitoringCallback(auctionId);
+              }
+            } else {
+              console.log(`😔 USER LOST sealed bid auction ${auctionId}:`, {
+                winner: highestBidder,
+                winningBid: ethers.formatEther(highestBid),
+                userBid: ethers.formatEther(userBid),
+              });
+              notifySealedBidLoss(
+                auctionId.toString(),
+                highestBidder,
+                parseFloat(ethers.formatEther(highestBid))
+              );
+
+              // ✅ STOP MONITORING: Remove from monitoring to prevent recursive notifications
+              console.log(
+                `🛑 [SealedBid] Stopping monitoring for auction ${auctionId} - user lost`
+              );
+              if (removeFromMonitoringCallback) {
+                removeFromMonitoringCallback(auctionId);
+              }
+            }
+          } catch (error) {
+            console.error(
+              `❌ Error checking sealed bid bids for auction ${auctionId}:`,
+              error
+            );
+            notifyAuctionFailed(auctionId.toString(), "error checking bids");
+
+            // ✅ STOP MONITORING: Remove from monitoring to prevent recursive notifications
+            console.log(
+              `🛑 [SealedBid] Stopping monitoring for auction ${auctionId} - error checking bids`
+            );
+            if (removeFromMonitoringCallback) {
+              removeFromMonitoringCallback(auctionId);
+            }
+          }
+          return;
+        }
+
+        // For non-sealed bid auctions, use the original logic
+        const highestBidder = auctionData.highestBidder;
+        const highestBid = auctionData.highestBid;
 
         // Check if there's a valid winner
         if (highestBidder === ethers.ZeroAddress || highestBid === 0n) {
@@ -188,7 +327,7 @@ export function useSealedBidStatusManager(): SealedBidStatusManager {
         const auctionData = await auctionContract.getAuction(auctionId);
 
         // Debug: Log complete auction data structure
-        console.log(`🔍 Complete auction data for ${auctionId}:`, {
+        console.log(`🔍 [SealedBid] Complete auction data for ${auctionId}:`, {
           auctionId,
           rawData: auctionData,
           keys: Object.keys(auctionData),
@@ -248,10 +387,26 @@ export function useSealedBidStatusManager(): SealedBidStatusManager {
           return;
         }
 
-        // Handle ACTIVE -> REVEAL transition for sealed bid auctions
+        // Debug: Log transition logic
+        console.log(
+          `🔍 [SealedBid] Transition logic for auction ${auctionId}:`,
+          {
+            auctionId,
+            currentStatus,
+            auctionType: Number(auctionData.auctionType),
+            endTime,
+            currentTime,
+            timeExpired: currentTime >= endTime,
+            shouldTransition: currentStatus === 1 && currentTime >= endTime,
+            isSealedBid: Number(auctionData.auctionType) === 2,
+            timestamp: new Date().toISOString(),
+          }
+        );
+
+        // Handle ACTIVE -> NOTIFICATION for sealed bid auctions
         if (currentStatus === 1 && currentTime >= endTime) {
           console.log(
-            `🔓 ACTIVE -> REVEAL: Starting reveal phase for sealed bid auction ${auctionId}:`,
+            `🔔 [SealedBid] ACTIVE -> NOTIFICATION: Sealed bid auction ${auctionId} expired:`,
             {
               auctionId,
               currentStatus,
@@ -265,85 +420,42 @@ export function useSealedBidStatusManager(): SealedBidStatusManager {
           );
 
           try {
-            const signer = await provider.getSigner();
-            const auctionContractWithSigner = auctionContract.connect(signer);
-
-            console.log(`🔓 Starting reveal phase for auction ${auctionId}`);
-            const revealTx = await (
-              auctionContractWithSigner as any
-            ).startRevealPhase(auctionId);
+            // Check for winner without ending the auction
             console.log(
-              `📝 Start reveal phase transaction submitted: ${revealTx.hash}`
+              `🔍 Checking winner for expired sealed bid auction ${auctionId}`
             );
-
-            await revealTx.wait();
-            console.log(
-              `✅ Reveal phase started successfully for auction ${auctionId}`
-            );
-
-            // Notifica gestita dal sistema unificato
-            console.log(`🔓 Reveal phase started for auction #${auctionId}`);
-
-            // After starting reveal phase, immediately end the auction
-            setTimeout(async () => {
-              try {
-                // Check if automatic system is active
-                const isAutomaticSystemActive =
-                  typeof window !== "undefined" &&
-                  localStorage.getItem("auction-monitoring-active") === "true";
-
-                if (isAutomaticSystemActive) {
-                  console.log(
-                    `⏭️ Automatic system is active, skipping manual endAuction for auction ${auctionId}`
-                  );
-                  return;
-                }
-
-                console.log(
-                  `🏁 Ending auction ${auctionId} after reveal phase started`
-                );
-                const endTx = await (
-                  auctionContractWithSigner as any
-                ).endAuction(auctionId);
-                console.log(
-                  `📝 End auction transaction submitted: ${endTx.hash}`
-                );
-
-                await endTx.wait();
-                console.log(`✅ Auction ${auctionId} ended successfully`);
-
-                // Notifica gestita dal sistema unificato
-                console.log(
-                  `🏁 Auction #${auctionId} ended - winner determined`
-                );
-
-                // Check for winner after ending
-                setTimeout(async () => {
-                  await checkForWinner(auctionId, auctionContract);
-                }, 2000);
-              } catch (error) {
-                console.error(`❌ Error ending auction ${auctionId}:`, error);
-                // Notifica gestita dal sistema unificato
-                console.error(
-                  `Failed to end auction: ${
-                    error instanceof Error ? error.message : "Unknown error"
-                  }`
-                );
-              }
-            }, 3000); // Wait 3 seconds before ending
+            await checkForWinner(auctionId, auctionContract);
           } catch (error) {
             console.error(
-              `❌ Error starting reveal phase for auction ${auctionId}:`,
+              `❌ Error checking winner for sealed bid auction ${auctionId}:`,
               error
             );
             // Notifica gestita dal sistema unificato
             console.error(
-              `Failed to start reveal phase: ${
+              `Failed to check winner: ${
                 error instanceof Error ? error.message : "Unknown error"
               }`
             );
           }
-        } else if (currentStatus === 2) {
+        } else {
+          console.log(
+            `⚠️ [SealedBid] Auction ${auctionId} does not need transition:`,
+            {
+              auctionId,
+              currentStatus,
+              endTime: new Date(endTime * 1000).toISOString(),
+              currentTime: new Date().toISOString(),
+              timeExpired: currentTime >= endTime,
+              reason:
+                currentStatus === 1
+                  ? "Not expired yet"
+                  : `Status ${currentStatus} - not ACTIVE`,
+              timestamp: new Date().toISOString(),
+            }
+          );
+        }
+
+        if (currentStatus === 2) {
           // For REVEAL phase, use the new revealEndTime field from the contract
           // First try to get reveal info from the new contract function
           try {
@@ -632,13 +744,18 @@ export function useSealedBidStatusManager(): SealedBidStatusManager {
     startRevealPhaseForNewAuction,
     isProcessing: isProcessing || isPending,
     error: error || revealError?.message || null,
+    setRemoveFromMonitoringCallback,
   };
 }
 
 // Hook to automatically monitor sealed bid auctions
 export function useSealedBidAutoMonitor() {
-  const { checkAndTransitionStatus, isProcessing, error } =
-    useSealedBidStatusManager();
+  const {
+    checkAndTransitionStatus,
+    isProcessing,
+    error,
+    setRemoveFromMonitoringCallback,
+  } = useSealedBidStatusManager();
   const [monitoredAuctions, setMonitoredAuctions] = useState<Set<number>>(
     new Set()
   );
@@ -659,27 +776,54 @@ export function useSealedBidAutoMonitor() {
     console.log(`📡 Removed auction ${auctionId} from sealed bid monitoring`);
   }, []);
 
+  // Set the callback in the status manager
+  useEffect(() => {
+    setRemoveFromMonitoringCallback(() => removeFromMonitoring);
+  }, [setRemoveFromMonitoringCallback, removeFromMonitoring]);
+
   // Monitor auctions periodically
   useEffect(() => {
-    if (monitoredAuctions.size === 0) return;
+    if (monitoredAuctions.size === 0) {
+      console.log(
+        "🔍 [SealedBid] No auctions to monitor, skipping interval setup"
+      );
+      return;
+    }
+
+    const auctionIds = Array.from(monitoredAuctions);
+    console.log(
+      `🔍 [SealedBid] Setting up monitoring for ${auctionIds.length} auctions:`,
+      auctionIds
+    );
 
     const interval = setInterval(async () => {
       console.log(
-        `🔍 Auto-monitoring ${monitoredAuctions.size} sealed bid auctions:`,
-        Array.from(monitoredAuctions)
+        `🔍 [SealedBid] Auto-monitoring ${auctionIds.length} sealed bid auctions:`,
+        auctionIds
       );
 
-      for (const auctionId of monitoredAuctions) {
+      for (const auctionId of auctionIds) {
         try {
+          console.log(`🔍 [SealedBid] Checking auction ${auctionId}...`);
           await checkAndTransitionStatus(auctionId);
         } catch (error) {
-          console.error(`❌ Error monitoring auction ${auctionId}:`, error);
+          console.error(
+            `❌ [SealedBid] Error monitoring auction ${auctionId}:`,
+            error
+          );
         }
       }
     }, 60000); // Check every 60 seconds to reduce MetaMask requests
 
-    return () => clearInterval(interval);
-  }, [monitoredAuctions, checkAndTransitionStatus]);
+    console.log(
+      `✅ [SealedBid] Monitoring interval set up for ${auctionIds.length} auctions`
+    );
+
+    return () => {
+      console.log(`🛑 [SealedBid] Clearing monitoring interval`);
+      clearInterval(interval);
+    };
+  }, [monitoredAuctions.size]); // Solo dipendenza dalla dimensione, non dall'oggetto
 
   return {
     addToMonitoring,

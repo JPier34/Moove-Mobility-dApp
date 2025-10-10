@@ -124,6 +124,87 @@ export default function ConsolidatedNotificationBadge({
         `${CONFIG.ETHERSCAN_BASE_URL}/tx/${notification.transactionHash}#internal`,
         "_blank"
       );
+    } else if (notification.type === "sealedBidWin") {
+      markClaimAsRead(notification.id);
+
+      // Handle sealed bid win - just call endAuction
+      console.log(
+        `🔒 [SealedBid] Processing sealed bid win for auction ${notification.auctionId}`
+      );
+
+      try {
+        const { contracts } = await import("@/utils/contracts");
+        const { ethers } = await import("ethers");
+
+        const provider = new ethers.BrowserProvider(window.ethereum as any);
+        const signer = await provider.getSigner();
+        const auctionContract = new ethers.Contract(
+          contracts.MooveAuction.address,
+          contracts.MooveAuction.abi,
+          signer
+        );
+
+        // Check auction status
+        const auctionData = await auctionContract.getAuction(
+          notification.auctionId
+        );
+        const currentStatus = Number(auctionData.status);
+
+        console.log(
+          `🔒 [SealedBid] Auction ${notification.auctionId} status: ${currentStatus}`
+        );
+
+        if (currentStatus === 1) {
+          // Still ACTIVE, call endAuction
+          console.log(
+            `🏁 [SealedBid] Ending auction ${notification.auctionId}...`
+          );
+
+          const endTx = await auctionContract.endAuction(
+            notification.auctionId
+          );
+          console.log(`📝 [SealedBid] End auction transaction: ${endTx.hash}`);
+
+          toast.success(
+            `🏁 Ending sealed bid auction #${notification.auctionId}...`,
+            {
+              duration: 5000,
+            }
+          );
+
+          await endTx.wait();
+          console.log(
+            `✅ [SealedBid] Auction ${notification.auctionId} ended successfully`
+          );
+
+          toast.success(
+            `🎉 Sealed bid auction #${notification.auctionId} ended successfully!`,
+            {
+              duration: 8000,
+            }
+          );
+
+          // Dispatch event to trigger claim check
+          window.dispatchEvent(new CustomEvent("forceClaimCheck"));
+        } else {
+          console.log(
+            `⚠️ [SealedBid] Auction ${notification.auctionId} already ended (status: ${currentStatus})`
+          );
+          toast(
+            `Auction #${notification.auctionId} is already ended (status: ${currentStatus})`
+          );
+        }
+      } catch (error) {
+        console.error(
+          `❌ [SealedBid] Error ending auction ${notification.auctionId}:`,
+          error
+        );
+        toast.error(
+          `Failed to end sealed bid auction #${notification.auctionId}: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`
+        );
+      }
     } else if (notification.type === "endAuction") {
       markClaimAsRead(notification.id);
 
