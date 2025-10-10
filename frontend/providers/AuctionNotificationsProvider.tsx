@@ -17,25 +17,208 @@ import toast from "react-hot-toast";
 import { WonAuction } from "@/types/user";
 import { contracts } from "@/utils/contracts";
 
-// ✅ CONFIGURATION: Centralized configuration for external URLs
+// ============= OPTIMIZED CONFIGURATION =============
 const CONFIG = {
   ETHERSCAN_BASE_URL:
     process.env.NEXT_PUBLIC_ETHERSCAN_URL || "https://sepolia.etherscan.io",
-  // NOTIFICATION_COOLDOWN: 5 * 60 * 1000, // 5 minutes - REMOVED: Buggy cooldown system
-  REFUND_TOAST_DURATION: 5000, // 5 seconds
-  CLAIM_TOAST_DURATION: 8000, // 8 seconds
+
+  TOAST_DURATIONS: {
+    REFUND: 5000,
+    CLAIM: 8000,
+  },
+
   GAS_LIMITS: {
     END_AUCTION: 200000,
     SETTLE_AUCTION: 300000,
   },
+
+  // ✅ OPTIMIZED: Smarter intervals based on priority
   INTERVALS: {
-    REFUND_CHECK: 300000, // 5 minutes (era 30 secondi)
-    CLAIM_CHECK: 300000, // 5 minutes (era 30 secondi)
+    QUICK_CHECK: 60000, // 1 minute - for initial connection and high-priority checks
+    NORMAL_CHECK: 300000, // 5 minutes - for routine checks
+    SLOW_CHECK: 600000, // 10 minutes - for low-priority background checks
   },
+
+  // ✅ OPTIMIZED: Reduced batch sizes and smarter limits
   PERFORMANCE: {
-    MAX_AUCTION_CHECKS: 20, // Ridotto da 50 a 20 per ridurre chiamate RPC
+    MAX_AUCTION_RANGE: 100, // Check last 100 auctions max
+    BATCH_SIZE: 3, // Process 3 auctions at a time
+    BATCH_DELAY: 1500, // 1.5 seconds between batches
+    MAX_RETRIES: 2, // Reduced from 3 to 2
+    RETRY_DELAY: 2000, // 2 seconds between retries
+    CACHE_DURATION: 120000, // 2 minutes cache
+    MIN_CHECK_INTERVAL: 45000, // 45 seconds between checks (reduced from 2 min)
+  },
+
+  // ✅ NEW: Block range limits to reduce queryFilter calls
+  BLOCK_RANGES: {
+    MAX_BLOCKS_PER_QUERY: 5000, // Max blocks to query at once
+    LOOKBACK_BLOCKS: 10000, // Max blocks to look back
   },
 } as const;
+
+// ============= SMART CACHE SYSTEM =============
+
+interface CachedAuction {
+  data: any;
+  timestamp: number;
+  status: number;
+}
+
+class AuctionCache {
+  private cache: Map<string, CachedAuction> = new Map();
+  private cacheDuration: number;
+
+  constructor(cacheDuration: number = CONFIG.PERFORMANCE.CACHE_DURATION) {
+    this.cacheDuration = cacheDuration;
+  }
+
+  /**
+   * Get cached auction data if still valid
+   */
+  get(auctionId: string): any | null {
+    const cached = this.cache.get(auctionId);
+    if (!cached) return null;
+
+    const now = Date.now();
+    const isExpired = now - cached.timestamp > this.cacheDuration;
+
+    // ✅ SMART: Cache longer for settled/cancelled auctions
+    const isTerminalState = cached.status === 4 || cached.status === 5;
+    if (isTerminalState && !isExpired) {
+      console.log(`💾 [Cache] HIT for settled/cancelled auction ${auctionId}`);
+      return cached.data;
+    }
+
+    if (!isExpired) {
+      console.log(`💾 [Cache] HIT for auction ${auctionId}`);
+      return cached.data;
+    }
+
+    console.log(`❌ [Cache] MISS (expired) for auction ${auctionId}`);
+    this.cache.delete(auctionId);
+    return null;
+  }
+
+  /**
+   * Store auction data in cache
+   */
+  set(auctionId: string, data: any, status: number): void {
+    this.cache.set(auctionId, {
+      data,
+      timestamp: Date.now(),
+      status,
+    });
+    console.log(`💾 [Cache] SET auction ${auctionId} (status: ${status})`);
+  }
+
+  /**
+   * Clear expired entries
+   */
+  cleanup(): void {
+    const now = Date.now();
+    let cleaned = 0;
+
+    for (const [key, value] of this.cache.entries()) {
+      // Don't clean terminal states
+      const isTerminalState = value.status === 4 || value.status === 5;
+      if (isTerminalState) continue;
+
+      if (now - value.timestamp > this.cacheDuration) {
+        this.cache.delete(key);
+        cleaned++;
+      }
+    }
+
+    if (cleaned > 0) {
+      console.log(`🧹 [Cache] Cleaned ${cleaned} expired entries`);
+    }
+  }
+
+  /**
+   * Get cache stats
+   */
+  getStats(): { size: number; settled: number; active: number } {
+    let settled = 0;
+    let active = 0;
+
+    for (const value of this.cache.values()) {
+      if (value.status === 4 || value.status === 5) {
+        settled++;
+      } else {
+        active++;
+      }
+    }
+
+    return {
+      size: this.cache.size,
+      settled,
+      active,
+    };
+  }
+
+  /**
+   * Clear all cache
+   */
+  clear(): void {
+    this.cache.clear();
+    console.log(`🧹 [Cache] Cleared all entries`);
+  }
+}
+
+// ============= SMART AUCTION FINDER =============
+
+/**
+ * Efficiently find the total number of auctions without excessive RPC calls
+ */
+async function findTotalAuctions(
+  auctionContract: ethers.Contract,
+  cache: AuctionCache
+): Promise<number> {
+  console.log(`🔍 [Finder] Searching for total auctions...`);
+
+  // ✅ OPTIMIZATION: Binary search instead of linear
+  let low = 1;
+  let high = CONFIG.PERFORMANCE.MAX_AUCTION_RANGE;
+  let totalAuctions = 0;
+
+  while (low <= high) {
+    const mid = Math.floor((low + high) / 2);
+
+    try {
+      // Check cache first
+      const cached = cache.get(mid.toString());
+      if (cached) {
+        console.log(`💾 [Finder] Using cached data for auction ${mid}`);
+        totalAuctions = mid;
+        low = mid + 1;
+        continue;
+      }
+
+      const auctionData = await auctionContract.getAuction(mid);
+
+      if (
+        auctionData &&
+        auctionData.seller !== "0x0000000000000000000000000000000000000000"
+      ) {
+        // Auction exists, cache it and search higher
+        const status = Number(auctionData.status);
+        cache.set(mid.toString(), auctionData, status);
+        totalAuctions = mid;
+        low = mid + 1;
+      } else {
+        // Auction doesn't exist, search lower
+        high = mid - 1;
+      }
+    } catch (error) {
+      // Error means auction doesn't exist
+      high = mid - 1;
+    }
+  }
+
+  console.log(`✅ [Finder] Found ${totalAuctions} total auctions`);
+  return totalAuctions;
+}
 
 // ============= CONTEXT =============
 
@@ -436,7 +619,6 @@ export const AuctionNotificationsProvider: React.FC<{
   }, []);
 
   // ✅ NEW: Cache for auction data to reduce RPC calls
-  const [auctionCache, setAuctionCache] = useState<Map<string, any>>(new Map());
   const [cacheTimestamp, setCacheTimestamp] = useState<number>(0);
   const CACHE_DURATION = 60000; // 1 minute cache
 
@@ -539,11 +721,618 @@ export const AuctionNotificationsProvider: React.FC<{
       return [];
     }
   }, [address, isConnected]);
-  // ✅ NEW: Throttling to prevent too frequent calls
+  // ✅ NEW: Initialize cache and throttling states
+  const [auctionCache] = useState(() => new AuctionCache());
   const [lastRefundCheck, setLastRefundCheck] = useState<number>(0);
   const [lastClaimCheck, setLastClaimCheck] = useState<number>(0);
-  const MIN_CHECK_INTERVAL = 120000; // 2 minutes minimum between checks
 
+  // ============= OPTIMIZED CLAIM EVENT FETCHER =============
+
+  /**
+   * Fetch claim notifications with optimized RPC usage
+   */
+  const fetchClaimEventsOptimized = useCallback(async () => {
+    if (!address || !isConnected) {
+      console.log(
+        `🔍 [Claim] Skipping fetch - not connected (address: ${address}, connected: ${isConnected})`
+      );
+      return;
+    }
+
+    // ✅ THROTTLING: Check if enough time has passed
+    const now = Date.now();
+    if (now - lastClaimCheck < CONFIG.PERFORMANCE.MIN_CHECK_INTERVAL) {
+      console.log(
+        `⏭️ [Claim] Skipping - too soon since last check (${Math.round(
+          (now - lastClaimCheck) / 1000
+        )}s ago)`
+      );
+      return;
+    }
+    setLastClaimCheck(now);
+
+    console.log(`🔍 [Claim] Starting optimized fetch for user ${address}`);
+
+    try {
+      const provider = new ethers.JsonRpcProvider(
+        process.env.NEXT_PUBLIC_RPC_URL || "https://1rpc.io/sepolia"
+      );
+      const auctionContract = new ethers.Contract(
+        contracts.MooveAuction.address,
+        contracts.MooveAuction.abi,
+        provider
+      );
+
+      // Get current block
+      const currentBlock = await provider.getBlockNumber();
+      const fromBlock = Math.max(
+        lastCheckedClaimBlock,
+        currentBlock - CONFIG.BLOCK_RANGES.LOOKBACK_BLOCKS
+      );
+
+      console.log(
+        `🔍 [Claim] Block range: ${fromBlock} → ${currentBlock} (lastChecked: ${lastCheckedClaimBlock})`
+      );
+
+      if (fromBlock >= currentBlock) {
+        console.log(
+          `⏭️ [Claim] No new blocks to check (fromBlock: ${fromBlock}, currentBlock: ${currentBlock})`
+        );
+        return;
+      }
+
+      // ✅ OPTIMIZATION: Use cache stats to decide whether to do full scan
+      const cacheStats = auctionCache.getStats();
+      console.log(
+        `📊 [Cache] Stats: ${cacheStats.size} total, ${cacheStats.settled} settled, ${cacheStats.active} active`
+      );
+
+      // ✅ SMART: Find total auctions efficiently
+      const totalAuctions = await findTotalAuctions(
+        auctionContract,
+        auctionCache
+      );
+
+      if (totalAuctions === 0) {
+        console.log(`⏭️ [Claim] No auctions found, skipping claim check`);
+        return;
+      }
+
+      console.log(
+        `🔍 [Claim] Checking ${totalAuctions} auctions for claimable status`
+      );
+
+      // ✅ OPTIMIZATION: Check auctions in reverse order (newest first)
+      const claimableAuctions = [];
+      const nowTimestamp = Math.floor(Date.now() / 1000);
+
+      // ✅ BATCH: Process in small batches with delays
+      const batches = [];
+      for (
+        let i = totalAuctions;
+        i >= Math.max(1, totalAuctions - CONFIG.PERFORMANCE.MAX_AUCTION_RANGE);
+        i -= CONFIG.PERFORMANCE.BATCH_SIZE
+      ) {
+        batches.push({
+          start: Math.max(1, i - CONFIG.PERFORMANCE.BATCH_SIZE + 1),
+          end: i,
+        });
+      }
+
+      console.log(
+        `📦 [Claim] Processing ${batches.length} batches (newest first)`
+      );
+
+      for (const batch of batches) {
+        console.log(`📦 [Claim] Processing batch ${batch.start}-${batch.end}`);
+
+        for (let auctionId = batch.end; auctionId >= batch.start; auctionId--) {
+          try {
+            // ✅ CACHE: Check cache first
+            let auctionData = auctionCache.get(auctionId.toString());
+            let status: number = 0;
+
+            if (!auctionData) {
+              // Fetch from contract with retry logic
+              let retries = CONFIG.PERFORMANCE.MAX_RETRIES;
+              while (retries > 0) {
+                try {
+                  auctionData = await auctionContract.getAuction(auctionId);
+                  status = Number(auctionData.status);
+                  auctionCache.set(auctionId.toString(), auctionData, status);
+                  break;
+                } catch (error) {
+                  retries--;
+                  if (retries === 0) {
+                    console.warn(
+                      `⚠️ [Claim] Failed to fetch auction ${auctionId} after retries`
+                    );
+                    continue;
+                  }
+                  await new Promise((resolve) =>
+                    setTimeout(resolve, CONFIG.PERFORMANCE.RETRY_DELAY)
+                  );
+                }
+              }
+            } else {
+              status = Number(auctionData.status);
+            }
+
+            if (!auctionData) continue;
+
+            const endTime = Number(auctionData.endTime);
+            const highestBidder = auctionData.highestBidder;
+            const auctionType = Number(auctionData.auctionType);
+
+            // ✅ FILTER: Skip Dutch auctions (auto-settle) and non-winner auctions
+            if (auctionType === 1) continue;
+            if (highestBidder.toLowerCase() !== address.toLowerCase()) continue;
+
+            // ✅ FILTER: Skip already processed auctions
+            if (processedClaimAuctions.has(auctionId.toString())) {
+              console.log(
+                `⏭️ [Claim] Skipping already processed auction ${auctionId}`
+              );
+              continue;
+            }
+
+            // ✅ FILTER: Skip settled/cancelled auctions
+            if (status === 4 || status === 5) {
+              console.log(
+                `⏭️ [Claim] Skipping settled/cancelled auction ${auctionId} (status: ${status})`
+              );
+              continue;
+            }
+
+            // ✅ CASE 1: ACTIVE but expired → needs endAuction()
+            if (status === 1 && nowTimestamp > endTime) {
+              console.log(
+                `🏁 [Claim] Found expired ACTIVE auction ${auctionId} - needs endAuction()`
+              );
+
+              claimableAuctions.push({
+                auctionId: auctionId.toString(),
+                endTime,
+                highestBidder,
+                blockNumber: 0,
+                transactionHash: "expired-auction",
+                notificationType: "endAuction",
+              });
+            }
+
+            // ✅ CASE 2: ENDED (status 3) → needs settleAuction()
+            else if (status === 3) {
+              console.log(
+                `🏆 [Claim] Found ENDED auction ${auctionId} - needs settleAuction()`
+              );
+
+              // Special handling for Reserve Auctions
+              if (auctionType === 3) {
+                const reservePrice = parseFloat(
+                  ethers.formatEther(auctionData.reservePrice)
+                );
+                const highestBidAmount = parseFloat(
+                  ethers.formatEther(auctionData.highestBid)
+                );
+
+                if (highestBidAmount < reservePrice) {
+                  console.log(
+                    `⚠️ [Claim] Reserve Auction ${auctionId}: bid ${highestBidAmount} < reserve ${reservePrice}`
+                  );
+                }
+              }
+
+              claimableAuctions.push({
+                auctionId: auctionId.toString(),
+                endTime,
+                highestBidder,
+                blockNumber: 0,
+                transactionHash: "ended-auction",
+                notificationType: "settleAuction",
+              });
+            }
+          } catch (error) {
+            // Skip invalid auctions
+            continue;
+          }
+        }
+
+        // ✅ DELAY: Pause between batches to avoid rate limiting
+        if (batches.length > 1 && batch !== batches[batches.length - 1]) {
+          await new Promise((resolve) =>
+            setTimeout(resolve, CONFIG.PERFORMANCE.BATCH_DELAY)
+          );
+        }
+      }
+
+      console.log(
+        `🏆 [Claim] Found ${claimableAuctions.length} claimable auctions`
+      );
+
+      // Create notifications for claimable auctions
+      if (claimableAuctions.length > 0) {
+        const newNotifications: ClaimNotification[] = [];
+
+        for (const auction of claimableAuctions) {
+          const message =
+            auction.notificationType === "endAuction"
+              ? `🏁 Auction #${auction.auctionId} has expired! Click to end auction and proceed to settlement.`
+              : `🏆 You won auction #${auction.auctionId}! Click to claim your NFT.`;
+
+          const notification: ClaimNotification = {
+            id: `${auction.notificationType}-${auction.auctionId}-${auction.blockNumber}`,
+            auctionId: auction.auctionId,
+            message,
+            timestamp: Date.now(),
+            isRead: false,
+            transactionHash: auction.transactionHash,
+            priority: "high",
+            notificationType: auction.notificationType as
+              | "endAuction"
+              | "settleAuction",
+            isPermanent: true,
+          };
+
+          newNotifications.push(notification);
+
+          // Mark as processed
+          setProcessedClaimAuctions(
+            (prev) => new Set([...prev, auction.auctionId])
+          );
+        }
+
+        // Add notifications (avoid duplicates)
+        setClaimNotifications((prev) => {
+          const existingIds = new Set(prev.map((n) => n.id));
+          const trulyNew = newNotifications.filter(
+            (n) => !existingIds.has(n.id)
+          );
+
+          if (trulyNew.length > 0) {
+            const merged = [...prev, ...trulyNew];
+            console.log(
+              `💾 [Claim] Adding ${trulyNew.length} new notifications`
+            );
+            saveClaimNotifications(merged);
+
+            // Reload to ensure sync
+            setTimeout(() => {
+              reloadClaimNotifications();
+            }, 100);
+
+            // Show toasts
+            trulyNew.forEach((n) => {
+              toast.success(n.message, {
+                duration: CONFIG.TOAST_DURATIONS.CLAIM,
+                position: "top-right",
+              });
+            });
+
+            return merged;
+          }
+
+          return prev;
+        });
+      }
+
+      // Update last checked block
+      setLastCheckedClaimBlock(currentBlock);
+
+      // Cleanup cache
+      auctionCache.cleanup();
+    } catch (error) {
+      console.error("❌ [Claim] Error fetching claim events:", error);
+    }
+  }, [
+    address,
+    isConnected,
+    lastCheckedClaimBlock,
+    processedClaimAuctions,
+    auctionCache,
+    lastClaimCheck,
+    saveClaimNotifications,
+    reloadClaimNotifications,
+  ]);
+
+  // ============= OPTIMIZED REFUND EVENT FETCHER =============
+
+  /**
+   * Fetch refund notifications with optimized RPC usage
+   */
+  const fetchRefundEventsOptimized = useCallback(async () => {
+    if (!address || !isConnected) {
+      console.log(
+        `🔍 [Refund] Skipping fetch - not connected (address: ${address}, connected: ${isConnected})`
+      );
+      return;
+    }
+
+    // ✅ THROTTLING: Check if enough time has passed
+    const now = Date.now();
+    if (now - lastRefundCheck < CONFIG.PERFORMANCE.MIN_CHECK_INTERVAL) {
+      console.log(
+        `⏭️ [Refund] Skipping - too soon since last check (${Math.round(
+          (now - lastRefundCheck) / 1000
+        )}s ago)`
+      );
+      return;
+    }
+    setLastRefundCheck(now);
+
+    console.log(`🔍 [Refund] Starting optimized fetch for user ${address}`);
+
+    try {
+      const provider = new ethers.JsonRpcProvider(
+        process.env.NEXT_PUBLIC_RPC_URL || "https://1rpc.io/sepolia"
+      );
+      const auctionContract = new ethers.Contract(
+        contracts.MooveAuction.address,
+        contracts.MooveAuction.abi,
+        provider
+      );
+
+      // Get current block
+      const currentBlock = await provider.getBlockNumber();
+
+      // ✅ OPTIMIZED: Limit block range to reduce queryFilter load
+      const maxBlockRange = CONFIG.BLOCK_RANGES.LOOKBACK_BLOCKS;
+      const fromBlock = Math.max(
+        lastCheckedBlock,
+        currentBlock - maxBlockRange
+      );
+
+      console.log(
+        `🔍 [Refund] Block range: ${fromBlock} → ${currentBlock} (lastChecked: ${lastCheckedBlock})`
+      );
+
+      if (fromBlock >= currentBlock) {
+        console.log(
+          `⏭️ [Refund] No new blocks to check (fromBlock: ${fromBlock}, currentBlock: ${currentBlock})`
+        );
+        return;
+      }
+
+      // ✅ OPTIMIZED: Split large block ranges into smaller chunks
+      const blockRangeSize = CONFIG.BLOCK_RANGES.MAX_BLOCKS_PER_QUERY;
+      const ranges = [];
+
+      for (
+        let start = fromBlock;
+        start < currentBlock;
+        start += blockRangeSize
+      ) {
+        ranges.push({
+          from: start,
+          to: Math.min(start + blockRangeSize - 1, currentBlock),
+        });
+      }
+
+      console.log(
+        `📦 [Refund] Fetching events in ${ranges.length} block range(s)`
+      );
+
+      const allRefundEvents = [];
+
+      // Fetch events for each range
+      for (const range of ranges) {
+        console.log(
+          `📦 [Refund] Fetching BidRefunded events from block ${range.from} to ${range.to}`
+        );
+
+        try {
+          const refundEvents = await auctionContract.queryFilter(
+            auctionContract.filters.BidRefunded(),
+            range.from,
+            range.to
+          );
+
+          allRefundEvents.push(...refundEvents);
+          console.log(
+            `📊 [Refund] Found ${refundEvents.length} BidRefunded events in range`
+          );
+
+          // Small delay between ranges to avoid rate limiting
+          if (ranges.length > 1 && range !== ranges[ranges.length - 1]) {
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+          }
+        } catch (error) {
+          console.error(
+            `❌ [Refund] Error fetching events for range ${range.from}-${range.to}:`,
+            error
+          );
+          // Continue with other ranges even if one fails
+          continue;
+        }
+      }
+
+      console.log(
+        `📊 [Refund] Total BidRefunded events found: ${allRefundEvents.length}`
+      );
+
+      // Filter events for current user
+      const userRefundEvents = allRefundEvents.filter((event) => {
+        const bidder = (event as any).args?.bidder;
+        return bidder && bidder.toLowerCase() === address.toLowerCase();
+      });
+
+      console.log(
+        `👤 [Refund] Found ${userRefundEvents.length} refund events for current user ${address}`
+      );
+
+      if (userRefundEvents.length > 0) {
+        const newNotifications: RefundNotification[] = [];
+
+        for (const event of userRefundEvents) {
+          const args = (event as any).args;
+          const auctionId = args?.auctionId;
+          const bidder = args?.bidder;
+          const amount = args?.amount;
+
+          if (!auctionId || !bidder || !amount) {
+            console.warn(`⚠️ [Refund] Skipping event with missing data:`, {
+              auctionId,
+              bidder,
+              amount,
+            });
+            continue;
+          }
+
+          console.log(
+            `💰 [Refund] Processing refund: auction ${auctionId}, bidder ${bidder}, amount ${ethers.formatEther(
+              amount
+            )} ETH`
+          );
+
+          const notification: RefundNotification = {
+            id: `${auctionId}-refund-${event.blockNumber}`,
+            auctionId: auctionId.toString(),
+            amount: ethers.formatEther(amount),
+            transactionHash: event.transactionHash,
+            timestamp: Date.now(),
+            isRead: false,
+            message: `Your offer on auction #${auctionId} has been overcome! You received a refund of ${ethers.formatEther(
+              amount
+            )} ETH.`,
+          };
+
+          newNotifications.push(notification);
+        }
+
+        // Add new notifications to existing ones (avoid duplicates)
+        setRefundNotifications((prev) => {
+          const merged = [...prev, ...newNotifications];
+          const unique = merged.filter(
+            (n, index, self) => index === self.findIndex((t) => t.id === n.id)
+          );
+          console.log(
+            `💾 [Refund] Saving ${unique.length} total notifications (${newNotifications.length} new)`
+          );
+          saveRefundNotifications(unique);
+          return unique;
+        });
+
+        // Show toast notifications for new refunds
+        newNotifications.forEach((notification) => {
+          console.log(`🔔 [Refund] Showing toast: ${notification.message}`);
+          toast.success(notification.message, {
+            duration: CONFIG.TOAST_DURATIONS.REFUND,
+            position: "top-right",
+          });
+        });
+      }
+
+      // ✅ OPTIMIZED: Fetch AuctionCancelled events (for Reserve Auctions)
+      console.log(
+        `🔍 [Reserve] Fetching AuctionCancelled events in ${ranges.length} range(s)`
+      );
+
+      const allCancelledEvents = [];
+
+      for (const range of ranges) {
+        try {
+          const cancelledEvents = await auctionContract.queryFilter(
+            auctionContract.filters.AuctionCancelled(),
+            range.from,
+            range.to
+          );
+
+          allCancelledEvents.push(...cancelledEvents);
+          console.log(
+            `📊 [Reserve] Found ${cancelledEvents.length} AuctionCancelled events in range`
+          );
+
+          // Small delay between ranges
+          if (ranges.length > 1 && range !== ranges[ranges.length - 1]) {
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+          }
+        } catch (error) {
+          console.error(
+            `❌ [Reserve] Error fetching cancelled events for range ${range.from}-${range.to}:`,
+            error
+          );
+          continue;
+        }
+      }
+
+      console.log(
+        `📊 [Reserve] Total AuctionCancelled events found: ${allCancelledEvents.length}`
+      );
+
+      // Process cancelled events for Reserve Auctions
+      for (const event of allCancelledEvents) {
+        const args = (event as any).args;
+        const auctionId = args?.auctionId;
+        const reason = args?.reason;
+
+        if (!auctionId || !reason) {
+          console.warn(
+            `⚠️ [Reserve] Skipping cancelled event with missing data:`,
+            { auctionId, reason }
+          );
+          continue;
+        }
+
+        const RESERVE_PRICE_NOT_MET_REASON = "Reserve price not met";
+        if (reason === RESERVE_PRICE_NOT_MET_REASON) {
+          try {
+            // Get auction data to check if current user was involved
+            const auctionData = await auctionContract.getAuction(auctionId);
+            const seller = auctionData.seller;
+            const highestBidder = auctionData.highestBidder;
+
+            // Check if current user is the seller
+            if (seller.toLowerCase() === address.toLowerCase()) {
+              console.log(
+                `🏠 [Reserve] User is seller of cancelled Reserve Auction ${auctionId}`
+              );
+              toast.success(
+                `🏠 Reserve Auction #${auctionId} was automatically cancelled because the highest bid was below the reserve price. Your NFT has been returned to you.`,
+                {
+                  duration: 8000,
+                  position: "top-right",
+                }
+              );
+            }
+
+            // Check if current user is the highest bidder
+            if (highestBidder.toLowerCase() === address.toLowerCase()) {
+              console.log(
+                `💰 [Reserve] User is highest bidder of cancelled Reserve Auction ${auctionId}`
+              );
+              toast.success(
+                `💰 Reserve Auction #${auctionId} was automatically cancelled because your bid was below the reserve price. You will receive a refund.`,
+                {
+                  duration: 8000,
+                  position: "top-right",
+                }
+              );
+            }
+          } catch (error) {
+            console.warn(
+              `⚠️ [Reserve] Could not get auction data for cancelled auction ${auctionId}:`,
+              error
+            );
+          }
+        }
+      }
+
+      // Update last checked block
+      console.log(
+        `📝 [Refund] Updating lastCheckedBlock from ${lastCheckedBlock} to ${currentBlock}`
+      );
+      setLastCheckedBlock(currentBlock);
+    } catch (error) {
+      console.error("❌ [Refund] Error fetching refund events:", error);
+    }
+  }, [
+    address,
+    isConnected,
+    lastCheckedBlock,
+    lastRefundCheck,
+    saveRefundNotifications,
+  ]);
+
+  // Legacy functions for backward compatibility
   const fetchRefundEvents = async () => {
     if (!address || !isConnected) {
       console.log(
@@ -554,7 +1343,7 @@ export const AuctionNotificationsProvider: React.FC<{
 
     // ✅ THROTTLING: Check if enough time has passed since last check
     const now = Date.now();
-    if (now - lastRefundCheck < MIN_CHECK_INTERVAL) {
+    if (now - lastRefundCheck < CONFIG.PERFORMANCE.MIN_CHECK_INTERVAL) {
       console.log(
         `⏭️ [Refund] Skipping - too soon since last check (${Math.round(
           (now - lastRefundCheck) / 1000
@@ -676,7 +1465,7 @@ export const AuctionNotificationsProvider: React.FC<{
         newNotifications.forEach((notification) => {
           console.log(`🔔 [Refund] Showing toast: ${notification.message}`);
           toast.success(notification.message, {
-            duration: CONFIG.REFUND_TOAST_DURATION,
+            duration: CONFIG.TOAST_DURATIONS.REFUND,
             position: "top-right",
           });
         });
@@ -789,7 +1578,7 @@ export const AuctionNotificationsProvider: React.FC<{
 
     // ✅ THROTTLING: Check if enough time has passed since last check
     const now = Date.now();
-    if (now - lastClaimCheck < MIN_CHECK_INTERVAL) {
+    if (now - lastClaimCheck < CONFIG.PERFORMANCE.MIN_CHECK_INTERVAL) {
       console.log(
         `⏭️ [Claim] Skipping - too soon since last check (${Math.round(
           (now - lastClaimCheck) / 1000
@@ -845,7 +1634,7 @@ export const AuctionNotificationsProvider: React.FC<{
       try {
         // ✅ PERFORMANCE: Check a reasonable range to avoid excessive API calls
         // Start from a high number and work backwards until we find valid auctions
-        const maxCheckAuctions = CONFIG.PERFORMANCE.MAX_AUCTION_CHECKS;
+        const maxCheckAuctions = CONFIG.PERFORMANCE.MAX_AUCTION_RANGE;
         let totalAuctions = 0;
 
         // Find the highest auction ID by checking backwards
@@ -1216,7 +2005,7 @@ export const AuctionNotificationsProvider: React.FC<{
         newNotifications.forEach((notification) => {
           console.log(`🔔 [Claim] Showing toast: ${notification.message}`);
           toast.success(notification.message, {
-            duration: CONFIG.CLAIM_TOAST_DURATION,
+            duration: CONFIG.TOAST_DURATIONS.CLAIM,
             position: "top-right",
           });
         });
@@ -1270,61 +2059,73 @@ export const AuctionNotificationsProvider: React.FC<{
     }
   }, []);
 
-  // Monitor refund events periodically
+  // ✅ OPTIMIZED: Smarter interval management for REFUND events
   useEffect(() => {
     if (!isConnected || !address) {
-      console.log(
-        `🔍 [Refund] Skipping monitor setup - not connected (address: ${address}, connected: ${isConnected})`
-      );
+      console.log(`🔍 [Refund] Skipping monitor setup - not connected`);
       return;
     }
 
-    console.log(
-      `🔍 [Refund] Setting up monitor for user ${address} (lastCheckedBlock: ${lastCheckedBlock})`
-    );
+    console.log(`🔍 [Refund] Setting up optimized monitor for user ${address}`);
 
-    // Initial fetch
-    fetchRefundEvents();
+    // Initial fetch with quick check
+    fetchRefundEventsOptimized();
 
-    // Setup interval
-    const interval = setInterval(() => {
-      console.log(`⏰ [Refund] Periodic fetch triggered`);
-      fetchRefundEvents();
-    }, CONFIG.INTERVALS.REFUND_CHECK);
+    // First few minutes: quick checks
+    const quickInterval = setInterval(() => {
+      fetchRefundEventsOptimized();
+    }, CONFIG.INTERVALS.QUICK_CHECK);
+
+    // After 5 minutes: switch to normal checks
+    const switchTimeout = setTimeout(() => {
+      clearInterval(quickInterval);
+
+      const normalInterval = setInterval(() => {
+        fetchRefundEventsOptimized();
+      }, CONFIG.INTERVALS.NORMAL_CHECK);
+
+      return () => clearInterval(normalInterval);
+    }, 300000); // 5 minutes
 
     return () => {
-      console.log(`🔍 [Refund] Cleaning up monitor for user ${address}`);
-      clearInterval(interval);
+      clearInterval(quickInterval);
+      clearTimeout(switchTimeout);
     };
-  }, [isConnected, address, lastCheckedBlock, fetchRefundEvents]);
+  }, [isConnected, address, fetchRefundEventsOptimized]);
 
-  // Monitor claim events periodically
+  // ✅ OPTIMIZED: Smarter interval management for CLAIM events
   useEffect(() => {
     if (!isConnected || !address) {
-      console.log(
-        `🔍 [Claim] Skipping monitor setup - not connected (address: ${address}, connected: ${isConnected})`
-      );
+      console.log(`🔍 [Claim] Skipping monitor setup - not connected`);
       return;
     }
 
-    console.log(
-      `🔍 [Claim] Setting up monitor for user ${address} (lastCheckedClaimBlock: ${lastCheckedClaimBlock})`
-    );
+    console.log(`🔍 [Claim] Setting up optimized monitor for user ${address}`);
 
-    // Initial fetch
-    fetchClaimEvents();
+    // Initial fetch with quick check
+    fetchClaimEventsOptimized();
 
-    // Setup interval
-    const interval = setInterval(() => {
-      console.log(`⏰ [Claim] Periodic fetch triggered`);
-      fetchClaimEvents();
-    }, CONFIG.INTERVALS.CLAIM_CHECK);
+    // First few minutes: quick checks
+    const quickInterval = setInterval(() => {
+      fetchClaimEventsOptimized();
+    }, CONFIG.INTERVALS.QUICK_CHECK);
+
+    // After 5 minutes: switch to normal checks
+    const switchTimeout = setTimeout(() => {
+      clearInterval(quickInterval);
+
+      const normalInterval = setInterval(() => {
+        fetchClaimEventsOptimized();
+      }, CONFIG.INTERVALS.NORMAL_CHECK);
+
+      return () => clearInterval(normalInterval);
+    }, 300000); // 5 minutes
 
     return () => {
-      console.log(`🔍 [Claim] Cleaning up monitor for user ${address}`);
-      clearInterval(interval);
+      clearInterval(quickInterval);
+      clearTimeout(switchTimeout);
     };
-  }, [isConnected, address, lastCheckedClaimBlock]);
+  }, [isConnected, address, fetchClaimEventsOptimized]);
 
   // Context value
   const contextValue: AuctionNotificationsContextType = {
