@@ -93,7 +93,6 @@ export default function ConsolidatedNotificationBadge({
     notificationType: claim.notificationType, // Pass through the notification type
   }));
 
-
   // Combine all notifications and filter for current user
   const allNotifications = [
     ...refundNotificationsFormatted,
@@ -404,7 +403,7 @@ export default function ConsolidatedNotificationBadge({
 
   const handleClearAll = () => {
     clearAllRefundNotifications();
-    clearAllClaimNotificationsSafe(); // ✅ PROTECTION: Use safe version to preserve permanent notifications
+    clearAllClaimNotifications();
     setIsOpen(false);
   };
 

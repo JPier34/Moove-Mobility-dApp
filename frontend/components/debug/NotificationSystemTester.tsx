@@ -4,384 +4,376 @@ import React, { useState } from "react";
 import { useAccount } from "wagmi";
 import { ethers } from "ethers";
 import { contracts } from "@/utils/contracts";
-import Button from "../ui/Button";
+import toast from "react-hot-toast";
 
 export default function NotificationSystemTester() {
   const { address, isConnected } = useAccount();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [results, setResults] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [testResults, setTestResults] = useState<any>(null);
 
   const testNotificationSystem = async () => {
     if (!isConnected || !address) {
-      setError("Please connect your wallet");
+      toast.error("Please connect your wallet");
       return;
     }
 
-    setLoading(true);
-    setError(null);
-
+    setIsLoading(true);
     try {
-      const provider = new ethers.JsonRpcProvider(
-        process.env.NEXT_PUBLIC_RPC_URL || "https://1rpc.io/sepolia"
-      );
+      const provider = new ethers.BrowserProvider(window.ethereum as any);
       const auctionContract = new ethers.Contract(
         contracts.MooveAuction.address,
         contracts.MooveAuction.abi,
         provider
       );
 
-      console.log("🔍 Testing notification system...");
-      console.log("👤 User address:", address);
+      // Test auction #7 specifically
+      const auctionData = await auctionContract.getAuction(7);
+      const status = Number(auctionData.status);
+      const endTime = Number(auctionData.endTime);
+      const highestBidder = auctionData.highestBidder;
+      const auctionType = Number(auctionData.auctionType);
+      const now = Math.floor(Date.now() / 1000);
 
-      // Get current block
-      const currentBlock = await provider.getBlockNumber();
-      console.log("📦 Current block:", currentBlock);
+      const isExpired = now > endTime;
+      const isUserWinner =
+        highestBidder.toLowerCase() === address.toLowerCase();
 
-      // Test 1: Check BidRefunded events from a wider range
-      const fromBlock = Math.max(currentBlock - 2000, 0); // Last 2000 blocks
-      console.log("📦 Testing from block:", fromBlock, "to", currentBlock);
+      // ✅ REMOVED: Cooldown check - cooldown system has been removed
+      // const notificationKey = `notification_${address}_7`;
+      // const lastNotificationTime = parseInt(
+      //   localStorage.getItem(notificationKey) || "0"
+      // );
+      // const NOTIFICATION_COOLDOWN = 5 * 60 * 1000;
+      // const isInCooldown =
+      //   Date.now() - lastNotificationTime < NOTIFICATION_COOLDOWN;
 
-      // Fetch BidRefunded events
-      const refundFilter = auctionContract.filters.BidRefunded();
-      const events = await auctionContract.queryFilter(
-        refundFilter,
-        fromBlock,
-        currentBlock
+      // Check existing notifications
+      const existingNotifications = JSON.parse(
+        localStorage.getItem("moove-claim-notifications") || "[]"
+      );
+      const hasExistingNotification = existingNotifications.some(
+        (n: any) => n.auctionId === "7"
       );
 
-      console.log("📡 Found BidRefunded events:", events.length);
-
-      // Process events for current user
-      const userRefundEvents = events.filter(
-        (event) =>
-          (event as any).args.bidder.toLowerCase() === address.toLowerCase()
+      // Check processed auctions
+      const processedAuctions = JSON.parse(
+        localStorage.getItem("moove-processed-claim-auctions") || "[]"
       );
+      const isProcessed = processedAuctions.includes("7");
 
-      console.log(
-        "👤 BidRefunded events for current user:",
-        userRefundEvents.length
-      );
+      const results = {
+        // Auction data
+        auctionId: 7,
+        status,
+        endTime: new Date(endTime * 1000).toISOString(),
+        currentTime: new Date().toISOString(),
+        isExpired,
+        highestBidder,
+        isUserWinner,
+        auctionType,
 
-      // Test 2: Check if notifications exist in localStorage
-      const storedNotifications = localStorage.getItem("moove-notifications");
-      let parsedNotifications = [];
-      if (storedNotifications) {
-        try {
-          parsedNotifications = JSON.parse(storedNotifications);
-        } catch (error) {
-          console.warn("Failed to parse stored notifications:", error);
-        }
-      }
+        // Notification system state
+        // notificationKey, // REMOVED: No longer needed
+        // lastNotificationTime, // REMOVED: No longer needed
+        // lastNotificationTimeFormatted: // REMOVED: No longer needed
+        //   lastNotificationTime > 0
+        //     ? new Date(lastNotificationTime).toISOString()
+        //     : "Never",
+        // isInCooldown, // REMOVED: No longer needed
+        hasExistingNotification,
+        isProcessed,
 
-      const refundNotifications = parsedNotifications.filter(
-        (n: any) => n.type === "refund" && n.auctionId
-      );
+        // Logic checks
+        shouldHaveNotification: status === 3 && isUserWinner, // REMOVED: && !isInCooldown
+        statusCheck: status === 3,
+        winnerCheck: isUserWinner,
+        // cooldownCheck: !isInCooldown, // REMOVED: No longer needed
 
-      console.log(
-        "💾 Stored refund notifications:",
-        refundNotifications.length
-      );
-
-      // Test 3: Check dismissed notifications
-      const dismissedNotifications = localStorage.getItem(
-        "moove-dismissed-notifications"
-      );
-      let parsedDismissed = [];
-      if (dismissedNotifications) {
-        try {
-          parsedDismissed = JSON.parse(dismissedNotifications);
-        } catch (error) {
-          console.warn("Failed to parse dismissed notifications:", error);
-        }
-      }
-
-      console.log("🗑️ Dismissed notifications:", parsedDismissed.length);
-
-      // Test 4: Check lastCheckedBlock
-      const lastCheckedBlock = localStorage.getItem("lastCheckedBlock");
-      console.log("📦 Last checked block:", lastCheckedBlock);
-
-      // Analysis
-      const analysis = {
-        totalRefundEvents: events.length,
-        userRefundEvents: userRefundEvents.length,
-        storedRefundNotifications: refundNotifications.length,
-        dismissedNotifications: parsedDismissed.length,
-        lastCheckedBlock: lastCheckedBlock,
-        missingNotifications:
-          userRefundEvents.length - refundNotifications.length,
-        events: userRefundEvents.map((event) => ({
-          auctionId: (event as any).args.auctionId.toString(),
-          amount: ethers.formatEther((event as any).args.amount),
-          blockNumber: event.blockNumber,
-          transactionHash: event.transactionHash,
-        })),
-        storedNotifications: refundNotifications,
+        // System state
+        existingNotificationsCount: existingNotifications.length,
+        processedAuctionsCount: processedAuctions.length,
       };
 
-      setResults(analysis);
+      setTestResults(results);
+      console.log("🧪 Notification System Test Results:", results);
 
-      console.log("📊 Analysis:", analysis);
+      // Show summary
+      if (results.shouldHaveNotification) {
+        toast.success("✅ Auction #7 should have a notification!");
+      } else {
+        toast.error("❌ Auction #7 should NOT have a notification");
+      }
     } catch (error) {
-      console.error("❌ Test failed:", error);
-      setError(error instanceof Error ? error.message : "Unknown error");
+      console.error("Error testing notification system:", error);
+      toast.error("Error testing notification system");
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  const fixNotificationSystem = async () => {
-    if (!results) return;
+  const forceNotificationGeneration = async () => {
+    if (!testResults || !isConnected || !address) {
+      toast.error("Please run the test first");
+      return;
+    }
+
+    if (!testResults.shouldHaveNotification) {
+      toast.error(
+        "Auction #7 should not have a notification based on current state"
+      );
+      return;
+    }
 
     try {
-      console.log("🔧 Fixing notification system...");
+      // Create notification manually
+      const notification = {
+        id: `7-settleAuction-${Date.now()}`,
+        auctionId: "7",
+        message: "🎉 You won auction #7! Click to claim your NFT.",
+        timestamp: Date.now(),
+        isRead: false,
+        transactionHash: "ended-auction",
+        priority: "high" as const,
+        notificationType: "settleAuction" as const,
+        isPermanent: true,
+      };
 
-      // Clear old notifications
-      localStorage.removeItem("moove-notifications");
-      localStorage.removeItem("moove-dismissed-notifications");
-      localStorage.removeItem("lastCheckedBlock");
-
-      // Create new notifications for missing refund events
-      const newNotifications = results.events.map(
-        (event: any, index: number) => ({
-          id: `${event.auctionId}-refund-${event.blockNumber}`,
-          auctionId: event.auctionId,
-          type: "refund",
-          message: `Your bid of ${event.amount} ETH has been refunded for auction #${event.auctionId}`,
-          timestamp: Date.now(),
-          transactionHash: event.transactionHash,
-          amount: event.amount,
-          isRead: false,
-          isDismissed: false,
-          priority: "medium",
-        })
+      // Save to localStorage
+      const existingNotifications = JSON.parse(
+        localStorage.getItem("moove-claim-notifications") || "[]"
       );
 
-      // Save new notifications
+      // Check if notification already exists
+      const exists = existingNotifications.some(
+        (n: any) =>
+          n.auctionId === "7" && n.notificationType === "settleAuction"
+      );
+
+      if (exists) {
+        toast.error("Notification for auction #7 already exists");
+        return;
+      }
+
+      existingNotifications.push(notification);
       localStorage.setItem(
-        "moove-notifications",
-        JSON.stringify(newNotifications)
+        "moove-claim-notifications",
+        JSON.stringify(existingNotifications)
       );
 
-      // Set lastCheckedBlock to current block
-      const provider = new ethers.JsonRpcProvider(
-        process.env.NEXT_PUBLIC_RPC_URL || "https://1rpc.io/sepolia"
+      // ✅ REMOVED: Cooldown setting - cooldown system has been removed
+      // const notificationKey = `notification_${address}_7`;
+      // localStorage.setItem(notificationKey, Date.now().toString());
+
+      // Mark as processed
+      const processedAuctions = JSON.parse(
+        localStorage.getItem("moove-processed-claim-auctions") || "[]"
       );
-      const currentBlock = await provider.getBlockNumber();
-      localStorage.setItem("lastCheckedBlock", currentBlock.toString());
+      if (!processedAuctions.includes("7")) {
+        processedAuctions.push("7");
+        localStorage.setItem(
+          "moove-processed-claim-auctions",
+          JSON.stringify(processedAuctions)
+        );
+      }
 
-      console.log("✅ Notification system fixed!");
-      console.log("📊 Created", newNotifications.length, "new notifications");
+      toast.success(
+        "✅ Notification created for auction #7! Refresh the page to see it."
+      );
 
-      // Refresh the test
-      await testNotificationSystem();
+      // Refresh test results
+      setTimeout(() => {
+        testNotificationSystem();
+      }, 1000);
     } catch (error) {
-      console.error("❌ Fix failed:", error);
-      setError(error instanceof Error ? error.message : "Unknown error");
+      console.error("Error creating notification:", error);
+      toast.error("Error creating notification");
     }
   };
 
-  const clearAllNotifications = () => {
-    localStorage.removeItem("moove-notifications");
-    localStorage.removeItem("moove-dismissed-notifications");
-    localStorage.removeItem("lastCheckedBlock");
-    console.log("🗑️ All notifications cleared");
-    setResults(null);
+  const clearAllData = () => {
+    if (!address) {
+      toast.error("Please connect your wallet");
+      return;
+    }
+
+    // Clear all notification data
+    localStorage.removeItem("moove-claim-notifications");
+    localStorage.removeItem("moove-processed-claim-auctions");
+
+    // ✅ REMOVED: Cooldown clearing - cooldown system has been removed
+    // const keys = Object.keys(localStorage);
+    // const userCooldownKeys = keys.filter((key) =>
+    //   key.startsWith(`notification_${address}_`)
+    // );
+    // userCooldownKeys.forEach((key) => {
+    //   localStorage.removeItem(key);
+    // });
+
+    toast.success("✅ All notification data cleared");
+
+    // Refresh test results
+    setTimeout(() => {
+      testNotificationSystem();
+    }, 1000);
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6">
-      <h2 className="text-2xl font-bold text-gray-900 mb-4">
-        🔧 Notification System Tester
+    <div className="bg-white p-6 rounded-lg shadow-lg max-w-4xl mx-auto">
+      <h2 className="text-2xl font-bold mb-4 text-gray-900">
+        🧪 Notification System Tester
       </h2>
 
-      <div className="mb-6 space-y-4">
-        <Button
-          onClick={testNotificationSystem}
-          disabled={loading || !isConnected}
-          className="w-full"
-        >
-          {loading ? (
-            <>
-              <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
-              Testing Notification System...
-            </>
-          ) : (
-            "Test Notification System"
-          )}
-        </Button>
-
-        {results && results.missingNotifications > 0 && (
-          <Button
-            onClick={fixNotificationSystem}
-            disabled={loading}
-            className="w-full bg-green-600 hover:bg-green-700"
+      <div className="space-y-4">
+        <div className="flex gap-2">
+          <button
+            onClick={testNotificationSystem}
+            disabled={isLoading}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
           >
-            Fix Missing Notifications ({results.missingNotifications})
-          </Button>
+            {isLoading ? "Testing..." : "Test Notification System"}
+          </button>
+
+          <button
+            onClick={forceNotificationGeneration}
+            disabled={!testResults?.shouldHaveNotification}
+            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+          >
+            Force Generate Notification
+          </button>
+
+          <button
+            onClick={clearAllData}
+            className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+          >
+            Clear All Data
+          </button>
+        </div>
+
+        {testResults && (
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <h3 className="font-semibold mb-2">📊 Test Results</h3>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <h4 className="font-medium text-blue-800 mb-2">Auction Data</h4>
+                <div className="text-sm space-y-1">
+                  <div>
+                    <strong>Status:</strong> {testResults.status} (
+                    {testResults.status === 3 ? "ENDED" : "OTHER"})
+                  </div>
+                  <div>
+                    <strong>Type:</strong> {testResults.auctionType} (
+                    {testResults.auctionType === 0 ? "ENGLISH" : "OTHER"})
+                  </div>
+                  <div>
+                    <strong>Is Expired:</strong>{" "}
+                    {testResults.isExpired ? "✅ YES" : "❌ NO"}
+                  </div>
+                  <div>
+                    <strong>Is User Winner:</strong>{" "}
+                    {testResults.isUserWinner ? "✅ YES" : "❌ NO"}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-medium text-green-800 mb-2">
+                  System State
+                </h4>
+                <div className="text-sm space-y-1">
+                  <div>
+                    <strong>Has Existing:</strong>{" "}
+                    {testResults.hasExistingNotification ? "✅ YES" : "❌ NO"}
+                  </div>
+                  <div>
+                    <strong>Is Processed:</strong>{" "}
+                    {testResults.isProcessed ? "✅ YES" : "❌ NO"}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 p-3 bg-blue-50 rounded">
+              <h4 className="font-semibold text-blue-800">
+                🔔 Notification Logic
+              </h4>
+              <div className="text-sm text-blue-700 space-y-1">
+                <div>
+                  Should Have Notification:{" "}
+                  {testResults.shouldHaveNotification ? "✅ YES" : "❌ NO"}
+                </div>
+                <div>
+                  Status Check (status === 3):{" "}
+                  {testResults.statusCheck ? "✅ true" : "❌ false"}
+                </div>
+                <div>
+                  Winner Check (isUserWinner):{" "}
+                  {testResults.winnerCheck ? "✅ true" : "❌ false"}
+                </div>
+                <div className="text-green-600 font-semibold">
+                  ✅ Cooldown System Removed - No longer blocking notifications!
+                </div>
+              </div>
+            </div>
+
+            {testResults.shouldHaveNotification && (
+              <div className="mt-4 p-3 bg-green-50 rounded">
+                <h4 className="font-semibold text-green-800">
+                  ✅ Ready for Notification
+                </h4>
+                <div className="text-sm text-green-700">
+                  <p>
+                    All conditions are met for generating a notification for
+                    auction #7.
+                  </p>
+                  <p>
+                    Use "Force Generate Notification" to create it manually.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {!testResults.shouldHaveNotification && (
+              <div className="mt-4 p-3 bg-red-50 rounded">
+                <h4 className="font-semibold text-red-800">
+                  ❌ Cannot Generate Notification
+                </h4>
+                <div className="text-sm text-red-700">
+                  <p>
+                    One or more conditions are not met for generating a
+                    notification.
+                  </p>
+                  <p>Check the logic above to see what's missing.</p>
+                </div>
+              </div>
+            )}
+          </div>
         )}
 
-        <Button
-          onClick={clearAllNotifications}
-          disabled={loading}
-          className="w-full bg-red-600 hover:bg-red-700"
-        >
-          Clear All Notifications
-        </Button>
-      </div>
-
-      {error && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md">
-          <p className="text-red-800">❌ Error: {error}</p>
-        </div>
-      )}
-
-      {/* Results */}
-      {results && (
-        <div className="space-y-6">
-          {/* Summary */}
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-3">
-              📊 Analysis Summary
-            </h3>
-            <div className="bg-gray-50 text-black p-4 rounded-md">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p>
-                    <strong>Total Refund Events:</strong>{" "}
-                    {results.totalRefundEvents}
-                  </p>
-                  <p>
-                    <strong>Events for You:</strong> {results.userRefundEvents}
-                  </p>
-                  <p>
-                    <strong>Stored Notifications:</strong>{" "}
-                    {results.storedRefundNotifications}
-                  </p>
-                </div>
-                <div>
-                  <p>
-                    <strong>Dismissed Notifications:</strong>{" "}
-                    {results.dismissedNotifications}
-                  </p>
-                  <p>
-                    <strong>Last Checked Block:</strong>{" "}
-                    {results.lastCheckedBlock || "Not set"}
-                  </p>
-                  <p>
-                    <strong>Missing Notifications:</strong>{" "}
-                    {results.missingNotifications}
-                  </p>
-                </div>
-              </div>
-            </div>
+        <div className="bg-yellow-50 p-4 rounded-lg">
+          <h3 className="font-semibold text-yellow-800 mb-2">
+            💡 How This Works
+          </h3>
+          <div className="text-sm text-yellow-700 space-y-1">
+            <p>
+              <strong>Test:</strong> Checks all conditions for notification
+              generation
+            </p>
+            <p>
+              <strong>Force Generate:</strong> Manually creates the notification
+              if conditions are met
+            </p>
+            <p>
+              <strong>Clear All Data:</strong> Resets all notification system
+              data
+            </p>
+            <p>
+              <strong>Purpose:</strong> Debug why notifications aren't being
+              generated automatically
+            </p>
           </div>
-
-          {/* Missing Notifications Alert */}
-          {results.missingNotifications > 0 && (
-            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
-              <p className="text-yellow-800 font-medium">
-                ⚠️ MISSING NOTIFICATIONS DETECTED
-              </p>
-              <p className="text-yellow-700">
-                You have {results.missingNotifications} refund events that
-                should have triggered notifications but didn't.
-              </p>
-              <p className="text-yellow-600 text-sm mt-1">
-                This indicates a bug in the notification system. Click "Fix
-                Missing Notifications" to resolve.
-              </p>
-            </div>
-          )}
-
-          {/* Refund Events */}
-          {results.events.length > 0 && (
-            <div>
-              <h3 className="text-lg font-semibold text-black mb-3">
-                💰 Your Refund Events ({results.events.length})
-              </h3>
-              <div className="space-y-2">
-                {results.events.map((event: any, index: number) => (
-                  <div
-                    key={index}
-                    className="p-3 rounded-md border bg-blue-50 border-blue-200"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium text-black">
-                          Auction #{event.auctionId} - {event.amount} ETH
-                        </p>
-                        <p className="text-xs text-black">
-                          Block: {event.blockNumber} | TX:{" "}
-                          {event.transactionHash.slice(0, 10)}...
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <div className="px-2 py-1 rounded text-xs bg-blue-100 text-blue-800">
-                          REFUNDED
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Stored Notifications */}
-          {results.storedNotifications.length > 0 && (
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">
-                💾 Stored Refund Notifications (
-                {results.storedNotifications.length})
-              </h3>
-              <div className="space-y-2">
-                {results.storedNotifications.map(
-                  (notification: any, index: number) => (
-                    <div
-                      key={index}
-                      className="p-3 rounded-md border bg-green-50 border-green-200"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium">
-                            Auction #{notification.auctionId} -{" "}
-                            {notification.amount} ETH
-                          </p>
-                          <p className="text-sm text-gray-600">
-                            {notification.message}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {new Date(notification.timestamp).toLocaleString()}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <div
-                            className={`px-2 py-1 rounded text-xs ${
-                              notification.isDismissed
-                                ? "bg-gray-100 text-gray-800"
-                                : notification.isRead
-                                ? "bg-blue-100 text-blue-800"
-                                : "bg-green-100 text-green-800"
-                            }`}
-                          >
-                            {notification.isDismissed
-                              ? "DISMISSED"
-                              : notification.isRead
-                              ? "READ"
-                              : "UNREAD"}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                )}
-              </div>
-            </div>
-          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }
