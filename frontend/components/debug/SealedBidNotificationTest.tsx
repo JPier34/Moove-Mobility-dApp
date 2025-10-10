@@ -96,7 +96,10 @@ export default function SealedBidNotificationTest() {
       setTestResults(results);
     } catch (error) {
       console.error("Test failed:", error);
-      alert("Test failed: " + error.message);
+      alert(
+        "Test failed: " +
+          (error instanceof Error ? error.message : String(error))
+      );
     } finally {
       setIsTesting(false);
     }
@@ -130,7 +133,10 @@ export default function SealedBidNotificationTest() {
       await testSealedBidNotifications();
     } catch (error) {
       console.error("End auction failed:", error);
-      alert("End auction failed: " + error.message);
+      alert(
+        "End auction failed: " +
+          (error instanceof Error ? error.message : String(error))
+      );
     }
   };
 
@@ -200,7 +206,10 @@ export default function SealedBidNotificationTest() {
       await testSealedBidNotifications();
     } catch (error) {
       console.error("End all auctions failed:", error);
-      alert("End all auctions failed: " + error.message);
+      alert(
+        "End all auctions failed: " +
+          (error instanceof Error ? error.message : String(error))
+      );
     }
   };
 

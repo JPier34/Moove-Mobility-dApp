@@ -6,6 +6,10 @@ import EndedAuctionsManager from "@/components/debug/EndedAuctionsManager";
 import EndedAuctionsNotificationGenerator from "@/components/debug/EndedAuctionsNotificationGenerator";
 import NotificationDebugger from "@/components/debug/NotificationDebugger";
 import CooldownCleanup from "@/components/debug/CooldownCleanup";
+import Auction9Debugger from "@/components/debug/Auction9Debugger";
+import Auction10Debugger from "@/components/debug/Auction10Debugger";
+import SealedBidTransitionManager from "@/components/debug/SealedBidTransitionManager";
+import SealedBidMonitoringTest from "@/components/debug/SealedBidMonitoringTest";
 
 export default function DebugPage() {
   return (
@@ -34,6 +38,26 @@ export default function DebugPage() {
           {/* Ended Auctions Notification Generator */}
           <div className="mt-8">
             <EndedAuctionsNotificationGenerator />
+          </div>
+
+          {/* Auction #9 Debugger */}
+          <div className="mt-8">
+            <Auction9Debugger />
+          </div>
+
+          {/* Auction #10 Debugger */}
+          <div className="mt-8">
+            <Auction10Debugger />
+          </div>
+
+          {/* Sealed Bid Transition Manager */}
+          <div className="mt-8">
+            <SealedBidTransitionManager />
+          </div>
+
+          {/* Sealed Bid Monitoring Test */}
+          <div className="mt-8">
+            <SealedBidMonitoringTest />
           </div>
 
           {/* Notification Debugger */}

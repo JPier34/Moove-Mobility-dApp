@@ -32,7 +32,7 @@ const categoryEmojis = {
 const auctionTypeInfo = {
   [AuctionType.RESERVE]: {
     emoji: "🏛️",
-    name: "Traditional",
+    name: "Reserve",
     color: "bg-blue-100 text-blue-800",
   },
   [AuctionType.ENGLISH]: {

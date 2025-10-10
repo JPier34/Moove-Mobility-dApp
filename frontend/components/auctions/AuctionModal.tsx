@@ -1295,7 +1295,7 @@ export default function AuctionModal({
                   <span className="text-gray-500">Auction Type</span>
                   <span className="font-medium text-gray-700">
                     {Number(localAuction.auctionType) === AuctionType.RESERVE
-                      ? "🏛️ Traditional"
+                      ? "🏛️ Reserve"
                       : Number(localAuction.auctionType) === AuctionType.ENGLISH
                       ? "⬆️ English"
                       : Number(localAuction.auctionType) === AuctionType.DUTCH

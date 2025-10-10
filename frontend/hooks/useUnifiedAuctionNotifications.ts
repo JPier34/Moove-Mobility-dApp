@@ -38,9 +38,11 @@ export function useAuctionNotificationTriggers(): NotificationTrigger {
 
       if (
         notification.notificationType === "sealedBidWin" ||
-        notification.notificationType === "sealedBidLoss"
+        notification.notificationType === "sealedBidLoss" ||
+        notification.notificationType === "auctionFailed"
       ) {
-        addNotificationToSystem(notification);
+        // Add sealed bid notifications to the main system
+        context.addSealedBidNotification?.(notification);
       } else if (notification.notificationType === "bidRefunded") {
         context.addRefundNotification?.(notification);
       } else if (

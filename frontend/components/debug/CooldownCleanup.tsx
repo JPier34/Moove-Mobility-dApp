@@ -37,7 +37,7 @@ export default function CooldownCleanup() {
     if (cooldownKeys.length > 0) {
       toast.success(`✅ Removed ${cooldownKeys.length} cooldown entries`);
     } else {
-      toast.info("ℹ️ No cooldown entries found");
+      toast("ℹ️ No cooldown entries found");
     }
 
     console.log("🧹 Cooldown Cleanup Results:", results);

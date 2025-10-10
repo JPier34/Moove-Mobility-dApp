@@ -212,6 +212,18 @@ export default function ConsolidatedNotificationBadge({
 
         // ✅ Remove the permanent notification since endAuction was successful
         removePermanentClaimNotification(notification.id);
+
+        // ✅ IMMEDIATE CHECK: Force immediate status check to detect ENDED status
+        console.log(
+          `🔄 [EndAuction] Triggering immediate status check for auction ${notification.auctionId}`
+        );
+
+        // Trigger immediate claim check by dispatching a custom event
+        window.dispatchEvent(
+          new CustomEvent("forceClaimCheck", {
+            detail: { auctionId: notification.auctionId },
+          })
+        );
       } catch (error) {
         console.error(
           `❌ [EndAuction] Error handling endAuction for auction ${notification.auctionId}:`,

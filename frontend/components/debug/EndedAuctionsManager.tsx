@@ -133,7 +133,7 @@ export default function EndedAuctionsManager() {
       if (ended.length > 0) {
         toast.success(`Found ${ended.length} auctions ready for settlement!`);
       } else {
-        toast.info("No ENDED auctions found where you are the winner");
+        toast("No ENDED auctions found where you are the winner");
       }
     } catch (error) {
       console.error("Error fetching ended auctions:", error);
@@ -211,7 +211,7 @@ export default function EndedAuctionsManager() {
       return;
     }
 
-    toast.info(`Settling ${endedAuctions.length} auctions...`);
+    toast(`Settling ${endedAuctions.length} auctions...`);
 
     for (const auction of endedAuctions) {
       await settleAuction(auction.auctionId);

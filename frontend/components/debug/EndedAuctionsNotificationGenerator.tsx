@@ -170,10 +170,10 @@ export default function EndedAuctionsNotificationGenerator() {
           // ✅ NEW: Reload notifications in the context
           reloadClaimNotifications();
         } else {
-          toast.info("ℹ️ All ENDED auctions already have notifications");
+          toast("ℹ️ All ENDED auctions already have notifications");
         }
       } else {
-        toast.info("ℹ️ No ENDED auctions found where you are the winner");
+        toast("ℹ️ No ENDED auctions found where you are the winner");
       }
 
       const results = {

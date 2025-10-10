@@ -102,12 +102,18 @@ export default function AuctionGrid({
       Object.keys(groupedAuctions).length === auctions.length ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {auctions.map((auction) => (
-            <AuctionCard
-              key={auction.auctionId}
-              auction={auction}
-              onClick={() => setSelectedAuction(auction)}
-              showEndedState={showEndedState}
-            />
+            <div key={auction.auctionId} className="relative">
+              {/* Type indicator */}
+              {/*               <div className="absolute top-2 left-2 z-10 bg-white/90 backdrop-blur-sm rounded-lg px-2 py-1 text-xs font-medium text-gray-700 flex items-center">
+                <span className="mr-1">{typeEmojis[auction.auctionType]}</span>
+                {typeNames[auction.auctionType]}
+              </div> */}
+              <AuctionCard
+                auction={auction}
+                onClick={() => setSelectedAuction(auction)}
+                showEndedState={showEndedState}
+              />
+            </div>
           ))}
         </div>
       ) : (
