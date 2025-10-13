@@ -276,11 +276,3 @@ export default function ServerSideAuctionManager({
     </div>
   );
 }
-
-
-
-
-
-
-
-

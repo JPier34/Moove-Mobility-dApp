@@ -156,11 +156,3 @@ export function useAutomaticServerSideAuctionMonitor() {
     checkExpiredAuctions,
   };
 }
-
-
-
-
-
-
-
-

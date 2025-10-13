@@ -173,15 +173,3 @@ export default function NFTTransferNotificationsPanel({
     </AnimatePresence>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-

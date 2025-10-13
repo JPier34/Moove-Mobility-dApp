@@ -125,7 +125,7 @@ export function useSmartLazyCollection() {
 
     const MIN_TOKEN_ID = 110;
 
-    // Cerca progressivamente: 200, 300, 400, 500... fino a trovare un token vuoto
+    // Search progressively: 200, 300, 400, 500... until finding an empty token
     for (let step = 200; step <= 1000; step += 100) {
       try {
         const ownerResponse = await fetch("/api/contract-call", {
@@ -139,13 +139,13 @@ export function useSmartLazyCollection() {
         });
 
         if (!ownerResponse.ok) {
-          // Token vuoto trovato! Questo è il nostro limite superiore
+          // Empty token found! This is our upper limit
           console.log(
             `✅ Found empty token at ${step}, will search reverse from ${
               step - 1
             } to ${MIN_TOKEN_ID}`
           );
-          return step - 1; // Ritorna l'ultimo token esistente
+          return step - 1; // Return the last existing token
         }
       } catch (error) {
         console.warn(
@@ -185,8 +185,8 @@ export function useSmartLazyCollection() {
       }
     }
 
-    // Se arriviamo qui, tutti i token fino a 1000 esistono
-    // Fallback: cerca sequenzialmente da 110 per trovare il primo esistente
+    // If we get here, all tokens up to 1000 exist
+    // Fallback: search sequentially from 110 to find the first existing one
     console.log(
       `🔍 All tokens up to 1000 exist, searching sequentially from ${MIN_TOKEN_ID}`
     );

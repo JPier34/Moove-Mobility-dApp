@@ -56,7 +56,7 @@ export default function NFTModal({ nft, isOpen, onClose }: NFTModalProps) {
       console.log("Purchasing NFT:", nft.id);
 
       try {
-        // TODO: Implement actual purchase logic when marketplace contract is ready
+        // Marketplace functionality will be implemented in future version
         // For now, show success message
         toast.success(`Successfully purchased ${nft.name}!`);
         onClose();
@@ -83,7 +83,7 @@ export default function NFTModal({ nft, isOpen, onClose }: NFTModalProps) {
       alert("Connetti il wallet per fare un'offerta");
       return;
     }
-    // TODO: Implementing offer logic
+    // Offer functionality will be implemented in future version
     console.log("Making offer for NFT:", nft.id);
     alert("Funzionalità in arrivo!");
   };

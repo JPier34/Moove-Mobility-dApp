@@ -343,7 +343,6 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
                   const tokenURI = await nftContract.tokenURI(
                     auctionData.tokenId
                   );
-                  console.log(`🔍 [Auction ${i}] Raw tokenURI:`, tokenURI);
 
                   if (tokenURI) {
                     let cleanTokenURI = tokenURI.replace(/"/g, "");
@@ -642,7 +641,6 @@ export function useIncrementalAuctions(): UseIncrementalAuctionsReturn {
                   const tokenURI = await nftContract.tokenURI(
                     auctionData.tokenId
                   );
-                  console.log(`🔍 [Auction ${i}] Raw tokenURI:`, tokenURI);
 
                   if (tokenURI) {
                     let cleanTokenURI = tokenURI.replace(/"/g, "");

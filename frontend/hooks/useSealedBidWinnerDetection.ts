@@ -103,8 +103,3 @@ export function useSealedBidWinnerDetection() {
     detectAllSealedBidWinners,
   };
 }
-
-
-
-
-

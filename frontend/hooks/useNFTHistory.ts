@@ -52,7 +52,6 @@ export function useNFTHistory(tokenId: string | null) {
       return;
     }
 
-    console.log(`🚀 [useNFTHistory] Starting fetch for token ${tokenId}`);
     setIsLoading(true);
     setError(null);
 
@@ -75,8 +74,6 @@ export function useNFTHistory(tokenId: string | null) {
         contracts.MooveAuction.abi,
         provider
       );
-
-      console.log(`🔍 [useNFTHistory] Fetching events for token ${tokenId}`);
 
       // Get all events related to this token
       const [transferEvents, auctionCreatedEvents, auctionSettledEvents] =
@@ -200,7 +197,6 @@ export function useNFTHistory(tokenId: string | null) {
       setHistory(nftHistory);
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") {
-        console.log(`🛑 [useNFTHistory] Request aborted for token ${tokenId}`);
         return;
       }
 
@@ -284,8 +280,6 @@ export function useMultipleNFTHistory(tokenIds: string[]) {
           );
           continue;
         }
-
-        console.log(`🔍 [useMultipleNFTHistory] Processing token ${tokenId}`);
 
         try {
           // Get all events related to this token
@@ -419,7 +413,6 @@ export function useMultipleNFTHistory(tokenIds: string[]) {
       setHistories(allHistories);
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") {
-        console.log(`🛑 [useMultipleNFTHistory] Request aborted`);
         return;
       }
 

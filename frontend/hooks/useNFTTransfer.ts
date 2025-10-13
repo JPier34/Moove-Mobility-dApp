@@ -35,7 +35,7 @@ export function useNFTTransfer() {
   });
   const [currentTokenId, setCurrentTokenId] = useState<string | null>(null);
 
-  // Integrazione con il sistema di notifiche NFT transfer
+  // Integration with NFT transfer notification system
   const {
     startTransfer,
     confirmTransfer,
@@ -44,28 +44,28 @@ export function useNFTTransfer() {
     isTransferring,
   } = useNFTTransferNotifications();
 
-  // Hook per verificare ownership dell'NFT corrente - solo quando abbiamo un tokenId valido
+  // Hook to verify current NFT ownership - only when we have a valid tokenId
   const {
     data: nftOwner,
     isLoading: isLoadingOwner,
     error: ownerError,
   } = useReadMooveNFT(
     "ownerOf",
-    currentTokenId ? [BigInt(currentTokenId)] : [BigInt(1)], // Usa tokenId 1 come placeholder quando disabled
+    currentTokenId ? [BigInt(currentTokenId)] : [BigInt(1)], // Use tokenId 1 as placeholder when disabled
     { enabled: !!currentTokenId }
   );
 
-  // Hook per verificare il totalSupply - RIMOSSO perché non esiste nell'ABI
+  // Hook to verify totalSupply - REMOVED because it doesn't exist in ABI
   // const { data: totalSupply } = useReadMooveNFT("totalSupply", []);
 
-  // Hook per verificare se l'NFT è in un'asta (usando getAuction)
+  // Hook to verify if NFT is in an auction (using getAuction)
   const { data: auctionData } = useReadMooveAuction(
     "getAuction",
-    currentTokenId ? [BigInt(currentTokenId)] : [BigInt(1)], // Usa tokenId 1 come placeholder quando disabled
+    currentTokenId ? [BigInt(currentTokenId)] : [BigInt(1)], // Use tokenId 1 as placeholder when disabled
     { enabled: !!currentTokenId }
   );
 
-  // Debug logging per il hook
+  // Debug logging for the hook
   console.log("🔍 useReadMooveNFT debug:", {
     currentTokenId,
     nftOwner,
@@ -75,13 +75,13 @@ export function useNFTTransfer() {
     auctionData: auctionData ? "NFT is in auction" : "NFT not in auction",
   });
 
-  // Validazione formato indirizzo
+  // Address format validation
   const validateAddressFormat = useCallback((address: string): boolean => {
     if (!address) return false;
     return /^0x[a-fA-F0-9]{40}$/.test(address);
   }, []);
 
-  // Validazione completa indirizzo
+  // Complete address validation
   const validateRecipientAddress = useCallback(
     async (
       recipientAddress: string
@@ -90,7 +90,7 @@ export function useNFTTransfer() {
       error?: string;
     }> => {
       try {
-        // 1. Validazione formato
+        // 1. Format validation
         if (!validateAddressFormat(recipientAddress)) {
           return {
             isValid: false,
@@ -99,7 +99,7 @@ export function useNFTTransfer() {
           };
         }
 
-        // 2. Non può essere l'indirizzo del mittente
+        // 2. Cannot be the sender's address
         if (recipientAddress.toLowerCase() === address?.toLowerCase()) {
           return {
             isValid: false,
@@ -107,7 +107,7 @@ export function useNFTTransfer() {
           };
         }
 
-        // 3. Non può essere zero address
+        // 3. Cannot be zero address
         if (recipientAddress === "0x0000000000000000000000000000000000000000") {
           return {
             isValid: false,
@@ -115,7 +115,7 @@ export function useNFTTransfer() {
           };
         }
 
-        // 4. Controllo esistenza indirizzo (opzionale - può essere costoso)
+        // 4. Address existence check (optional - can be expensive)
         // const provider = new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_RPC_URL);
         // const code = await provider.getCode(recipientAddress);
         // if (code === "0x") {
@@ -134,16 +134,16 @@ export function useNFTTransfer() {
     [address, validateAddressFormat]
   );
 
-  // Verifica ownership NFT
+  // Verify NFT ownership
   const verifyNFTOwnership = useCallback(
     async (tokenId: string): Promise<boolean> => {
       try {
         if (!address) return false;
 
-        // Imposta il tokenId corrente per il hook
+        // Set current tokenId for the hook
         setCurrentTokenId(tokenId);
 
-        // Aspetta un momento per il hook di aggiornarsi
+        // Wait a moment for the hook to update
         await new Promise((resolve) => setTimeout(resolve, 500));
 
         const ownerAddress = nftOwner as string | undefined;
@@ -159,19 +159,19 @@ export function useNFTTransfer() {
           auctionData: auctionData ? "NFT is in auction" : "NFT not in auction",
         });
 
-        // Se c'è un errore, l'NFT potrebbe non esistere
+        // If there's an error, the NFT might not exist
         if (ownerError) {
           console.error(`❌ NFT ${tokenId} might not exist:`, ownerError);
           return false;
         }
 
-        // Se è ancora in loading, aspetta di più
+        // If still loading, wait more
         if (isLoadingOwner) {
           console.log(`⏳ Still loading ownership for token ${tokenId}`);
           return false;
         }
 
-        // Se l'NFT è in un'asta, non può essere trasferito
+        // If NFT is in an auction, it cannot be transferred
         if (auctionData) {
           console.log(
             `⚠️ Token ${tokenId} is currently in an auction and cannot be transferred`
@@ -188,15 +188,15 @@ export function useNFTTransfer() {
     [address, nftOwner, isLoadingOwner, ownerError, auctionData]
   );
 
-  // Simulazione trasferimento (dry-run)
+  // Transfer simulation (dry-run)
   const simulateTransfer = useCallback(
     async (
       tokenId: string,
       recipientAddress: string
     ): Promise<{ success: boolean; error?: string }> => {
       try {
-        // Simula la chiamata senza eseguirla
-        // Questo è un placeholder - in un'implementazione reale useresti callStatic
+        // Simulate the call without executing it
+        // This is a placeholder - in a real implementation you would use callStatic
         console.log(
           `Simulating transfer of token ${tokenId} to ${recipientAddress}`
         );
@@ -274,7 +274,7 @@ export function useNFTTransfer() {
         // 4. Avvia il processo di trasferimento con il sistema di notifiche
         startTransfer(tokenId, recipientAddress);
 
-        // Il resto del processo sarà gestito dal sistema di notifiche
+        // The rest of the process will be handled by the notification system
         return {
           success: true,
           transactionHash: hash,

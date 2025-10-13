@@ -90,7 +90,7 @@ export function useReserveAuction(): ReserveAuctionHandler {
         if (currentHighestBidder.toLowerCase() === address.toLowerCase()) {
           const errorMsg =
             "You are already the highest bidder. You cannot outbid yourself.";
-          console.log(`❌ [Reserve Auction] Bid blocked: ${errorMsg}`);
+
           setError(errorMsg);
           setStep("error");
           return false;

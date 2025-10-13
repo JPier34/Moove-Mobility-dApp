@@ -239,7 +239,3 @@ export default function AuctionClaimModal({
     </AnimatePresence>
   );
 }
-
-
-
-

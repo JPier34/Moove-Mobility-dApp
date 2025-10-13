@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import AuctionCard from "components/auctions/AuctionCard";
-import AuctionModal from "components/auctions/AuctionModal";
+import AuctionCard from "./AuctionCard";
+import AuctionModal from "./AuctionModal";
 import { AuctionType, type Auction } from "../../types/auction";
 
 // Interface for auction grid props

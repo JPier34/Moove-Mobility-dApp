@@ -6,19 +6,19 @@ import { contracts } from "@/utils/contracts";
 import { useAuctionNotificationTriggers } from "./useUnifiedAuctionNotifications";
 
 /**
- * Hook per ascoltare eventi BidRefunded e integrare le notifiche
- * nel sistema unificato esistente
+ * Hook to listen for BidRefunded events and integrate notifications
+ * into the existing unified system
  */
 export function useBidRefundListener() {
   const { address, isConnected } = useAccount();
   const { notifyBidRefunded } = useAuctionNotificationTriggers();
 
-  // Converte wei in ETH
+  // Convert wei to ETH
   const formatEther = useCallback((weiValue: bigint): string => {
     return (Number(weiValue) / 1e18).toFixed(6);
   }, []);
 
-  // Ascolta eventi BidRefunded dal contratto MooveAuction
+  // Listen for BidRefunded events from MooveAuction contract
   useWatchContractEvent({
     address: contracts.MooveAuction.address as `0x${string}`,
     abi: contracts.MooveAuction.abi,
@@ -39,13 +39,13 @@ export function useBidRefundListener() {
               transactionHash,
             });
 
-            // Solo se è il nostro indirizzo
+            // Only if it's our address
             if (!address || bidder.toLowerCase() !== address.toLowerCase()) {
               console.log("💰 Refund event not for current user, skipping");
               return;
             }
 
-            // Usa il sistema di notifiche unificato esistente
+            // Use the existing unified notification system
             notifyBidRefunded(
               auctionId.toString(),
               parseFloat(formatEther(refundAmount))
@@ -62,7 +62,7 @@ export function useBidRefundListener() {
     enabled: isConnected && !!address,
   });
 
-  // Log dello stato del listener
+  // Listener status logging
   useEffect(() => {
     if (isConnected && address) {
       console.log("🔔 Bid refund listener initialized for address:", address);
@@ -75,4 +75,3 @@ export function useBidRefundListener() {
     isActive: isConnected && !!address,
   };
 }
-

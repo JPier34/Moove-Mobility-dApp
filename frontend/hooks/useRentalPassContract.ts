@@ -344,9 +344,9 @@ export function useRentalPassContract() {
         JSON.stringify(transactionData)
       );
 
-      // ✅ Ritorna un oggetto temporaneo (l'hash sarà disponibile tramite mintTxHash)
+      // ✅ Return a temporary object (hash will be available via mintTxHash)
       return {
-        txHash: "pending", // Sarà aggiornato dal hook
+        txHash: "pending", // Will be updated by the hook
         vehicleType,
         cityId,
         duration,

@@ -59,8 +59,6 @@ export function useAuctionNotificationTriggers(): NotificationTrigger {
     (notification: any) => {
       if (!context) return;
 
-      console.log(`📢 [NotificationSystem] Adding notification:`, notification);
-
       if (
         notification.notificationType === "sealedBidWin" ||
         notification.notificationType === "sealedBidLoss" ||
@@ -86,33 +84,13 @@ export function useAuctionNotificationTriggers(): NotificationTrigger {
 
   // Process queued notifications when context becomes available
   useEffect(() => {
-    console.log(`🔍 [Debug] useEffect triggered:`, {
-      context: !!context,
-      queueLength: notificationQueue.length,
-      queue: notificationQueue,
-    });
-
     if (context) {
-      console.log(`📢 [NotificationSystem] Context is now available`);
       if (notificationQueue.length > 0) {
-        console.log(
-          `📢 [NotificationSystem] Processing ${notificationQueue.length} queued notifications`
-        );
         notificationQueue.forEach((notification) => {
-          console.log(
-            `📢 [NotificationSystem] Processing notification:`,
-            notification
-          );
           addNotificationToSystem(notification);
         });
         setNotificationQueue([]);
-      } else {
-        console.log(
-          `📢 [NotificationSystem] No notifications in queue to process`
-        );
       }
-    } else {
-      console.log(`📢 [NotificationSystem] Context not available yet`);
     }
   }, [context, notificationQueue, addNotificationToSystem]);
 

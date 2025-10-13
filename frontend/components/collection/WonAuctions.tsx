@@ -68,7 +68,6 @@ export default function WonAuctions({ auctions }: WonAuctionsProps) {
   };
 
   const handleViewAuction = (auctionId: string) => {
-    // TODO: Navigate to auction detail
     window.location.href = `/auctions/${auctionId}`;
   };
 

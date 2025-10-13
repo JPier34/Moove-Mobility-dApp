@@ -65,18 +65,6 @@ export function useActiveAuctions() {
   return { auctionIds, isLoading, error, refetch };
 }
 
-export function useAuction(auctionId: number) {
-  const {
-    data: auction,
-    isLoading,
-    error,
-  } = useReadMooveAuction<Auction>("getAuction", [auctionId], {
-    enabled: auctionId >= 0,
-  });
-
-  return { auction, isLoading, error };
-}
-
 export function useAuctionBids(auctionId: number) {
   const {
     data: bids,

@@ -6,7 +6,7 @@ import { ethers } from "ethers";
  * Genera un nonce casuale per le Sealed Bid auctions
  */
 export function generateSealedBidNonce(): string {
-  // Genera un nonce casuale di 32 bytes
+  // Generate a random 32-byte nonce
   const randomBytes = ethers.randomBytes(32);
   return ethers.hexlify(randomBytes);
 }
@@ -176,13 +176,13 @@ export function getAllSealedBidsForAuction(tokenId: string): Array<{
     status: "committed" | "revealed";
   }> = [];
 
-  // Scansiona tutti i key del localStorage
+  // Scan all localStorage keys
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
 
     if (key && key.startsWith(`sealed_bid_${tokenId}_`)) {
       const parts = key.split("_");
-      const bidderAddress = parts[3]; // L'indirizzo è sempre alla posizione 3
+      const bidderAddress = parts[3]; // The address is always at position 3
       const data = getSealedBidData(tokenId, bidderAddress);
 
       if (data) {

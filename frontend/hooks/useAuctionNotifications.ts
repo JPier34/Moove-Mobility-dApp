@@ -41,7 +41,7 @@ export function useAuctionNotifications() {
         const auction = wonAuctions.find((a) => a.auctionId === auctionId);
         if (auction) {
           // Usa un tipo generico per le notifiche da collezione
-          // Il tipo specifico sarà determinato dalle notifiche immediate
+          // The specific type will be determined by immediate notifications
           addNotification({
             type: "sealed_bid_win",
             auctionId: auctionId,

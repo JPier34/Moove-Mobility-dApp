@@ -89,8 +89,3 @@ export default class NotificationErrorBoundary extends Component<Props, State> {
     return this.props.children;
   }
 }
-
-
-
-
-

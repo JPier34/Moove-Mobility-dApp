@@ -15,7 +15,6 @@ import { toast } from "react-hot-toast";
 import OptimizedNFTImage from "@/components/collection/OptimizedNFTImage";
 import TransferNFTModalV2 from "@/components/TransferNFTModalV2";
 import InfiniteScrollTrigger from "@/components/collection/InfiniteScrollTrigger";
-import CacheStats from "@/components/CacheStats";
 import { WonAuction } from "@/types/user";
 
 // ============= TYPES =============
@@ -989,19 +988,6 @@ export default function MyCollection() {
           onClose={handleCloseTransferModal}
           onSuccess={handleTransferSuccess}
         />
-
-        {/* Cache Performance Stats */}
-        {cacheStats && (
-          <CacheStats
-            stats={{
-              hits: cacheStats.cached,
-              misses: cacheStats.total - cacheStats.cached,
-              evictions: 0,
-              totalSize: cacheStats.total,
-              hitRate: cacheStats.cached / cacheStats.total,
-            }}
-          />
-        )}
 
         {/* Congratulations Modal is now handled globally by AuctionNotificationsProvider */}
       </div>

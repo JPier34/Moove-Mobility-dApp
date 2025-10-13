@@ -25,12 +25,6 @@ export const ADMIN_CONFIG = {
   },
 } as const;
 
-// Helper function to check if address is admin
-export function isAdminAddress(address: string): boolean {
-  const adminAddress = getAdminAddress();
-  return address.toLowerCase() === adminAddress.toLowerCase();
-}
-
 // Helper function to get admin address
 export function getAdminAddress(): string {
   return (

@@ -1,7 +1,6 @@
 "use client";
 
-import { getCityImageUrl, getCityImageConfig } from "@/utils/cityImages";
-import { CityConfig } from "@/config/cities";
+import { getCityHeroImage, getCityHeroInfo, CityConfig } from "@/config/cities";
 
 interface CityBackgroundImageProps {
   city: CityConfig | null;
@@ -12,8 +11,8 @@ export default function CityBackgroundImage({
   city,
   className = "",
 }: CityBackgroundImageProps) {
-  const cityImageConfig = getCityImageConfig(city?.id || "");
-  const imageUrl = getCityImageUrl(city?.id || "");
+  const cityImageConfig = getCityHeroInfo(city?.id || "");
+  const imageUrl = getCityHeroImage(city?.id || "");
 
   // Debug temporaneo
   console.log("🔍 CityBackgroundImage Debug:", {
@@ -37,7 +36,7 @@ export default function CityBackgroundImage({
       {/* Background Image */}
       <div className="absolute inset-0">
         <img
-          src={imageUrl}
+          src={imageUrl || ""}
           alt={cityImageConfig.altText}
           className="w-full h-full object-cover"
           style={{

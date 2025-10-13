@@ -81,7 +81,7 @@ async function checkNFTOwnershipReal(
   }
 }
 
-// Funzione per filtrare le aste in base all'ownership attuale
+// Function to filter auctions based on current ownership
 async function filterAuctionsByOwnership(
   auctions: any[],
   address: string | undefined
@@ -106,10 +106,10 @@ async function filterAuctionsByOwnership(
     const isAuctionEnded = isEnded || isSettled || isActiveButExpired;
 
     if (!isUserWinner || !isAuctionEnded) {
-      continue; // Skip se non è vincitore o asta non finita
+      continue; // Skip if not winner or auction not finished
     }
 
-    // Per aste SETTLED (status 4), verifica l'ownership attuale dell'NFT
+    // For SETTLED auctions (status 4), verify current NFT ownership
     if (isSettled && auction.nftId) {
       console.log(
         `🔍 Checking ownership for settled auction ${auction.auctionId} (token ${auction.nftId})`

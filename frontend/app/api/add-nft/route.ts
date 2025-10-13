@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verifica se esiste già
+    // Check if it already exists
     const exists = nftDatabase.find(
       (nft) => nft.name === nftData.name && nft.imageHash === nftData.imageHash
     );
@@ -66,4 +66,3 @@ export async function GET() {
     );
   }
 }
-

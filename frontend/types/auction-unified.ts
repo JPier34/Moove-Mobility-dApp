@@ -1,15 +1,15 @@
 /**
- * Unified Auction Types - Compatibilità Completa
- * Risolve le inconsistenze tra contratto e frontend
+ * Unified Auction Types - Complete Compatibility
+ * Resolves inconsistencies between contract and frontend
  */
 
-// ============= TIPI BASE =============
+// ============= BASE TYPES =============
 
-export type AuctionId = string; // Sempre string per compatibilità frontend
-export type TokenId = string; // Sempre string per compatibilità frontend
-export type Address = string; // Sempre string per compatibilità frontend
+export type AuctionId = string; // Always string for frontend compatibility
+export type TokenId = string; // Always string for frontend compatibility
+export type Address = string; // Always string for frontend compatibility
 
-// ============= ENUM =============
+// ============= ENUMS =============
 
 export enum AuctionType {
   ENGLISH = 0,
@@ -27,27 +27,27 @@ export enum AuctionStatus {
   CANCELLED = 5, // Cancelled by seller or admin
 }
 
-// ============= INTERFACCIA CONTRATTO =============
+// ============= CONTRACT INTERFACE =============
 
 /**
- * Struttura dati raw dal contratto smart contract
- * Corrisponde esattamente alla struct Auction nel contratto
+ * Raw data structure from smart contract
+ * Exactly matches the Auction struct in the contract
  */
 export interface ContractAuctionData {
-  // Identificatori
+  // Identifiers
   auctionId: bigint;
   nftContract: Address;
   tokenId: bigint;
   seller: Address;
 
-  // Configurazione asta
+  // Auction configuration
   auctionType: bigint;
   status: bigint;
   allowPartialFulfillment: boolean;
   isSettled: boolean;
   revealPhaseStarted: boolean;
 
-  // Prezzi
+  // Prices
   startingPrice: bigint;
   reservePrice: bigint;
   buyNowPrice: bigint;
@@ -62,33 +62,33 @@ export interface ContractAuctionData {
   extensionDuration: bigint;
   revealEndTime: bigint;
 
-  // Partecipanti
+  // Participants
   highestBidder: Address;
   minBidders: bigint;
   totalBidders: bigint;
 }
 
-// ============= INTERFACCIA FRONTEND =============
+// ============= FRONTEND INTERFACE =============
 
 /**
- * Struttura dati ottimizzata per il frontend
- * Tutti i valori sono convertiti in formati user-friendly
+ * Data structure optimized for frontend
+ * All values are converted to user-friendly formats
  */
 export interface FrontendAuction {
-  // Identificatori (sempre string)
+  // Identifiers (always string)
   auctionId: AuctionId;
   nftContract: Address;
   tokenId: TokenId;
   seller: Address;
 
-  // Configurazione asta
+  // Auction configuration
   auctionType: AuctionType;
   status: AuctionStatus;
   allowPartialFulfillment: boolean;
   isSettled: boolean;
   revealPhaseStarted: boolean;
 
-  // Prezzi (sempre string in ETH)
+  // Prices (always string in ETH)
   startingPrice: string;
   reservePrice: string;
   buyNowPrice: string;
@@ -105,12 +105,12 @@ export interface FrontendAuction {
   extensionDurationMinutes: number; // minutes
   revealEndTime: Date;
 
-  // Partecipanti
+  // Participants
   highestBidder: Address;
   minBidders: number;
   totalBidders: number;
 
-  // Metadati aggiuntivi per UI
+  // Additional metadata for UI
   nftName?: string;
   nftImage?: string;
   nftCategory?: string;
@@ -118,7 +118,7 @@ export interface FrontendAuction {
   bidCount: number;
   transactionHash?: string;
 
-  // Attributi NFT
+  // NFT attributes
   attributes: {
     rarity?: string;
     designer?: string;
@@ -142,26 +142,26 @@ export interface FrontendAuction {
   };
 }
 
-// ============= INTERFACCIA COLLEZIONE =============
+// ============= COLLECTION INTERFACE =============
 
 /**
- * Struttura dati per NFT in my-collection
- * Unifica dati da aste e trasferimenti diretti
+ * Data structure for NFTs in my-collection
+ * Unifies data from auctions and direct transfers
  */
 export interface CollectionNFT {
-  // Identificatori
+  // Identifiers
   id: string;
   tokenId: TokenId;
 
-  // Metadati NFT
+  // NFT metadata
   name: string;
   description: string;
   image: string;
   rarity: "common" | "rare" | "epic" | "legendary";
 
-  // Dati acquisto
+  // Purchase data
   purchaseDate: Date;
-  price: number; // Sempre number per calcoli
+  price: number; // Always number for calculations
   priceSource:
     | "auction"
     | "transaction"
@@ -170,7 +170,7 @@ export interface CollectionNFT {
     | "deserted_auction";
   transactionHash: string;
 
-  // Dati asta (se applicabile)
+  // Auction data (if applicable)
   auctionWon?: {
     auctionId: AuctionId;
     finalBid: number;
@@ -178,7 +178,7 @@ export interface CollectionNFT {
     auctionType: AuctionType;
   };
 
-  // Proprietà aggiuntive
+  // Additional properties
   owner: Address;
   isDesertedAuction: boolean;
 }
@@ -186,26 +186,26 @@ export interface CollectionNFT {
 // ============= UTILITY FUNCTIONS =============
 
 /**
- * Converte dati raw del contratto in formato frontend
+ * Converts raw contract data to frontend format
  */
 export function convertContractToFrontend(
   contractData: ContractAuctionData
 ): FrontendAuction {
   return {
-    // Identificatori
+    // Identifiers
     auctionId: contractData.auctionId.toString(),
     nftContract: contractData.nftContract,
     tokenId: contractData.tokenId.toString(),
     seller: contractData.seller,
 
-    // Configurazione asta
+    // Auction configuration
     auctionType: Number(contractData.auctionType) as AuctionType,
     status: Number(contractData.status) as AuctionStatus,
     allowPartialFulfillment: contractData.allowPartialFulfillment,
     isSettled: contractData.isSettled,
     revealPhaseStarted: contractData.revealPhaseStarted,
 
-    // Prezzi (convertiti da wei a ETH)
+    // Prices (converted from wei to ETH)
     startingPrice: formatEther(contractData.startingPrice),
     reservePrice: formatEther(contractData.reservePrice),
     buyNowPrice: formatEther(contractData.buyNowPrice),
@@ -213,7 +213,7 @@ export function convertContractToFrontend(
     bidIncrement: formatEther(contractData.bidIncrement),
     highestBid: formatEther(contractData.highestBid),
 
-    // Timing (convertiti da timestamp a Date)
+    // Timing (converted from timestamp to Date)
     startTime: new Date(Number(contractData.startTime) * 1000),
     endTime: new Date(Number(contractData.endTime) * 1000),
     extensionThreshold: Number(contractData.extensionThreshold), // uint32 from contract
@@ -226,22 +226,22 @@ export function convertContractToFrontend(
     ),
     revealEndTime: new Date(Number(contractData.revealEndTime) * 1000),
 
-    // Partecipanti
+    // Participants
     highestBidder: contractData.highestBidder,
     minBidders: Number(contractData.minBidders),
     totalBidders: Number(contractData.totalBidders),
 
-    // Valori di default per UI
+    // Default values for UI
     currency: "ETH",
     bidCount: Number(contractData.totalBidders),
 
-    // Attributi vuoti (da popolare separatamente)
+    // Empty attributes (to be populated separately)
     attributes: {},
   };
 }
 
 /**
- * Converte array di valori dal contratto in oggetto tipizzato
+ * Converts array of values from contract to typed object
  */
 export function parseContractAuctionData(rawData: any[]): ContractAuctionData {
   return {
@@ -272,15 +272,15 @@ export function parseContractAuctionData(rawData: any[]): ContractAuctionData {
 }
 
 /**
- * Utility per convertire wei in ETH
+ * Utility to convert wei to ETH
  */
 function formatEther(wei: bigint): string {
-  // Usa ethers se disponibile, altrimenti conversione manuale
+  // Use ethers if available, otherwise manual conversion
   if (typeof window !== "undefined" && (window as any).ethers) {
     return (window as any).ethers.formatEther(wei);
   }
 
-  // Fallback: conversione manuale
+  // Fallback: manual conversion
   const weiString = wei.toString();
   const ethValue = parseFloat(weiString) / Math.pow(10, 18);
   return ethValue.toFixed(6);
@@ -314,4 +314,3 @@ export function isCollectionNFT(data: any): data is CollectionNFT {
     typeof data.name === "string"
   );
 }
-

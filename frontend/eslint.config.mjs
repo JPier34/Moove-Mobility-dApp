@@ -26,12 +26,6 @@ const eslintConfig = [
 ];
 
 export default eslintConfig;
-
-      "@typescript-eslint/no-explicit-any": "warn",
-      "react/no-unescaped-entities": "warn",
-      "react-hooks/rules-of-hooks": "warn",
-      "react-hooks/exhaustive-deps": "warn",
-      "@next/next/no-img-element": "warn",
       "prefer-const": "warn",
     },
   },

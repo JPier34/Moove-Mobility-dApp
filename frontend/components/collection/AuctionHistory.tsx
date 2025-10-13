@@ -53,7 +53,6 @@ export default function AuctionHistory({ history }: AuctionHistoryProps) {
     });
 
   const handleViewAuction = (auctionId: string) => {
-    // TODO: Navigate to auction detail
     window.location.href = `/auctions/${auctionId}`;
   };
 

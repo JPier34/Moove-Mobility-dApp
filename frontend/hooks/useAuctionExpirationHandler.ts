@@ -36,7 +36,6 @@ export function useAuctionExpirationHandler() {
         // Skip if already processed
         if (processedAuctions.has(auctionId)) {
           if (auctionId === 21) {
-            console.log(`⏭️ [Auction 21] Already processed, skipping`);
           }
           continue;
         }
@@ -64,7 +63,6 @@ export function useAuctionExpirationHandler() {
           const rawAuctionData = await contract.getAuction(auctionId);
 
           if (auctionId === 21) {
-            console.log(`🔍 [Auction 21] getAuction response:`, rawAuctionData);
           }
 
           if (rawAuctionData) {

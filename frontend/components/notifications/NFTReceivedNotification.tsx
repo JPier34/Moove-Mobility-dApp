@@ -18,7 +18,7 @@ export default function NFTReceivedNotification({
   const [showNotification, setShowNotification] = useState(false);
   const [currentNotification, setCurrentNotification] = useState<any>(null);
 
-  // Trova la notifica più recente di ricevuta non letta
+  // Find the most recent unread received notification
   useEffect(() => {
     const latestReceivedNotification = notifications.find(
       (n) => n.type === "received" && !n.isRead
@@ -123,16 +123,3 @@ export default function NFTReceivedNotification({
     </AnimatePresence>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -257,7 +257,7 @@ async function secureNFTApproval(
     throw new Error(`Cannot approve: you don't own token ${tokenId}`);
   }
 
-  // 2. Controlla se è già approvato
+  // 2. Check if already approved
   const currentApproval = await nftContract.getApproved(tokenId);
   if (currentApproval.toLowerCase() === auctionContractAddress.toLowerCase()) {
     console.log("✅ NFT already approved for auction contract");
@@ -356,11 +356,11 @@ function validateAuctionParams(params: AuctionParams): void {
 
   // ENGLISH AUCTION (tipo 0)
   else if (params.auctionType === 0) {
-    // Se reserve price è fornito, deve essere >= start price
+    // If reserve price is provided, it must be >= start price
     if (params.reservePrice > 0n && params.reservePrice < params.startPrice) {
       throw new Error("English auction reserve price must be >= start price");
     }
-    // Se buyNowPrice è fornito, deve essere >= start price
+    // If buyNowPrice is provided, it must be >= start price
     if (params.buyNowPrice > 0n && params.buyNowPrice < params.startPrice) {
       throw new Error("English auction buyNowPrice must be >= start price");
     }
@@ -379,14 +379,14 @@ function validateAuctionParams(params: AuctionParams): void {
 
   // RESERVE AUCTION (tipo 3)
   else if (params.auctionType === 3) {
-    // Reserve price è obbligatorio e deve essere >= start price
+    // Reserve price is mandatory and must be >= start price
     if (params.reservePrice <= 0n) {
       throw new Error("Reserve auction requires reserve price");
     }
     if (params.reservePrice < params.startPrice) {
       throw new Error("Reserve auction reserve price must be >= start price");
     }
-    // Se buyNowPrice è fornito, deve essere >= start price
+    // If buyNowPrice is provided, it must be >= start price
     if (params.buyNowPrice > 0n && params.buyNowPrice < params.startPrice) {
       throw new Error("Reserve auction buyNowPrice must be >= start price");
     }
@@ -591,7 +591,7 @@ async function secureAuctionCreation(
 
     console.log("🆔 Auction created with ID:", auctionId.toString());
 
-    // 6. Se è un'asta sealed bid, aggiungila al monitoraggio automatico
+    // 6. If it's a sealed bid auction, add it to automatic monitoring
     if (params.auctionType === AuctionType.SEALED_BID) {
       console.log(
         "🔓 Sealed bid auction created, adding to automatic monitoring"

@@ -145,6 +145,3 @@ export default function UnifiedStats({ stats, onRefresh }: UnifiedStatsProps) {
     </motion.div>
   );
 }
-
-
-

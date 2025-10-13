@@ -1,6 +1,6 @@
-# 🚗 Moove Mobility dApp
+# 🚗 Moove Mobility - NFT Vehicle Rental Platform
 
-A decentralized mobility platform built on Ethereum that enables users to auction, trade, and manage NFT-based vehicle access passes. This dApp combines smart contract technology with a modern React frontend to create a seamless mobility ecosystem.
+A revolutionary decentralized mobility platform built on Ethereum that enables users to auction, trade, and manage NFT-based vehicle access passes. This dApp combines smart contract technology with a modern React frontend to create a seamless mobility ecosystem for the future of transportation.
 
 ## 📌 Features
 
@@ -13,6 +13,9 @@ A decentralized mobility platform built on Ethereum that enables users to auctio
 - ✅ **Access Control System** - Role-based permissions for admins and users
 - ✅ **IPFS Integration** - Decentralized metadata storage
 - ✅ **Multi-language Support** - English and Italian localization
+- ✅ **Advanced Notification System** - Real-time auction and claim notifications
+- ✅ **Sealed Bid Auctions** - Private bidding with automatic winner detection
+- ✅ **Automatic Refund System** - Smart refunds for losing bidders
 
 ### 🔧 Technical Features
 

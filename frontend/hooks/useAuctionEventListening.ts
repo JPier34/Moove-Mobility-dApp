@@ -173,5 +173,3 @@ export function useAuctionEventListening(
     processedEventsCount: processedEvents.current.size,
   };
 }
-
-

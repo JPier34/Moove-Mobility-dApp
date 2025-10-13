@@ -42,17 +42,3 @@ export default function ClientOnlyMotion({
     </motion.div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

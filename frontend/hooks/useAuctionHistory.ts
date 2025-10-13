@@ -47,7 +47,6 @@ export function useAuctionHistory(tokenId: string | null) {
       return;
     }
 
-    console.log(`🚀 [useAuctionHistory] Starting fetch for token ${tokenId}`);
     setIsLoading(true);
     setError(null);
 

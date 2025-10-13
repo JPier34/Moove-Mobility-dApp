@@ -20,7 +20,7 @@ export function useAutomaticRefundHandler() {
     async (auctionId: number) => {
       if (!isConnected || !address) return;
 
-      // Evita di processare lo stesso auction più volte
+      // Avoid processing the same auction multiple times
       if (processedRefunds.has(auctionId)) {
         console.log(`💰 Refunds already processed for auction ${auctionId}`);
         return;
@@ -70,6 +70,3 @@ export function useAutomaticRefundHandler() {
     processedRefunds: Array.from(processedRefunds),
   };
 }
-
-
-

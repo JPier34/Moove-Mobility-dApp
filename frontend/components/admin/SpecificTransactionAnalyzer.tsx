@@ -456,11 +456,3 @@ export default function SpecificTransactionAnalyzer({
     </div>
   );
 }
-
-
-
-
-
-
-
-

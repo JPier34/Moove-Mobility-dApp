@@ -73,7 +73,7 @@ export function useEnglishAuction(auctionId?: number) {
         if (currentHighestBidder.toLowerCase() === address.toLowerCase()) {
           const errorMsg =
             "You are already the highest bidder. You cannot outbid yourself.";
-          console.log(`❌ [English Auction] Bid blocked: ${errorMsg}`);
+
           setError(errorMsg);
           return false;
         }
@@ -103,7 +103,7 @@ export function useEnglishAuction(auctionId?: number) {
             (fiveMinutes - timeSinceLastBid) / 1000
           );
           const errorMsg = `Please wait ${remainingTime} seconds before placing another bid`;
-          console.log(`❌ [English Auction] Bid blocked: ${errorMsg}`);
+
           setError(errorMsg);
           return false;
         }

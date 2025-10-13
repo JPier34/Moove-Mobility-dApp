@@ -349,11 +349,3 @@ export default function AuctionIdRangeChecker({
     </div>
   );
 }
-
-
-
-
-
-
-
-

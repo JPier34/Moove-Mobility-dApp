@@ -82,7 +82,6 @@ export default function ActiveBids({ bids }: ActiveBidsProps) {
   }, [bids]);
 
   const handleViewAuction = (auctionId: string) => {
-    // TODO: Navigate to auction detail
     window.location.href = `/auctions/${auctionId}`;
   };
 

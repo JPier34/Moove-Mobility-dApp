@@ -215,11 +215,3 @@ export function useServerSideAuctionActions() {
     error,
   };
 }
-
-
-
-
-
-
-
-

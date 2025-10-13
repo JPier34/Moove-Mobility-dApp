@@ -88,8 +88,10 @@ export default function OptimizedNFTImage({
     }
 
     // Check if it's an IPFS hash (starts with Qm or bafy) without ipfs:// prefix
-    const isIPFSHash = /^(Qm[a-zA-Z0-9]{44}|bafy[a-zA-Z0-9]{50,})/.test(originalSrc);
-    
+    const isIPFSHash = /^(Qm[a-zA-Z0-9]{44}|bafy[a-zA-Z0-9]{50,})/.test(
+      originalSrc
+    );
+
     // If it's not an IPFS URL or hash, return as-is
     if (!originalSrc.includes("ipfs://") && !isIPFSHash) {
       return originalSrc;

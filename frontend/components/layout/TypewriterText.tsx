@@ -46,5 +46,3 @@ export default function TypewriterText({
     </motion.div>
   );
 }
-
-

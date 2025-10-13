@@ -9,7 +9,6 @@ import React, {
 } from "react";
 import { useWonAuctionsManager } from "@/hooks/useWonAuctionsManager";
 import ConsolidatedNotificationBadge from "@/components/notifications/ConsolidatedNotificationBadge";
-import AuctionNotificationsDebug from "@/components/debug/AuctionNotificationsDebug";
 import { useSealedBidAutoMonitor } from "@/hooks/useSealedBidStatusManager";
 import { useAccount } from "wagmi";
 import { ethers } from "ethers";
@@ -1303,7 +1302,6 @@ export const AuctionNotificationsProvider: React.FC<{
     <AuctionNotificationsContext.Provider value={contextValue}>
       {children}
       <ConsolidatedNotificationBadge />
-      <AuctionNotificationsDebug />
     </AuctionNotificationsContext.Provider>
   );
 };

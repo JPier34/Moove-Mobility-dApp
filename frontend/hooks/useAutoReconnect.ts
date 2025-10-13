@@ -9,19 +9,23 @@ export function useAutoReconnect() {
   const [hasAttemptedReconnect, setHasAttemptedReconnect] = useState(false);
 
   useEffect(() => {
-    // Solo se non siamo già connessi, non stiamo connettendo, e non abbiamo già tentato
+    // Only if we're not already connected, not connecting, and haven't already tried
     if (!isConnected && !isConnecting && !hasAttemptedReconnect) {
-      console.log("🔄 Auto-reconnect: Wallet not connected, attempting reconnection...");
-      
-      // Trova il connector più comune (MetaMask o WalletConnect)
-      const preferredConnector = 
-        connectors.find(c => c.name === "MetaMask") ||
-        connectors.find(c => c.name === "WalletConnect") ||
+      console.log(
+        "🔄 Auto-reconnect: Wallet not connected, attempting reconnection..."
+      );
+
+      // Find the most common connector (MetaMask or WalletConnect)
+      const preferredConnector =
+        connectors.find((c) => c.name === "MetaMask") ||
+        connectors.find((c) => c.name === "WalletConnect") ||
         connectors[0];
 
       if (preferredConnector) {
-        console.log(`🔄 Attempting to reconnect with ${preferredConnector.name}...`);
-        
+        console.log(
+          `🔄 Attempting to reconnect with ${preferredConnector.name}...`
+        );
+
         try {
           connect({ connector: preferredConnector });
           console.log("✅ Auto-reconnect initiated!");
@@ -46,6 +50,7 @@ export function useAutoReconnect() {
 
   return {
     hasAttemptedReconnect,
-    isAttemptingReconnect: !isConnected && !isConnecting && !hasAttemptedReconnect,
+    isAttemptingReconnect:
+      !isConnected && !isConnecting && !hasAttemptedReconnect,
   };
 }

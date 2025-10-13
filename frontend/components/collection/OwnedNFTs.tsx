@@ -61,7 +61,7 @@ export default function OwnedNFTs({ nfts }: OwnedNFTsProps) {
 
   const handleRemoveFromSale = (nft: OwnedNFT) => {
     console.log("Removing from sale:", nft.id);
-    // TODO: Implement remove from sale logic when marketplace is ready
+    // Marketplace functionality will be implemented in future version
     alert(`Rimuovendo ${nft.name} dalla vendita...`);
   };
 

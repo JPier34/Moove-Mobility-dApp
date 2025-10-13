@@ -810,7 +810,6 @@ export function useSealedBidAutoMonitor() {
 
       for (const auctionId of auctionIds) {
         try {
-          console.log(`🔍 [SealedBid] Checking auction ${auctionId}...`);
           await checkAndTransitionStatus(auctionId);
         } catch (error) {
           console.error(
@@ -826,7 +825,6 @@ export function useSealedBidAutoMonitor() {
     );
 
     return () => {
-      console.log(`🛑 [SealedBid] Clearing monitoring interval`);
       clearInterval(interval);
     };
   }, [monitoredAuctions.size]); // Solo dipendenza dalla dimensione, non dall'oggetto

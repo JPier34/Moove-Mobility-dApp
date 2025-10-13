@@ -73,7 +73,7 @@ export function useReverseNFTFinder(): ReverseNFTFinderResult {
         throw new Error("Failed to fetch metadata");
       }
       const metadata = await response.json();
-      console.log(`✅ [useReverseNFTFinder] Metadata fetched:`, metadata);
+
       return metadata;
     } catch (error) {
       console.warn(

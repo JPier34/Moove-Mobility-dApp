@@ -49,6 +49,3 @@ export default function AutomaticRefundHandler() {
   // Questo componente non renderizza nulla
   return null;
 }
-
-
-

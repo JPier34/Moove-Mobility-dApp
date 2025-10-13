@@ -8,4 +8,3 @@ export default function RouteLoadingWrapper() {
 
   return <RouteLoading isLoading={isLoading} message="Navigating..." />;
 }
-

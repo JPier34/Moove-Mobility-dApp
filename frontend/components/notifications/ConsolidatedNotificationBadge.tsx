@@ -163,7 +163,6 @@ export default function ConsolidatedNotificationBadge({
           const endTx = await auctionContract.endAuction(
             notification.auctionId
           );
-          console.log(`📝 [SealedBid] End auction transaction: ${endTx.hash}`);
 
           toast.success(
             `🏁 Ending sealed bid auction #${notification.auctionId}...`,
@@ -272,7 +271,6 @@ export default function ConsolidatedNotificationBadge({
         const tx = await auctionContract.endAuction(notification.auctionId, {
           gasLimit: CONFIG.GAS_LIMITS.END_AUCTION,
         });
-        console.log(`🏁 [EndAuction] Transaction sent: ${tx.hash}`);
 
         toast.success(`Ending auction ${notification.auctionId}...`, {
           duration: CONFIG.TOAST_DURATION,
@@ -280,7 +278,6 @@ export default function ConsolidatedNotificationBadge({
 
         // Wait for transaction confirmation
         const receipt = await tx.wait();
-        console.log(`🏁 [EndAuction] Transaction confirmed:`, receipt);
 
         // ✅ SECURITY: Only increment counter AFTER successful confirmation
         localStorage.setItem(userAttemptsKey, (attempts + 1).toString());
@@ -340,8 +337,8 @@ export default function ConsolidatedNotificationBadge({
       notification.type === "settleAuction" &&
       notification.auctionType === "SEALED_BID"
     ) {
-      // Per Sealed Bid, rimuovi direttamente la notifica senza chiamare settleAuction
-      // perché endAuction() ha già fatto tutto automaticamente
+      // For Sealed Bid, remove the notification directly without calling settleAuction
+      // because endAuction() has already done everything automatically
       removePermanentClaimNotification(notification.id);
       markClaimAsRead(notification.id);
       return;
@@ -422,7 +419,6 @@ export default function ConsolidatedNotificationBadge({
         const tx = await auctionContract.settleAuction(notification.auctionId, {
           gasLimit: CONFIG.GAS_LIMITS.SETTLE_AUCTION,
         });
-        console.log(`🏆 [SettleAuction] Transaction sent: ${tx.hash}`);
 
         toast.success(`Settling auction ${notification.auctionId}...`, {
           duration: CONFIG.TOAST_DURATION,
@@ -430,7 +426,6 @@ export default function ConsolidatedNotificationBadge({
 
         // Wait for transaction confirmation
         const receipt = await tx.wait();
-        console.log(`🏆 [SettleAuction] Transaction confirmed:`, receipt);
 
         // ✅ SECURITY: Only increment counter AFTER successful confirmation
         localStorage.setItem(userAttemptsKey, (attempts + 1).toString());

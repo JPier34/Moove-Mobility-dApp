@@ -33,7 +33,7 @@ export function useNFTValidationAPI() {
   const [isValidating, setIsValidating] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Cache locale con metadati
+  // Local cache with metadata
   const getCachedNFTs = useCallback((): CachedNFT[] => {
     try {
       const cached = localStorage.getItem("moove-nft-cache");
@@ -43,12 +43,12 @@ export function useNFTValidationAPI() {
     }
   }, []);
 
-  // Aggiungi NFT alla cache
+  // Add NFT to cache
   const addToCache = useCallback(
     (nft: CachedNFT) => {
       try {
         const cached = getCachedNFTs();
-        // Evita duplicati
+        // Avoid duplicates
         const exists = cached.find(
           (cachedNFT) =>
             cachedNFT.name === nft.name && cachedNFT.imageHash === nft.imageHash
@@ -65,7 +65,7 @@ export function useNFTValidationAPI() {
     [getCachedNFTs]
   );
 
-  // Calcola hash dell'immagine
+  // Calculate image hash
   const calculateImageHash = useCallback(
     async (file: File): Promise<string> => {
       const buffer = await file.arrayBuffer();
@@ -76,7 +76,7 @@ export function useNFTValidationAPI() {
     []
   );
 
-  // Chiamata API per verificare duplicati
+  // API call to check duplicates
   const checkDuplicatesAPI = useCallback(
     async (
       name: string,
@@ -116,7 +116,7 @@ export function useNFTValidationAPI() {
     []
   );
 
-  // Sincronizza cache locale con API
+  // Sync local cache with API
   const syncWithAPI = useCallback(async () => {
     setIsSyncing(true);
     try {
@@ -128,7 +128,7 @@ export function useNFTValidationAPI() {
         const apiNFTs: APINFTResponse[] = await response.json();
         const cachedNFTs = getCachedNFTs();
 
-        // Aggiungi NFT dall'API che non sono in cache locale
+        // Add NFTs from API that are not in local cache
         apiNFTs.forEach((apiNFT) => {
           const exists = cachedNFTs.find(
             (cached) =>
@@ -143,17 +143,17 @@ export function useNFTValidationAPI() {
           }
         });
 
-        toast.success("Cache sincronizzata con il server");
+        toast.success("Cache synchronized with server");
       }
     } catch (error) {
       console.warn("Sync failed:", error);
-      toast.error("Sincronizzazione fallita");
+      toast.error("Synchronization failed");
     } finally {
       setIsSyncing(false);
     }
   }, [getCachedNFTs, addToCache]);
 
-  // Verifica duplicati (locale + API)
+  // Check duplicates (local + API)
   const checkDuplicates = useCallback(
     async (
       name: string,
@@ -168,7 +168,7 @@ export function useNFTValidationAPI() {
       const cached = getCachedNFTs();
       const suggestions: string[] = [];
 
-      // 1. Controllo cache locale (veloce)
+      // 1. Local cache check (fast)
       const localNameDuplicate = cached.find(
         (nft) => nft.name.toLowerCase().trim() === name.toLowerCase().trim()
       );
@@ -176,7 +176,7 @@ export function useNFTValidationAPI() {
         (nft) => nft.imageHash === imageHash
       );
 
-      // 2. Se non trovato localmente, controlla API
+      // 2. If not found locally, check API
       let apiResult = {
         nameDuplicate: false,
         imageDuplicate: false,
@@ -187,11 +187,11 @@ export function useNFTValidationAPI() {
         apiResult = await checkDuplicatesAPI(name, imageHash);
       }
 
-      // 3. Combina risultati
+      // 3. Combine results
       const nameDuplicate = !!localNameDuplicate || apiResult.nameDuplicate;
       const imageDuplicate = !!localImageDuplicate || apiResult.imageDuplicate;
 
-      // 4. Genera suggerimenti se duplicato
+      // 4. Generate suggestions if duplicate
       if (nameDuplicate) {
         const timestamp = new Date().toISOString().slice(0, 10);
         const randomSuffix = Math.random()
@@ -206,7 +206,7 @@ export function useNFTValidationAPI() {
         suggestions.push(`${name} Collection`);
       }
 
-      // 5. Combina NFT esistenti
+      // 5. Combine existing NFTs
       const existingNFTs: CachedNFT[] = [
         ...(localNameDuplicate ? [localNameDuplicate] : []),
         ...(localImageDuplicate ? [localImageDuplicate] : []),
@@ -289,37 +289,35 @@ export function useNFTValidationAPI() {
           result.isValid = false;
         }
 
-        // 3. Altri controlli di validazione...
-        // (mantieni gli stessi controlli del hook precedente)
+        // 3. Other validation checks...
+        // (keep the same checks as the previous hook)
 
-        // 4. Verifica lunghezza nome
+        // 4. Check name length
         if (name.length < 3) {
-          result.errors.push("Nome deve essere di almeno 3 caratteri");
+          result.errors.push("Name must be at least 3 characters");
           result.isValid = false;
         } else if (name.length > 50) {
-          result.errors.push("Nome deve essere di massimo 50 caratteri");
+          result.errors.push("Name must be at most 50 characters");
           result.isValid = false;
         }
 
-        // 5. Verifica lunghezza descrizione
+        // 5. Check description length
         if (description.length < 10) {
-          result.errors.push("Descrizione deve essere di almeno 10 caratteri");
+          result.errors.push("Description must be at least 10 characters");
           result.isValid = false;
         } else if (description.length > 500) {
-          result.errors.push(
-            "Descrizione deve essere di massimo 500 caratteri"
-          );
+          result.errors.push("Description must be at most 500 characters");
           result.isValid = false;
         }
 
-        // 6. Verifica caratteri speciali nel nome
+        // 6. Check special characters in name
         const invalidChars = /[<>:"/\\|?*]/;
         if (invalidChars.test(name)) {
-          result.errors.push("Nome contiene caratteri non validi");
+          result.errors.push("Name contains invalid characters");
           result.isValid = false;
         }
 
-        // 7. Verifica rarità
+        // 7. Check rarity
         const validRarities = [
           "COMMON",
           "UNCOMMON",
@@ -329,11 +327,11 @@ export function useNFTValidationAPI() {
           "MYTHIC",
         ];
         if (!validRarities.includes(rarity)) {
-          result.errors.push("Rarità non valida");
+          result.errors.push("Invalid rarity");
           result.isValid = false;
         }
 
-        // 9. Verifica tipo immagine
+        // 9. Check image type
         const validTypes = [
           "image/jpeg",
           "image/png",
@@ -341,22 +339,20 @@ export function useNFTValidationAPI() {
           "image/webp",
         ];
         if (!validTypes.includes(image.type)) {
-          result.errors.push("Tipo immagine non supportato");
+          result.errors.push("Unsupported image type");
           result.isValid = false;
         }
 
-        // 10. Suggerimenti per miglioramenti
+        // 10. Improvement suggestions
         if (name.length < 10) {
-          result.warnings.push(
-            "Nome breve - considera un nome più descrittivo"
-          );
+          result.warnings.push("Short name - consider a more descriptive name");
         }
 
         if (description.length < 50) {
-          result.warnings.push("Descrizione breve - considera più dettagli");
+          result.warnings.push("Short description - consider more details");
         }
       } catch (error) {
-        result.errors.push("Errore durante la validazione");
+        result.errors.push("Error during validation");
         result.isValid = false;
         console.error("NFT validation error:", error);
       } finally {
@@ -368,7 +364,7 @@ export function useNFTValidationAPI() {
     [checkDuplicates, calculateImageHash]
   );
 
-  // Aggiungi NFT validato alla cache
+  // Add validated NFT to cache
   const addValidatedNFT = useCallback(
     async (name: string, image: File, tokenId?: number) => {
       try {
@@ -384,7 +380,7 @@ export function useNFTValidationAPI() {
 
         addToCache(nft);
 
-        // Sincronizza con API in background
+        // Sync with API in background
         try {
           await fetch("/api/add-nft", {
             method: "POST",
@@ -403,7 +399,7 @@ export function useNFTValidationAPI() {
     [calculateImageHash, address, addToCache]
   );
 
-  // Pulisci cache (per testing)
+  // Clear cache (for testing)
   const clearCache = useCallback(() => {
     localStorage.removeItem("moove-nft-cache");
     toast.success("Cache NFT pulita");

@@ -38,17 +38,3 @@ export function useNavigationLoading() {
     resetLoading,
   };
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

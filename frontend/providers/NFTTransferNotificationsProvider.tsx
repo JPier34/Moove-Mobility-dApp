@@ -14,8 +14,6 @@ import { CheckCircle, XCircle, Gift, ArrowRight } from "lucide-react";
 import { ethers } from "ethers";
 import { contracts } from "@/utils/contracts";
 // import NFTReceivedNotification from "@/components/notifications/NFTReceivedNotification";
-import TransferStatusIndicator from "@/components/TransferStatusIndicator";
-import TransferConfirmationHandler from "@/components/TransferConfirmationHandler";
 
 // ============= TYPES =============
 
@@ -129,8 +127,8 @@ export function NFTTransferNotificationsProvider({
   const confirmTransfer = () => {
     setState((prev) => ({
       ...prev,
-      isTransferConfirmed: true, // Ora è confermato!
-      isTransactionPending: true, // Transazione in corso
+      isTransferConfirmed: true, // Now confirmed!
+      isTransactionPending: true, // Transaction in progress
       showTransferConfirmation: false,
     }));
   };
@@ -412,7 +410,7 @@ export function NFTTransferNotificationsProvider({
         isRecipient: to.toLowerCase() === address.toLowerCase(),
       });
 
-      // SOLO se l'NFT è stato trasferito AL current user (destinatario)
+      // ONLY if the NFT was transferred TO the current user (recipient)
       if (to.toLowerCase() === address.toLowerCase()) {
         console.log(`🎉 NFT ${tokenId} received by current user`);
 
@@ -497,7 +495,7 @@ export function NFTTransferNotificationsProvider({
             isRecipient: to.toLowerCase() === address.toLowerCase(),
           });
 
-          // SOLO se l'NFT è stato trasferito AL current user (destinatario)
+          // ONLY if the NFT was transferred TO the current user (recipient)
           if (to.toLowerCase() === address.toLowerCase()) {
             console.log(`🎉 NFT ${tokenId} received via blockchain event`);
 
@@ -782,12 +780,6 @@ export function NFTTransferNotificationsProvider({
 
       {/* NFT Received Notification - Disabled, using ReceivedNotificationModal instead */}
       {/* <NFTReceivedNotification /> */}
-
-      {/* Transfer Status Indicator */}
-      <TransferStatusIndicator />
-
-      {/* Transfer Confirmation Handler */}
-      <TransferConfirmationHandler />
     </NFTTransferContext.Provider>
   );
 }
@@ -877,7 +869,7 @@ function TransferConfirmationModal() {
               <button
                 onClick={() => {
                   confirmTransfer();
-                  // Il TransferConfirmationHandler gestirà l'esecuzione
+                  // The TransferConfirmationHandler will handle the execution
                 }}
                 disabled={isTransactionPending}
                 className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${

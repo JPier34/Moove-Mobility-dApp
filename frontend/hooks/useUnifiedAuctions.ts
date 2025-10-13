@@ -1,6 +1,6 @@
 /**
- * Hook Unificato per Gestione Aste
- * Risolve tutti i problemi di compatibilità dati
+ * Unified Hook for Auction Management
+ * Resolves all data compatibility issues
  */
 
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -20,20 +20,20 @@ import {
   isCollectionNFT,
 } from "@/types/auction-unified";
 
-// ============= INTERFACCE =============
+// ============= INTERFACES =============
 
 export interface UseUnifiedAuctionReturn {
-  // Dati aste
+  // Auction data
   auctions: FrontendAuction[];
   isLoading: boolean;
   error: string | null;
 
-  // Funzioni
+  // Functions
   fetchAuctions: () => Promise<void>;
   fetchAuctionById: (auctionId: AuctionId) => Promise<FrontendAuction | null>;
   refreshAuctions: () => Promise<void>;
 
-  // Cache e performance
+  // Cache and performance
   cacheStats: {
     totalAuctions: number;
     lastFetch: Date | null;
@@ -42,16 +42,16 @@ export interface UseUnifiedAuctionReturn {
 }
 
 export interface UseUnifiedCollectionReturn {
-  // Dati collezione
+  // Collection data
   nfts: CollectionNFT[];
   isLoading: boolean;
   error: string | null;
 
-  // Statistiche
+  // Statistics
   totalItems: number;
   totalValue: number;
 
-  // Funzioni
+  // Functions
   fetchCollection: () => Promise<void>;
   refreshCollection: () => Promise<void>;
   loadMore: () => Promise<void>;
@@ -61,15 +61,15 @@ export interface UseUnifiedCollectionReturn {
   isLoadingMore: boolean;
 }
 
-// ============= CACHE GLOBALE =============
+// ============= GLOBAL CACHE =============
 
 const auctionCache = new Map<AuctionId, FrontendAuction>();
 const collectionCache = new Map<string, CollectionNFT[]>();
 const cacheTimestamps = new Map<string, number>();
 
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minuti
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
-// ============= HOOK ASTE UNIFICATO =============
+// ============= UNIFIED AUCTIONS HOOK =============
 
 export function useUnifiedAuctions(): UseUnifiedAuctionReturn {
   const { address, isConnected } = useAccount();
@@ -80,14 +80,14 @@ export function useUnifiedAuctions(): UseUnifiedAuctionReturn {
   const cacheHits = useRef(0);
   const totalRequests = useRef(0);
 
-  // Verifica validità cache
+  // Check cache validity
   const isCacheValid = useCallback((cacheKey: string): boolean => {
     const timestamp = cacheTimestamps.get(cacheKey);
     if (!timestamp) return false;
     return Date.now() - timestamp < CACHE_DURATION;
   }, []);
 
-  // Fetch aste dal contratto
+  // Fetch auctions from contract
   const fetchAuctions = useCallback(async () => {
     if (!isConnected || !address) {
       setAuctions([]);
@@ -97,7 +97,7 @@ export function useUnifiedAuctions(): UseUnifiedAuctionReturn {
 
     const cacheKey = `auctions_${address}`;
 
-    // Controlla cache
+    // Check cache
     if (isCacheValid(cacheKey)) {
       const cachedAuctions = Array.from(auctionCache.values());
       if (cachedAuctions.length > 0) {
@@ -504,6 +504,3 @@ export function clearUnifiedCache(): void {
   cacheTimestamps.clear();
   console.log("🧹 Unified cache cleared");
 }
-
-
-

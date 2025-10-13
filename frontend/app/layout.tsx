@@ -16,49 +16,63 @@ const inter = Inter({
 // SEO Metadata
 export const metadata = {
   title: {
-    default: "Moove NFT Platform",
-    template: "%s | Moove NFT Platform",
+    default: "Moove Mobility - NFT Vehicle Rental Platform",
+    template: "%s | Moove Mobility",
   },
   description:
-    "Decentralized mobility platform for NFT-based vehicle rental passes",
+    "Revolutionary NFT-based vehicle rental platform. Rent scooters, bikes, and vehicles using blockchain technology. Decentralized mobility solutions for the future.",
   keywords: [
     "NFT",
     "mobility",
-    "rental",
+    "vehicle rental",
+    "scooter rental",
+    "bike rental",
     "blockchain",
     "ethereum",
     "decentralized",
-    "vehicle",
-    "scooter",
-    "bike",
+    "smart contracts",
+    "Web3",
+    "cryptocurrency",
+    "digital assets",
+    "sustainable transport",
+    "urban mobility",
   ],
-  authors: [{ name: "Moove Team" }],
-  creator: "Moove",
-  publisher: "Moove",
+  authors: [{ name: "Moove Mobility Team" }],
+  creator: "Moove Mobility",
+  publisher: "Moove Mobility",
   formatDetection: {
     email: false,
     address: false,
     telephone: false,
   },
-  metadataBase: new URL("https://moove-nft.vercel.app"),
+  metadataBase: new URL("https://moove-mobility.com"),
   alternates: {
     canonical: "/",
   },
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "https://moove-nft.vercel.app",
-    title: "Moove NFT Platform",
+    url: "https://moove-mobility.com",
+    title: "Moove Mobility - NFT Vehicle Rental Platform",
     description:
-      "Decentralized mobility platform for NFT-based vehicle rental passes",
-    siteName: "Moove NFT Platform",
+      "Revolutionary NFT-based vehicle rental platform. Rent scooters, bikes, and vehicles using blockchain technology.",
+    siteName: "Moove Mobility",
+    images: [
+      {
+        url: "/og-image.jpg",
+        width: 1200,
+        height: 630,
+        alt: "Moove Mobility - NFT Vehicle Rental Platform",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Moove NFT Platform",
+    title: "Moove Mobility - NFT Vehicle Rental Platform",
     description:
-      "Decentralized mobility platform for NFT-based vehicle rental passes",
-    creator: "@moove",
+      "Revolutionary NFT-based vehicle rental platform. Rent scooters, bikes, and vehicles using blockchain technology.",
+    creator: "@moovemobility",
+    images: ["/og-image.jpg"],
   },
   robots: {
     index: true,
@@ -146,7 +160,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
               <div className="flex items-center space-x-3">
                 <div className="animate-spin rounded-full h-6 w-6 border-2 border-moove-primary border-t-transparent"></div>
                 <span className="text-gray-700 dark:text-gray-300 font-medium">
-                  Caricamento...
+                  Loading...
                 </span>
               </div>
             </div>
