@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { useAuctionNotifications } from "@/providers/AuctionNotificationsProvider";
 
 export interface NotificationTrigger {
@@ -31,10 +31,35 @@ export function useAuctionNotificationTriggers(): NotificationTrigger {
     console.log("useAuctionNotifications not available during SSR");
   }
 
+  // Queue for notifications when context is not available
+  const [notificationQueue, setNotificationQueue] = useState<any[]>([]);
+
+  // Load queued notifications from localStorage on mount
+  useEffect(() => {
+    const storedQueue = localStorage.getItem("moove-notification-queue");
+    if (storedQueue) {
+      try {
+        const parsedQueue = JSON.parse(storedQueue);
+        console.log(
+          `📢 [NotificationSystem] Loaded ${parsedQueue.length} notifications from localStorage`
+        );
+        setNotificationQueue(parsedQueue);
+        localStorage.removeItem("moove-notification-queue");
+      } catch (error) {
+        console.error(
+          `❌ [NotificationSystem] Error parsing stored queue:`,
+          error
+        );
+      }
+    }
+  }, []);
+
   // Helper function to add notifications to the appropriate system
   const addNotificationToSystem = useCallback(
     (notification: any) => {
       if (!context) return;
+
+      console.log(`📢 [NotificationSystem] Adding notification:`, notification);
 
       if (
         notification.notificationType === "sealedBidWin" ||
@@ -42,6 +67,9 @@ export function useAuctionNotificationTriggers(): NotificationTrigger {
         notification.notificationType === "auctionFailed"
       ) {
         // Add sealed bid notifications to the main system
+        console.log(
+          `🔒 [NotificationSystem] Adding sealed bid notification via addSealedBidNotification`
+        );
         context.addSealedBidNotification?.(notification);
       } else if (notification.notificationType === "bidRefunded") {
         context.addRefundNotification?.(notification);
@@ -55,6 +83,38 @@ export function useAuctionNotificationTriggers(): NotificationTrigger {
     },
     [context]
   );
+
+  // Process queued notifications when context becomes available
+  useEffect(() => {
+    console.log(`🔍 [Debug] useEffect triggered:`, {
+      context: !!context,
+      queueLength: notificationQueue.length,
+      queue: notificationQueue,
+    });
+
+    if (context) {
+      console.log(`📢 [NotificationSystem] Context is now available`);
+      if (notificationQueue.length > 0) {
+        console.log(
+          `📢 [NotificationSystem] Processing ${notificationQueue.length} queued notifications`
+        );
+        notificationQueue.forEach((notification) => {
+          console.log(
+            `📢 [NotificationSystem] Processing notification:`,
+            notification
+          );
+          addNotificationToSystem(notification);
+        });
+        setNotificationQueue([]);
+      } else {
+        console.log(
+          `📢 [NotificationSystem] No notifications in queue to process`
+        );
+      }
+    } else {
+      console.log(`📢 [NotificationSystem] Context not available yet`);
+    }
+  }, [context, notificationQueue, addNotificationToSystem]);
 
   const notifyReserveWin = useCallback(
     (auctionId: string, amount: number) => {
@@ -189,22 +249,49 @@ export function useAuctionNotificationTriggers(): NotificationTrigger {
     (auctionId: string, amount: number) => {
       console.log(`🔒 Sealed bid auction ${auctionId} won with ${amount} ETH`);
 
+      const notification = {
+        id: `sealed-bid-win-${auctionId}-${Date.now()}`,
+        auctionId,
+        timestamp: Date.now(),
+        isRead: false,
+        message: `🎉 Congratulations! You won the sealed bid auction #${auctionId} with ${amount} ETH!`,
+        notificationType: "sealedBidWin" as const,
+        priority: "high" as const,
+        amount: amount.toString(),
+      };
+
       // Add notification to the system
       if (context) {
-        const notification = {
-          id: `sealed-bid-win-${auctionId}-${Date.now()}`,
-          auctionId,
-          timestamp: Date.now(),
-          isRead: false,
-          message: `🎉 Congratulations! You won the sealed bid auction #${auctionId} with ${amount} ETH!`,
-          notificationType: "sealedBidWin" as const,
-          priority: "high" as const,
-          amount: amount.toString(),
-        };
+        console.log(
+          `🔒 [SealedBidWin] Context available, adding notification immediately`
+        );
         addNotificationToSystem(notification);
+      } else {
+        console.log(
+          `🔒 [SealedBidWin] Context not available, queuing notification`
+        );
+        setNotificationQueue((prev) => {
+          const newQueue = [...prev, notification];
+          console.log(`🔒 [SealedBidWin] Updated queue:`, {
+            oldLength: prev.length,
+            newLength: newQueue.length,
+            notification: notification,
+          });
+
+          // Save to localStorage for persistence across instances
+          localStorage.setItem(
+            "moove-notification-queue",
+            JSON.stringify(newQueue)
+          );
+          console.log(
+            `💾 [SealedBidWin] Saved ${newQueue.length} notifications to localStorage`
+          );
+
+          return newQueue;
+        });
       }
     },
-    [context]
+    [context, addNotificationToSystem]
   );
 
   const notifySealedBidLoss = useCallback(

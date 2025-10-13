@@ -891,7 +891,7 @@ function AdminNFTCreatorUltraSimpleContent() {
             );
 
             // Get total auction count to find the latest auction
-            const totalAuctions = await auctionContract.getTotalAuctions();
+            const totalAuctions = await auctionContract.totalAuctions();
             const latestAuctionId = Number(totalAuctions) - 1;
 
             if (latestAuctionId >= 0) {
@@ -906,7 +906,10 @@ function AdminNFTCreatorUltraSimpleContent() {
                 { duration: 8000 }
               );
 
-              // Don't redirect - let user see the validation results
+              // Redirect to auctions after showing validation error
+              setTimeout(() => {
+                router.push("/auctions");
+              }, 3000);
               return;
             }
           } catch (error) {

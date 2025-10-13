@@ -54,15 +54,9 @@ export function useSealedBidStatusManager(): SealedBidStatusManager {
 
         // For sealed bid auctions, check actual bids instead of highestBidder
         if (auctionType === 2) {
-          console.log(`🔒 Checking sealed bid auction ${auctionId} bids...`);
-
           try {
             // Get all bids for this auction
             const bids = await auctionContract.getAuctionBids(auctionId);
-            console.log(
-              `📋 Found ${bids.length} bids for auction ${auctionId}:`,
-              bids
-            );
 
             if (bids.length === 0) {
               console.log(`❌ Auction ${auctionId} FAILED - No bids found`);
@@ -132,14 +126,26 @@ export function useSealedBidStatusManager(): SealedBidStatusManager {
                 winningBid: ethers.formatEther(highestBid),
                 winner: address,
               });
-              notifySealedBidWin(
-                auctionId.toString(),
-                parseFloat(ethers.formatEther(highestBid))
-              );
 
-              // ✅ ADD CLAIM FUNCTIONALITY: Also add a claim notification
-              // This will allow the user to claim their sealed bid win
-              notifyClaimReady(auctionId.toString());
+              // ✅ DIRECT NOTIFICATION: Dispatch custom event to add notification
+              const notification = {
+                id: `sealed-bid-win-${auctionId}-${Date.now()}`,
+                auctionId: auctionId.toString(),
+                timestamp: Date.now(),
+                isRead: false,
+                message: `🎉 Congratulations! You won the sealed bid auction #${auctionId} with ${ethers.formatEther(
+                  highestBid
+                )} ETH!`,
+                notificationType: "sealedBidWin" as const,
+                priority: "high" as const,
+                amount: ethers.formatEther(highestBid),
+              };
+
+              window.dispatchEvent(
+                new CustomEvent("addSealedBidNotification", {
+                  detail: notification,
+                })
+              );
 
               // ✅ STOP MONITORING: Remove from monitoring to prevent recursive notifications
               console.log(

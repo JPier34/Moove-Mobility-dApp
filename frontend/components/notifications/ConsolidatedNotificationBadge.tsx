@@ -185,7 +185,11 @@ export default function ConsolidatedNotificationBadge({
           );
 
           // Dispatch event to trigger claim check
-          window.dispatchEvent(new CustomEvent("forceClaimCheck"));
+          window.dispatchEvent(
+            new CustomEvent("forceClaimCheck", {
+              detail: { auctionId: notification.auctionId },
+            })
+          );
         } else {
           console.log(
             `⚠️ [SealedBid] Auction ${notification.auctionId} already ended (status: ${currentStatus})`
@@ -446,6 +450,18 @@ export default function ConsolidatedNotificationBadge({
               duration: 5000,
             }
           );
+
+          // Show redirect toast after 2 seconds
+          setTimeout(() => {
+            toast.success("🎉 NFT claimed! Redirecting to My Collection...", {
+              duration: 3000,
+            });
+
+            // Redirect to my-collection after 3 seconds
+            setTimeout(() => {
+              window.location.href = "/my-collection";
+            }, 3000);
+          }, 2000);
         }
 
         // ✅ SECURITY: Reset attempt counter on success

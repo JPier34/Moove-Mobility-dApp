@@ -1153,9 +1153,22 @@ export const AuctionNotificationsProvider: React.FC<{
       }, 1000); // Small delay to ensure transaction is fully processed
     };
 
+    const handleAddSealedBidNotification = (event: CustomEvent) => {
+      const notification = event.detail;
+      console.log(
+        `🔒 [SealedBid] Received sealed bid notification event:`,
+        notification
+      );
+      addSealedBidNotification(notification);
+    };
+
     window.addEventListener(
       "forceClaimCheck",
       handleForceClaimCheck as EventListener
+    );
+    window.addEventListener(
+      "addSealedBidNotification",
+      handleAddSealedBidNotification as EventListener
     );
 
     return () => {
@@ -1163,8 +1176,12 @@ export const AuctionNotificationsProvider: React.FC<{
         "forceClaimCheck",
         handleForceClaimCheck as EventListener
       );
+      window.removeEventListener(
+        "addSealedBidNotification",
+        handleAddSealedBidNotification as EventListener
+      );
     };
-  }, [fetchClaimEventsOptimized, auctionCache]);
+  }, [fetchClaimEventsOptimized, auctionCache, addSealedBidNotification]);
 
   // ✅ SEALED BID MONITORING: Activate automatic monitoring for sealed bid auctions
   useEffect(() => {
@@ -1208,7 +1225,21 @@ export const AuctionNotificationsProvider: React.FC<{
               sealedBidCount++;
             }
           } catch (error) {
-            console.warn(`⚠️ [SealedBid] Could not fetch auction ${i}:`, error);
+            // Check if it's an "Auction does not exist" error
+            if (
+              error instanceof Error &&
+              error.message.includes("Auction does not exist")
+            ) {
+              console.log(
+                `📝 [SealedBid] Auction ${i} does not exist, skipping`
+              );
+              break; // Stop iterating if we hit a non-existent auction
+            } else {
+              console.warn(
+                `⚠️ [SealedBid] Could not fetch auction ${i}:`,
+                error
+              );
+            }
           }
         }
 

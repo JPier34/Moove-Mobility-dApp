@@ -53,3 +53,5 @@ Ora puoi:
 - ✅ **User experience migliore** - Messaggi chiari e azioni semplici
 
 **Il sistema è ora completamente funzionante!** 🎉 Prova a usare "Ended Auctions Manager" per vedere e claimare l'asta #7.
+
+
