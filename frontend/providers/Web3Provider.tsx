@@ -13,11 +13,11 @@ import { config } from "@/lib/wagmi";
 import "@rainbow-me/rainbowkit/styles.css";
 
 // Check if WalletConnect projectId is configured
-const projectId = process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID;
+const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
 
-if (!projectId || projectId === "your-walletconnect-project-id-here") {
+if (!projectId || projectId === "your_walletconnect_project_id_here") {
   console.warn(
-    "⚠️ NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID not configured. Please add it to your .env.local file."
+    "⚠️ NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID not configured. Please add it to your .env.local file."
   );
   console.warn("Get your projectId from: https://cloud.walletconnect.com/");
 }

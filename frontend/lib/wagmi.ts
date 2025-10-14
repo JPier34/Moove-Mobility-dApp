@@ -4,7 +4,8 @@ import { createStorage, noopStorage } from "wagmi";
 import { http } from "viem";
 
 const projectId =
-  process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID || "your-project-id";
+  process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ||
+  "f47264bf464907d794f2ab4af58b45b7";
 
 // Create storage with persistence - using Wagmi's built-in persistence
 const storage = createStorage({
