@@ -27,8 +27,7 @@ export function useAuctionNotificationTriggers(): NotificationTrigger {
   try {
     context = useAuctionNotifications();
   } catch (error) {
-    // Context not available during SSR - this is expected
-    console.log("useAuctionNotifications not available during SSR");
+    // Context not available during SSR - this is expected, silent
   }
 
   // Queue for notifications when context is not available

@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAccount, useWriteContract } from "wagmi";
-import { CONTRACT_ADDRESSES } from "@/utils/contracts";
+import { CONTRACT_ADDRESSES, contracts } from "@/utils/contracts";
 import { AuctionStatus } from "@/types/auction";
-import MooveAuctionArtifact from "@/src/abis/MooveAuction.json";
 import { ethers } from "ethers";
 import toast from "react-hot-toast";
 
@@ -47,7 +46,7 @@ export function useAuctionExpirationHandler() {
           );
           const contract = new ethers.Contract(
             CONTRACT_ADDRESSES.MooveAuction,
-            MooveAuctionArtifact.abi,
+            contracts.MooveAuction.abi,
             provider
           );
 
@@ -110,7 +109,7 @@ export function useAuctionExpirationHandler() {
               try {
                 const result = await writeContractAsync({
                   address: CONTRACT_ADDRESSES.MooveAuction as `0x${string}`,
-                  abi: MooveAuctionArtifact.abi,
+                  abi: contracts.MooveAuction.abi,
                   functionName: "endAuction",
                   args: [auctionId],
                 });

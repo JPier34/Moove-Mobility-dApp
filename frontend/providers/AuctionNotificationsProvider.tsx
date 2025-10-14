@@ -78,16 +78,13 @@ class AuctionCache {
     const isTerminalState = cached.status === 4 || cached.status === 5;
 
     if (isTerminalState && !isExpired) {
-      console.log(`💾 [Cache] HIT for settled/cancelled auction ${auctionId}`);
       return cached.data;
     }
 
     if (!isExpired) {
-      console.log(`💾 [Cache] HIT for auction ${auctionId}`);
       return cached.data;
     }
 
-    console.log(`❌ [Cache] MISS (expired) for auction ${auctionId}`);
     this.cache.delete(auctionId);
     return null;
   }
@@ -98,7 +95,6 @@ class AuctionCache {
       timestamp: Date.now(),
       status,
     });
-    console.log(`💾 [Cache] SET auction ${auctionId} (status: ${status})`);
   }
 
   cleanup(): void {
@@ -116,7 +112,7 @@ class AuctionCache {
     }
 
     if (cleaned > 0) {
-      console.log(`🧹 [Cache] Cleaned ${cleaned} expired entries`);
+      // Cache cleaned
     }
   }
 
@@ -141,7 +137,6 @@ class AuctionCache {
 
   clear(): void {
     this.cache.clear();
-    console.log(`🧹 [Cache] Cleared all entries`);
   }
 }
 
@@ -151,7 +146,6 @@ async function findTotalAuctions(
   auctionContract: ethers.Contract,
   cache: AuctionCache
 ): Promise<number> {
-  console.log(`🔍 [Finder] Searching for total auctions...`);
 
   let low = 1;
   let high = CONFIG.PERFORMANCE.MAX_AUCTION_RANGE;
@@ -1209,7 +1203,7 @@ export const AuctionNotificationsProvider: React.FC<{
         console.log(`📊 [SealedBid] Found ${totalAuctions} total auctions`);
 
         let sealedBidCount = 0;
-        for (let i = 1; i <= totalAuctions; i++) {
+        for (let i = 0; i < totalAuctions; i++) {
           try {
             const auction = await auctionContract.getAuction(i);
             const auctionType = Number(auction.auctionType);

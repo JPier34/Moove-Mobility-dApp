@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from "react";
 import { useAccount } from "wagmi";
 import { ethers } from "ethers";
 import { contracts } from "@/utils/contracts";
-import MooveAuctionArtifact from "@/src/abis/MooveAuction.json";
 
 interface AuctionCreationData {
   auctionId: number;
@@ -49,7 +48,7 @@ export function useAuctionCreationMonitor() {
       );
       const contract = new ethers.Contract(
         contracts.MooveAuction.address,
-        MooveAuctionArtifact.abi,
+        contracts.MooveAuction.abi,
         provider
       );
 

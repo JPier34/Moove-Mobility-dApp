@@ -120,44 +120,6 @@ export default function AdminPage() {
           >
             <AdminNFTCreatorUltraSimple />
           </motion.div>
-
-          {/* Environment Setup Guide */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.6 }}
-          >
-            <EnvironmentSetupGuide />
-          </motion.div>
-
-          {/* Auction ID Range Checker */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.8 }}
-          >
-            <AuctionIdRangeChecker />
-          </motion.div>
-
-          {/* Server-Side Auction Manager */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 1.0 }}
-          >
-            <ServerSideAuctionManager />
-          </motion.div>
-
-          {/* Environment Debugger - Temporarily disabled */}
-          {/* <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 2.0 }}
-          >
-            <EnvironmentDebugger />
-          </motion.div> */}
-
-          {/* Debug components removed */}
         </div>
       </div>
     </AdminGuard>

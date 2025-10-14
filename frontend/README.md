@@ -162,8 +162,8 @@ NEXT_PUBLIC_MOOVE_RENTAL_PASS_ADDRESS=0x74aAb47A0439B728A5956A1d7faAc6716F1F18Df
 NEXT_PUBLIC_PINATA_API_KEY=your_pinata_api_key_here
 NEXT_PUBLIC_PINATA_SECRET_KEY=your_pinata_secret_key_here
 
-# Optional: RPC Configuration
-NEXT_PUBLIC_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com
+# Optional: Site URL for production
+NEXT_PUBLIC_SITE_URL=https://moove-mobility.vercel.app
 ```
 
 4. **Start development server**
