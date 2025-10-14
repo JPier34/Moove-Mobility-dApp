@@ -48,7 +48,7 @@ export function useAuctionCreationMonitor() {
       );
       const contract = new ethers.Contract(
         contracts.MooveAuction.address,
-        contracts.MooveAuction.abi,
+        contracts.MooveAuction.abi as any,
         provider
       );
 
