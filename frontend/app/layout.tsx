@@ -3,10 +3,12 @@ import SimplifiedAppProvider from "../providers/SimplifiedAppProvider";
 import Header from "../components/layout/Header";
 import Footer from "../components/layout/Footer";
 import RouteLoadingWrapper from "@/components/layout/RouteLoadingWrapper";
+import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 import { Inter } from "next/font/google";
 
-// Font config
+// Font configuration
 const inter = Inter({
   subsets: ["latin"],
   display: "swap",
@@ -20,7 +22,7 @@ export const metadata = {
     template: "%s | Moove Mobility",
   },
   description:
-    "Revolutionary NFT-based vehicle rental platform. Rent scooters, bikes, and vehicles using blockchain technology. Decentralized mobility solutions for the future.",
+    "Revolutionary NFT-based vehicle rental platform on Sepolia Ethereum. Rent scooters, bikes, and vehicles using blockchain technology. Decentralized mobility solutions for developers and users.",
   keywords: [
     "NFT",
     "mobility",
@@ -29,9 +31,11 @@ export const metadata = {
     "bike rental",
     "blockchain",
     "ethereum",
+    "sepolia",
     "decentralized",
     "smart contracts",
     "Web3",
+    "dApp",
     "cryptocurrency",
     "digital assets",
     "sustainable transport",
@@ -45,34 +49,29 @@ export const metadata = {
     address: false,
     telephone: false,
   },
-  metadataBase: new URL("https://moove-mobility.com"),
+  // NOTE: Update this URL after Vercel deployment
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL || "https://moove-mobility.vercel.app"
+  ),
   alternates: {
     canonical: "/",
   },
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "https://moove-mobility.com",
+    url: "/",
     title: "Moove Mobility - NFT Vehicle Rental Platform",
     description:
-      "Revolutionary NFT-based vehicle rental platform. Rent scooters, bikes, and vehicles using blockchain technology.",
+      "Revolutionary NFT-based vehicle rental platform on Sepolia Ethereum. Rent scooters, bikes, and vehicles using blockchain technology.",
     siteName: "Moove Mobility",
     images: [
       {
-        url: "/og-image.jpg",
+        url: "/src/og/og.png",
         width: 1200,
         height: 630,
         alt: "Moove Mobility - NFT Vehicle Rental Platform",
       },
     ],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Moove Mobility - NFT Vehicle Rental Platform",
-    description:
-      "Revolutionary NFT-based vehicle rental platform. Rent scooters, bikes, and vehicles using blockchain technology.",
-    creator: "@moovemobility",
-    images: ["/og-image.jpg"],
   },
   robots: {
     index: true,
@@ -85,20 +84,49 @@ export const metadata = {
       "max-snippet": -1,
     },
   },
-  verification: {
-    google: "your-google-verification-code",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon-96x96.png", sizes: "96x96", type: "image/png" },
+    ],
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
   },
+  manifest: "/site.webmanifest",
 };
 
 // Viewport configuration
 export const viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  maximumScale: 5,
+  userScalable: true,
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#00d4aa" },
     { media: "(prefers-color-scheme: dark)", color: "#00d4aa" },
+  ],
+};
+
+// JSON-LD Structured Data for SEO
+const structuredData = {
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  name: "Moove Mobility",
+  applicationCategory: "BusinessApplication",
+  operatingSystem: "Web Browser",
+  description:
+    "Revolutionary NFT-based vehicle rental platform on Sepolia Ethereum",
+  offers: {
+    "@type": "Offer",
+    category: "Vehicle Rental",
+  },
+  featureList: [
+    "NFT-based vehicle rentals",
+    "Blockchain technology",
+    "Decentralized mobility",
+    "Smart contracts",
   ],
 };
 
@@ -110,17 +138,11 @@ export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="en" className={`${inter.variable} antialiased`}>
       <head>
-        <link rel="icon" href="/favicon.ico" />
-        <link rel="apple-touch-icon" href="/icon.svg" />
-        <link rel="manifest" href="/manifest.json" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta name="theme-color" content="#00d4aa" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="Moove" />
-        <meta name="msapplication-TileColor" content="#00d4aa" />
-        <meta name="msapplication-config" content="/browserconfig.xml" />
-        <meta name="web3-provider" content="wagmi" />
+        {/* JSON-LD for SEO */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+        />
       </head>
       <body
         className={`
@@ -176,28 +198,9 @@ export default function RootLayout({ children }: RootLayoutProps) {
           <RouteLoadingWrapper />
         </SimplifiedAppProvider>
 
-        {/* Enhanced analytics and debug tools */}
-        {process.env.NODE_ENV === "production" && (
-          <>
-            <script
-              dangerouslySetInnerHTML={{
-                __html: `
-                  console.log('Moove NFT Platform loaded');
-                  
-                  // Track Web3 connection events
-                  window.addEventListener('web3-connected', (e) => {
-                    console.log('Web3 Connected:', e.detail);
-                  });
-                  
-                  // Track theme changes
-                  window.addEventListener('theme-changed', (e) => {
-                    console.log('Theme Changed:', e.detail);
-                  });
-                `,
-              }}
-            />
-          </>
-        )}
+        {/* Vercel Analytics & Speed Insights */}
+        <Analytics />
+        <SpeedInsights />
 
         {/* Development helper scripts */}
         {process.env.NODE_ENV === "development" && (
@@ -210,7 +213,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
                   clearStorage: () => {
                     localStorage.clear();
                     sessionStorage.clear();
-                    console.log('Storage cleared');
+                    console.log('✅ Storage cleared');
                   },
                   checkTheme: () => {
                     console.log('HTML classes:', document.documentElement.classList.toString());
@@ -227,12 +230,14 @@ export default function RootLayout({ children }: RootLayoutProps) {
                   forceWalletReconnect: () => {
                     if (window.forceWalletReconnect) {
                       window.forceWalletReconnect();
+                      console.log('✅ Reconnecting wallet...');
                     } else {
-                      console.log('Force reconnect not available yet');
+                      console.log('⚠️ Force reconnect not available yet');
                     }
                   }
                 };
-                console.log('🚀 Moove Debug Tools:', window.mooveDebug);
+                console.log('🚀 Moove Debug Tools available:', Object.keys(window.mooveDebug));
+                console.log('💡 Try: window.mooveDebug.checkWallet()');
               `,
             }}
           />

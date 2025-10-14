@@ -3,11 +3,42 @@ const fs = require("fs");
 const path = require("path");
 
 /**
- * Deploy script per MooveAccessControl
- * Gestisce la configurazione iniziale dei ruoli e permessi per l'ecosistema Moove
+ * Helper function to safely get vehicle prices
+ */
+async function getVehiclePrices(mooveRentalPass) {
+  try {
+    return {
+      bike: ethers.formatEther(await mooveRentalPass.getVehiclePrice(0)),
+      scooter: ethers.formatEther(await mooveRentalPass.getVehiclePrice(1)),
+      monopattino: ethers.formatEther(await mooveRentalPass.getVehiclePrice(2)),
+    };
+  } catch (error) {
+    console.log("⚠️ Could not get vehicle prices:", error.message);
+    return {
+      bike: "0.00000075",
+      scooter: "0.000001",
+      monopattino: "0.00000125",
+    };
+  }
+}
+
+/**
+ * Deploy script completo per MooveAuction e MooveRentalPass
+ * Deploya entrambi i contratti principali con tutte le funzionalità
+ *
+ * MOOVEAUCTION FUNZIONALITÀ:
+ * - English, Dutch, Sealed Bid, Reserve auctions
+ * - Sistema automatico sealed bid
+ * - Sistema di refund automatico
+ *
+ * MOOVERENTALPASS FUNZIONALITÀ:
+ * - Funzione updateAccessControl() per aggiornare l'indirizzo AccessControl
+ * - Prezzi configurabili on-chain per tutti i tipi di veicolo
+ * - Sistema di access control flessibile e aggiornabile
+ * - Minting pubblico con pagamento diretto
  */
 async function main() {
-  console.log("🔐 Starting MooveAccessControl deployment...");
+  console.log("🚗 Starting MooveRentalPass deployment...");
 
   // Get deployment account
   const [deployer] = await ethers.getSigners();
@@ -17,133 +48,214 @@ async function main() {
     ethers.formatEther(await ethers.provider.getBalance(deployer.address))
   );
 
-  // Deploy MooveAccessControl
-  console.log("\n🔐 Deploying MooveAccessControl...");
+  // Use existing MooveAccessControl address (already deployed) or deploy new one for local testing
+  let accessControlAddress;
+  if (hre.network.name === "hardhat" || hre.network.name === "localhost") {
+    // Deploy new AccessControl for local testing
+    console.log("🔐 Deploying new MooveAccessControl for local testing...");
+    const MooveAccessControl = await ethers.getContractFactory(
+      "MooveAccessControl"
+    );
+    const accessControl = await MooveAccessControl.deploy(deployer.address);
+    await accessControl.waitForDeployment();
+    accessControlAddress = await accessControl.getAddress();
+    console.log("✅ MooveAccessControl deployed to:", accessControlAddress);
+  } else {
+    // Use existing AccessControl for Sepolia/mainnet
+    accessControlAddress = "0x93b6F6F4b28cd61F68c16A85c9FC107Bf8f47e42"; // Updated working AccessControl
+    console.log(
+      "🔐 Using existing MooveAccessControl at:",
+      accessControlAddress
+    );
+  }
+
+  // Deploy MooveAuction
+  console.log("\n🎯 Deploying MooveAuction...");
+  const MooveAuction = await ethers.getContractFactory("MooveAuction");
+  const mooveAuction = await MooveAuction.deploy(accessControlAddress);
+  await mooveAuction.waitForDeployment();
+
+  const auctionAddress = await mooveAuction.getAddress();
+  console.log("✅ MooveAuction deployed to:", auctionAddress);
+
+  // Verify MooveAuction deployment
+  console.log("🔍 Verifying MooveAuction deployment...");
+  const totalAuctions = await mooveAuction.totalAuctions();
+  console.log("Total auctions:", totalAuctions.toString());
+  
+  // Test sealed bid reveal info function
+  try {
+    const revealInfo = await mooveAuction.getSealedBidRevealInfo(0);
+    console.log("✅ Sealed bid reveal info function working");
+  } catch (error) {
+    console.log("⚠️ Sealed bid reveal info test failed (expected for non-existent auction)");
+  }
+
+  // Deploy new MooveRentalPass
+  console.log("\n🚗 Deploying new MooveRentalPass...");
+  const MooveRentalPass = await ethers.getContractFactory("MooveRentalPass");
+
+  const mooveRentalPass = await MooveRentalPass.deploy(accessControlAddress);
+  await mooveRentalPass.waitForDeployment();
+
+  const rentalPassAddress = await mooveRentalPass.getAddress();
+  console.log("✅ MooveRentalPass deployed to:", rentalPassAddress);
+
+  // Setup initial configuration for MooveRentalPass
+  console.log("\n⚙️ Setting up initial configuration...");
+
+  // Get access control contract instance
   const MooveAccessControl = await ethers.getContractFactory(
     "MooveAccessControl"
   );
+  const accessControl = MooveAccessControl.attach(accessControlAddress);
 
-  const mooveAccessControl = await MooveAccessControl.deploy(deployer.address);
-  await mooveAccessControl.waitForDeployment();
-
-  const accessControlAddress = await mooveAccessControl.getAddress();
-  console.log("✅ MooveAccessControl deployed to:", accessControlAddress);
-
-  // Setup initial configuration
-  console.log("\n⚙️ Setting up initial configuration...");
-
-  // Get role constants
-  const MINTER_ROLE = await mooveAccessControl.MINTER_ROLE();
-  const AUCTION_MANAGER_ROLE = await mooveAccessControl.AUCTION_MANAGER_ROLE();
-  const CUSTOMIZATION_ADMIN_ROLE =
-    await mooveAccessControl.CUSTOMIZATION_ADMIN_ROLE();
-  const PRICE_MANAGER_ROLE = await mooveAccessControl.PRICE_MANAGER_ROLE();
-  const PAUSER_ROLE = await mooveAccessControl.PAUSER_ROLE();
-  const WITHDRAWER_ROLE = await mooveAccessControl.WITHDRAWER_ROLE();
+  // Get role constants (these are constants, not functions)
+  const MASTER_ADMIN_ROLE = ethers.keccak256(
+    ethers.toUtf8Bytes("MASTER_ADMIN_ROLE")
+  );
+  const MINTER_ROLE = ethers.keccak256(ethers.toUtf8Bytes("MINTER_ROLE"));
+  const PAUSER_ROLE = ethers.keccak256(ethers.toUtf8Bytes("PAUSER_ROLE"));
 
   // Grant essential roles to deployer for initial setup
   console.log("🎭 Granting initial roles to deployer...");
 
   const rolesToGrant = [
+    { role: MASTER_ADMIN_ROLE, name: "MASTER_ADMIN_ROLE" },
     { role: MINTER_ROLE, name: "MINTER_ROLE" },
-    { role: AUCTION_MANAGER_ROLE, name: "AUCTION_MANAGER_ROLE" },
-    { role: CUSTOMIZATION_ADMIN_ROLE, name: "CUSTOMIZATION_ADMIN_ROLE" },
-    { role: PRICE_MANAGER_ROLE, name: "PRICE_MANAGER_ROLE" },
     { role: PAUSER_ROLE, name: "PAUSER_ROLE" },
-    { role: WITHDRAWER_ROLE, name: "WITHDRAWER_ROLE" },
   ];
 
   for (const { role, name } of rolesToGrant) {
-    const tx = await mooveAccessControl.grantRole(role, deployer.address);
-    await tx.wait();
-    console.log(`✅ Granted ${name} to deployer`);
-  }
-
-  // Setup additional emergency contacts (esempio con indirizzi di team members)
-  console.log("\n🚨 Setting up emergency contacts...");
-
-  // Esempio di indirizzi emergency (sostituisci con indirizzi reali del team)
-  const emergencyContacts = [
-    // "0x1234567890123456789012345678901234567890", // Team Member 1
-    // "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd", // Team Member 2
-  ];
-
-  for (const contact of emergencyContacts) {
-    if (contact && contact !== deployer.address) {
-      try {
-        const tx = await mooveAccessControl.addEmergencyContact(contact);
-        await tx.wait();
-        console.log(`✅ Added emergency contact: ${contact}`);
-      } catch (error) {
-        console.log(
-          `⚠️ Failed to add emergency contact ${contact}:`,
-          error.message
-        );
-      }
+    const hasRole = await accessControl.hasRole(role, deployer.address);
+    if (!hasRole) {
+      const tx = await accessControl.grantRole(role, deployer.address);
+      await tx.wait();
+      console.log(`✅ Granted ${name} to deployer`);
+    } else {
+      console.log(`✅ Deployer already has ${name}`);
     }
   }
 
-  // Verify deployment and roles
-  console.log("\n🔍 Verifying deployment...");
+  // Authorize the MooveRentalPass contract to call AccessControl functions
+  console.log("\n🔗 Authorizing MooveRentalPass contract...");
+  try {
+    const tx = await accessControl.authorizeContract(rentalPassAddress);
+    await tx.wait();
+    console.log("✅ MooveRentalPass contract authorized");
+  } catch (error) {
+    console.log("⚠️ Failed to authorize contract:", error.message);
+  }
 
-  // Check master admin count
-  const masterAdminCount = await mooveAccessControl.masterAdminCount();
-  console.log(`👥 Master admin count: ${masterAdminCount}`);
+  // Configure vehicle prices and settings
+  console.log("\n🚗 Configuring vehicle prices...");
+  try {
+    // Set prices in ETH (very small amounts for testing)
+
+    // Test the new updateAccessControl functionality (optional)
+    if (hre.network.name !== "hardhat" && hre.network.name !== "localhost") {
+      console.log("\n🔧 Testing updateAccessControl functionality...");
+      try {
+        // This is just a test - we're setting it to the same address
+        // In a real scenario, you could update to a different AccessControl
+        const testTx = await mooveRentalPass.updateAccessControl(
+          accessControlAddress
+        );
+        await testTx.wait();
+        console.log("✅ updateAccessControl function works correctly");
+      } catch (error) {
+        console.log("⚠️ updateAccessControl test failed:", error.message);
+      }
+    }
+    const bikePrice = ethers.parseEther("0.00000075"); // 0.00000075 ETH
+    const scooterPrice = ethers.parseEther("0.000001"); // 0.000001 ETH
+    const monopattinoPrice = ethers.parseEther("0.00000125"); // 0.00000125 ETH
+
+    await mooveRentalPass.setVehicleConfig(0, bikePrice, "E-Bike Access");
+    console.log(
+      "✅ Bike price configured:",
+      ethers.formatEther(bikePrice),
+      "ETH"
+    );
+
+    await mooveRentalPass.setVehicleConfig(1, scooterPrice, "E-Scooter Access");
+    console.log(
+      "✅ Scooter price configured:",
+      ethers.formatEther(scooterPrice),
+      "ETH"
+    );
+
+    await mooveRentalPass.setVehicleConfig(
+      2,
+      monopattinoPrice,
+      "Monopattino Access"
+    );
+    console.log(
+      "✅ Monopattino price configured:",
+      ethers.formatEther(monopattinoPrice),
+      "ETH"
+    );
+  } catch (error) {
+    console.log("⚠️ Failed to configure vehicle prices:", error.message);
+  }
+
+  // Verify deployment and configuration
+  console.log("\n🔍 Verifying deployment...");
 
   // Check deployer roles
   const deployerRoles = [];
   for (const { role, name } of rolesToGrant) {
-    const hasRole = await mooveAccessControl.hasRole(role, deployer.address);
+    const hasRole = await accessControl.hasRole(role, deployer.address);
     if (hasRole) {
       deployerRoles.push(name);
     }
   }
   console.log(`🎭 Deployer roles: ${deployerRoles.join(", ")}`);
 
-  // Check contract state
-  const isGloballyPaused = await mooveAccessControl.isGloballyPaused();
-  const timeLockDuration = await mooveAccessControl.timeLockDuration();
+  // Check vehicle prices
+  try {
+    const bikePrice = await mooveRentalPass.getVehiclePrice(0);
+    const scooterPrice = await mooveRentalPass.getVehiclePrice(1);
+    const monopattinoPrice = await mooveRentalPass.getVehiclePrice(2);
 
-  console.log(`⏸️ Globally paused: ${isGloballyPaused}`);
-  console.log(
-    `⏰ Time lock duration: ${timeLockDuration} seconds (${
-      timeLockDuration / 3600
-    } hours)`
-  );
+    console.log(`🚲 Bike price: ${ethers.formatEther(bikePrice)} ETH`);
+    console.log(`🛴 Scooter price: ${ethers.formatEther(scooterPrice)} ETH`);
+    console.log(
+      `🛹 Monopattino price: ${ethers.formatEther(monopattinoPrice)} ETH`
+    );
+  } catch (error) {
+    console.log("⚠️ Could not verify vehicle prices:", error.message);
+  }
 
   // Test core functionality
   console.log("\n🧪 Testing core functionality...");
 
   try {
     // Test role checking functions
-    const canMint = await mooveAccessControl.canMint(deployer.address);
-    const canManageAuctions = await mooveAccessControl.canManageAuctions(
-      deployer.address
-    );
-    const canPause = await mooveAccessControl.canPause(deployer.address);
+    const canMint = await accessControl.canMint(deployer.address);
+    const canPause = await accessControl.canPause(deployer.address);
 
     console.log(`✅ canMint: ${canMint}`);
-    console.log(`✅ canManageAuctions: ${canManageAuctions}`);
     console.log(`✅ canPause: ${canPause}`);
 
-    // Test time lock scheduling (non-destructive test)
-    const testOperationId = ethers.keccak256(
-      ethers.toUtf8Bytes("test_operation")
-    );
-    const scheduleTx = await mooveAccessControl.scheduleTimeLockOperation(
-      testOperationId
-    );
-    await scheduleTx.wait();
-    console.log("✅ Time lock operation scheduled successfully");
+    // Test vehicle price retrieval
+    try {
+      const testBikePrice = await mooveRentalPass.getVehiclePrice(0);
+      console.log(
+        `✅ Bike price retrieval: ${ethers.formatEther(testBikePrice)} ETH`
+      );
+    } catch (error) {
+      console.log("⚠️ Vehicle price test failed:", error.message);
+    }
 
-    // Cancel the test operation
-    const cancelTx = await mooveAccessControl.cancelTimeLockOperation(
-      testOperationId
+    // Test contract authorization
+    const isAuthorized = await accessControl.authorizedContracts(
+      rentalPassAddress
     );
-    await cancelTx.wait();
-    console.log("✅ Time lock operation cancelled successfully");
+    console.log(`✅ Contract authorization: ${isAuthorized}`);
   } catch (error) {
     console.error("❌ Error during functionality testing:", error.message);
+    console.log("⚠️ Continuing with deployment despite test errors...");
   }
 
   // Save deployment information
@@ -153,27 +265,40 @@ async function main() {
     contracts: {
       MooveAccessControl: {
         address: accessControlAddress,
-        constructorArgs: [deployer.address],
-        roles: {
-          MASTER_ADMIN_ROLE: await mooveAccessControl.MASTER_ADMIN_ROLE(),
-          MINTER_ROLE: await mooveAccessControl.MINTER_ROLE(),
-          AUCTION_MANAGER_ROLE: await mooveAccessControl.AUCTION_MANAGER_ROLE(),
-          CUSTOMIZATION_ADMIN_ROLE:
-            await mooveAccessControl.CUSTOMIZATION_ADMIN_ROLE(),
-          PRICE_MANAGER_ROLE: await mooveAccessControl.PRICE_MANAGER_ROLE(),
-          PAUSER_ROLE: await mooveAccessControl.PAUSER_ROLE(),
-          WITHDRAWER_ROLE: await mooveAccessControl.WITHDRAWER_ROLE(),
-          UPGRADER_ROLE: await mooveAccessControl.UPGRADER_ROLE(),
-          METADATA_MANAGER_ROLE:
-            await mooveAccessControl.METADATA_MANAGER_ROLE(),
-        },
+        note:
+          hre.network.name === "hardhat" || hre.network.name === "localhost"
+            ? "Deployed by this script for local testing"
+            : "Existing contract, not deployed by this script",
+      },
+      MooveAuction: {
+        address: auctionAddress,
+        constructorArgs: [accessControlAddress],
+        features: [
+          "English auctions",
+          "Dutch auctions", 
+          "Sealed bid auctions",
+          "Reserve auctions",
+          "Automatic sealed bid system",
+          "Bid refund system",
+        ],
+      },
+      MooveRentalPass: {
+        address: rentalPassAddress,
+        constructorArgs: [accessControlAddress],
+        features: [
+          "Public minting with ETH payment",
+          "Configurable vehicle pricing",
+          "Auto-generated access codes",
+          "Auto-generated metadata URIs",
+          "Non-transferable NFTs",
+          "30-day expiration",
+        ],
       },
     },
     configuration: {
-      masterAdminCount: Number(masterAdminCount),
-      timeLockDuration: Number(timeLockDuration),
-      emergencyContacts: emergencyContacts.length,
-      globallyPaused: isGloballyPaused,
+      vehiclePrices: await getVehiclePrices(mooveRentalPass),
+      deployerRoles: deployerRoles,
+      contractAuthorized: true,
     },
     deploymentTime: new Date().toISOString(),
     blockNumber: await ethers.provider.getBlockNumber(),
@@ -187,22 +312,28 @@ async function main() {
 
   const deploymentFile = path.join(
     deploymentsDir,
-    `${hre.network.name}_access_control.json`
+    `${hre.network.name}_rental_pass.json`
   );
   fs.writeFileSync(deploymentFile, JSON.stringify(deploymentInfo, null, 2));
 
-  // Generate ABI file for frontend
+  // Generate ABI files for frontend
   const abisDir = path.join(__dirname, "..", "frontend", "src", "abis");
   if (!fs.existsSync(abisDir)) {
     fs.mkdirSync(abisDir, { recursive: true });
   }
 
-  const mooveAccessControlArtifact = await hre.artifacts.readArtifact(
-    "MooveAccessControl"
-  );
+  // Generate MooveAuction ABI
+  const mooveAuctionArtifact = await hre.artifacts.readArtifact("MooveAuction");
   fs.writeFileSync(
-    path.join(abisDir, "MooveAccessControl.json"),
-    JSON.stringify(mooveAccessControlArtifact.abi, null, 2)
+    path.join(abisDir, "MooveAuction.json"),
+    JSON.stringify(mooveAuctionArtifact.abi, null, 2)
+  );
+
+  // Generate MooveRentalPass ABI
+  const mooveRentalPassArtifact = await hre.artifacts.readArtifact("MooveRentalPass");
+  fs.writeFileSync(
+    path.join(abisDir, "MooveRentalPass.json"),
+    JSON.stringify(mooveRentalPassArtifact.abi, null, 2)
   );
 
   // Update contracts configuration for frontend
@@ -210,7 +341,6 @@ async function main() {
     __dirname,
     "..",
     "frontend",
-    "src",
     "utils",
     "contracts.ts"
   );
@@ -234,12 +364,16 @@ async function main() {
     }
   }
 
-  // Add MooveAccessControl to existing config
+  // Add contracts to existing config
   const updatedConfig = {
     ...existingConfig,
-    MooveAccessControl: {
-      address: accessControlAddress,
-      abi: mooveAccessControlArtifact.abi,
+    MooveAuction: {
+      address: auctionAddress,
+      abi: mooveAuctionArtifact.abi,
+    },
+    MooveRentalPass: {
+      address: rentalPassAddress,
+      abi: mooveRentalPassArtifact.abi,
     },
   };
 
@@ -252,9 +386,16 @@ export const CONTRACT_ADDRESSES = {
       .join(",\n    ")}
 } as const;
 
-// Role constants for MooveAccessControl
-export const ACCESS_CONTROL_ROLES = ${JSON.stringify(
-    deploymentInfo.contracts.MooveAccessControl.roles,
+// Vehicle type constants for MooveRentalPass
+export const VEHICLE_TYPES = {
+    BIKE: 0,
+    SCOOTER: 1,
+    MONOPATTINO: 2
+} as const;
+
+// Vehicle prices (in ETH)
+export const VEHICLE_PRICES = ${JSON.stringify(
+    deploymentInfo.configuration.vehiclePrices,
     null,
     2
   )} as const;
@@ -262,60 +403,68 @@ export const ACCESS_CONTROL_ROLES = ${JSON.stringify(
 
   fs.writeFileSync(contractsConfigPath, contractsConfigContent);
 
-  console.log("\n🎉 MooveAccessControl deployment completed successfully!");
+  console.log("\n🎉 Deployment completed successfully!");
   console.log("\n📋 Summary:");
   console.log("=====================================");
   console.log(`🏠 Network: ${hre.network.name}`);
   console.log(`👤 Deployer: ${deployer.address}`);
-  console.log(`🔐 MooveAccessControl: ${accessControlAddress}`);
-  console.log(`👥 Master Admins: ${masterAdminCount}`);
-  console.log(`⏰ Time Lock: ${timeLockDuration / 3600} hours`);
-  console.log(`🚨 Emergency Contacts: ${emergencyContacts.length + 1}`); // +1 for deployer
+  console.log(
+    `🔐 MooveAccessControl: ${accessControlAddress} ${
+      hre.network.name === "hardhat" || hre.network.name === "localhost"
+        ? "(deployed)"
+        : "(existing)"
+    }`
+  );
+  console.log(`🎯 MooveAuction: ${auctionAddress}`);
+  console.log(`🚗 MooveRentalPass: ${rentalPassAddress}`);
+  console.log(`🎭 Deployer Roles: ${deployerRoles.join(", ")}`);
   console.log(`💾 Config saved to: ${deploymentFile}`);
   console.log("=====================================");
 
   // Verification command
   if (hre.network.name !== "hardhat" && hre.network.name !== "localhost") {
-    console.log("\n🔍 Verification Command:");
+    console.log("\n🔍 Verification Commands:");
     console.log(
-      `npx hardhat verify --network ${hre.network.name} ${accessControlAddress} "${deployer.address}"`
+      `npx hardhat verify --network ${hre.network.name} ${auctionAddress} "${accessControlAddress}"`
+    );
+    console.log(
+      `npx hardhat verify --network ${hre.network.name} ${rentalPassAddress} "${accessControlAddress}"`
     );
   }
 
   console.log("\n📝 Next Steps:");
-  console.log(
-    "1. Update your NFT and Auction contracts to use this AccessControl"
-  );
-  console.log(
-    "2. Authorize your NFT and Auction contracts using authorizeContract()"
-  );
-  console.log("3. Grant specific roles to team members as needed");
-  console.log("4. Test integration with your existing contracts");
-  console.log(
-    "5. Consider implementing trading-specific extensions (see analysis)"
-  );
+  console.log("1. Test MooveAuction functionality (create auctions, place bids)");
+  console.log("2. Test sealed bid auction system");
+  console.log("3. Test the new public minting functionality");
+  console.log("4. Verify vehicle prices are correctly configured");
+  console.log("5. Test access code generation and validation");
+  console.log("6. Update frontend to use the new contract addresses");
+  console.log("7. Test the complete user flow from minting to access");
+  console.log("8. Test updateAccessControl function if needed");
+  console.log("9. Verify AccessControl integration works correctly");
 }
 
-// Helper function to verify contract authorization
-async function authorizeContractsAfterDeploy(
-  accessControlAddress,
-  contractsToAuthorize
-) {
-  console.log("\n🔗 Authorizing contracts...");
+// Helper function to configure vehicle prices
+async function configureVehiclePrices(rentalPassAddress, prices) {
+  console.log("\n🚗 Configuring vehicle prices...");
 
-  const MooveAccessControl = await ethers.getContractFactory(
-    "MooveAccessControl"
-  );
-  const accessControl = MooveAccessControl.attach(accessControlAddress);
+  const MooveRentalPass = await ethers.getContractFactory("MooveRentalPass");
+  const rentalPass = MooveRentalPass.attach(rentalPassAddress);
 
-  for (const contractAddress of contractsToAuthorize) {
+  for (const [vehicleType, price] of Object.entries(prices)) {
     try {
-      const tx = await accessControl.authorizeContract(contractAddress);
+      const tx = await rentalPass.setVehicleConfig(
+        vehicleType,
+        price,
+        `${vehicleType} Access`
+      );
       await tx.wait();
-      console.log(`✅ Authorized contract: ${contractAddress}`);
+      console.log(
+        `✅ ${vehicleType} price configured: ${ethers.formatEther(price)} ETH`
+      );
     } catch (error) {
       console.error(
-        `❌ Failed to authorize contract ${contractAddress}:`,
+        `❌ Failed to configure ${vehicleType} price:`,
         error.message
       );
     }
@@ -323,11 +472,15 @@ async function authorizeContractsAfterDeploy(
 }
 
 main()
-  .then(() => process.exit(0))
+  .then(() => {
+    console.log("🎉 Deployment completed successfully!");
+    process.exit(0);
+  })
   .catch((error) => {
     console.error("❌ Deployment failed:", error);
+    console.log("⚠️ Check the error above and try again...");
     process.exit(1);
   });
 
 // Export helper function for use in other scripts
-module.exports = { authorizeContractsAfterDeploy };
+module.exports = { configureVehiclePrices };

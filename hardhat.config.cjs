@@ -1,23 +1,23 @@
-import { HardhatUserConfig } from "hardhat/config";
-import "@nomicfoundation/hardhat-toolbox";
-import "hardhat-gas-reporter";
-import "solidity-coverage";
-import "@nomicfoundation/hardhat-verify";
-import "hardhat-deploy";
-import "hardhat-deploy-ethers";
-import * as dotenv from "dotenv";
+const { HardhatUserConfig } = require("hardhat/config");
+require("@nomicfoundation/hardhat-toolbox");
+require("hardhat-gas-reporter");
+require("solidity-coverage");
+require("@nomicfoundation/hardhat-verify");
+require("hardhat-deploy");
+require("hardhat-deploy-ethers");
+const dotenv = require("dotenv");
 require("dotenv").config();
 require("hardhat-contract-sizer");
 
 dotenv.config();
 
-const config: HardhatUserConfig = {
+const config = {
   solidity: {
     version: "0.8.21",
     settings: {
       optimizer: {
         enabled: true,
-        runs: 200,
+        runs: 1,
       },
       viaIR: true,
     },
@@ -36,8 +36,10 @@ const config: HardhatUserConfig = {
       accounts:
         process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
       chainId: 11155111,
-      gasPrice: 10000000000, // 10 gwei (further reduced)
-      gas: 25000000, // 25 million gas limit (further reduced)
+      gasPrice: 5000000000, // 5 gwei (further reduced)
+      gas: 15000000, // 15 million gas limit (further reduced)
+      maxFeePerGas: 5000000000, // 5 gwei max fee
+      maxPriorityFeePerGas: 1000000000, // 1 gwei priority fee
     },
     localhost: {
       url: "http://127.0.0.1:8545",
@@ -72,4 +74,4 @@ const config: HardhatUserConfig = {
   },
 };
 
-export default config;
+module.exports = config;

@@ -89,3 +89,5 @@ export default function FailedAuctionHandler({
     </motion.div>
   );
 }
+
+

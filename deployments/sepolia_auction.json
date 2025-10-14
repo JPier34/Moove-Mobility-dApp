@@ -1,0 +1,13 @@
+{
+  "network": "sepolia",
+  "deployer": "0x777382955f33Bb8540602E914D9b650C962EF6Cc",
+  "accessControl": "0x93b6F6F4b28cd61F68c16A85c9FC107Bf8f47e42",
+  "mooveAuction": "0x463a4fff0796AF7C69788463629AeF046A2fc211",
+  "timestamp": "2025-09-24T09:38:49.248Z",
+  "features": [
+    "Automatic sealed bid winner determination",
+    "Automatic refunds for losing bidders",
+    "Simplified sealed bid submission",
+    "No manual reveal phase required"
+  ]
+}

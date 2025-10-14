@@ -26,9 +26,3 @@ const eslintConfig = [
 ];
 
 export default eslintConfig;
-      "prefer-const": "warn",
-    },
-  },
-];
-
-export default eslintConfig;

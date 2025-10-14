@@ -5,8 +5,6 @@ import { motion } from "framer-motion";
 import AuctionGrid from "@/components/auctions/AuctionGrid";
 import { AuctionType, AuctionStatus } from "@/types/auction";
 import { useIncrementalAuctions } from "@/hooks/useIncrementalAuctions";
-import { useAutomaticAuctionMonitor } from "@/hooks/useAutomaticAuctionMonitor";
-import { useAuctionExpirationHandler } from "@/hooks/useAuctionExpirationHandler";
 
 // ============= TYPES =============
 

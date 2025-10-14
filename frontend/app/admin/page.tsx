@@ -12,7 +12,7 @@ import ServerSideAuctionManager from "@/components/admin/ServerSideAuctionManage
 
 export default function AdminPage() {
   const { address } = useAccount();
-  const { isMasterAdmin, canMint } = useUserRoles(address);
+  const { isMasterAdmin } = useUserRoles(address);
 
   return (
     <AdminGuard>

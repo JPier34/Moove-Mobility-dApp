@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "./MooveAccessControl.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
 
 /**
  * @title MooveRentalPass
@@ -21,7 +22,7 @@ contract MooveRentalPass is
     // ============= STATE VARIABLES =============
 
     /// @dev Reference to access control contract
-    MooveAccessControl public immutable accessControl;
+    MooveAccessControl public accessControl;
 
     /// @dev Counter for token IDs
     uint256 private _tokenIdCounter = 1;
@@ -56,6 +57,35 @@ contract MooveRentalPass is
         MONOPATTINO
     }
 
+    // ============= MODULAR PRICING =============
+
+    struct VehicleConfig {
+        uint256 priceWei;
+        bool isActive;
+        string name;
+    }
+
+    mapping(uint8 => VehicleConfig) public vehicleConfigs;
+
+    event VehicleConfigUpdated(
+        uint8 indexed vehicleType,
+        uint256 priceWei,
+        string name
+    );
+
+    event AccessControlUpdated(
+        address indexed oldAccessControl,
+        address indexed newAccessControl
+    );
+
+    modifier onlyAdmin() {
+        accessControl.validateRole(
+            accessControl.MASTER_ADMIN_ROLE(),
+            msg.sender
+        );
+        _;
+    }
+
     // ============= EVENTS =============
 
     event RentalPassMinted(
@@ -73,12 +103,13 @@ contract MooveRentalPass is
         address indexed user
     );
 
-    event PassExpired(uint256 indexed tokenId, string accessCode);
-
     event PassDeactivated(
         uint256 indexed tokenId,
-        string accessCode,
         string reason
+    );
+
+    event PassExpired(
+        uint256 indexed tokenId
     );
 
     // ============= MODIFIERS =============
@@ -106,6 +137,52 @@ contract MooveRentalPass is
     constructor(address _accessControl) ERC721("Moove Rental Pass", "MRP") {
         require(_accessControl != address(0), "Invalid access control address");
         accessControl = MooveAccessControl(_accessControl);
+    }
+
+    // ============= ADMIN FUNCTIONS =============
+
+    /**
+     * @dev Update the access control contract address
+     * @param _newAccessControl New access control contract address
+     */
+    function updateAccessControl(address _newAccessControl) external onlyAdmin {
+        require(_newAccessControl != address(0), "Invalid access control address");
+        require(_newAccessControl != address(accessControl), "Same address");
+        
+        address oldAccessControl = address(accessControl);
+        accessControl = MooveAccessControl(_newAccessControl);
+        
+        emit AccessControlUpdated(oldAccessControl, _newAccessControl);
+    }
+
+    // ============= PRICING FUNCTIONS =============
+
+    /**
+     * @dev Set vehicle configuration (replaces hardcoded prices)
+     */
+    function setVehicleConfig(
+        uint8 vehicleType,
+        uint256 priceWei,
+        string memory name
+    ) external onlyAdmin {
+        vehicleConfigs[vehicleType] = VehicleConfig({
+            priceWei: priceWei,
+            isActive: true,
+            name: name
+        });
+
+        emit VehicleConfigUpdated(vehicleType, priceWei, name);
+    }
+
+    /**
+     * @dev Get vehicle price from configuration (NO MORE HARDCODED)
+     */
+    function getVehiclePrice(
+        VehicleType vehicleType
+    ) public view returns (uint256) {
+        VehicleConfig memory config = vehicleConfigs[uint8(vehicleType)];
+        require(config.isActive, "Vehicle type not configured");
+        return config.priceWei;
     }
 
     // ============= MINTING FUNCTIONS =============
@@ -167,31 +244,53 @@ contract MooveRentalPass is
         );
     }
 
-    /**
-     * @dev Mint a rental pass
-     * @param to Address to mint to
-     * @param vehicleType Type of vehicle
-     * @param passName Name of the pass
-     * @param passDescription Description of the pass
-     * @param duration Duration in seconds
-     * @param metadataURI URI for the token metadata
-     */
-    function mintRentalPass(
-        address to,
+    function mintRentalPassPublic(
         VehicleType vehicleType,
-        string memory passName,
-        string memory passDescription,
-        uint256 duration,
-        string memory metadataURI
-    ) external onlyAccessControlRole(accessControl.MINTER_ROLE()) nonReentrant {
+        string memory cityId,
+        uint256 duration
+    ) external payable nonReentrant whenNotPaused {
+        require(msg.value > 0, "Payment required");
+        require(bytes(cityId).length > 0, "City ID required");
+
+        // Set default duration if not provided (30 days)
+        if (duration == 0) {
+            duration = 30 days;
+        }
+
+        // Get price from configuration
+        uint256 expectedPrice = getVehiclePrice(vehicleType);
+        require(msg.value >= expectedPrice, "Insufficient payment");
+
+        // Generate access code
+        string memory accessCode = _generateSimpleAccessCode(
+            msg.sender,
+            vehicleType
+        );
+
+        // Create metadata URI
+        string memory metadataURI = string(
+            abi.encodePacked(
+                "https://api.moove.com/metadata/",
+                Strings.toString(uint8(vehicleType)),
+                "/",
+                cityId
+            )
+        );
+
+        // Mint the pass
         _mintRentalPass(
-            to,
+            msg.sender,
             vehicleType,
-            passName,
-            passDescription,
-            duration,
+            accessCode,
+            cityId,
+            expectedPrice,
             metadataURI
         );
+
+        // Refund excess payment
+        if (msg.value > expectedPrice) {
+            payable(msg.sender).transfer(msg.value - expectedPrice);
+        }
     }
 
     /**
@@ -295,7 +394,7 @@ contract MooveRentalPass is
         // Remove from user's active passes
         _removeFromActivePasses(_ownerOf(tokenId), tokenId);
 
-        emit PassDeactivated(tokenId, pass.accessCode, reason);
+        emit PassDeactivated(tokenId, reason);
     }
 
     /**
@@ -313,7 +412,7 @@ contract MooveRentalPass is
                     // Remove from user's active passes
                     _removeFromActivePasses(_ownerOf(tokenId), tokenId);
 
-                    emit PassExpired(tokenId, pass.accessCode);
+                    emit PassExpired(tokenId);
                 }
             }
         }
@@ -413,6 +512,25 @@ contract MooveRentalPass is
     }
 
     // ============= INTERNAL FUNCTIONS =============
+
+    /**
+     * @dev Generate a simple access code for public minting
+     */
+    function _generateSimpleAccessCode(
+        address user,
+        VehicleType vehicleType
+    ) internal view returns (string memory) {
+        return
+            string(
+                abi.encodePacked(
+                    Strings.toString(uint8(vehicleType)),
+                    "-",
+                    Strings.toHexString(uint160(user), 20),
+                    "-",
+                    Strings.toString(block.timestamp)
+                )
+            );
+    }
 
     /**
      * @dev Remove token from user's active passes array

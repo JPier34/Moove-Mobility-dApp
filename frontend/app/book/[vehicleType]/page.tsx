@@ -8,7 +8,7 @@ import { useAccount } from "wagmi";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useRentalPassContract } from "@/hooks/useRentalPassContract";
 import { useRouteLoading } from "@/hooks/useRouteLoading";
-import { VehicleType, EUROPEAN_CITIES } from "@/config/cities";
+import { VehicleType } from "@/config/cities";
 import { VEHICLE_OPTIONS } from "@/config/vehicles";
 
 import { toast } from "react-hot-toast";
