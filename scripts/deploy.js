@@ -62,7 +62,7 @@ async function main() {
     console.log("✅ MooveAccessControl deployed to:", accessControlAddress);
   } else {
     // Use existing AccessControl for Sepolia/mainnet
-    accessControlAddress = "0x93b6F6F4b28cd61F68c16A85c9FC107Bf8f47e42"; // Updated working AccessControl
+    accessControlAddress = "0xd346AA5BcB802560446c1517AC61cD7F6935448b"; // Updated working AccessControl with security fixes
     console.log(
       "🔐 Using existing MooveAccessControl at:",
       accessControlAddress
@@ -82,13 +82,15 @@ async function main() {
   console.log("🔍 Verifying MooveAuction deployment...");
   const totalAuctions = await mooveAuction.totalAuctions();
   console.log("Total auctions:", totalAuctions.toString());
-  
+
   // Test sealed bid reveal info function
   try {
     const revealInfo = await mooveAuction.getSealedBidRevealInfo(0);
     console.log("✅ Sealed bid reveal info function working");
   } catch (error) {
-    console.log("⚠️ Sealed bid reveal info test failed (expected for non-existent auction)");
+    console.log(
+      "⚠️ Sealed bid reveal info test failed (expected for non-existent auction)"
+    );
   }
 
   // Deploy new MooveRentalPass
@@ -275,7 +277,7 @@ async function main() {
         constructorArgs: [accessControlAddress],
         features: [
           "English auctions",
-          "Dutch auctions", 
+          "Dutch auctions",
           "Sealed bid auctions",
           "Reserve auctions",
           "Automatic sealed bid system",
@@ -330,7 +332,9 @@ async function main() {
   );
 
   // Generate MooveRentalPass ABI
-  const mooveRentalPassArtifact = await hre.artifacts.readArtifact("MooveRentalPass");
+  const mooveRentalPassArtifact = await hre.artifacts.readArtifact(
+    "MooveRentalPass"
+  );
   fs.writeFileSync(
     path.join(abisDir, "MooveRentalPass.json"),
     JSON.stringify(mooveRentalPassArtifact.abi, null, 2)
@@ -433,7 +437,9 @@ export const VEHICLE_PRICES = ${JSON.stringify(
   }
 
   console.log("\n📝 Next Steps:");
-  console.log("1. Test MooveAuction functionality (create auctions, place bids)");
+  console.log(
+    "1. Test MooveAuction functionality (create auctions, place bids)"
+  );
   console.log("2. Test sealed bid auction system");
   console.log("3. Test the new public minting functionality");
   console.log("4. Verify vehicle prices are correctly configured");
