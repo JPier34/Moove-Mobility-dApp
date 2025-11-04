@@ -50,9 +50,8 @@ export function useEnglishAuction(auctionId?: number) {
 
       // Check if user is already the highest bidder
       try {
-        const provider = new ethers.JsonRpcProvider(
-          process.env.NEXT_PUBLIC_RPC_URL || "https://1rpc.io/sepolia"
-        );
+        const { getBestProvider } = await import("@/utils/rpcProvider");
+        const provider = getBestProvider();
         const auctionContract = new ethers.Contract(
           contracts.MooveAuction.address,
           contracts.MooveAuction.abi,
@@ -144,7 +143,7 @@ export function useEnglishAuction(auctionId?: number) {
             : "N/A",
           contractAddress: contracts.MooveAuction.address,
           functionName: "placeBid",
-          args: [auctionId],
+          args: [BigInt(auctionId)],
           value: bidAmountWei.toString(),
         });
 

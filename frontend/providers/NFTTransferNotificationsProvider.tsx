@@ -473,6 +473,14 @@ export function NFTTransferNotificationsProvider({
     const setupBlockchainListener = async () => {
       try {
         const provider = new ethers.BrowserProvider(window.ethereum as any);
+        // Validate contract address before creating contract instance
+        if (!contracts.MooveNFT?.address || contracts.MooveNFT.address === "") {
+          console.warn(
+            "⚠️ [NFTTransfer] MooveNFT contract address not configured, skipping listener setup"
+          );
+          return;
+        }
+
         contract = new ethers.Contract(
           contracts.MooveNFT.address,
           contracts.MooveNFT.abi,
@@ -598,6 +606,15 @@ export function NFTTransferNotificationsProvider({
         if (!window.ethereum) return;
 
         const provider = new ethers.BrowserProvider(window.ethereum);
+        
+        // Validate contract address before creating contract instance
+        if (!contracts.MooveNFT?.address || contracts.MooveNFT.address === "") {
+          console.warn(
+            "⚠️ [NFTTransfer] MooveNFT contract address not configured, skipping transfer check"
+          );
+          return;
+        }
+
         const nftContract = new ethers.Contract(
           contracts.MooveNFT.address,
           contracts.MooveNFT.abi,

@@ -43,20 +43,9 @@ export const useDutchAuction = () => {
         return false;
       }
 
-      // Check if automatic system is active
-      const isAutomaticSystemActive =
-        typeof window !== "undefined" &&
-        localStorage.getItem("auction-monitoring-active") === "true";
-
-      if (isAutomaticSystemActive) {
-        console.log(
-          `⏭️ Automatic system is active, skipping manual buy for auction ${auctionId}`
-        );
-        toast.success(
-          `Automatic system is processing auction ${auctionId}. Please wait...`
-        );
-        return false;
-      }
+      // Note: For Dutch auctions, users should always be able to buy manually
+      // The automatic system is for monitoring, not for blocking manual purchases
+      // Removed the automatic system check to allow manual purchases
 
       if (isProcessing) {
         setError("Transaction already in progress");

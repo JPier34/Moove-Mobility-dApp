@@ -473,12 +473,6 @@ export default function AuctionCard({
                   </span>
                 )}
               </div>
-              {/* Buy Now price if available */}
-              {auction.buyNowPrice && parseFloat(auction.buyNowPrice) > 0 && (
-                <div className="text-xs text-blue-600 mt-1">
-                  💰 Buy Now: {auction.buyNowPrice} ETH
-                </div>
-              )}
             </div>
           ) : (
             /* Reserve auction */

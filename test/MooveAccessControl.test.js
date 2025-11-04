@@ -16,7 +16,7 @@ describe("MooveAccessControl", function () {
     const MooveAccessControl = await ethers.getContractFactory(
       "MooveAccessControl"
     );
-    const accessControl = await MooveAccessControl.deploy(owner.address);
+    const accessControl = await MooveAccessControl.deploy(owner.address, 10); // maxAdmins = 10
     await accessControl.waitForDeployment();
 
     // Deploy a test contract to use for authorization tests
@@ -92,7 +92,7 @@ describe("MooveAccessControl", function () {
         "MooveAccessControl"
       );
       await expect(
-        MooveAccessControl.deploy(ethers.ZeroAddress)
+        MooveAccessControl.deploy(ethers.ZeroAddress, 10)
       ).to.be.revertedWith("Invalid admin address");
     });
   });

@@ -23,19 +23,20 @@ async function getVehiclePrices(mooveRentalPass) {
 }
 
 /**
- * Deploy script completo per MooveAuction e MooveRentalPass
- * Deploya entrambi i contratti principali con tutte le funzionalità
+ * Deploy script completely for MooveAuction and MooveRentalPass with all features
+ * This script deploys both main contracts with all features
  *
- * MOOVEAUCTION FUNZIONALITÀ:
+ *
+ * MOOVEAUCTION FEATURES:
  * - English, Dutch, Sealed Bid, Reserve auctions
- * - Sistema automatico sealed bid
- * - Sistema di refund automatico
+ * - Automatic sealed bid system
+ * - Automatic refund system
  *
- * MOOVERENTALPASS FUNZIONALITÀ:
- * - Funzione updateAccessControl() per aggiornare l'indirizzo AccessControl
- * - Prezzi configurabili on-chain per tutti i tipi di veicolo
- * - Sistema di access control flessibile e aggiornabile
- * - Minting pubblico con pagamento diretto
+ * MOOVERENTALPASS FEATURES:
+ * - updateAccessControl() function to update the AccessControl address
+ * - Configurable on-chain prices for all vehicle types
+ * - Flexible and updatable access control system
+ * - Public minting with direct payment
  */
 async function main() {
   console.log("🚗 Starting MooveRentalPass deployment...");
@@ -56,18 +57,39 @@ async function main() {
     const MooveAccessControl = await ethers.getContractFactory(
       "MooveAccessControl"
     );
-    const accessControl = await MooveAccessControl.deploy(deployer.address);
+    // ✅ AGGIORNATO: Deploy con maxAdmins parametro (configurabile 1-100)
+    const maxAdmins = 10; // Default: 10 admins max, può essere modificato
+    const accessControl = await MooveAccessControl.deploy(
+      deployer.address, // initialAdmin
+      maxAdmins // maxAdmins
+    );
     await accessControl.waitForDeployment();
     accessControlAddress = await accessControl.getAddress();
     console.log("✅ MooveAccessControl deployed to:", accessControlAddress);
+    console.log(`✅ Max admins configured: ${maxAdmins}`);
   } else {
     // Use existing AccessControl for Sepolia/mainnet
-    accessControlAddress = "0xd346AA5BcB802560446c1517AC61cD7F6935448b"; // Updated working AccessControl with security fixes
+    // MUST be set via ACCESS_CONTROL_ADDRESS env variable
+    const addressConfig = require("./config/addresses");
+    accessControlAddress = addressConfig.getAddress("ACCESS_CONTROL_ADDRESS");
     console.log(
       "🔐 Using existing MooveAccessControl at:",
       accessControlAddress
     );
   }
+
+  // Deploy MooveNFT
+  console.log("\n🎨 Deploying MooveNFT...");
+  const MooveNFT = await ethers.getContractFactory("MooveNFT");
+  const mooveNFT = await MooveNFT.deploy(
+    "Moove Stickers",
+    "MOOVE",
+    accessControlAddress
+  );
+  await mooveNFT.waitForDeployment();
+
+  const nftAddress = await mooveNFT.getAddress();
+  console.log("✅ MooveNFT deployed to:", nftAddress);
 
   // Deploy MooveAuction
   console.log("\n🎯 Deploying MooveAuction...");
@@ -139,14 +161,34 @@ async function main() {
     }
   }
 
-  // Authorize the MooveRentalPass contract to call AccessControl functions
-  console.log("\n🔗 Authorizing MooveRentalPass contract...");
+  // Authorize contracts to call AccessControl functions
+  console.log("\n🔗 Authorizing contracts...");
+
+  // Authorize MooveNFT
   try {
-    const tx = await accessControl.authorizeContract(rentalPassAddress);
-    await tx.wait();
+    const tx1 = await accessControl.authorizeContract(nftAddress);
+    await tx1.wait();
+    console.log("✅ MooveNFT contract authorized");
+  } catch (error) {
+    console.log("⚠️ Failed to authorize MooveNFT:", error.message);
+  }
+
+  // Authorize MooveAuction
+  try {
+    const tx2 = await accessControl.authorizeContract(auctionAddress);
+    await tx2.wait();
+    console.log("✅ MooveAuction contract authorized");
+  } catch (error) {
+    console.log("⚠️ Failed to authorize MooveAuction:", error.message);
+  }
+
+  // Authorize MooveRentalPass
+  try {
+    const tx3 = await accessControl.authorizeContract(rentalPassAddress);
+    await tx3.wait();
     console.log("✅ MooveRentalPass contract authorized");
   } catch (error) {
-    console.log("⚠️ Failed to authorize contract:", error.message);
+    console.log("⚠️ Failed to authorize MooveRentalPass:", error.message);
   }
 
   // Configure vehicle prices and settings
@@ -267,10 +309,24 @@ async function main() {
     contracts: {
       MooveAccessControl: {
         address: accessControlAddress,
+        constructorArgs:
+          hre.network.name === "hardhat" || hre.network.name === "localhost"
+            ? [deployer.address, 10] // [initialAdmin, maxAdmins]
+            : undefined,
         note:
           hre.network.name === "hardhat" || hre.network.name === "localhost"
             ? "Deployed by this script for local testing"
             : "Existing contract, not deployed by this script",
+      },
+      MooveNFT: {
+        address: nftAddress,
+        constructorArgs: ["Moove Stickers", "MOOVE", accessControlAddress],
+        features: [
+          "ERC-721 NFT implementation",
+          "Metadata management with IPFS",
+          "Royalty management (ERC-2981)",
+          "Royalty reset on burn",
+        ],
       },
       MooveAuction: {
         address: auctionAddress,
@@ -282,6 +338,7 @@ async function main() {
           "Reserve auctions",
           "Automatic sealed bid system",
           "Bid refund system",
+          "O(1) user bid lookup optimization",
         ],
       },
       MooveRentalPass: {
@@ -419,6 +476,7 @@ export const VEHICLE_PRICES = ${JSON.stringify(
         : "(existing)"
     }`
   );
+  console.log(`🎨 MooveNFT: ${nftAddress}`);
   console.log(`🎯 MooveAuction: ${auctionAddress}`);
   console.log(`🚗 MooveRentalPass: ${rentalPassAddress}`);
   console.log(`🎭 Deployer Roles: ${deployerRoles.join(", ")}`);
@@ -429,10 +487,24 @@ export const VEHICLE_PRICES = ${JSON.stringify(
   if (hre.network.name !== "hardhat" && hre.network.name !== "localhost") {
     console.log("\n🔍 Verification Commands:");
     console.log(
+      `npx hardhat verify --network ${hre.network.name} ${nftAddress} "Moove Stickers" "MOOVE" "${accessControlAddress}"`
+    );
+    console.log(
       `npx hardhat verify --network ${hre.network.name} ${auctionAddress} "${accessControlAddress}"`
     );
     console.log(
       `npx hardhat verify --network ${hre.network.name} ${rentalPassAddress} "${accessControlAddress}"`
+    );
+    // Note: If deploying MooveAccessControl to public network, use:
+    // npx hardhat verify --network <network> <accessControlAddress> "<initialAdmin>" "<maxAdmins>"
+  } else {
+    // For local/testing networks, show verification command format
+    console.log("\n💡 For public network deployments, verification commands:");
+    console.log(
+      `npx hardhat verify --network <network> ${accessControlAddress} "${deployer.address}" "10"`
+    );
+    console.log(
+      `npx hardhat verify --network <network> ${nftAddress} "Moove Stickers" "MOOVE" "${accessControlAddress}"`
     );
   }
 

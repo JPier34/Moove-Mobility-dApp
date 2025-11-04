@@ -21,6 +21,7 @@ import {
   AuctionFormData,
 } from "@/hooks/useAuctionValidationModular";
 import { useAuctionFormValidation } from "@/hooks/useAuctionFormValidation";
+import { getAdminAddress } from "@/config/admin";
 
 interface NFTFormData {
   name: string;
@@ -45,8 +46,8 @@ function AdminNFTCreatorContent() {
   const { canMint, isMasterAdmin, isLoading } = useUserRoles(address);
   const { error: lastError, clearError } = useLastError();
 
-  // Master admin wallet - always has access
-  const MASTER_WALLET = "0x777382955f33Bb8540602E914D9b650C962EF6Cc";
+  // Master admin wallet - always has access (from config)
+  const MASTER_WALLET = getAdminAddress();
   const isMasterWallet = address?.toLowerCase() === MASTER_WALLET.toLowerCase();
   const hasAdminAccess = isMasterWallet || canMint || isMasterAdmin;
 

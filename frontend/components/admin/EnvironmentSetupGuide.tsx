@@ -16,9 +16,12 @@ PINATA_SECRET_KEY=your_pinata_secret_key_here
 # RPC Configuration
 NEXT_PUBLIC_RPC_URL=https://sepolia.infura.io/v3/your_infura_key_here
 
-# Contract Addresses (if needed)
-NEXT_PUBLIC_MOOVE_AUCTION_ADDRESS=0xE8f6836A0054B83b9a952e8B62D92e62f5c67606
-NEXT_PUBLIC_MOOVE_NFT_ADDRESS=your_nft_contract_address_here`;
+# Contract Addresses (REQUIRED - set these from your deployment)
+NEXT_PUBLIC_MOOVE_ACCESS_CONTROL_ADDRESS=your_access_control_address_here
+NEXT_PUBLIC_MOOVE_NFT_ADDRESS=your_nft_contract_address_here
+NEXT_PUBLIC_MOOVE_AUCTION_ADDRESS=your_auction_contract_address_here
+NEXT_PUBLIC_MOOVE_RENTAL_PASS_ADDRESS=your_rental_pass_contract_address_here
+NEXT_PUBLIC_MASTER_WALLET_ADDRESS=your_master_admin_address_here`;
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(envContent);

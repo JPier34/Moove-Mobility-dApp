@@ -73,31 +73,35 @@ The dApp is built on **4 main smart contracts** deployed on **Sepolia Testnet**:
 
 #### 1. **MooveAccessControl**
 
-**Address:** `0xd346AA5BcB802560446c1517AC61cD7F6935448b`
+**Address:** `0xd346AA5BcB802560446c1517AC61cD7F6935448b` ✅ **Updated with maxAdmins**
 
 - Role-based access control system
 - Master Admin and User role management
 - Permission validation for all operations
+- Configurable maximum admins limit (maxAdmins parameter)
 
 #### 2. **MooveNFT**
 
-**Address:** `0x40E455515bf712144C1A5D859F19d64b537754f7`
+**Address:** `0xd49be5B487C3B28b8d9a57636461735Df2999dB5` ✅ **Updated**
 
 - ERC-721 NFT implementation for vehicle passes
 - Metadata management with IPFS integration
 - Transfer and ownership tracking
+- Royalty reset on burn (fixed)
 
 #### 3. **MooveAuction**
 
-**Address:** `0xaBcF309597e6280aF5DBB0ce82778f048bC600f0`
+**Address:** `0x356f9e8Db3B9b20D5446f5c8262fA49d8B968482` ✅ **Updated**
 
 - Multi-type auction system (English, Dutch, Sealed Bid, Reserve)
 - Bid management and settlement
 - Automatic auction monitoring and settlement
+- O(1) optimization for user bid lookups
+- Removed duplicate functions
 
 #### 4. **MooveRentalPass**
 
-**Address:** `0x74aAb47A0439B728A5956A1d7faAc6716F1F18Df`
+**Address:** `0x13d7fF1dE425849F00B46b6FB5f169Df866F6166` ✅ **Updated**
 
 - Vehicle rental pass management
 - Time-based access control
@@ -154,9 +158,9 @@ cp env.example .env.local
 
 # Add your configuration
 NEXT_PUBLIC_MOOVE_ACCESS_CONTROL_ADDRESS=0xd346AA5BcB802560446c1517AC61cD7F6935448b
-NEXT_PUBLIC_MOOVE_NFT_ADDRESS=0x40E455515bf712144C1A5D859F19d64b537754f7
-NEXT_PUBLIC_MOOVE_AUCTION_ADDRESS=0xaBcF309597e6280aF5DBB0ce82778f048bC600f0
-NEXT_PUBLIC_MOOVE_RENTAL_PASS_ADDRESS=0x74aAb47A0439B728A5956A1d7faAc6716F1F18Df
+NEXT_PUBLIC_MOOVE_NFT_ADDRESS=0xd49be5B487C3B28b8d9a57636461735Df2999dB5
+NEXT_PUBLIC_MOOVE_AUCTION_ADDRESS=0x356f9e8Db3B9b20D5446f5c8262fA49d8B968482
+NEXT_PUBLIC_MOOVE_RENTAL_PASS_ADDRESS=0x13d7fF1dE425849F00B46b6FB5f169Df866F6166
 
 # Optional: Pinata IPFS Configuration
 NEXT_PUBLIC_PINATA_API_KEY=your_pinata_api_key_here
@@ -478,9 +482,9 @@ npx hardhat verify --network mainnet <CONTRACT_ADDRESS>
 **Contract Addresses** (Sepolia Testnet):
 
 - **MooveAccessControl**: `0xd346AA5BcB802560446c1517AC61cD7F6935448b`
-- **MooveNFT**: `0x40E455515bf712144C1A5D859F19d64b537754f7`
-- **MooveAuction**: `0xaBcF309597e6280aF5DBB0ce82778f048bC600f0`
-- **MooveRentalPass**: `0x74aAb47A0439B728A5956A1d7faAc6716F1F18Df`
+- **MooveNFT**: `0xd49be5B487C3B28b8d9a57636461735Df2999dB5`
+- **MooveAuction**: `0x356f9e8Db3B9b20D5446f5c8262fA49d8B968482`
+- **MooveRentalPass**: `0x13d7fF1dE425849F00B46b6FB5f169Df866F6166`
 
 **Verification Status**: ✅ All contracts verified on Etherscan
 

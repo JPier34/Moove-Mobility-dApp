@@ -1445,27 +1445,6 @@ function AdminNFTCreatorUltraSimpleContent() {
                   </div>
                 )}
 
-                {/* Buy Now Price - Only show for Dutch auctions */}
-                {auctionFormData.auctionType === AuctionType.DUTCH && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Buy Now Price (ETH)
-                      <span className="text-sm text-gray-500 ml-1">
-                        (Optional)
-                      </span>
-                    </label>
-                    <input
-                      type="number"
-                      step="0.000001"
-                      value={auctionFormData.buyNowPrice}
-                      onChange={(e) =>
-                        updateField("buyNowPrice", e.target.value)
-                      }
-                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-500"
-                      placeholder="0.1"
-                    />
-                  </div>
-                )}
 
                 {/* English Auction Extension Settings - Only show for English auctions */}
                 {auctionFormData.auctionType === AuctionType.ENGLISH && (

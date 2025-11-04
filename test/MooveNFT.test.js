@@ -28,7 +28,8 @@ describe("MooveNFT - Optimized", function () {
       "MooveAccessControl"
     );
     const accessControlContract = await MooveAccessControl.deploy(
-      deployer.address
+      deployer.address,
+      10 // maxAdmins = 10
     );
 
     // Deploy MooveNFT

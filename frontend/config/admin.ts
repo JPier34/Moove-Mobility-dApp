@@ -1,10 +1,17 @@
 // Admin Configuration
 // Centralized admin address management
+// NO HARDCODED ADDRESSES - All addresses come from environment variables
 
+import { CONTRACT_ADDRESSES } from "@/utils/contracts";
+
+// Get master admin address from environment
+function getMasterAdminAddress(): string {
+  const value = process.env.NEXT_PUBLIC_MASTER_WALLET_ADDRESS?.trim() || "";
+  return value && value !== "your_..._address_here" && value !== "0x..." ? value : "";
+}
+
+// Admin Role Hashes (computed from contract - these are constants, not addresses)
 export const ADMIN_CONFIG = {
-  // Master Admin Address - Change this when admin wallet changes
-  MASTER_ADMIN_ADDRESS: "0x777382955f33Bb8540602E914D9b650C962EF6Cc",
-
   // Admin Role Hashes (computed from contract)
   ROLES: {
     MASTER_ADMIN_ROLE:
@@ -25,10 +32,14 @@ export const ADMIN_CONFIG = {
   },
 } as const;
 
-// Helper function to get admin address
+// Helper function to get admin address from environment
+// Returns empty string if not configured (graceful degradation)
 export function getAdminAddress(): string {
-  return (
-    process.env.NEXT_PUBLIC_MASTER_WALLET_ADDRESS ||
-    ADMIN_CONFIG.MASTER_ADMIN_ADDRESS
-  );
+  try {
+    return getMasterAdminAddress();
+  } catch (error) {
+    // Graceful degradation - admin features will be disabled but app won't crash
+    console.warn("⚠️ [ADMIN] Could not load master admin address:", error);
+    return "";
+  }
 }

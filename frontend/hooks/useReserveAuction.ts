@@ -67,9 +67,8 @@ export function useReserveAuction(): ReserveAuctionHandler {
         const { ethers } = await import("ethers");
         const { contracts } = await import("@/utils/contracts");
 
-        const provider = new ethers.JsonRpcProvider(
-          process.env.NEXT_PUBLIC_RPC_URL || "https://1rpc.io/sepolia"
-        );
+        const { getBestProvider } = await import("@/utils/rpcProvider");
+        const provider = getBestProvider();
         const auctionContract = new ethers.Contract(
           contracts.MooveAuction.address,
           contracts.MooveAuction.abi,

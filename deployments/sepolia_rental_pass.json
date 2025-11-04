@@ -3,13 +3,42 @@
   "deployer": "0x777382955f33Bb8540602E914D9b650C962EF6Cc",
   "contracts": {
     "MooveAccessControl": {
-      "address": "0x93b6F6F4b28cd61F68c16A85c9FC107Bf8f47e42",
+      "address": "0xd346AA5BcB802560446c1517AC61cD7F6935448b",
       "note": "Existing contract, not deployed by this script"
     },
-    "MooveRentalPass": {
-      "address": "0x52d95a8Fd4D8c0Ad210DCAD3BA8EBd533EB5420a",
+    "MooveNFT": {
+      "address": "0xd49be5B487C3B28b8d9a57636461735Df2999dB5",
       "constructorArgs": [
-        "0x93b6F6F4b28cd61F68c16A85c9FC107Bf8f47e42"
+        "Moove Stickers",
+        "MOOVE",
+        "0xd346AA5BcB802560446c1517AC61cD7F6935448b"
+      ],
+      "features": [
+        "ERC-721 NFT implementation",
+        "Metadata management with IPFS",
+        "Royalty management (ERC-2981)",
+        "Royalty reset on burn"
+      ]
+    },
+    "MooveAuction": {
+      "address": "0x356f9e8Db3B9b20D5446f5c8262fA49d8B968482",
+      "constructorArgs": [
+        "0xd346AA5BcB802560446c1517AC61cD7F6935448b"
+      ],
+      "features": [
+        "English auctions",
+        "Dutch auctions",
+        "Sealed bid auctions",
+        "Reserve auctions",
+        "Automatic sealed bid system",
+        "Bid refund system",
+        "O(1) user bid lookup optimization"
+      ]
+    },
+    "MooveRentalPass": {
+      "address": "0x13d7fF1dE425849F00B46b6FB5f169Df866F6166",
+      "constructorArgs": [
+        "0xd346AA5BcB802560446c1517AC61cD7F6935448b"
       ],
       "features": [
         "Public minting with ETH payment",
@@ -34,6 +63,6 @@
     ],
     "contractAuthorized": true
   },
-  "deploymentTime": "2025-09-23T13:38:28.405Z",
-  "blockNumber": 9262982
+  "deploymentTime": "2025-11-03T15:40:02.382Z",
+  "blockNumber": 9552537
 }

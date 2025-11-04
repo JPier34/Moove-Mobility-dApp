@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useAccount } from "wagmi";
 import { contracts } from "@/utils/contracts";
 import { ethers } from "ethers";
@@ -27,9 +27,26 @@ export function useSmartLazyCollection() {
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
 
+  // Track processed tokenIds to avoid duplicate calls
+  const processingTokenIds = useRef<Set<number>>(new Set());
+  const isFetching = useRef<boolean>(false);
+
   // Pagination constants (like original)
   const INITIAL_BATCH_SIZE = 12;
   const SCROLL_BATCH_SIZE = 8;
+
+  // Helper to get NFT contract instance (browser direct like useIncrementalAuctions)
+  const getNFTContract = useCallback(async () => {
+    if (!window.ethereum) {
+      throw new Error("No ethereum provider available");
+    }
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    return new ethers.Contract(
+      contracts.MooveNFT.address,
+      contracts.MooveNFT.abi,
+      provider
+    );
+  }, []);
 
   // Smart range detection function - find first non-existent token
   const findUpperBound = useCallback(async (): Promise<number> => {
@@ -38,86 +55,66 @@ export function useSmartLazyCollection() {
 
     console.log(`🔍 Starting smart range detection from ${searchPoint}`);
 
-    while (true) {
-      try {
-        // Check if token exists at current search point
-        const ownerResponse = await fetch("/api/contract-call", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            method: "ownerOf",
-            args: [searchPoint],
-            contract: "nft",
-          }),
-        });
+    try {
+      const nftContract = await getNFTContract();
 
-        if (ownerResponse.ok) {
-          // Token exists, continue searching higher
-          searchPoint += increment;
-          increment += 100; // Progressive increment: +100, +200, +300, etc.
+      while (true) {
+        // Safety limit to prevent infinite loops
+        if (searchPoint > 10000) {
           console.log(
-            `🔍 Token ${searchPoint - increment} exists, trying ${searchPoint}`
-          );
-        } else {
-          // Token doesn't exist or API error, this is our upper bound
-          console.log(
-            `✅ Found upper bound at token ${searchPoint} (first non-existent or API error)`
+            `🛑 Reached safety limit, using ${searchPoint} as upper bound`
           );
           return searchPoint;
         }
-      } catch (error) {
-        console.warn(
-          `⚠️ API call failed for token ${searchPoint}, trying direct contract call...`
-        );
 
-        // Fallback: Try direct contract call if API fails
         try {
-          if (window.ethereum) {
-            const provider = new ethers.BrowserProvider(window.ethereum);
-            const nftContract = new ethers.Contract(
-              contracts.MooveNFT.address,
-              contracts.MooveNFT.abi,
-              provider
+          // Check if token exists using direct contract call (browser)
+          const owner = await nftContract.ownerOf(searchPoint);
+
+          if (owner && owner !== "0x0000000000000000000000000000000000000000") {
+            // Token exists, continue searching higher
+            searchPoint += increment;
+            increment += 100;
+            console.log(
+              `🔍 Token ${
+                searchPoint - increment
+              } exists, trying ${searchPoint}`
             );
-
-            const owner = await nftContract.ownerOf(searchPoint);
-            if (
-              owner &&
-              owner !== "0x0000000000000000000000000000000000000000"
-            ) {
-              // Token exists, continue searching higher
-              searchPoint += increment;
-              increment += 100;
-              console.log(
-                `🔍 Token ${
-                  searchPoint - increment
-                } exists (direct call), trying ${searchPoint}`
-              );
-              continue;
-            }
+          } else {
+            // Token doesn't exist, this is our upper bound
+            console.log(
+              `✅ Found upper bound at token ${searchPoint} (token doesn't exist)`
+            );
+            return searchPoint;
           }
-        } catch (directError) {
-          console.warn(
-            `⚠️ Direct contract call also failed for token ${searchPoint}`
+        } catch (error: any) {
+          // Token doesn't exist (revert) - this is our upper bound
+          // Check for various error formats that indicate non-existent token
+          const isNonExistentToken =
+            error?.message?.includes("ERC721NonexistentToken") ||
+            error?.message?.includes("nonexistent token") ||
+            error?.message?.includes("execution reverted") ||
+            error?.code === 3;
+
+          if (isNonExistentToken) {
+            console.log(
+              `✅ Found upper bound at token ${searchPoint} (token doesn't exist)`
+            );
+            return searchPoint;
+          }
+          // Other error - return current point
+          console.log(
+            `✅ Found upper bound at token ${searchPoint} (error occurred)`
           );
+          return searchPoint;
         }
-
-        // On error, assume token doesn't exist and return current search point
-        console.log(
-          `✅ Found upper bound at token ${searchPoint} (both API and direct call failed)`
-        );
-        return searchPoint;
       }
-
-      // Safety limit to prevent infinite loops
-      if (searchPoint > 10000) {
-        console.log(
-          `🛑 Reached safety limit, using ${searchPoint} as upper bound`
-        );
-        return searchPoint;
-      }
+    } catch (error) {
+      // No provider available - return safe default
+      console.log(`⚠️ No ethereum provider, using default upper bound`);
+      return 1000;
     }
-  }, []);
+  }, [getNFTContract]);
 
   // Find the upper bound for NFT search (starting from 110, searching progressively)
   const findFirstExistingToken = useCallback(async (): Promise<number> => {
@@ -125,98 +122,76 @@ export function useSmartLazyCollection() {
 
     const MIN_TOKEN_ID = 110;
 
-    // Search progressively: 200, 300, 400, 500... until finding an empty token
-    for (let step = 200; step <= 1000; step += 100) {
-      try {
-        const ownerResponse = await fetch("/api/contract-call", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            method: "ownerOf",
-            args: [step],
-            contract: "nft",
-          }),
-        });
+    try {
+      const nftContract = await getNFTContract();
 
-        if (!ownerResponse.ok) {
-          // Empty token found! This is our upper limit
-          console.log(
-            `✅ Found empty token at ${step}, will search reverse from ${
-              step - 1
-            } to ${MIN_TOKEN_ID}`
-          );
-          return step - 1; // Return the last existing token
-        }
-      } catch (error) {
-        console.warn(
-          `⚠️ API call failed for token ${step}, trying direct contract call...`
-        );
-
-        // Fallback: Try direct contract call if API fails
+      // Search progressively: 200, 300, 400, 500... until finding an empty token
+      for (let step = 200; step <= 1000; step += 100) {
         try {
-          if (window.ethereum) {
-            const provider = new ethers.BrowserProvider(window.ethereum);
-            const nftContract = new ethers.Contract(
-              contracts.MooveNFT.address,
-              contracts.MooveNFT.abi,
-              provider
+          const owner = await nftContract.ownerOf(step);
+
+          if (owner && owner !== "0x0000000000000000000000000000000000000000") {
+            // Token exists, continue
+            continue;
+          } else {
+            // Empty token found! This is our upper limit
+            console.log(
+              `✅ Found empty token at ${step}, will search reverse from ${
+                step - 1
+              } to ${MIN_TOKEN_ID}`
             );
-
-            const owner = await nftContract.ownerOf(step);
-            if (
-              owner &&
-              owner !== "0x0000000000000000000000000000000000000000"
-            ) {
-              // Token exists, continue
-              continue;
-            }
+            return step - 1;
           }
-        } catch (directError) {
-          console.warn(`⚠️ Direct contract call also failed for token ${step}`);
+        } catch (error: any) {
+          // Token doesn't exist (revert) - found upper bound
+          // Check for various error formats that indicate non-existent token
+          const isNonExistentToken =
+            error?.message?.includes("ERC721NonexistentToken") ||
+            error?.message?.includes("nonexistent token") ||
+            error?.message?.includes("execution reverted") ||
+            error?.code === 3;
+
+          if (isNonExistentToken) {
+            console.log(
+              `✅ Found empty token at ${step}, will search reverse from ${
+                step - 1
+              } to ${MIN_TOKEN_ID}`
+            );
+            return step - 1;
+          }
+          // Other error - continue
+          continue;
         }
-
-        // If both API and direct call fail, assume token doesn't exist
-        console.log(
-          `✅ Found empty token at ${step} (both API and direct call failed), will search reverse from ${
-            step - 1
-          } to ${MIN_TOKEN_ID}`
-        );
-        return step - 1;
       }
-    }
 
-    // If we get here, all tokens up to 1000 exist
-    // Fallback: search sequentially from 110 to find the first existing one
-    console.log(
-      `🔍 All tokens up to 1000 exist, searching sequentially from ${MIN_TOKEN_ID}`
-    );
-    for (let tokenId = MIN_TOKEN_ID; tokenId <= 1000; tokenId++) {
-      try {
-        const ownerResponse = await fetch("/api/contract-call", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            method: "ownerOf",
-            args: [tokenId],
-            contract: "nft",
-          }),
-        });
-
-        if (ownerResponse.ok) {
-          console.log(`✅ Found first existing token: ${tokenId}`);
-          return tokenId;
+      // If we get here, all tokens up to 1000 exist
+      // Fallback: search sequentially from 110 to find the first existing one
+      console.log(
+        `🔍 All tokens up to 1000 exist, searching sequentially from ${MIN_TOKEN_ID}`
+      );
+      for (let tokenId = MIN_TOKEN_ID; tokenId <= 1000; tokenId++) {
+        try {
+          const owner = await nftContract.ownerOf(tokenId);
+          if (owner && owner !== "0x0000000000000000000000000000000000000000") {
+            console.log(`✅ Found first existing token: ${tokenId}`);
+            return tokenId;
+          }
+        } catch (error: any) {
+          // Token doesn't exist (expected) - continue searching silently
+          continue;
         }
-      } catch (error) {
-        // Token doesn't exist, continue searching
-        continue;
       }
+    } catch (error) {
+      // No provider available - return safe default
+      console.log(`⚠️ No ethereum provider, using default range`);
+      return 200;
     }
 
     console.log(
       `⚠️ No tokens found in range ${MIN_TOKEN_ID}-1000, using fallback`
     );
     return MIN_TOKEN_ID; // Fallback
-  }, []);
+  }, [getNFTContract]);
 
   // Check if user owns a specific token (simplified version for loadMore)
   const checkTokenOwnership = useCallback(
@@ -224,38 +199,17 @@ export function useSmartLazyCollection() {
       if (!address) return null;
 
       try {
+        // Use direct browser contract call
+        const nftContract = await getNFTContract();
+
         // Check ownership
-        const ownerResponse = await fetch("/api/contract-call", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            method: "ownerOf",
-            args: [tokenId],
-            contract: "nft",
-          }),
-        });
+        const owner = await nftContract.ownerOf(tokenId);
+        const cleanOwner = owner.toLowerCase();
 
-        if (!ownerResponse.ok) return null;
+        if (cleanOwner !== address.toLowerCase()) return null;
 
-        const owner = await ownerResponse.text();
-        const cleanOwner = owner.replace(/"/g, "");
-
-        if (cleanOwner.toLowerCase() !== address.toLowerCase()) return null;
-
-        // User owns this token, fetch metadata
-        const tokenURIResponse = await fetch("/api/contract-call", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            method: "tokenURI",
-            args: [tokenId],
-            contract: "nft",
-          }),
-        });
-
-        if (!tokenURIResponse.ok) return null;
-
-        const tokenURI = await tokenURIResponse.text();
+        // User owns token, get tokenURI directly
+        const tokenURI = await nftContract.tokenURI(tokenId);
         const cleanTokenURI = tokenURI.replace(/"/g, "");
 
         // Fetch metadata
@@ -290,7 +244,7 @@ export function useSmartLazyCollection() {
         return null;
       }
     },
-    [address]
+    [address, getNFTContract]
   );
 
   // Get auction data and transaction details for an NFT
@@ -536,8 +490,15 @@ export function useSmartLazyCollection() {
   const fetchNFTs = useCallback(async () => {
     if (!address) return;
 
+    // Prevent concurrent fetches using ref
+    if (isFetching.current || isLoading) {
+      return;
+    }
+
+    isFetching.current = true;
     setIsLoading(true);
     setError(null);
+    processingTokenIds.current.clear(); // Reset processed tokens
 
     try {
       console.log("🔍 Fetching user NFTs with smart reverse search...");
@@ -561,6 +522,9 @@ export function useSmartLazyCollection() {
         `🚀 Starting reverse NFT search from tokenId ${upperBound} to ${MIN_TOKEN_ID}`
       );
 
+      // Get NFT contract once for all calls
+      const nftContract = await getNFTContract();
+
       // Search strategy: check tokens from upperBound down to MIN_TOKEN_ID
       for (
         let currentTokenId = upperBound;
@@ -569,195 +533,144 @@ export function useSmartLazyCollection() {
       ) {
         if (foundCount >= INITIAL_BATCH_SIZE) break;
         try {
-          // Check if user owns this token using API
-          const ownerResponse = await fetch("/api/contract-call", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              method: "ownerOf",
-              args: [currentTokenId],
-              contract: "nft",
-            }),
-          });
+          // Check if user owns this token using direct browser call
+          const owner = await nftContract.ownerOf(currentTokenId);
+          const cleanOwner = owner.toLowerCase();
 
-          if (ownerResponse.ok) {
-            const owner = await ownerResponse.text();
-            const cleanOwner = owner.replace(/"/g, ""); // Remove quotes
+          if (cleanOwner === address.toLowerCase()) {
+            console.log(`✅ User owns token ${currentTokenId}`);
 
-            if (cleanOwner.toLowerCase() === address.toLowerCase()) {
-              console.log(`✅ User owns token ${currentTokenId}`);
+            // Get tokenURI directly
+            const tokenURI = await nftContract.tokenURI(currentTokenId);
+            const cleanTokenURI = tokenURI.replace(/"/g, "");
 
-              // Get token URI
-              const tokenURIResponse = await fetch("/api/contract-call", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  method: "tokenURI",
-                  args: [currentTokenId],
-                  contract: "nft",
-                }),
-              });
+            // Fetch metadata
+            let metadata;
+            try {
+              console.log(
+                `🔍 Fetching metadata for token ${currentTokenId} from: ${cleanTokenURI}`
+              );
 
-              if (tokenURIResponse.ok) {
-                const tokenURI = await tokenURIResponse.text();
-                const cleanTokenURI = tokenURI.replace(/"/g, "");
+              if (cleanTokenURI.includes("QmMockMetadataHashForTesting")) {
                 console.log(
-                  `🔗 TokenURI for ${currentTokenId}: "${tokenURI}" → "${cleanTokenURI}"`
+                  `🎭 Mock metadata detected for token ${currentTokenId}, using enhanced fallback`
                 );
-
-                // Fetch metadata
-                let metadata;
-                try {
-                  console.log(
-                    `🔍 Fetching metadata for token ${currentTokenId} from: ${cleanTokenURI}`
-                  );
-
-                  // Check if this is a mock metadata hash
-                  if (cleanTokenURI.includes("QmMockMetadataHashForTesting")) {
-                    console.log(
-                      `🎭 Mock metadata detected for token ${currentTokenId}, using enhanced fallback`
-                    );
-                    metadata = {
-                      name: `Moove NFT #${currentTokenId}`,
-                      description: `Premium Moove Mobility NFT - Token ID ${currentTokenId}`,
-                      image: "/images/moove-nft.svg",
-                      attributes: [
-                        { trait_type: "Rarity", value: "rare" },
-                        { trait_type: "Type", value: "Auction Won" },
-                        {
-                          trait_type: "Token ID",
-                          value: currentTokenId.toString(),
-                        },
-                        { trait_type: "Collection", value: "Moove Mobility" },
-                      ],
-                    };
-                  } else {
-                    const response = await fetch(cleanTokenURI);
-                    if (response.ok) {
-                      const rawMetadata = await response.json();
-                      console.log(
-                        `📊 Raw metadata for token ${currentTokenId}:`,
-                        rawMetadata
-                      );
-
-                      // Apply corrections if available
-                      metadata = applyCorrections(currentTokenId, rawMetadata);
-
-                      if (metadata !== rawMetadata) {
-                        console.log(
-                          `🔧 Applied corrections for token ${currentTokenId}:`,
-                          metadata._corrections
-                        );
-                      }
-                    } else {
-                      console.warn(
-                        `⚠️ Metadata fetch failed for token ${currentTokenId}: ${response.status}`
-                      );
-                      throw new Error(`HTTP ${response.status}`);
-                    }
-                  }
-                } catch (error) {
-                  console.warn(
-                    `⚠️ Failed to fetch metadata for token ${currentTokenId}:`,
-                    error
-                  );
-                  metadata = {
-                    name: `Moove NFT #${currentTokenId}`,
-                    description: `Premium Moove Mobility NFT - Token ID ${currentTokenId}`,
-                    image: "/images/moove-nft.svg",
-                    attributes: [
-                      { trait_type: "Rarity", value: "common" },
-                      { trait_type: "Type", value: "Auction Won" },
-                      {
-                        trait_type: "Token ID",
-                        value: currentTokenId.toString(),
-                      },
-                      { trait_type: "Collection", value: "Moove Mobility" },
-                    ],
-                  };
-                }
-
-                // Extract rarity
-                const rarityAttr = metadata.attributes?.find(
-                  (attr: any) => attr.trait_type?.toLowerCase() === "rarity"
-                );
-                const rarity = rarityAttr?.value?.toLowerCase() || "common";
-
-                // Create NFT with basic data first (for immediate display)
-                const nft: NFT = {
-                  tokenId: currentTokenId,
-                  name: metadata.name || `NFT #${currentTokenId}`,
-                  description:
-                    metadata.description || "NFT from Moove Mobility",
-                  image: metadata.image || "/images/default-nft.svg",
-                  rarity,
-                  purchaseDate: Date.now(), // Temporary
-                  price: getFallbackPrice(currentTokenId), // Fallback pricing
+                metadata = {
+                  name: `Moove NFT #${currentTokenId}`,
+                  description: `Premium Moove Mobility NFT - Token ID ${currentTokenId}`,
+                  image: "/images/moove-nft.svg",
+                  attributes: [
+                    { trait_type: "Rarity", value: "rare" },
+                    { trait_type: "Type", value: "Auction Won" },
+                    {
+                      trait_type: "Token ID",
+                      value: currentTokenId.toString(),
+                    },
+                    { trait_type: "Collection", value: "Moove Mobility" },
+                  ],
                 };
-
-                userNFTs.push(nft);
-                foundCount++;
-                currentFoundIds.add(currentTokenId);
-                console.log(
-                  `✅ Added NFT #${currentTokenId}: ${nft.name} (basic data)`
-                );
-
-                // Get comprehensive NFT data in background (async, non-blocking)
-                getComprehensiveNFTData(currentTokenId)
-                  .then(
-                    ({
-                      price,
-                      purchaseDate,
-                      priceSource,
-                      owner,
-                      isDesertedAuction,
-                    }) => {
-                      console.log(
-                        `💰 Price source for #${currentTokenId}: ${priceSource}, price: ${price} ETH, owner: ${owner}, deserted: ${isDesertedAuction}`
-                      );
-
-                      // Update the NFT with real data
-                      const nftIndex = userNFTs.findIndex(
-                        (n) => n.tokenId === currentTokenId
-                      );
-                      if (nftIndex !== -1) {
-                        userNFTs[nftIndex].price = price;
-                        userNFTs[nftIndex].purchaseDate = purchaseDate;
-                        console.log(
-                          `🔄 Updated NFT #${currentTokenId} with real data: price=${price} ETH, date=${new Date(
-                            purchaseDate
-                          ).toISOString()}, source=${priceSource}`
-                        );
-
-                        // ✅ FIX: Avoid infinite loop - only update if data actually changed
-                        setAllNFTs((prev) => {
-                          const updated = [...prev];
-                          const nftIndex = updated.findIndex(
-                            (n) => n.tokenId === currentTokenId
-                          );
-                          if (nftIndex !== -1) {
-                            updated[nftIndex] = {
-                              ...updated[nftIndex],
-                              price,
-                              purchaseDate,
-                            };
-                          }
-                          return updated;
-                        });
-                      }
-                    }
-                  )
-                  .catch((error) => {
-                    console.warn(
-                      `⚠️ Failed to get auction data for #${currentTokenId}:`,
-                      error
-                    );
-                  });
+              } else {
+                const response = await fetch(cleanTokenURI);
+                if (response.ok) {
+                  const rawMetadata = await response.json();
+                  metadata = applyCorrections(currentTokenId, rawMetadata);
+                } else {
+                  throw new Error(`HTTP ${response.status}`);
+                }
               }
+            } catch (error) {
+              console.warn(
+                `⚠️ Failed to fetch metadata for token ${currentTokenId}:`,
+                error
+              );
+              metadata = {
+                name: `Moove NFT #${currentTokenId}`,
+                description: `Premium Moove Mobility NFT - Token ID ${currentTokenId}`,
+                image: "/images/moove-nft.svg",
+                attributes: [
+                  { trait_type: "Rarity", value: "common" },
+                  { trait_type: "Type", value: "Auction Won" },
+                  {
+                    trait_type: "Token ID",
+                    value: currentTokenId.toString(),
+                  },
+                  { trait_type: "Collection", value: "Moove Mobility" },
+                ],
+              };
+            }
+
+            // Extract rarity
+            const rarityAttr = metadata.attributes?.find(
+              (attr: any) => attr.trait_type?.toLowerCase() === "rarity"
+            );
+            const rarity = rarityAttr?.value?.toLowerCase() || "common";
+
+            // Create NFT with basic data first
+            const nft: NFT = {
+              tokenId: currentTokenId,
+              name: metadata.name || `NFT #${currentTokenId}`,
+              description: metadata.description || "NFT from Moove Mobility",
+              image: metadata.image || "/images/default-nft.svg",
+              rarity,
+              purchaseDate: Date.now(),
+              price: getFallbackPrice(currentTokenId),
+            };
+
+            userNFTs.push(nft);
+            foundCount++;
+            currentFoundIds.add(currentTokenId);
+            console.log(
+              `✅ Added NFT #${currentTokenId}: ${nft.name} (basic data)`
+            );
+
+            // Get comprehensive NFT data in background (only if not already processing)
+            if (!processingTokenIds.current.has(currentTokenId)) {
+              processingTokenIds.current.add(currentTokenId);
+
+              getComprehensiveNFTData(currentTokenId)
+                .then(({ price, purchaseDate }) => {
+                  // Update allNFTs only once, avoiding infinite loops
+                  setAllNFTs((prev) => {
+                    const updated = [...prev];
+                    const idx = updated.findIndex(
+                      (n) => n.tokenId === currentTokenId
+                    );
+                    if (
+                      idx !== -1 &&
+                      (updated[idx].price !== price ||
+                        updated[idx].purchaseDate !== purchaseDate)
+                    ) {
+                      return updated.map((nft) =>
+                        nft.tokenId === currentTokenId
+                          ? { ...nft, price, purchaseDate }
+                          : nft
+                      );
+                    }
+                    return prev; // No change, return previous to avoid re-render
+                  });
+                })
+                .catch(() => {
+                  processingTokenIds.current.delete(currentTokenId);
+                })
+                .finally(() => {
+                  processingTokenIds.current.delete(currentTokenId);
+                });
             }
           }
-        } catch (error) {
-          console.warn(`⚠️ Error checking token ${currentTokenId}:`, error);
+        } catch (error: any) {
+          // Token doesn't exist or error - continue to next silently
+          // Check for various error formats that indicate non-existent token
+          const isNonExistentToken =
+            error?.message?.includes("ERC721NonexistentToken") ||
+            error?.message?.includes("nonexistent token") ||
+            error?.message?.includes("execution reverted") ||
+            error?.code === 3 ||
+            (error?.data &&
+              typeof error.data === "string" &&
+              error.data.length > 0);
+
+          // Silently continue - token doesn't exist (expected behavior)
+          continue;
         }
       }
 
@@ -782,8 +695,9 @@ export function useSmartLazyCollection() {
       console.error("❌ Error fetching user collection:", err);
     } finally {
       setIsLoading(false);
+      isFetching.current = false;
     }
-  }, [address]);
+  }, [address, findFirstExistingToken, getNFTContract, applyCorrections]);
 
   const loadMore = useCallback(async () => {
     if (isLoadingMore || !hasMore) return;
@@ -807,138 +721,103 @@ export function useSmartLazyCollection() {
             continue;
           }
           try {
-            // Check if user owns this token using API
-            const ownerResponse = await fetch("/api/contract-call", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                method: "ownerOf",
-                args: [tokenId],
-                contract: "nft",
-              }),
-            });
+            // Use direct browser contract call
+            const nftContract = await getNFTContract();
 
-            if (ownerResponse.ok) {
-              const owner = await ownerResponse.text();
-              if (
-                address &&
-                owner.replace(/"/g, "").toLowerCase() === address.toLowerCase()
-              ) {
-                console.log(`✅ User owns token ${tokenId} (loadMore)`);
+            // Check ownership
+            const owner = await nftContract.ownerOf(tokenId);
+            const cleanOwner = owner.toLowerCase();
 
-                // Get token URI
-                const tokenURIResponse = await fetch("/api/contract-call", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    method: "tokenURI",
-                    args: [tokenId],
-                    contract: "nft",
-                  }),
-                });
+            if (address && cleanOwner === address.toLowerCase()) {
+              console.log(`✅ User owns token ${tokenId} (loadMore)`);
 
-                if (tokenURIResponse.ok) {
-                  const tokenURI = await tokenURIResponse.text();
-                  const cleanTokenURI = tokenURI.replace(/"/g, "");
+              // Get tokenURI directly
+              const tokenURI = await nftContract.tokenURI(tokenId);
+              const cleanTokenURI = tokenURI.replace(/"/g, "");
 
-                  // Fetch metadata
-                  let metadata;
-                  try {
-                    const response = await fetch(cleanTokenURI);
-                    metadata = await response.json();
-                  } catch {
-                    metadata = {
-                      name: `NFT #${tokenId}`,
-                      description: "NFT from Moove Mobility",
-                      image: "/images/default-nft.svg",
-                      attributes: [{ trait_type: "Rarity", value: "common" }],
-                    };
-                  }
+              // Fetch metadata
+              let metadata;
+              try {
+                const response = await fetch(cleanTokenURI);
+                metadata = await response.json();
+              } catch {
+                metadata = {
+                  name: `NFT #${tokenId}`,
+                  description: "NFT from Moove Mobility",
+                  image: "/images/default-nft.svg",
+                  attributes: [{ trait_type: "Rarity", value: "common" }],
+                };
+              }
 
-                  // Extract rarity
-                  const rarityAttr = metadata.attributes?.find(
-                    (attr: any) => attr.trait_type?.toLowerCase() === "rarity"
-                  );
-                  const rarity = rarityAttr?.value?.toLowerCase() || "common";
+              // Extract rarity
+              const rarityAttr = metadata.attributes?.find(
+                (attr: any) => attr.trait_type?.toLowerCase() === "rarity"
+              );
+              const rarity = rarityAttr?.value?.toLowerCase() || "common";
 
-                  // Create NFT with basic data first (for immediate display)
-                  const nft: NFT = {
-                    tokenId,
-                    name: metadata.name || `NFT #${tokenId}`,
-                    description:
-                      metadata.description || "NFT from Moove Mobility",
-                    image: metadata.image || "/images/default-nft.svg",
-                    rarity,
-                    purchaseDate: Date.now(), // Temporary
-                    price: getFallbackPrice(tokenId), // Fallback pricing
-                  };
+              // Create NFT with basic data first
+              const nft: NFT = {
+                tokenId,
+                name: metadata.name || `NFT #${tokenId}`,
+                description: metadata.description || "NFT from Moove Mobility",
+                image: metadata.image || "/images/default-nft.svg",
+                rarity,
+                purchaseDate: Date.now(),
+                price: getFallbackPrice(tokenId),
+              };
 
-                  nextBatch.push(nft);
-                  foundCount++;
-                  newFoundIds.add(tokenId);
-                  console.log(
-                    `✅ Added NFT #${tokenId} (loadMore): ${nft.name} (basic data)`
-                  );
+              nextBatch.push(nft);
+              foundCount++;
+              newFoundIds.add(tokenId);
+              console.log(
+                `✅ Added NFT #${tokenId} (loadMore): ${nft.name} (basic data)`
+              );
 
-                  // Get comprehensive NFT data in background (async, non-blocking)
-                  getComprehensiveNFTData(tokenId)
-                    .then(
-                      ({
-                        price,
-                        purchaseDate,
-                        priceSource,
-                        owner,
-                        isDesertedAuction,
-                      }) => {
-                        console.log(
-                          `💰 Price source for #${tokenId}: ${priceSource}, price: ${price} ETH, owner: ${owner}, deserted: ${isDesertedAuction}`
-                        );
+              // Get comprehensive NFT data in background (only if not already processing)
+              if (!processingTokenIds.current.has(tokenId)) {
+                processingTokenIds.current.add(tokenId);
 
-                        // Update the NFT with real data
-                        const nftIndex = nextBatch.findIndex(
-                          (n) => n.tokenId === tokenId
-                        );
-                        if (nftIndex !== -1) {
-                          nextBatch[nftIndex].price = price;
-                          nextBatch[nftIndex].purchaseDate = purchaseDate;
-                          console.log(
-                            `🔄 Updated NFT #${tokenId} (loadMore) with real data: price=${price} ETH, date=${new Date(
-                              purchaseDate
-                            ).toISOString()}, source=${priceSource}`
-                          );
-
-                          // ✅ FIX: Avoid infinite loop - only update if data actually changed
-                          setAllNFTs((prev) => {
-                            const updated = [...prev];
-                            const nftIndex = updated.findIndex(
-                              (n) => n.tokenId === tokenId
-                            );
-                            if (nftIndex !== -1) {
-                              updated[nftIndex] = {
-                                ...updated[nftIndex],
-                                price,
-                                purchaseDate,
-                              };
-                            }
-                            return updated;
-                          });
-                        }
-                      }
-                    )
-                    .catch((error) => {
-                      console.warn(
-                        `⚠️ Failed to get auction data for #${tokenId} (loadMore):`,
-                        error
+                getComprehensiveNFTData(tokenId)
+                  .then(({ price, purchaseDate }) => {
+                    // Update allNFTs only once, avoiding infinite loops
+                    setAllNFTs((prev) => {
+                      const updated = [...prev];
+                      const idx = updated.findIndex(
+                        (n) => n.tokenId === tokenId
                       );
+                      if (
+                        idx !== -1 &&
+                        (updated[idx].price !== price ||
+                          updated[idx].purchaseDate !== purchaseDate)
+                      ) {
+                        return updated.map((nft) =>
+                          nft.tokenId === tokenId
+                            ? { ...nft, price, purchaseDate }
+                            : nft
+                        );
+                      }
+                      return prev; // No change, return previous to avoid re-render
                     });
-                }
+                  })
+                  .catch(() => {
+                    processingTokenIds.current.delete(tokenId);
+                  })
+                  .finally(() => {
+                    processingTokenIds.current.delete(tokenId);
+                  });
               }
             }
-          } catch (error) {
-            console.warn(
-              `⚠️ Error checking token ${tokenId} (loadMore):`,
-              error
-            );
+          } catch (error: any) {
+            // Token doesn't exist (expected) - continue to next silently
+            // Check for various error formats that indicate non-existent token
+            const isNonExistentToken =
+              error?.message?.includes("ERC721NonexistentToken") ||
+              error?.message?.includes("nonexistent token") ||
+              error?.message?.includes("execution reverted") ||
+              error?.code === 3;
+
+            // Silently continue - token doesn't exist (expected behavior)
+            // Continue to next token
           }
 
           tokenId--;
@@ -967,7 +846,14 @@ export function useSmartLazyCollection() {
         setIsLoadingMore(false);
       }
     }, 300);
-  }, [isLoadingMore, hasMore, nfts.length, address]);
+  }, [
+    isLoadingMore,
+    hasMore,
+    nfts.length,
+    allNFTs.length,
+    address,
+    getNFTContract,
+  ]);
 
   const refresh = useCallback(async () => {
     setAllNFTs([]);
@@ -976,9 +862,20 @@ export function useSmartLazyCollection() {
     await fetchNFTs();
   }, [fetchNFTs]);
 
+  // Only fetch once when address changes, not on every fetchNFTs change
+  const addressRef = useRef<string | undefined>(address);
   useEffect(() => {
-    fetchNFTs();
-  }, [fetchNFTs]);
+    // Only fetch if address actually changed
+    if (addressRef.current !== address) {
+      addressRef.current = address;
+      fetchNFTs();
+    } else if (!address) {
+      // Clear NFTs if no address
+      setAllNFTs([]);
+      setNfts([]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [address]); // Only depend on address, not fetchNFTs
 
   // Listen for NFT claim events to refresh collection
   useEffect(() => {

@@ -1318,15 +1318,6 @@ export default function AuctionModal({
                     </span>
                   </div>
                 )}
-                {localAuction.buyNowPrice &&
-                  Number(localAuction.auctionType) === AuctionType.DUTCH && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">Buy Now</span>
-                      <span className="font-medium text-gray-700">
-                        {localAuction.buyNowPrice} ETH
-                      </span>
-                    </div>
-                  )}
                 {/*                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Bid Increment</span>
                   <span className="font-medium text-gray-700">

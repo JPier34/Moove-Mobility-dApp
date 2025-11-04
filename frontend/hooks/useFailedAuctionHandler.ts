@@ -51,8 +51,13 @@ export function useFailedAuctionHandler(): FailedAuctionHandler {
         }
 
         const provider = new ethers.BrowserProvider(window.ethereum);
+        
+        // Get auction address from contracts config
+        const { CONTRACT_ADDRESSES } = await import("@/utils/contracts");
+        const auctionAddress = CONTRACT_ADDRESSES.MOOVE_AUCTION;
+        
         const auctionContract = new ethers.Contract(
-          "0x6096c74Ed257b14c601210e0B6256e39D534154e",
+          auctionAddress,
           [
             "function getAuction(uint256 auctionId) view returns (tuple(uint256 auctionId, address nftContract, uint256 tokenId, address seller, uint8 auctionType, uint256 startingPrice, uint256 reservePrice, uint256 buyNowPrice, uint256 currentPrice, uint256 startTime, uint256 endTime, uint256 bidIncrement, address highestBidder, uint256 highestBid, uint8 status, bool allowPartialFulfillment, uint256 minBidders, uint256 totalBidders, bool isSettled, uint256 extensionThreshold, uint256 extensionDuration, uint256 revealEndTime, bool revealPhaseStarted))",
             "function endAuction(uint256 auctionId) external",

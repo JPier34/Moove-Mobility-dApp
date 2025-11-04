@@ -47,10 +47,10 @@ npm run dev
 
 ## 📋 Contract Addresses (Sepolia)
 
-- **MooveAccessControl**: `0xd346AA5BcB802560446c1517AC61cD7F6935448b` ✅ **Updated with Security Fixes**
-- **MooveNFT**: `0x40E455515bf712144C1A5D859F19d64b537754f7`
-- **MooveAuction**: `0xaBcF309597e6280aF5DBB0ce82778f048bC600f0` ✅ **Updated with Security Fixes**
-- **MooveRentalPass**: `0x74aAb47A0439B728A5956A1d7faAc6716F1F18Df`
+- **MooveAccessControl**: `0xd346AA5BcB802560446c1517AC61cD7F6935448b` ✅ **Updated with Security Fixes & maxAdmins**
+- **MooveNFT**: `0xd49be5B487C3B28b8d9a57636461735Df2999dB5` ✅ **Updated with royalty reset on burn**
+- **MooveAuction**: `0x356f9e8Db3B9b20D5446f5c8262fA49d8B968482` ✅ **Updated with O(1) optimization & fixes**
+- **MooveRentalPass**: `0x13d7fF1dE425849F00B46b6FB5f169Df866F6166` ✅ **Latest version**
 
 ## 🔒 Security Updates
 
@@ -72,11 +72,17 @@ npx hardhat run scripts/deploy-security-fix.js --network sepolia
 ### Contract Verification
 
 ```bash
-# Verify MooveAccessControl
-npx hardhat verify --network sepolia 0xd346AA5BcB802560446c1517AC61cD7F6935448b "0x777382955f33Bb8540602E914D9b650C962EF6Cc"
+# Verify MooveAccessControl (if deploying new version)
+npx hardhat verify --network sepolia 0xd346AA5BcB802560446c1517AC61cD7F6935448b "0x777382955f33Bb8540602E914D9b650C962EF6Cc" "10"
+
+# Verify MooveNFT
+npx hardhat verify --network sepolia 0xd49be5B487C3B28b8d9a57636461735Df2999dB5 "Moove Stickers" "MOOVE" "0xd346AA5BcB802560446c1517AC61cD7F6935448b"
 
 # Verify MooveAuction
-npx hardhat verify --network sepolia 0xaBcF309597e6280aF5DBB0ce82778f048bC600f0 "0xd346AA5BcB802560446c1517AC61cD7F6935448b"
+npx hardhat verify --network sepolia 0x356f9e8Db3B9b20D5446f5c8262fA49d8B968482 "0xd346AA5BcB802560446c1517AC61cD7F6935448b"
+
+# Verify MooveRentalPass
+npx hardhat verify --network sepolia 0x13d7fF1dE425849F00B46b6FB5f169Df866F6166 "0xd346AA5BcB802560446c1517AC61cD7F6935448b"
 ```
 
 ## 🧪 Testing & Security

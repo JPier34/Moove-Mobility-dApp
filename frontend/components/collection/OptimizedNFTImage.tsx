@@ -28,12 +28,12 @@ export default function OptimizedNFTImage({
   const imgRef = useRef<HTMLImageElement>(null);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Multiple IPFS gateways for fallback - Pinata first if available
+  // Multiple IPFS gateways for fallback - ipfs.io first (most reliable)
   const ipfsGateways = [
-    "https://gateway.pinata.cloud/ipfs/",
     "https://ipfs.io/ipfs/",
     "https://cloudflare-ipfs.com/ipfs/",
     "https://dweb.link/ipfs/",
+    "https://gateway.pinata.cloud/ipfs/",
   ];
 
   // Debounce src changes to prevent excessive API calls
@@ -99,7 +99,7 @@ export default function OptimizedNFTImage({
 
     const cid = originalSrc.replace("ipfs://", "");
 
-    // Try Pinata first (index 0), then other gateways
+    // Try ipfs.io first (most reliable), then other gateways
     if (currentGatewayIndex < ipfsGateways.length) {
       const currentGateway = ipfsGateways[currentGatewayIndex];
       return `${currentGateway}${cid}`;

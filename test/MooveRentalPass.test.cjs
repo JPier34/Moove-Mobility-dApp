@@ -21,7 +21,7 @@ describe("MooveRentalPass", function () {
     const MooveAccessControl = await ethers.getContractFactory(
       "MooveAccessControl"
     );
-    const accessControl = await MooveAccessControl.deploy(owner.address);
+    const accessControl = await MooveAccessControl.deploy(owner.address, 10); // maxAdmins = 10
     await accessControl.waitForDeployment();
 
     // Deploy MooveRentalPass
@@ -627,7 +627,7 @@ describe("MooveRentalPass", function () {
         const MooveAccessControl = await ethers.getContractFactory(
           "MooveAccessControl"
         );
-        const newAccessControl = await MooveAccessControl.deploy(owner.address);
+        const newAccessControl = await MooveAccessControl.deploy(owner.address, 10); // maxAdmins = 10
         await newAccessControl.waitForDeployment();
 
         // Grant MASTER_ADMIN_ROLE to owner in new contract

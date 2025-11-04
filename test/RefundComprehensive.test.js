@@ -15,7 +15,7 @@ describe("Comprehensive Refund Testing", function () {
     const MooveAccessControl = await ethers.getContractFactory(
       "MooveAccessControl"
     );
-    mooveAccessControl = await MooveAccessControl.deploy(owner.address);
+    mooveAccessControl = await MooveAccessControl.deploy(owner.address, 10); // maxAdmins = 10
 
     const MooveNFT = await ethers.getContractFactory("MooveNFT");
     mooveNFT = await MooveNFT.deploy(

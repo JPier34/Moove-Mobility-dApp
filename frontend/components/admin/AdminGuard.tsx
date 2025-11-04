@@ -11,16 +11,19 @@ interface AdminGuardProps {
 
 export default function AdminGuard({ children }: AdminGuardProps) {
   const { address, isConnected } = useAccount();
+  const [isReady, setIsReady] = useState(false);
+  const [loadingTimeout, setLoadingTimeout] = useState(false);
+
+  // Master admin wallet - always has access (check first, no RPC needed)
+  const MASTER_WALLET = getAdminAddress();
+  const isMasterWallet = address?.toLowerCase() === MASTER_WALLET?.toLowerCase();
+
+  // Check roles (hook will skip RPC calls if master wallet)
   const {
     isMasterAdmin,
     canMint,
     isLoading: rolesLoading,
   } = useUserRoles(address);
-  const [isReady, setIsReady] = useState(false);
-
-  // Master admin wallet - always has access
-  const MASTER_WALLET = getAdminAddress();
-  const isMasterWallet = address?.toLowerCase() === MASTER_WALLET.toLowerCase();
 
   useEffect(() => {
     // Mark as ready after a short delay to ensure wallet state is stable
@@ -28,11 +31,22 @@ export default function AdminGuard({ children }: AdminGuardProps) {
       setIsReady(true);
     }, 200);
 
-    return () => clearTimeout(timer);
-  }, []);
+    // Timeout after 10 seconds if still loading (429 error likely)
+    const timeoutTimer = setTimeout(() => {
+      if (rolesLoading && !isMasterWallet) {
+        console.warn("⚠️ [AdminGuard] Permission check timeout, assuming access denied");
+        setLoadingTimeout(true);
+      }
+    }, 10000);
 
-  // Show loading state while checking permissions
-  if (!isReady || rolesLoading) {
+    return () => {
+      clearTimeout(timer);
+      clearTimeout(timeoutTimer);
+    };
+  }, [rolesLoading, isMasterWallet]);
+
+  // Show loading state while checking permissions (but not for master wallet)
+  if (!isReady || (rolesLoading && !isMasterWallet && !loadingTimeout)) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-purple-50 dark:from-gray-900 dark:to-purple-900/20 flex items-center justify-center">
         <div className="text-center">
@@ -40,6 +54,11 @@ export default function AdminGuard({ children }: AdminGuardProps) {
           <p className="text-xl text-gray-600 dark:text-gray-300">
             {!isReady ? "Initializing..." : "Checking permissions..."}
           </p>
+          {loadingTimeout && (
+            <p className="text-sm text-yellow-600 dark:text-yellow-400 mt-2">
+              ⚠️ Taking longer than expected. Please check your RPC connection.
+            </p>
+          )}
         </div>
       </div>
     );

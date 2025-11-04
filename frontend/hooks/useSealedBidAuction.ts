@@ -5,6 +5,7 @@ import { useAccount } from "wagmi";
 import { parseEther, formatEther } from "viem";
 import { ethers } from "ethers";
 import { toast } from "react-hot-toast";
+import { CONTRACT_ADDRESSES } from "@/utils/contracts";
 import {
   generateSealedBidNonce,
   generateSealedBidCommit,
@@ -107,13 +108,12 @@ export function useSealedBidAuction(): SealedBidAuctionHandler {
         const signer = await provider.getSigner();
 
         // Import contract addresses and ABIs
-        const { CONTRACT_ADDRESSES, CONTRACT_ABIS } = await import(
-          "@/utils/contracts"
-        );
+        const { contracts } = await import("@/utils/contracts");
+        const { CONTRACT_ADDRESSES } = await import("@/utils/contracts");
 
         const auctionContract = new ethers.Contract(
-          CONTRACT_ADDRESSES.MooveAuction,
-          CONTRACT_ABIS.MooveAuction,
+          CONTRACT_ADDRESSES.MOOVE_AUCTION,
+          contracts.MooveAuction.abi,
           signer
         );
 
@@ -250,13 +250,12 @@ export function useSealedBidAuction(): SealedBidAuctionHandler {
         const signer = await provider.getSigner();
 
         // Import contract addresses and ABIs
-        const { CONTRACT_ADDRESSES, CONTRACT_ABIS } = await import(
-          "@/utils/contracts"
-        );
+        const { contracts } = await import("@/utils/contracts");
+        const { CONTRACT_ADDRESSES } = await import("@/utils/contracts");
 
         const auctionContract = new ethers.Contract(
-          CONTRACT_ADDRESSES.MooveAuction,
-          CONTRACT_ABIS.MooveAuction,
+          CONTRACT_ADDRESSES.MOOVE_AUCTION,
+          contracts.MooveAuction.abi,
           signer
         );
 

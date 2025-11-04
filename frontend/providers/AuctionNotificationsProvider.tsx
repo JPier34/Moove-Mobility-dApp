@@ -15,6 +15,7 @@ import { ethers } from "ethers";
 import toast from "react-hot-toast";
 import { WonAuction } from "@/types/user";
 import { contracts } from "@/utils/contracts";
+import { getBestProvider } from "@/utils/rpcProvider";
 
 // ============= OPTIMIZED CONFIGURATION =============
 const CONFIG = {
@@ -176,8 +177,19 @@ async function findTotalAuctions(
       } else {
         high = mid - 1;
       }
-    } catch (error) {
-      high = mid - 1;
+    } catch (error: any) {
+      // "Auction does not exist" means we've reached the end - expected error
+      if (
+        error?.message?.includes("Auction does not exist") ||
+        error?.message?.includes("execution reverted") ||
+        error?.code === 3
+      ) {
+        high = mid - 1;
+      } else {
+        // Rate limit or other error - reduce range and retry
+        console.warn(`⚠️ [Finder] Error checking auction ${mid}:`, error?.message || error);
+        high = mid - 1;
+      }
     }
   }
 
@@ -591,9 +603,16 @@ export const AuctionNotificationsProvider: React.FC<{
     setLastClaimCheck(now);
 
     try {
-      const provider = new ethers.JsonRpcProvider(
-        process.env.NEXT_PUBLIC_RPC_URL || "https://1rpc.io/sepolia"
-      );
+      // Use best available provider (browser first, then RPC fallback)
+      const provider = getBestProvider();
+      // Validate contract address before creating contract instance
+      if (!contracts.MooveAuction?.address || contracts.MooveAuction.address === "") {
+        console.warn(
+          "⚠️ [AuctionNotifications] MooveAuction contract address not configured, skipping monitoring"
+        );
+        return;
+      }
+
       const auctionContract = new ethers.Contract(
         contracts.MooveAuction.address,
         contracts.MooveAuction.abi,
@@ -879,9 +898,16 @@ export const AuctionNotificationsProvider: React.FC<{
     setLastRefundCheck(now);
 
     try {
-      const provider = new ethers.JsonRpcProvider(
-        process.env.NEXT_PUBLIC_RPC_URL || "https://1rpc.io/sepolia"
-      );
+      // Use best available provider (browser first, then RPC fallback)
+      const provider = getBestProvider();
+      // Validate contract address before creating contract instance
+      if (!contracts.MooveAuction?.address || contracts.MooveAuction.address === "") {
+        console.warn(
+          "⚠️ [AuctionNotifications] MooveAuction contract address not configured, skipping monitoring"
+        );
+        return;
+      }
+
       const auctionContract = new ethers.Contract(
         contracts.MooveAuction.address,
         contracts.MooveAuction.abi,
@@ -1189,9 +1215,23 @@ export const AuctionNotificationsProvider: React.FC<{
 
     const startSealedBidMonitoring = async () => {
       try {
-        const provider = new ethers.JsonRpcProvider(
-          process.env.NEXT_PUBLIC_RPC_URL || "https://1rpc.io/sepolia"
-        );
+        // Prefer browser provider (window.ethereum) over public RPC to avoid rate limits
+        let provider: ethers.Provider;
+        if (typeof window !== "undefined" && window.ethereum) {
+          provider = new ethers.BrowserProvider(window.ethereum);
+        } else {
+          provider = new ethers.JsonRpcProvider(
+            process.env.NEXT_PUBLIC_RPC_URL || "https://1rpc.io/sepolia"
+          );
+        }
+        // Validate contract address before creating contract instance
+        if (!contracts.MooveAuction?.address || contracts.MooveAuction.address === "") {
+          console.warn(
+            "⚠️ [SealedBid] MooveAuction contract address not configured, skipping sealed bid monitoring"
+          );
+          return;
+        }
+
         const auctionContract = new ethers.Contract(
           contracts.MooveAuction.address,
           contracts.MooveAuction.abi,

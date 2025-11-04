@@ -1,4 +1,5 @@
 const { ethers } = require("hardhat");
+const hre = require("hardhat");
 
 async function main() {
   console.log("🚗 Configuring vehicle prices on MooveRentalPass...");
@@ -11,9 +12,16 @@ async function main() {
     ethers.formatEther(await ethers.provider.getBalance(deployer.address))
   );
 
-  // Contract addresses
-  const rentalPassAddress = "0x460353902aF2A73f0323EC888BBFcE64681932E8";
-  const accessControlAddress = "0x74aAb47A0439B728A5956A1d7faAc6716F1F18Df";
+  // Contract addresses - MUST come from environment variables
+  const addressConfig = require("./config/addresses");
+  const addresses = addressConfig.getContractAddresses(hre.network.name);
+
+  const rentalPassAddress = addresses.MOOVE_RENTAL_PASS;
+  const accessControlAddress = addresses.ACCESS_CONTROL;
+
+  console.log("📋 Using contract addresses from environment:");
+  console.log("  RentalPass:", rentalPassAddress);
+  console.log("  AccessControl:", accessControlAddress);
 
   // Get contract instances
   const MooveRentalPass = await ethers.getContractFactory("MooveRentalPass");

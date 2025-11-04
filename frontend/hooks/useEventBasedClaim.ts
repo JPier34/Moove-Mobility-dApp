@@ -43,9 +43,8 @@ export function useEventBasedClaim() {
       setLoading(true);
       console.log("🔍 Fetching claimable auctions based on events...");
 
-      const provider = new ethers.JsonRpcProvider(
-        process.env.NEXT_PUBLIC_RPC_URL || "https://1rpc.io/sepolia"
-      );
+      const { getBestProvider } = await import("@/utils/rpcProvider");
+      const provider = getBestProvider();
 
       const auctionABI = [
         "event BidPlaced(uint256 indexed auctionId, address indexed bidder, uint256 amount, bool isHighestBid)",
@@ -276,7 +275,7 @@ export function useEventBasedClaim() {
           address: contracts.MooveAuction.address as `0x${string}`,
           abi: contracts.MooveAuction.abi,
           functionName: "endAuction",
-          args: [auctionId],
+          args: [BigInt(auctionId)],
         });
       } catch (error) {
         console.error(
@@ -317,7 +316,7 @@ export function useEventBasedClaim() {
             address: contracts.MooveAuction.address as `0x${string}`,
             abi: contracts.MooveAuction.abi,
             functionName: "settleAuction",
-            args: [currentAuctionId],
+            args: [BigInt(currentAuctionId)],
           });
         }, 2000); // 2 second delay
       } else if (currentClaimStep === "settling") {

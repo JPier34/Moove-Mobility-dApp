@@ -44,7 +44,7 @@ describe("MooveAuction", function () {
     const MooveAccessControl = await ethers.getContractFactory(
       "MooveAccessControl"
     );
-    accessControl = await MooveAccessControl.deploy(deployer.address);
+    accessControl = await MooveAccessControl.deploy(deployer.address, 10); // maxAdmins = 10
 
     // Deploy MooveNFT
     const MooveNFT = await ethers.getContractFactory("MooveNFT");
@@ -777,8 +777,8 @@ describe("MooveAuction", function () {
       const currentPrice = await mooveAuction.getDutchPrice(auctionId);
       const initialBalance = await ethers.provider.getBalance(bidder1.address);
 
-      // Buy at current price using commitToBuyDutch
-      await mooveAuction.connect(bidder1).commitToBuyDutch(auctionId, {
+      // Buy at current price using buyNowDutch
+      await mooveAuction.connect(bidder1).buyNowDutch(auctionId, {
         value: currentPrice,
       });
 

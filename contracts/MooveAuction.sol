@@ -60,6 +60,9 @@ contract MooveAuction is ReentrancyGuard, Pausable {
     /// @dev Mapping to track last bid time per user per auction
     mapping(uint256 => mapping(address => uint256)) public lastBidTime;
     
+    /// @dev Mapping to track if user has bid (O(1) lookup instead of O(n))
+    mapping(uint256 => mapping(address => bool)) private userHasBid;
+    
     // Dutch auction commitments removed - simplified to direct buy now
     
     /// @dev Mapping for sealed bid deposits (actual ETH deposited vs bid amount)
@@ -529,9 +532,10 @@ contract MooveAuction is ReentrancyGuard, Pausable {
             auctionBids[auctionId][i].isWinning = false;
         }
 
-        // Add to user bids if not already there
+        // Add to user bids if not already there (check BEFORE setting userHasBid)
         if (!_hasUserBid(auctionId, msg.sender)) {
             userBids[msg.sender].push(auctionId);
+            userHasBid[auctionId][msg.sender] = true;
         }
 
         // Refund previous bidder
@@ -573,30 +577,6 @@ contract MooveAuction is ReentrancyGuard, Pausable {
         }
     }
 
-    /**
-     * @dev Commit to buy Dutch auction at current price
-     * @notice Alias for buyNowDutch for test compatibility
-     */
-    function commitToBuyDutch(uint256 auctionId) external payable nonReentrant {
-        Auction storage auction = auctions[auctionId];
-        require(
-            auction.auctionType == AuctionType.DUTCH,
-            "Not a Dutch auction"
-        );
-        require(auction.status == AuctionStatus.ACTIVE, "Auction not active");
-        require(msg.sender != auction.seller, "Seller cannot buy");
-        require(!auction.isSettled, "Auction already settled");
-
-        uint256 currentPrice = _getDutchPrice(auctionId);
-        require(msg.value >= currentPrice, "Insufficient payment");
-
-        _executeBuyNow(auctionId, msg.sender, currentPrice);
-
-        // Refund excess payment
-        if (msg.value > currentPrice) {
-            payable(msg.sender).transfer(msg.value - currentPrice);
-        }
-    }
 
     /**
      * @dev Submit sealed bid with simplified deposit system
@@ -639,11 +619,12 @@ contract MooveAuction is ReentrancyGuard, Pausable {
         // Store sealed bid hash (for commitment-reveal pattern if needed)
         sealedBids[auctionId][msg.sender] = bidHash;
 
-        // Track bidder
+        // Track bidder (check BEFORE setting userHasBid)
         if (!_hasUserBid(auctionId, msg.sender)) {
             auction.totalBidders++;
             userBids[msg.sender].push(auctionId);
-        }
+            userHasBid[auctionId][msg.sender] = true;
+        } 
 
         // Add to bid history (amount is the actual ETH deposited)
         auctionBids[auctionId].push(
@@ -1351,11 +1332,11 @@ contract MooveAuction is ReentrancyGuard, Pausable {
         auction.status = AuctionStatus.ENDED;
         auction.totalBidders = 1;
 
-        // Add to user bids if not already present
+        // Add to user bids if not already present (check BEFORE setting userHasBid)
         if (!_hasUserBid(auctionId, buyer)) {
             userBids[buyer].push(auctionId);
-        }
-
+            userHasBid[auctionId][buyer] = true;
+        } 
         // Add bid to history
         auctionBids[auctionId].push(
             Bid({
@@ -1537,20 +1518,11 @@ contract MooveAuction is ReentrancyGuard, Pausable {
         }
     }
 
-    /**
-     * @dev Check if user has placed a bid on auction
-     */
     function _hasUserBid(
         uint256 auctionId,
         address user
     ) internal view returns (bool) {
-        uint256[] memory userBidsArray = userBids[user];
-        for (uint256 i = 0; i < userBidsArray.length; i++) {
-            if (userBidsArray[i] == auctionId) {
-                return true;
-            }
-        }
-        return false;
+        return userHasBid[auctionId][user];
     }
 
     /**

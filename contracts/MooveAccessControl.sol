@@ -70,7 +70,7 @@ contract MooveAccessControl is AccessControl, Pausable, ReentrancyGuard {
     bool public globalPause = false;
 
     /// @dev Maximum number of admins allowed
-    uint256 public constant MAX_ADMINS = 10;
+    uint256 public immutable MAX_ADMINS;
 
     /// @dev Current number of master admins
     uint256 public masterAdminCount = 0;
@@ -162,7 +162,9 @@ contract MooveAccessControl is AccessControl, Pausable, ReentrancyGuard {
      * @dev Constructor sets up initial roles and admin
      * @param initialAdmin Address to be granted master admin role
      */
-    constructor(address initialAdmin) {
+    constructor(address initialAdmin, uint256 maxAdmins) {
+    require(maxAdmins > 0 && maxAdmins <= 100, "Invalid max admins range");
+    MAX_ADMINS = maxAdmins;
         require(initialAdmin != address(0), "Invalid admin address");
 
         // Grant master admin role to initial admin

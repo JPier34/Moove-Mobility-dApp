@@ -2,6 +2,7 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
+  // @ts-ignore - hardhat-deploy extends hre with deployments and getNamedAccounts
   const { deployments, getNamedAccounts } = hre;
   const { deploy, get } = deployments;
   const { deployer } = await getNamedAccounts();

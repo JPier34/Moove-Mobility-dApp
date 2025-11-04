@@ -34,7 +34,7 @@ export function useAutomaticRefundHandler() {
           address: contracts.MooveAuction.address as `0x${string}`,
           abi: contracts.MooveAuction.abi,
           functionName: "refundRemainingBidders",
-          args: [auctionId, 0, 50], // auctionId, startIndex, batchSize
+          args: [BigInt(auctionId), BigInt(0), BigInt(50)], // auctionId, startIndex, batchSize
         });
 
         console.log(`📝 Refund transaction submitted: ${refundTx}`);

@@ -43,9 +43,8 @@ export function useAuctionCreationMonitor() {
 
       console.log("🔍 Fetching auction creation data from contract...");
 
-      const provider = new ethers.JsonRpcProvider(
-        process.env.NEXT_PUBLIC_RPC_URL || "https://1rpc.io/sepolia"
-      );
+      const { getBestProvider } = await import("@/utils/rpcProvider");
+      const provider = getBestProvider();
       const contract = new ethers.Contract(
         contracts.MooveAuction.address,
         contracts.MooveAuction.abi as any,

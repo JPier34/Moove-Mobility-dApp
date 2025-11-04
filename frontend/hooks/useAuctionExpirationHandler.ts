@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAccount, useWriteContract } from "wagmi";
-import { CONTRACT_ADDRESSES, contracts } from "@/utils/contracts";
+import { contracts } from "@/utils/contracts";
+import { CONTRACT_ADDRESSES } from "@/utils/contracts";
 import { AuctionStatus } from "@/types/auction";
 import { ethers } from "ethers";
 import toast from "react-hot-toast";
@@ -41,18 +42,18 @@ export function useAuctionExpirationHandler() {
 
         try {
           // Get auction data using the same approach as useIncrementalAuctions
-          const provider = new ethers.JsonRpcProvider(
-            process.env.NEXT_PUBLIC_RPC_URL || "https://1rpc.io/sepolia"
-          );
+          const { getBestProvider } = await import("@/utils/rpcProvider");
+          const provider = getBestProvider();
+          // Use centralized contract addresses from config
           const contract = new ethers.Contract(
-            CONTRACT_ADDRESSES.MooveAuction,
+            CONTRACT_ADDRESSES.MOOVE_AUCTION,
             contracts.MooveAuction.abi,
             provider
           );
 
           if (auctionId === 21) {
             console.log(`🔍 [Auction 21] About to call getAuction...`, {
-              contractAddress: CONTRACT_ADDRESSES.MooveAuction,
+              contractAddress: CONTRACT_ADDRESSES.MOOVE_AUCTION,
               rpcUrl:
                 process.env.NEXT_PUBLIC_RPC_URL ||
                 "https://sepolia.infura.io/v3/YOUR_PROJECT_ID",
@@ -108,10 +109,10 @@ export function useAuctionExpirationHandler() {
 
               try {
                 const result = await writeContractAsync({
-                  address: CONTRACT_ADDRESSES.MooveAuction as `0x${string}`,
+                  address: CONTRACT_ADDRESSES.MOOVE_AUCTION as `0x${string}`,
                   abi: contracts.MooveAuction.abi,
                   functionName: "endAuction",
-                  args: [auctionId],
+                  args: [BigInt(auctionId)],
                 });
 
                 if (auctionId === 21) {
@@ -158,7 +159,7 @@ export function useAuctionExpirationHandler() {
             console.log(`❌ [Auction 21] Error details:`, {
               error: (error as any).message,
               stack: (error as any).stack,
-              contractAddress: CONTRACT_ADDRESSES.MooveAuction,
+              contractAddress: CONTRACT_ADDRESSES.MOOVE_AUCTION,
               rpcUrl:
                 process.env.NEXT_PUBLIC_RPC_URL ||
                 "https://sepolia.infura.io/v3/YOUR_PROJECT_ID",
